@@ -1,0 +1,131 @@
+flowchart TB
+    subgraph AUTH["🔐 AUTHENTICATION"]
+        A1[Admin Creates User<br>with Temp Password] --> A2[User Logs In]
+        A2 --> A3[Change Password]
+        A3 --> A4{Role?}
+    end
+
+    A4 -->|Admin| ADMIN_DASH
+    A4 -->|Store Incharge| STORE_DASH
+    A4 -->|Site Manager| SITE_DASH
+
+    subgraph ADMIN["👑 ADMIN FLOW"]
+        ADMIN_DASH[Admin Dashboard]
+        ADMIN_DASH --> U1[Manage Users]
+        ADMIN_DASH --> S1[Manage Sites]
+        ADMIN_DASH --> PO_APPROVE
+        ADMIN_DASH --> VIEW_LOGS[View All Logs]
+        
+        U1 --> U2[Create/Edit/Disable Users]
+        S1 --> S2[Create Sites & Assign Managers]
+    end
+
+    subgraph STORE["📦 STORE INCHARGE FLOW"]
+        STORE_DASH[Store Dashboard]
+        STORE_DASH --> INV[Manage Central Inventory]
+        STORE_DASH --> REQ_QUEUE[Process Request Queue]
+        STORE_DASH --> PO_CREATE[Create Purchase Order]
+        STORE_DASH --> MAINT[Manage Maintenance]
+        STORE_DASH --> VENDOR[Manage Vendors]
+        
+        INV --> INV1[Add/Edit Items]
+        INV --> INV2[Adjust Quantities<br>with Reason]
+        INV --> INV3[Low Stock Alerts]
+    end
+
+    subgraph SITE["🏗️ SITE MANAGER FLOW"]
+        SITE_DASH[Site Manager Dashboard]
+        SITE_DASH --> MY_INV[View My Site Inventory]
+        SITE_DASH --> OTHER_INV[View Other Sites<br>Read-Only]
+        SITE_DASH --> CREATE_REQ[Create Request]
+        SITE_DASH --> RETURN[Return Items]
+    end
+
+    subgraph REQUEST["📋 REQUEST WORKFLOW"]
+        CREATE_REQ --> REQ_PENDING[PENDING<br>High/Medium/Low Priority]
+        REQ_QUEUE --> REQ_REVIEW[Review Request]
+        REQ_PENDING --> REQ_REVIEW
+        
+        REQ_REVIEW --> EDIT_REQ[Edit Request<br>Change Qty/Items/Priority]
+        EDIT_REQ --> REQ_REVIEW
+        
+        REQ_REVIEW --> STOCK_CHECK{All Items<br>Available?}
+        
+        STOCK_CHECK -->|No| WAIT_OR_REJECT{Action?}
+        WAIT_OR_REJECT -->|Wait| REQ_PENDING
+        WAIT_OR_REJECT -->|Reject| REQ_REJECTED[REJECTED<br>Reason Required]
+        
+        STOCK_CHECK -->|Yes| REQ_APPROVED[APPROVED<br>Items Reserved]
+        REQ_APPROVED --> REQ_TRANSFER[TRANSFERRED<br>Inventory Updated]
+        
+        REQ_TRANSFER --> SITE_INV_UPDATE[(Site Inventory<br>Increased)]
+        REQ_TRANSFER --> CENTRAL_INV_DEC[(Central Store<br>Decreased)]
+    end
+
+    subgraph RETURN_FLOW["🔄 RETURN WORKFLOW"]
+        RETURN --> RET1{Item Type?}
+        RET1 -->|Consumable| NO_RETURN[No Return<br>Consumed]
+        RET1 -->|Non-Consumable| RET2[Select Items & Condition]
+        RET2 --> RET3{Condition?}
+        RET3 -->|Good| CENTRAL_RETURN[(Return to<br>Central Store)]
+        RET3 -->|Damaged/Needs Repair| MAINT
+    end
+
+    subgraph PO["🛒 PURCHASE ORDER WORKFLOW"]
+        INV3 -.->|Trigger| PO_CREATE
+        PO_CREATE --> PO_DRAFT[Add Vendor & Items<br>Enter Prices Manually]
+        PO_DRAFT --> PO_PENDING[PENDING APPROVAL]
+        PO_PENDING --> PO_APPROVE{Admin<br>Approves?}
+        PO_APPROVE -->|No| PO_REJECTED[REJECTED]
+        PO_APPROVE -->|Yes| PO_APPROVED[APPROVED]
+        PO_APPROVED --> PO_ORDERED[ORDERED<br>PDF Generated]
+        PO_ORDERED --> PO_RECEIVED[RECEIVED<br>Upload Invoice]
+        PO_RECEIVED --> CENTRAL_INV_INC[(Central Store<br>Inventory Increased)]
+    end
+
+    subgraph MAINTENANCE["🔧 MAINTENANCE WORKFLOW"]
+        MAINT --> MAINT1[Add Damaged Item<br>Issue Type & Description]
+        MAINT1 --> MAINT2[UNDER REPAIR<br>Add Updates/Notes]
+        MAINT2 --> MAINT3{Repairable?}
+        MAINT3 -->|Yes| MAINT_RETURN[Return to Inventory]
+        MAINT3 -->|No| WRITE_OFF[WRITE OFF<br>Permanent Removal]
+        MAINT_RETURN --> CENTRAL_RETURN
+    end
+
+    subgraph LOGS["📜 ACTIVITY LOGGING"]
+        A2 -.->|Log| LOG_DB[(Activity Logs<br>Immutable)]
+        U2 -.->|Log| LOG_DB
+        S2 -.->|Log| LOG_DB
+        INV1 -.->|Log| LOG_DB
+        INV2 -.->|Log| LOG_DB
+        REQ_APPROVED -.->|Log| LOG_DB
+        REQ_REJECTED -.->|Log| LOG_DB
+        REQ_TRANSFER -.->|Log| LOG_DB
+        EDIT_REQ -.->|Log| LOG_DB
+        PO_APPROVED -.->|Log| LOG_DB
+        PO_RECEIVED -.->|Log| LOG_DB
+        MAINT_RETURN -.->|Log| LOG_DB
+        WRITE_OFF -.->|Log| LOG_DB
+        RETURN -.->|Log| LOG_DB
+    end
+
+    subgraph NOTIFY["🔔 NOTIFICATIONS"]
+        REQ_PENDING -.->|Notify| STORE_DASH
+        REQ_APPROVED -.->|Notify| SITE_DASH
+        REQ_REJECTED -.->|Notify| SITE_DASH
+        EDIT_REQ -.->|Notify| SITE_DASH
+        PO_PENDING -.->|Notify| ADMIN_DASH
+        PO_APPROVED -.->|Notify| STORE_DASH
+        INV3 -.->|Notify| STORE_DASH
+    end
+
+    style AUTH fill:#e8f5e9
+    style ADMIN fill:#ffebee
+    style STORE fill:#e3f2fd
+    style SITE fill:#fff3e0
+    style REQUEST fill:#f3e5f5
+    style RETURN_FLOW fill:#fce4ec
+    style PO fill:#e0f2f1
+    style MAINTENANCE fill:#fff8e1
+    style LOGS fill:#ede7f6
+    style NOTIFY fill:#e1f5fe
