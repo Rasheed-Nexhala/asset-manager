@@ -1,4 +1,5 @@
 import './global.css';
+import './config/firebase'; // Initialize Firebase
 import { Text, View } from 'react-native';
 
 export default function App() {
