@@ -1,0 +1,1 @@
+Learn from `/Applications/React/Nexhala/asset-manager/asset-manager/.cursor/skills/thinking-in-react-native` and tell me how the components should be split for the given description or if a component is given then tell how it can be split. Your work is to only tell how to split, not to actually split in the code.

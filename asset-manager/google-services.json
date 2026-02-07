@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "145560718311",
+    "project_id": "asset-management-system-622c2",
+    "storage_bucket": "asset-management-system-622c2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:145560718311:android:c6a6e0897b6c4bf3bb0b42",
+        "android_client_info": {
+          "package_name": "com.assetmanager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDSWfCx7PRZKKRKv6ngClA03s4sIEnGzd0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
