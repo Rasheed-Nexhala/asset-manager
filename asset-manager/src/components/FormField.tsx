@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TextInput, TextInputProps } from 'react-native';
+import { View, Text, TextInput, TextInputProps, TouchableOpacity } from 'react-native';
 
 /**
  * FormField — Reusable labeled input following CIAMS design system.
@@ -23,6 +23,10 @@ export interface FormFieldProps extends Omit<TextInputProps, 'style'> {
   secureTextEntry?: boolean;
   /** Accessibility label for the input (recommended for screen readers) */
   accessibilityLabel?: string;
+  /** Optional right icon component (e.g., eye icon for password toggle) */
+  rightIcon?: React.ReactNode;
+  /** Called when right icon is pressed */
+  onRightIconPress?: () => void;
 }
 
 export const FormField: React.FC<FormFieldProps> = ({
@@ -33,6 +37,8 @@ export const FormField: React.FC<FormFieldProps> = ({
   error,
   secureTextEntry = false,
   accessibilityLabel,
+  rightIcon,
+  onRightIconPress,
   ...rest
 }) => {
   const hasError = Boolean(error);
@@ -45,20 +51,32 @@ export const FormField: React.FC<FormFieldProps> = ({
       >
         {label}
       </Text>
-      <TextInput
-        className={`border rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] ${
-          hasError ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
-        }`}
-        placeholderTextColor="#94A3B8"
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        secureTextEntry={secureTextEntry}
-        accessibilityLabel={accessibilityLabel ?? label}
-        accessibilityRole="none"
-        accessibilityState={{ disabled: rest.editable === false }}
-        {...rest}
-      />
+      <View className="relative">
+        <TextInput
+          className={`border rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] ${
+            hasError ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
+          } ${rightIcon ? 'pr-12' : ''}`}
+          placeholderTextColor="#94A3B8"
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          secureTextEntry={secureTextEntry}
+          accessibilityLabel={accessibilityLabel ?? label}
+          accessibilityRole="none"
+          accessibilityState={{ disabled: rest.editable === false }}
+          {...rest}
+        />
+        {rightIcon && onRightIconPress && (
+          <TouchableOpacity
+            onPress={onRightIconPress}
+            className="absolute right-0 top-0 h-12 w-12 items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel={secureTextEntry ? "Show password" : "Hide password"}
+          >
+            {rightIcon}
+          </TouchableOpacity>
+        )}
+      </View>
       {error ? (
         <Text className="text-[13px] text-[#DC2626]" accessibilityLiveRegion="polite">
           {error}

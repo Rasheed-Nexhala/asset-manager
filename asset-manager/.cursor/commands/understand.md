@@ -1,0 +1,1 @@
+Understand the given components, services, stores or other files and their interconnections and prepare yourself to do the next task I ask you to do or answer the question I ask you.

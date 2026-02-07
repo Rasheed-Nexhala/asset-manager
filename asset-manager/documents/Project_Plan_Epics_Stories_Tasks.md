@@ -1,6 +1,6 @@
 # CIAMS Project Plan: Epics, Stories, and Tasks
 
-**Technology Stack:** React Native (Expo), Firebase (Firestore, Cloud Functions, Auth, Storage, Messaging)
+**Technology Stack:** React Native (Expo), Firebase Web SDK (Firestore, Cloud Functions, Auth, Storage, Messaging)
 **Version:** 2.0
 **Last Updated:** 2026-02-03
 
@@ -12,18 +12,16 @@
 **Goal:** Initialize the project environment and CI/CD pipeline.
 
 *   **Story 1.1: Project Initialization**
-    *   **Task:** Initialize React Native Expo project with TypeScript.
-    *   **Task:** Set up folder structure (components, screens, services, hooks, types).
-    *   **Task:** Configure ESLint, Prettier, and Husky pre-commit hooks.
-    *   **Task:** Set up React Navigation (Stack and Tab navigators).
-    *   **Task:** Install UI library (e.g., React Native Paper or custom implementation per design).
+    *   **Task:** Initialize React Native Expo project with TypeScript. ✅ 
+    *   **Task:** Set up folder structure (components, screens, services, hooks, types). ✅ 
+    *   **Task:** Set up React Navigation (Stack and Tab navigators). 
 
 *   **Story 1.2: Firebase & Backend Setup**
     *   **Task:** Create Firebase Project (CIAMS).
     *   **Task:** Initialize Cloud Functions environment (TypeScript).
     *   **Task:** Set up Cloud Firestore (databases).
     *   **Task:** Set up Cloud Storage (buckets).
-    *   **Task:** Integrate `react-native-firebase` or generic Firebase JS SDK into the app.
+    *   **Task:** Integrate Firebase Web SDK into the app.
 
 ---
 

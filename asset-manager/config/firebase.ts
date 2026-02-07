@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { connectAuthEmulator, initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { browserLocalPersistence, connectAuthEmulator, initializeAuth, setPersistence } from 'firebase/auth';
 import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions } from 'firebase/functions';
 import { connectStorageEmulator, getStorage } from 'firebase/storage';
@@ -30,7 +30,7 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Firebase Auth with React Native persistence
 export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage)
+  persistence: browserLocalPersistence
 });
 export const db = getFirestore(app);
 export const storage = getStorage(app);
