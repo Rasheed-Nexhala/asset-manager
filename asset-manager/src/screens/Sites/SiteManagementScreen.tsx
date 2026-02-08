@@ -251,7 +251,7 @@ export const SiteManagementScreen: React.FC = () => {
           ) : (
             <>
               {renderSection('ACTIVE SITES', activeSites)}
-              {renderSection('INACTIVE SITES', inactiveSites, true)}
+              {renderSection('INACTIVE SITES', inactiveSites)}
             </>
           )}
         </ScrollView>

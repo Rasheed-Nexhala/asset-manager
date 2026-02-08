@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FormField } from '../FormField';
 import { SiteManagerSelector } from './SiteManagerSelector';
+import { ManagerReassignmentConfirmationModal } from './ManagerReassignmentConfirmationModal';
+import { getAllUsers } from '../../services/firebase/userRoleService';
 import type { SiteFormData, SiteStatus } from '../../types/sites';
 
 export interface SiteFormProps {
@@ -10,6 +12,7 @@ export interface SiteFormProps {
   onSubmit: (data: SiteFormData) => void;
   isLoading?: boolean;
   submitButtonLabel?: string;
+  siteId?: string;
 }
 
 interface FormErrors {
@@ -29,6 +32,7 @@ export const SiteForm: React.FC<SiteFormProps> = ({
   onSubmit,
   isLoading = false,
   submitButtonLabel = 'Save',
+  siteId,
 }) => {
   const [formData, setFormData] = useState<SiteFormData>({
     name: initialData?.name || '',
@@ -40,6 +44,9 @@ export const SiteForm: React.FC<SiteFormProps> = ({
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
+  const [showInactiveConfirmation, setShowInactiveConfirmation] = useState<boolean>(false);
+  const [pendingStatus, setPendingStatus] = useState<SiteStatus | null>(null);
+  const [managerName, setManagerName] = useState<string>('the assigned manager');
 
   useEffect(() => {
     if (initialData) {
@@ -75,11 +82,56 @@ export const SiteForm: React.FC<SiteFormProps> = ({
     }
   }, [errors]);
 
-  const handleStatusChange = useCallback((status: SiteStatus) => {
+  const handleStatusChange = useCallback(
+    async (status: SiteStatus) => {
+      // If changing to inactive and there's a manager assigned, show confirmation
+      if (status === 'inactive' && formData.managerId) {
+        try {
+          // Get manager name for the confirmation message
+          const users = await getAllUsers();
+          const manager = users.find((user) => user.id === formData.managerId);
+          const name = manager?.displayName || manager?.email || 'the assigned manager';
+          setManagerName(name);
+          setPendingStatus(status);
+          setShowInactiveConfirmation(true);
+        } catch (error) {
+          console.error('Error fetching manager name:', error);
+          // On error, still show confirmation with generic message
+          setManagerName('the assigned manager');
+          setPendingStatus(status);
+          setShowInactiveConfirmation(true);
+        }
+      } else {
+        // No manager assigned or changing to active - proceed immediately
+        setFormData((prev) => ({
+          ...prev,
+          status,
+        }));
+      }
+    },
+    [formData.managerId]
+  );
+
+  const handleConfirmInactive = useCallback(() => {
+    if (pendingStatus === 'inactive') {
+      setFormData((prev) => ({
+        ...prev,
+        status: 'inactive',
+        managerId: null, // Unassign manager when site becomes inactive
+      }));
+    }
+    setShowInactiveConfirmation(false);
+    setPendingStatus(null);
+  }, [pendingStatus]);
+
+  const handleCancelInactive = useCallback(() => {
+    // Revert to active status
     setFormData((prev) => ({
       ...prev,
-      status,
+      status: 'active',
     }));
+    setShowInactiveConfirmation(false);
+    setPendingStatus(null);
   }, []);
 
   const validateForm = useCallback((): boolean => {
@@ -159,6 +211,7 @@ export const SiteForm: React.FC<SiteFormProps> = ({
         <SiteManagerSelector
           value={formData.managerId}
           onChange={(managerId) => handleFieldChange('managerId', managerId)}
+          excludeSiteId={siteId}
         />
 
         <View className="gap-1.5">
@@ -241,6 +294,28 @@ export const SiteForm: React.FC<SiteFormProps> = ({
           </View>
         )}
       </TouchableOpacity>
+
+      {/* Inactive Status Confirmation Modal */}
+      <ManagerReassignmentConfirmationModal
+        visible={showInactiveConfirmation}
+        managerName={managerName}
+        siteName={formData.name || 'this site'}
+        onConfirm={handleConfirmInactive}
+        onCancel={handleCancelInactive}
+        title="Unassign Manager?"
+        message={
+          <>
+            Setting{' '}
+            <Text className="font-semibold text-[#0F172A]">{formData.name || 'this site'}</Text>
+            {' to inactive will unassign '}
+            <Text className="font-semibold text-[#0F172A]">{managerName}</Text>
+            {'. Do you want to continue?'}
+          </>
+        }
+        confirmButtonLabel="Unassign & Set Inactive"
+        cancelButtonLabel="Cancel"
+        accessibilityLabel="Confirm manager unassignment"
+      />
     </ScrollView>
   );
 };

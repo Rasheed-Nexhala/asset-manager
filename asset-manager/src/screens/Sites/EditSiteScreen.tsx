@@ -167,6 +167,7 @@ export const EditSiteScreen: React.FC = () => {
         onSubmit={handleSubmit}
         isLoading={isLoading}
         submitButtonLabel="Save"
+        siteId={siteId}
       />
     </ScreenLayout>
   );

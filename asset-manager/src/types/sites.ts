@@ -6,10 +6,10 @@ import { Timestamp } from 'firebase/firestore';
 export type SiteStatus = 'active' | 'inactive';
 
 /**
- * Site document structure in Firestore
+ * Site document structure in Firestore (with Firebase Timestamps)
  * Note: id is the Firebase document ID (not stored as a field)
  */
-export interface Site {
+export interface FirestoreSite {
   id: string;                    // Firebase-generated document ID
   name: string;                  // Required, unique
   description?: string;          // Optional project description
@@ -20,6 +20,23 @@ export interface Site {
   status: SiteStatus;           // Site status
   createdAt: Timestamp;          // Creation timestamp
   updatedAt: Timestamp;          // Last modified timestamp
+}
+
+/**
+ * Site document structure for Redux store (serialized timestamps)
+ * This version uses ISO strings for timestamps to be Redux-serializable
+ */
+export interface Site {
+  id: string;                    // Firebase-generated document ID
+  name: string;                  // Required, unique
+  description?: string;          // Optional project description
+  address: string;               // Required location
+  contactNumber?: string;        // Optional phone number
+  managerId?: string | null;     // Optional Site Manager user ID
+  managerName?: string | null;   // Denormalized manager name
+  status: SiteStatus;           // Site status
+  createdAt: string | null;      // Serialized creation timestamp (ISO string)
+  updatedAt: string | null;      // Serialized last modified timestamp (ISO string)
 }
 
 /**

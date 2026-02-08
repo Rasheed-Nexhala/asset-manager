@@ -1,12 +1,18 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { Site } from '../../types/sites';
 import { fetchSites, createSite, updateSite } from '../thunks/sitesThunks';
+import {
+  cleanupManagerAssignments,
+  validateAllManagerAssignments,
+} from '../thunks/managerValidationThunks';
 
 interface SitesState {
   sites: Site[];
   isLoading: boolean;
   error: string | null;
   searchQuery: string;
+  validationLoading: boolean;
+  lastValidationAt: string | null;
 }
 
 const initialState: SitesState = {
@@ -14,6 +20,8 @@ const initialState: SitesState = {
   isLoading: false,
   error: null,
   searchQuery: '',
+  validationLoading: false,
+  lastValidationAt: null,
 };
 
 const sitesSlice = createSlice({
@@ -90,6 +98,42 @@ const sitesSlice = createSlice({
       .addCase(updateSite.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
+      })
+      // Cleanup manager assignments
+      .addCase(cleanupManagerAssignments.pending, (state) => {
+        state.validationLoading = true;
+      })
+      .addCase(cleanupManagerAssignments.fulfilled, (state, action) => {
+        state.validationLoading = false;
+        state.lastValidationAt = new Date().toISOString();
+        // Log cleanup result for debugging
+        if (action.payload.sitesUpdated > 0) {
+          console.log(
+            `Cleaned up ${action.payload.sitesUpdated} site(s) for manager ${action.payload.managerId}`
+          );
+        }
+      })
+      .addCase(cleanupManagerAssignments.rejected, (state, action) => {
+        state.validationLoading = false;
+        console.error('Manager cleanup failed:', action.payload);
+      })
+      // Validate all manager assignments
+      .addCase(validateAllManagerAssignments.pending, (state) => {
+        state.validationLoading = true;
+      })
+      .addCase(validateAllManagerAssignments.fulfilled, (state, action) => {
+        state.validationLoading = false;
+        state.lastValidationAt = new Date().toISOString();
+        // Log validation result for debugging
+        if (action.payload.sitesUpdated > 0) {
+          console.log(
+            `Validated all sites: ${action.payload.sitesUpdated} site(s) cleaned up, ${action.payload.managersCleaned.length} manager(s) affected`
+          );
+        }
+      })
+      .addCase(validateAllManagerAssignments.rejected, (state, action) => {
+        state.validationLoading = false;
+        console.error('Validation failed:', action.payload);
       });
   },
 });

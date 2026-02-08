@@ -7,6 +7,7 @@ import { Provider } from 'react-redux';
 import { store } from './src/store';
 import { useAuthStateSync } from './src/hooks/useAuthStateSync';
 import { useUserRoleSync } from './src/hooks/useUserRoleSync';
+import { useManagerValidationSync } from './src/hooks/useManagerValidationSync';
 import { useAppSelector } from './src/store/hooks';
 import { selectUserId } from './src/store/selectors/authSelectors';
 import { RootNavigator } from './src/navigation/RootNavigator';
@@ -21,6 +22,7 @@ function AppContent() {
   useAuthStateSync();
   const userId = useAppSelector(selectUserId);
   useUserRoleSync(userId);
+  useManagerValidationSync();
 
   return (
     <>
