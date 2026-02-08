@@ -10,6 +10,17 @@ const Tab = createBottomTabNavigator();
 const TAB_BAR_BASE_HEIGHT = 56;
 const TAB_BAR_MIN_BOTTOM_PADDING = 12;
 
+/**
+ * Bottom Tab Navigator (Standard)
+ *
+ * Uses the JS-based tab navigator which works without a native rebuild.
+ *
+ * To upgrade to the Native Bottom Tab Navigator (iOS Liquid Glass, etc.),
+ * you need to rebuild the development build:
+ *   npx expo run:ios
+ * Then switch to createNativeBottomTabNavigator from
+ * '@react-navigation/bottom-tabs/unstable'
+ */
 export const BottomTabNavigator: React.FC = () => {
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, TAB_BAR_MIN_BOTTOM_PADDING);
