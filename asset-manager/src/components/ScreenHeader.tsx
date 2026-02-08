@@ -1,59 +1,88 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-/**
- * Props for the optional right-side action (e.g. "Sign out").
- * When provided, the header shows a button with optional loading state.
- */
 export interface ScreenHeaderRightAction {
-  /** Button label, e.g. "Sign out" */
-  label: string;
-  /** Called when the button is pressed */
+  label?: string;
+  icon?: keyof typeof Ionicons.glyphMap;
+  iconSize?: number;
+  iconColor?: string;
   onPress: () => void;
-  /** When true, shows a spinner and disables the button */
   loading?: boolean;
-  /** Accessibility label when not loading (e.g. "Sign out") */
   accessibilityLabel?: string;
-  /** Accessibility label when loading (e.g. "Signing out, please wait") */
   accessibilityLabelLoading?: string;
 }
 
 export interface ScreenHeaderProps {
-  /** Screen title shown on the left (e.g. "Dashboard", "Profile", "Profiles") */
   title: string;
-  /**
-   * Optional right-side action. Use for primary actions like "Sign out".
-   * Omit for title-only headers (e.g. Dashboard).
-   */
   rightAction?: ScreenHeaderRightAction;
 }
 
-/**
- * Reusable screen header with consistent CIAMS styling.
- * Use on Dashboard, Profile, Profiles (SignedIn), and any screen that needs
- * a top bar with title and optional action button.
- *
- * @example Title only (Dashboard)
- * <ScreenHeader title="Dashboard" />
- *
- * @example Title + Sign out
- * <ScreenHeader
- *   title="Profile"
- *   rightAction={{
- *     label: "Sign out",
- *     onPress: handleLogout,
- *     loading: isLoading,
- *     accessibilityLabel: "Sign out",
- *     accessibilityLabelLoading: "Signing out, please wait",
- *   }}
- * />
- */
-/** Fixed header height so title-only and title+action variants match (CIAMS). */
 const HEADER_HEIGHT = 56;
+const DEFAULT_ICON_SIZE = 24;
+const DEFAULT_ICON_COLOR = '#1E40AF';
 
 export const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title, rightAction }) => {
   const isLoading = rightAction?.loading ?? false;
-  const showRightAction = rightAction != null;
+  const hasLabel = Boolean(rightAction?.label);
+  const hasIcon = Boolean(rightAction?.icon);
+  const showRightAction = rightAction != null && (hasLabel || hasIcon);
+
+  if (rightAction && !hasLabel && !hasIcon) {
+    console.warn(
+      'ScreenHeader: rightAction must have either a label or icon property. Action will not be rendered.'
+    );
+  }
+
+  const iconSize = rightAction?.iconSize ?? DEFAULT_ICON_SIZE;
+  const iconColor = rightAction?.iconColor ?? DEFAULT_ICON_COLOR;
+
+  const getAccessibilityLabel = () => {
+    if (isLoading) {
+      return (
+        rightAction?.accessibilityLabelLoading ??
+        (hasLabel ? `${rightAction?.label}, please wait` : 'Loading, please wait')
+      );
+    }
+    return (
+      rightAction?.accessibilityLabel ??
+      (hasLabel ? rightAction?.label : (hasIcon ? 'Action button' : undefined))
+    );
+  };
+
+  const renderActionContent = () => {
+    if (isLoading) {
+      return <ActivityIndicator size="small" color={DEFAULT_ICON_COLOR} />;
+    }
+
+    const content: React.ReactNode[] = [];
+
+    if (hasIcon) {
+      content.push(
+        <Ionicons
+          key="icon"
+          name={rightAction!.icon!}
+          size={iconSize}
+          color={iconColor}
+        />
+      );
+    }
+
+    if (hasLabel) {
+      content.push(
+        <Text
+          key="label"
+          className={`text-[15px] font-semibold text-[#1E40AF] ${hasIcon ? 'ml-2' : ''}`}
+        >
+          {rightAction!.label}
+        </Text>
+      );
+    }
+
+    return content.length > 0 ? (
+      <View className="flex-row items-center">{content}</View>
+    ) : null;
+  };
 
   return (
     <View
@@ -76,21 +105,11 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title, rightAction }
           activeOpacity={0.7}
           onPress={rightAction.onPress}
           disabled={isLoading}
-          accessibilityLabel={
-            isLoading
-              ? rightAction.accessibilityLabelLoading ?? `${rightAction.label}, please wait`
-              : rightAction.accessibilityLabel ?? rightAction.label
-          }
+          accessibilityLabel={getAccessibilityLabel()}
           accessibilityRole="button"
           accessibilityState={{ disabled: isLoading, busy: isLoading }}
         >
-          {isLoading ? (
-            <ActivityIndicator size="small" color="#1E40AF" />
-          ) : (
-            <Text className="text-[15px] font-semibold text-[#1E40AF]">
-              {rightAction.label}
-            </Text>
-          )}
+          {renderActionContent()}
         </TouchableOpacity>
       )}
     </View>

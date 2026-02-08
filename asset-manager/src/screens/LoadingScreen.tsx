@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenLayout } from '../components';
 
 interface LoadingScreenProps {
   message?: string;
@@ -17,11 +17,11 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
   message = 'Loading...' 
 }) => {
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top', 'bottom']}>
+    <ScreenLayout edges={['top', 'bottom']}>
       <View className="flex-1 items-center justify-center px-4">
         <ActivityIndicator size="large" color="#1E40AF" />
         <Text className="text-[15px] text-[#64748B] mt-4">{message}</Text>
       </View>
-    </SafeAreaView>
+    </ScreenLayout>
   );
 };

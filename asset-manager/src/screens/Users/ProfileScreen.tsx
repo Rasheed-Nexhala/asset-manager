@@ -1,7 +1,6 @@
 import React, { useCallback } from 'react';
 import { View, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ScreenHeader, UserProfile } from '../../components';
+import { ScreenHeader, ScreenLayout, UserProfile } from '../../components';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { signOutUser } from '../../store/slices/authSlice';
 import {
@@ -33,7 +32,7 @@ export const ProfileScreen: React.FC = () => {
   }, [dispatch]);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top']}>
+    <ScreenLayout edges={['top']}>
       <ScreenHeader
         title="Profile"
         rightAction={{
@@ -59,10 +58,11 @@ export const ProfileScreen: React.FC = () => {
               role={role || 'Unassigned'}
               isActive={isActive}
               permissions={permissions}
+              showPasswordUpdate={true}
             />
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </ScreenLayout>
   );
 };

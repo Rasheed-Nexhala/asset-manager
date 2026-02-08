@@ -11,6 +11,8 @@ import { View, Text, TextInput, TextInputProps, TouchableOpacity } from 'react-n
 export interface FormFieldProps extends Omit<TextInputProps, 'style'> {
   /** Label shown above the input (e.g. "Email", "Password") */
   label: string;
+  /** When true, shows a red asterisk (*) after the label */
+  required?: boolean;
   /** Current value (controlled input) */
   value: string;
   /** Called when text changes */
@@ -31,6 +33,7 @@ export interface FormFieldProps extends Omit<TextInputProps, 'style'> {
 
 export const FormField: React.FC<FormFieldProps> = ({
   label,
+  required = false,
   value,
   onChangeText,
   placeholder,
@@ -45,12 +48,19 @@ export const FormField: React.FC<FormFieldProps> = ({
 
   return (
     <View className="gap-1.5">
-      <Text
-        className="text-[15px] text-[#0F172A]"
-        accessibilityRole="text"
-      >
-        {label}
-      </Text>
+      <View className="flex-row">
+        <Text
+          className="text-[15px] text-[#0F172A]"
+          accessibilityRole="text"
+        >
+          {label}
+        </Text>
+        {required ? (
+          <Text className="text-[15px] text-[#DC2626]" accessibilityRole="text">
+            {' *'}
+          </Text>
+        ) : null}
+      </View>
       <View className="relative">
         <TextInput
           className={`border rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] ${

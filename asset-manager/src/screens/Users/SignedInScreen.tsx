@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ScreenHeader, UserProfile, Users } from '../../components';
+import { ScreenHeader, ScreenLayout, UserProfile, Users } from '../../components';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { signOutUser } from '../../store/slices/authSlice';
 import {
@@ -36,7 +35,7 @@ export const SignedInScreen: React.FC = () => {
   }, [dispatch]);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top', 'bottom']}>
+    <ScreenLayout edges={['top', 'bottom']}>
       <ScreenHeader
         title="Profiles"
         rightAction={{
@@ -104,6 +103,7 @@ export const SignedInScreen: React.FC = () => {
                 role={role || 'Unassigned'}
                 isActive={isActive}
                 permissions={permissions}
+                showPasswordUpdate={true}
               />
             </View>
           </View>
@@ -114,6 +114,6 @@ export const SignedInScreen: React.FC = () => {
           <Users />
         </View>
       )}
-    </SafeAreaView>
+    </ScreenLayout>
   );
 };

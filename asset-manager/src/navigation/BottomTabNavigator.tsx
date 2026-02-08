@@ -4,6 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { SignedInScreen } from '../screens/Users/SignedInScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
+import { SiteStackNavigator } from './SiteStackNavigator';
+import { useAppSelector } from '../store/hooks';
+import { selectIsAdmin } from '../store/selectors/authSelectors';
 
 const Tab = createBottomTabNavigator();
 
@@ -24,6 +27,7 @@ const TAB_BAR_MIN_BOTTOM_PADDING = 12;
 export const BottomTabNavigator: React.FC = () => {
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, TAB_BAR_MIN_BOTTOM_PADDING);
+  const isAdmin = useAppSelector(selectIsAdmin);
 
   return (
     <Tab.Navigator
@@ -68,6 +72,18 @@ export const BottomTabNavigator: React.FC = () => {
           tabBarLabel: 'Dashboard',
         }}
       />
+      {isAdmin && (
+        <Tab.Screen
+          name="Sites"
+          component={SiteStackNavigator}
+          options={{
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="business-outline" size={size} color={color} />
+            ),
+            tabBarLabel: 'Sites',
+          }}
+        />
+      )}
     </Tab.Navigator>
   );
 };

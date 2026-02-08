@@ -4,11 +4,9 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenLayout } from '../../components';
 import { FormField } from '../../components/FormField';
 import { AuthLogo } from '../../components/AuthLogo';
 import type { AuthFormValues, AuthFormErrors } from '../../types/auth';
@@ -58,105 +56,101 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onGoToSignup }) => {
   }, [values, dispatch]);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top', 'bottom']}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <ScreenLayout edges={['top', 'bottom']} keyboardAware>
+      <ScrollView
         className="flex-1"
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        contentContainerClassName="flex-1 justify-center px-4 py-5"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          className="flex-1"
-          contentContainerClassName="flex-1 justify-center px-4 py-5"
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View>
-            <AuthLogo className="mb-6" />
-            <Text
-              className="text-[22px] text-center font-semibold text-[#0F172A] mb-1"
-              accessibilityRole="header"
+        <View>
+          <AuthLogo className="mb-6" />
+          <Text
+            className="text-[22px] text-center font-semibold text-[#0F172A] mb-1"
+            accessibilityRole="header"
+          >
+            Welcome back
+          </Text>
+          <Text className="text-[15px] text-center text-[#64748B] mb-6">
+            Enter your email and password to continue.
+          </Text>
+
+          <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] gap-4">
+            <FormField
+              label="Email"
+              required
+              value={values.email}
+              onChangeText={(text) => updateField('email', text)}
+              placeholder="you@example.com"
+              error={errors.email}
+              accessibilityLabel="Email address"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <FormField
+              label="Password"
+              required
+              value={values.password}
+              onChangeText={(text) => updateField('password', text)}
+              placeholder="Your password"
+              error={errors.password}
+              secureTextEntry
+              accessibilityLabel="Password"
+            />
+
+            <TouchableOpacity
+              className={`rounded-[10px] h-[50px] flex-row items-center justify-center gap-2 ${
+                isLoading ? 'bg-[#1E40AF]/70' : 'bg-[#1E40AF]'
+              }`}
+              activeOpacity={0.7}
+              onPress={handleSubmit}
+              disabled={isLoading}
+              accessibilityLabel={isLoading ? 'Signing in, please wait' : 'Log in'}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isLoading, busy: isLoading }}
             >
-              Welcome back
-            </Text>
-            <Text className="text-[15px] text-center text-[#64748B] mb-6">
-              Enter your email and password to continue.
-            </Text>
+              {isLoading ? (
+                <>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <Text className="text-[15px] font-semibold text-white">Please wait…</Text>
+                </>
+              ) : (
+                <Text className="text-[15px] font-semibold text-white">Log in</Text>
+              )}
+            </TouchableOpacity>
 
-            <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] gap-4">
-              <FormField
-                label="Email"
-                value={values.email}
-                onChangeText={(text) => updateField('email', text)}
-                placeholder="you@example.com"
-                error={errors.email}
-                accessibilityLabel="Email address"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <FormField
-                label="Password"
-                value={values.password}
-                onChangeText={(text) => updateField('password', text)}
-                placeholder="Your password"
-                error={errors.password}
-                secureTextEntry
-                accessibilityLabel="Password"
-              />
-
-              <TouchableOpacity
-                className={`rounded-[10px] h-[50px] flex-row items-center justify-center gap-2 ${
-                  isLoading ? 'bg-[#1E40AF]/70' : 'bg-[#1E40AF]'
-                }`}
-                activeOpacity={0.7}
-                onPress={handleSubmit}
-                disabled={isLoading}
-                accessibilityLabel={isLoading ? 'Signing in, please wait' : 'Log in'}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: isLoading, busy: isLoading }}
+            {authError ? (
+              <View
+                className="p-3 rounded-lg bg-[#DC2626]/10 border-[1.5px] border-[#DC2626]"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
               >
-                {isLoading ? (
-                  <>
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                    <Text className="text-[15px] font-semibold text-white">Please wait…</Text>
-                  </>
-                ) : (
-                  <Text className="text-[15px] font-semibold text-white">Log in</Text>
-                )}
-              </TouchableOpacity>
-
-              {authError ? (
-                <View
-                  className="p-3 rounded-lg bg-[#DC2626]/10 border-[1.5px] border-[#DC2626]"
-                  accessibilityRole="alert"
-                  accessibilityLiveRegion="polite"
-                >
-                  <View className="flex-row items-start gap-2">
-                    <Text className="text-[18px] mt-0.5">⚠️</Text>
-                    <Text className="text-[14px] text-[#DC2626] flex-1 leading-5">
-                      {authError}
-                    </Text>
-                  </View>
+                <View className="flex-row items-start gap-2">
+                  <Text className="text-[18px] mt-0.5">⚠️</Text>
+                  <Text className="text-[14px] text-[#DC2626] flex-1 leading-5">
+                    {authError}
+                  </Text>
                 </View>
-              ) : null}
-            </View>
-
-            {onGoToSignup && (
-              <TouchableOpacity
-                className="mt-6 items-center py-3"
-                onPress={onGoToSignup}
-                activeOpacity={0.7}
-                accessibilityLabel="Don't have an account? Sign up"
-                accessibilityRole="button"
-              >
-                <Text className="text-[15px] text-[#3B82F6]">
-                  Don't have an account? Sign up
-                </Text>
-              </TouchableOpacity>
-            )}
+              </View>
+            ) : null}
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+
+          {onGoToSignup && (
+            <TouchableOpacity
+              className="mt-6 items-center py-3"
+              onPress={onGoToSignup}
+              activeOpacity={0.7}
+              accessibilityLabel="Don't have an account? Sign up"
+              accessibilityRole="button"
+            >
+              <Text className="text-[15px] text-[#3B82F6]">
+                Don't have an account? Sign up
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </ScrollView>
+    </ScreenLayout>
   );
 };

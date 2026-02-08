@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text } from 'react-native';
+import React, { useCallback } from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 /**
  * Props for the UserProfile card component.
@@ -20,6 +21,10 @@ export interface UserProfileProps {
   permissions?: string[];
   /** Optional section title above the card content */
   sectionTitle?: string;
+  /** Whether to show the password update section */
+  showPasswordUpdate?: boolean;
+  /** Called when password is successfully updated */
+  onPasswordUpdated?: () => void;
 }
 
 /**
@@ -35,7 +40,22 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   isActive,
   permissions = [],
   sectionTitle = 'User Information',
+  showPasswordUpdate = false,
+  onPasswordUpdated,
 }) => {
+  const navigation = useNavigation();
+
+  /**
+   * Navigates to the dedicated UpdatePassword screen.
+   */
+  const handleUpdatePassword = useCallback(() => {
+    if (navigation && navigation.navigate) {
+      // @ts-ignore - navigation typing varies by navigator
+      navigation.navigate('UpdatePasswordScreen');
+    } else {
+      console.log('Navigation not available - Update Password screen requested');
+    }
+  }, [navigation]);
   return (
     <View
       className="bg-white rounded-[10px] p-4 border border-[#E2E8F0]"
@@ -105,6 +125,23 @@ export const UserProfile: React.FC<UserProfileProps> = ({
           </View>
         ) : null}
       </View>
+
+      {/* Password Update Section */}
+      {showPasswordUpdate ? (
+        <View className="mt-4 pt-4 border-t border-[#E2E8F0]">
+          <TouchableOpacity
+            className="border-[1.5px] border-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center"
+            onPress={handleUpdatePassword}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Update password"
+          >
+            <Text className="text-[15px] font-semibold text-[#1E40AF]">
+              Update Password
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 };

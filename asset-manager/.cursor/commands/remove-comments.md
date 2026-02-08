@@ -1,0 +1,1 @@
+Remove all the comments from the given file.

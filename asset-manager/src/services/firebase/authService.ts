@@ -4,6 +4,9 @@ import {
   signOut,
   sendPasswordResetEmail,
   updateProfile,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
   onAuthStateChanged,
   User,
   UserCredential,
@@ -104,6 +107,58 @@ export const isAuthenticated = (): boolean => {
   return auth.currentUser !== null;
 };
 
+export const requiresRecentLogin = (error: any): boolean => {
+  return error?.code === 'auth/requires-recent-login';
+};
+
+export const updateUserPassword = async (newPassword: string): Promise<void> => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('No user is currently signed in');
+    }
+    await updatePassword(user, newPassword);
+  } catch (error) {
+    const authError = error as AuthError;
+    console.error('Password update error:', authError.code, authError.message);
+    throw handleAuthError(authError);
+  }
+};
+
+export const reauthenticateAndUpdatePassword = async (
+  currentPassword: string,
+  newPassword: string
+): Promise<void> => {
+  try {
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+      throw new Error('No user is currently signed in or user email is missing');
+    }
+
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+
+    await reauthenticateWithCredential(user, credential);
+
+    await updatePassword(user, newPassword);
+  } catch (error) {
+    const authError = error as AuthError;
+    console.error(
+      'Re-authentication and password update error:',
+      authError.code,
+      authError.message
+    );
+    if (
+      authError.code === 'auth/wrong-password' ||
+      authError.code === 'auth/invalid-credential'
+    ) {
+      const reauthError = new Error('Current password is incorrect.');
+      (reauthError as any).code = authError.code;
+      throw reauthError;
+    }
+    throw handleAuthError(authError);
+  }
+};
+
 const handleAuthError = (error: AuthError): Error => {
   const errorMessages: Record<string, string> = {
     'auth/email-already-in-use':
@@ -122,7 +177,7 @@ const handleAuthError = (error: AuthError): Error => {
     'auth/too-many-requests':
       'Too many failed attempts. Please try again later or reset your password.',
     'auth/requires-recent-login':
-      'For security, please sign in again to complete this action.',
+      'Please verify your current password to continue.',
     'auth/network-request-failed':
       'Network error. Please check your internet connection and try again.',
     'auth/operation-not-allowed':
@@ -144,6 +199,9 @@ export default {
   logout,
   sendPasswordReset,
   updateUserProfile,
+  updateUserPassword,
+  reauthenticateAndUpdatePassword,
+  requiresRecentLogin,
   subscribeToAuthState,
   getCurrentUser,
   isAuthenticated,
