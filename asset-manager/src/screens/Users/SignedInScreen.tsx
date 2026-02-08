@@ -1,9 +1,9 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { UserProfile, Users } from '../components';
-import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { signOutUser } from '../store/slices/authSlice';
+import { ScreenHeader, UserProfile, Users } from '../../components';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { signOutUser } from '../../store/slices/authSlice';
 import {
   selectAuthLoading,
   selectUserDisplayName,
@@ -12,7 +12,7 @@ import {
   selectUserRoleType,
   selectIsActive,
   selectUserPermissions,
-} from '../store/selectors/authSelectors';
+} from '../../store/selectors/authSelectors';
 
 type SignedInTab = 'profile' | 'users';
 
@@ -37,32 +37,16 @@ export const SignedInScreen: React.FC = () => {
 
   return (
     <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top', 'bottom']}>
-      {/* Header: title + sign out */}
-      <View className="bg-white border-b border-[#E2E8F0] px-4 py-3 flex-row items-center justify-between">
-        <Text
-          className="text-[22px] font-semibold text-[#0F172A]"
-          accessibilityRole="header"
-        >
-          Welcome
-        </Text>
-        <TouchableOpacity
-          className={`min-w-[48px] min-h-[48px] items-center justify-center rounded-[10px] ${
-            isLoading ? 'opacity-50' : ''
-          }`}
-          activeOpacity={0.7}
-          onPress={handleLogout}
-          disabled={isLoading}
-          accessibilityLabel={isLoading ? 'Signing out, please wait' : 'Sign out'}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: isLoading, busy: isLoading }}
-        >
-          {isLoading ? (
-            <ActivityIndicator size="small" color="#1E40AF" />
-          ) : (
-            <Text className="text-[15px] font-semibold text-[#1E40AF]">Sign out</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Profiles"
+        rightAction={{
+          label: 'Sign out',
+          onPress: handleLogout,
+          loading: isLoading,
+          accessibilityLabel: 'Sign out',
+          accessibilityLabelLoading: 'Signing out, please wait',
+        }}
+      />
 
       {/* Tab bar */}
       <View className="flex-row border-b border-[#E2E8F0] bg-white px-4">

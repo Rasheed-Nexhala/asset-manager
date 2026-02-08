@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FormField } from '../../components/FormField';
+import { AuthLogo } from '../../components/AuthLogo';
 import type { AuthFormValues, AuthFormErrors } from '../../types/auth';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { signInUser, clearError } from '../../store/slices/authSlice';
@@ -70,6 +71,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onGoToSignup }) => {
           showsVerticalScrollIndicator={false}
         >
           <View>
+            <AuthLogo className="mb-6" />
             <Text
               className="text-[22px] text-center font-semibold text-[#0F172A] mb-1"
               accessibilityRole="header"
