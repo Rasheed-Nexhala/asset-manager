@@ -1,10 +1,93 @@
 rules_version = '2';
 
-// Craft rules based on data in your Firestore database
-// allow write: if firestore.get(
-//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
 service firebase.storage {
   match /b/{bucket}/o {
+    
+    // ============================================
+    // Helper Functions
+    // ============================================
+    
+    /**
+     * Check if user is authenticated
+     */
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    /**
+     * Get user role from Firestore users collection
+     * Note: This requires a Firestore read, which is allowed in Storage rules
+     */
+    function getUserRole() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    /**
+     * Check if user is Admin
+     * Role values are stored as PascalCase: 'Admin', 'StoreIncharge', 'SiteManager'
+     */
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'Admin';
+    }
+    
+    /**
+     * Check if user is Store Incharge
+     */
+    function isStoreIncharge() {
+      return isAuthenticated() && getUserRole() == 'StoreIncharge';
+    }
+    
+    /**
+     * Check if user is Admin or Store Incharge
+     * These roles can upload item images
+     */
+    function isAdminOrStoreIncharge() {
+      return isAdmin() || isStoreIncharge();
+    }
+    
+    /**
+     * Check if user is active (not disabled)
+     */
+    function isUserActive() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isActive == true;
+    }
+    
+    /**
+     * Combined check: authenticated, active, and has required role
+     */
+    function hasItemImageAccess() {
+      return isAuthenticated() && isUserActive() && isAdminOrStoreIncharge();
+    }
+    
+    // ============================================
+    // Storage Path Rules
+    // ============================================
+    
+    /**
+     * Item Images Path
+     * 
+     * Purpose: Store images for inventory items
+     * Path pattern: itemImages/{itemId}/{filename}
+     * 
+     * Access Rules:
+     * - Read: All authenticated users (so Site Managers can view item images in their inventory)
+     * - Write: Admin and Store Incharge only (they manage items)
+     * 
+     * File size and type validation should be handled in the application code.
+     * Recommended: max 5MB per file, image types only (jpg, png, webp)
+     */
+    match /itemImages/{itemId}/{fileName} {
+      allow read: if isAuthenticated() && isUserActive();
+      allow write: if hasItemImageAccess() 
+        && request.resource.size < 5 * 1024 * 1024 // Max 5MB
+        && request.resource.contentType.matches('image/.*'); // Images only
+      allow delete: if hasItemImageAccess();
+    }
+    
+    /**
+     * Default rule: Deny all other paths
+     * Add additional paths above this rule as needed
+     */
     match /{allPaths=**} {
       allow read, write: if false;
     }

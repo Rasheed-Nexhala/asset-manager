@@ -1,7 +1,8 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { useAppDispatch } from '../store/hooks';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { subscribeToAllUsers } from '../services/firebase/userRoleService';
 import { cleanupManagerAssignments } from '../store/thunks/managerValidationThunks';
+import { selectIsAuthenticated, selectIsAdmin, selectIsRoleLoaded } from '../store/selectors/authSelectors';
 import type { UserListItem } from '../types/roles';
 
 /**
@@ -26,6 +27,12 @@ export const useManagerValidationSync = (): void => {
   const previousUsersRef = useRef<Map<string, UserListItem>>(new Map());
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pendingCleanupsRef = useRef<Set<string>>(new Set());
+
+  // Only run for authenticated admin users
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const isAdmin = useAppSelector(selectIsAdmin);
+  const isRoleLoaded = useAppSelector(selectIsRoleLoaded);
+  const shouldRun = isAuthenticated && isRoleLoaded && isAdmin;
 
   /**
    * Check if a user change invalidates their manager assignment
@@ -92,6 +99,11 @@ export const useManagerValidationSync = (): void => {
   );
 
   useEffect(() => {
+    // Only subscribe if user is authenticated admin with loaded role
+    if (!shouldRun) {
+      return;
+    }
+
     // Subscribe to all users for real-time updates
     const unsubscribe = subscribeToAllUsers((currentUsers) => {
       const currentUsersMap = new Map<string, UserListItem>();
@@ -134,7 +146,7 @@ export const useManagerValidationSync = (): void => {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [checkManagerInvalidation, triggerCleanup]);
+  }, [shouldRun, checkManagerInvalidation, triggerCleanup]);
 };
 
 export default useManagerValidationSync;

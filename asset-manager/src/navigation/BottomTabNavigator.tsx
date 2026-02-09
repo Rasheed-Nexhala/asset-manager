@@ -5,8 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { SignedInScreen } from '../screens/Users/SignedInScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { SiteStackNavigator } from './SiteStackNavigator';
+import { InventoryStackNavigator } from './InventoryStackNavigator';
 import { useAppSelector } from '../store/hooks';
-import { selectIsAdmin } from '../store/selectors/authSelectors';
+import {
+  selectIsAdmin,
+  selectIsStoreIncharge,
+  selectIsSiteManager,
+} from '../store/selectors/authSelectors';
 
 const Tab = createBottomTabNavigator();
 
@@ -28,6 +33,11 @@ export const BottomTabNavigator: React.FC = () => {
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, TAB_BAR_MIN_BOTTOM_PADDING);
   const isAdmin = useAppSelector(selectIsAdmin);
+  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const isSiteManager = useAppSelector(selectIsSiteManager);
+  
+  // Inventory tab is visible to Admin, StoreIncharge, and SiteManager
+  const showInventoryTab = isAdmin || isStoreIncharge || isSiteManager;
 
   return (
     <Tab.Navigator
@@ -72,6 +82,18 @@ export const BottomTabNavigator: React.FC = () => {
           tabBarLabel: 'Dashboard',
         }}
       />
+      {showInventoryTab && (
+        <Tab.Screen
+          name="Inventory"
+          component={InventoryStackNavigator}
+          options={{
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="cube-outline" size={size} color={color} />
+            ),
+            tabBarLabel: 'Inventory',
+          }}
+        />
+      )}
       {isAdmin && (
         <Tab.Screen
           name="Sites"

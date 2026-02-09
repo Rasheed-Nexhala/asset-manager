@@ -1,18 +1,218 @@
-rules_version='2'
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2026, 3, 9);
+    
+    // ============================================
+    // Helper Functions
+    // ============================================
+    
+    /**
+     * Check if user is authenticated
+     */
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    /**
+     * Get user role from users collection
+     * Returns the role string or null if user doesn't exist
+     */
+    function getUserRole() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return userDoc != null ? userDoc.data.role : null;
+    }
+    
+    /**
+     * Check if user is Admin
+     * Role values are stored as PascalCase: 'Admin', 'StoreIncharge', 'SiteManager'
+     */
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'Admin';
+    }
+    
+    /**
+     * Check if user is Store Incharge
+     */
+    function isStoreIncharge() {
+      return isAuthenticated() && getUserRole() == 'StoreIncharge';
+    }
+    
+    /**
+     * Check if user is Site Manager
+     */
+    function isSiteManager() {
+      return isAuthenticated() && getUserRole() == 'SiteManager';
+    }
+    
+    /**
+     * Check if user is Admin or Store Incharge
+     * These roles have similar permissions for inventory management
+     */
+    function isAdminOrStoreIncharge() {
+      return isAdmin() || isStoreIncharge();
+    }
+    
+    /**
+     * Check if user is active (not disabled)
+     */
+    function isUserActive() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return userDoc != null && userDoc.data.isActive == true;
+    }
+    
+    /**
+     * Combined check: authenticated, active, and has required role
+     */
+    function hasInventoryAccess() {
+      return isAuthenticated() && isUserActive() && isAdminOrStoreIncharge();
+    }
+    
+    // ============================================
+    // Existing Collections (preserve existing rules)
+    // ============================================
+    
+    /**
+     * Users collection
+     * Users can read their own data; Admins can read all
+     * Write operations should be handled via Cloud Functions
+     */
+    match /users/{userId} {
+      // Allow reading individual user documents
+      allow get: if isAuthenticated() && (isAdmin() || request.auth.uid == userId);
+      // Allow listing/querying the entire users collection (only for Admins)
+      allow list: if isAuthenticated() && isAdmin();
+      allow write: if false; // Only via Cloud Functions
+    }
+    
+    /**
+     * Sites collection
+     * All authenticated users can read sites
+     * Write operations should be handled via Cloud Functions
+     */
+    match /sites/{siteId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Only via Cloud Functions
+    }
+    
+    /**
+     * Requests collection
+     * Admins and Store Incharge can read all requests
+     * Site Managers can only read their own requests
+     */
+    match /requests/{requestId} {
+      allow read: if isAuthenticated() &&
+        (isAdminOrStoreIncharge() ||
+         (isSiteManager() && resource.data.requestedBy == request.auth.uid));
+      allow write: if false; // Only via Cloud Functions
+    }
+    
+    /**
+     * Purchase Orders collection
+     * Only Admins and Store Incharge can read purchase orders
+     */
+    match /purchaseOrders/{poId} {
+      allow read: if isAuthenticated() && isAdminOrStoreIncharge();
+      allow write: if false; // Only via Cloud Functions
+    }
+    
+    /**
+     * Vendors collection
+     * Only Admins and Store Incharge can read vendors
+     */
+    match /vendors/{vendorId} {
+      allow read: if isAuthenticated() && isAdminOrStoreIncharge();
+      allow write: if false; // Only via Cloud Functions
+    }
+    
+    // ============================================
+    // Inventory Management Collections
+    // ============================================
+    
+    /**
+     * Items Collection
+     * 
+     * Purpose: Item master data (name, SKU, category, type, unit, minStockLevel, status, 
+     * denormalized stock totals)
+     * 
+     * Access Rules:
+     * - Read: Admin and Store Incharge only (Site Managers cannot see central store items)
+     * - Write: Admin and Store Incharge only
+     * 
+     * Note: Site Managers should not have access to items collection as they only see
+     * site-level inventory, not the central store item master.
+     */
+    match /items/{itemId} {
+      allow read: if hasInventoryAccess();
+      allow create: if hasInventoryAccess();
+      allow update: if hasInventoryAccess();
+      allow delete: if hasInventoryAccess();
+    }
+    
+    /**
+     * Inventory Collection
+     * 
+     * Purpose: Location-level stock (itemId, locationId, locationType, locationName, quantity)
+     * 
+     * Access Rules:
+     * - Read: 
+     *   - Admin and Store Incharge: can read all inventory (central store, sites, maintenance)
+     *   - Site Manager: can only read inventory where locationType == 'site' 
+     *     (they cannot see 'store' or 'maintenance' locations)
+     * - Write: Admin and Store Incharge only
+     * 
+     * Note: Site Managers can see site inventory (their own and other sites) but cannot
+     * see central store or maintenance inventory.
+     */
+    match /inventory/{inventoryId} {
+      allow read: if isAuthenticated() && isUserActive() &&
+        (isAdminOrStoreIncharge() ||
+         (isSiteManager() && resource.data.locationType == 'site'));
+      allow create: if hasInventoryAccess();
+      allow update: if hasInventoryAccess();
+      allow delete: if hasInventoryAccess();
+    }
+    
+    /**
+     * Categories Collection
+     * 
+     * Purpose: Item categories (name)
+     * 
+     * Access Rules:
+     * - Read: Admin and Store Incharge only
+     * - Write: Admin and Store Incharge only
+     * 
+     * Note: Site Managers don't need to see categories as they don't manage items.
+     */
+    match /categories/{categoryId} {
+      allow read: if hasInventoryAccess();
+      allow create: if hasInventoryAccess();
+      allow update: if hasInventoryAccess();
+      allow delete: if hasInventoryAccess();
+    }
+    
+    /**
+     * Inventory Adjustments Collection
+     * 
+     * Purpose: Audit log for every quantity change
+     * Fields: itemId, locationId, type (add/remove), quantityBefore/After, reason, 
+     * notes, adjustedBy, createdAt
+     * 
+     * Access Rules:
+     * - Read: Admin and Store Incharge only
+     * - Create: Admin and Store Incharge only (when making adjustments)
+     * - Update: Denied (adjustments are immutable audit records)
+     * - Delete: Denied (adjustments are immutable audit records)
+     * 
+     * Note: This is an audit trail - once created, adjustments should never be modified
+     * or deleted. Only Admins and Store Incharge can create adjustments when they
+     * adjust inventory quantities.
+     */
+    match /inventoryAdjustments/{adjustmentId} {
+      allow read: if hasInventoryAccess();
+      allow create: if hasInventoryAccess();
+      allow update: if false; // Immutable audit log
+      allow delete: if false; // Immutable audit log
     }
   }
 }
