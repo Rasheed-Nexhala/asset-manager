@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { CategorySelector } from './CategorySelector';
+import { UnitSelector } from './UnitSelector';
 import type { Item, ItemType, ItemStatus, CreateItemData, UpdateItemData } from '../../types/inventory';
 
 /**
@@ -384,26 +385,12 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         </View>
 
         {/* Unit of Measurement */}
-        <View className="gap-1.5">
-          <Text className="text-[15px] text-[#0F172A]">Unit of Measurement *</Text>
-          <TextInput
-            className={`border rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] ${
-              errors.unit ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
-            }`}
-            placeholderTextColor="#94A3B8"
-            placeholder="e.g., bags, pcs, kg, liters"
-            value={formData.unit}
-            onChangeText={(text) => updateField('unit', text)}
-            editable={!loading}
-            accessibilityLabel="Unit of measurement input"
-            accessibilityRole="none"
-          />
-          {errors.unit && (
-            <Text className="text-[13px] text-[#DC2626]" accessibilityLiveRegion="polite">
-              {errors.unit}
-            </Text>
-          )}
-        </View>
+        <UnitSelector
+          selectedUnit={formData.unit}
+          onSelect={(unit) => updateField('unit', unit)}
+          error={errors.unit}
+          disabled={loading}
+        />
 
         {/* Initial Quantity (Create mode only) */}
         {mode === 'create' && (

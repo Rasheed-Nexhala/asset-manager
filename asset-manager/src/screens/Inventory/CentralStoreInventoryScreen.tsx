@@ -64,12 +64,10 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   const lowStockCount = useAppSelector(selectLowStockCount);
   const totalItemsCount = useAppSelector(selectTotalItemsCount);
 
-  // Apply search filter - create selector memoized by search query
-  const searchSelector = useMemo(
-    () => selectItemsBySearchQuery(searchQuery),
-    [searchQuery]
+  // Apply search filter using optimized selector
+  const searchedItems = useAppSelector((state) => 
+    selectItemsBySearchQuery(state, searchQuery)
   );
-  const searchedItems = useAppSelector(searchSelector);
 
   // Combine filters and search
   const filteredItems = useMemo(() => {

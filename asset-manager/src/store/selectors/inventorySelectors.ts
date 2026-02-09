@@ -159,36 +159,66 @@ export const selectFilteredLowStockItems = createSelector(
     filteredItems.filter((item) => lowStockIds.includes(item.id))
 );
 
-// Search functionality (can be combined with filters)
-export const selectItemsBySearchQuery = (searchQuery: string) =>
+// Base search query selector
+const selectSearchQuery = (state: RootState, searchQuery: string) => searchQuery;
+
+// Optimized search functionality with proper memoization
+export const selectItemsBySearchQuery = createSelector(
+  [selectAllItems, selectSearchQuery],
+  (items, searchQuery) => {
+    const trimmedQuery = searchQuery?.trim() || '';
+    
+    if (!trimmedQuery) {
+      return items;
+    }
+
+    const lowerQuery = trimmedQuery.toLowerCase();
+    return items.filter(
+      (item) =>
+        item.name.toLowerCase().includes(lowerQuery) ||
+        item.sku.toLowerCase().includes(lowerQuery) ||
+        (item.description && item.description.toLowerCase().includes(lowerQuery)) ||
+        item.categoryName.toLowerCase().includes(lowerQuery)
+    );
+  }
+);
+
+// Legacy factory function for backward compatibility (deprecated)
+export const selectItemsBySearchQueryFactory = (searchQuery: string) =>
   createSelector(
     [selectAllItems],
     (items) => {
-      if (!searchQuery.trim()) {
+      const trimmedQuery = searchQuery?.trim() || '';
+      
+      if (!trimmedQuery) {
         return items;
       }
 
-      const query = searchQuery.toLowerCase().trim();
+      const lowerQuery = trimmedQuery.toLowerCase();
       return items.filter(
         (item) =>
-          item.name.toLowerCase().includes(query) ||
-          item.sku.toLowerCase().includes(query) ||
-          (item.description && item.description.toLowerCase().includes(query)) ||
-          item.categoryName.toLowerCase().includes(query)
+          item.name.toLowerCase().includes(lowerQuery) ||
+          item.sku.toLowerCase().includes(lowerQuery) ||
+          (item.description && item.description.toLowerCase().includes(lowerQuery)) ||
+          item.categoryName.toLowerCase().includes(lowerQuery)
       );
     }
   );
 
-// Combined search and filters
-export const selectFilteredAndSearchedItems = (searchQuery: string) =>
-  createSelector(
-    [selectFilteredItems, selectItemsBySearchQuery(searchQuery)],
-    (filteredItems, searchedItems) => {
-      // Intersection of filtered and searched items
-      const filteredIds = new Set(filteredItems.map((item) => item.id));
-      return searchedItems.filter((item) => filteredIds.has(item.id));
+// Combined search and filters with proper memoization
+export const selectFilteredAndSearchedItems = createSelector(
+  [selectFilteredItems, selectItemsBySearchQuery],
+  (filteredItems, searchedItems) => {
+    // If both arrays are the same reference (no search applied), return filtered items
+    if (filteredItems === searchedItems) {
+      return filteredItems;
     }
-  );
+    
+    // Intersection of filtered and searched items
+    const filteredIds = new Set(filteredItems.map((item) => item.id));
+    return searchedItems.filter((item) => filteredIds.has(item.id));
+  }
+);
 
 // Statistics selectors
 export const selectTotalItemsCount = createSelector(
