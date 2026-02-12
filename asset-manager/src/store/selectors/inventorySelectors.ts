@@ -21,6 +21,9 @@ export const selectItemsError = createSelector(
   (inventoryState) => inventoryState.error
 );
 
+/** Alias for selectItemsError - same error state used for both items and categories */
+export const selectInventoryError = selectItemsError;
+
 export const selectItemsFilters = createSelector(
   [selectInventoryState],
   (inventoryState) => inventoryState.filters

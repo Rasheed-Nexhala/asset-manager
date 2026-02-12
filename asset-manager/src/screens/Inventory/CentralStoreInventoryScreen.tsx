@@ -20,22 +20,20 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   fetchItems,
   fetchCategories,
-  setFilters,
 } from '../../store/slices/inventorySlice';
 import {
   selectAllItems,
-  selectFilteredItems,
   selectItemsBySearchQuery,
   selectAllCategories,
   selectItemsLoading,
-  selectItemsError,
   selectLowStockCount,
   selectTotalItemsCount,
 } from '../../store/selectors/inventorySelectors';
+import { useInventoryError } from '../../hooks/useInventoryError';
 import { subscribeItems } from '../../services/firebase/inventoryService';
 import { subscribeCategories } from '../../services/firebase/categoryService';
 import { setItems, setCategories } from '../../store/slices/inventorySlice';
-import type { Item, ItemType, ItemFilters } from '../../types/inventory';
+import type { Item, ItemType, Category } from '../../types/inventory';
 
 type StockFilter = 'all' | 'low_stock';
 
@@ -60,7 +58,7 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   const allItems = useAppSelector(selectAllItems);
   const categories = useAppSelector(selectAllCategories);
   const isLoading = useAppSelector(selectItemsLoading);
-  const error = useAppSelector(selectItemsError);
+  const error = useInventoryError();
   const lowStockCount = useAppSelector(selectLowStockCount);
   const totalItemsCount = useAppSelector(selectTotalItemsCount);
 
@@ -96,63 +94,34 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     ).length;
   }, [filteredItems]);
 
-  // Set up real-time listeners
+  // Subscribe once on mount — filters are applied in memory via useMemo/selectors
   useEffect(() => {
-    // Build Redux filters for subscription
-    const reduxFilters: ItemFilters = {};
-    if (filters.categoryId) {
-      reduxFilters.categoryId = filters.categoryId;
-    }
-    if (filters.type) {
-      reduxFilters.type = filters.type;
-    }
-    if (filters.stock === 'low_stock') {
-      reduxFilters.lowStockOnly = true;
-    }
-
-    // Update Redux filters
-    dispatch(setFilters(Object.keys(reduxFilters).length > 0 ? reduxFilters : null));
-
-    // Initial fetch
-    dispatch(fetchItems(reduxFilters));
+    // Initial fetch (subscription will also fire immediately with current data)
+    dispatch(fetchItems());
     dispatch(fetchCategories());
 
-    // Subscribe to real-time updates
-    const unsubscribeItems = subscribeItems(
-      (items: Item[]) => {
-        dispatch(setItems(items));
-      },
-      reduxFilters
-    );
+    const unsubscribeItems = subscribeItems((updatedItems: Item[]) => {
+      dispatch(setItems(updatedItems));
+    });
 
-    const unsubscribeCategories = subscribeCategories((categories) => {
-      dispatch(setCategories(categories));
+    const unsubscribeCategories = subscribeCategories((updatedCategories: Category[]) => {
+      dispatch(setCategories(updatedCategories));
     });
 
     return () => {
       unsubscribeItems();
       unsubscribeCategories();
     };
-  }, [dispatch, filters]);
+  }, [dispatch]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    const reduxFilters: ItemFilters = {};
-    if (filters.categoryId) {
-      reduxFilters.categoryId = filters.categoryId;
-    }
-    if (filters.type) {
-      reduxFilters.type = filters.type;
-    }
-    if (filters.stock === 'low_stock') {
-      reduxFilters.lowStockOnly = true;
-    }
-    dispatch(fetchItems(reduxFilters))
+    dispatch(fetchItems())
       .then(() => dispatch(fetchCategories()))
       .finally(() => {
         setRefreshing(false);
       });
-  }, [dispatch, filters]);
+  }, [dispatch]);
 
   const handleAddItem = useCallback(() => {
     navigation.navigate('AddEditItem');

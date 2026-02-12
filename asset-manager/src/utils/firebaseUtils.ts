@@ -5,11 +5,25 @@ import { Timestamp, DocumentSnapshot } from 'firebase/firestore';
  */
 
 /**
- * Convert Firebase Timestamp to serializable ISO string
+ * Convert Firebase Timestamp to serializable ISO string.
+ * Handles null/undefined from serverTimestamp() during optimistic updates.
+ * Falls back to current time when timestamp is missing to prevent runtime errors.
+ *
+ * @param timestamp - Firebase Timestamp, Date, or null/undefined
+ * @returns ISO string - never null (uses current time as fallback)
  */
-export const timestampToISOString = (timestamp: Timestamp | null | undefined): string | null => {
-  if (!timestamp) return null;
-  return timestamp.toDate().toISOString();
+export const timestampToISOString = (timestamp: Timestamp | Date | null | undefined): string => {
+  if (!timestamp || timestamp === null) {
+    return new Date().toISOString(); // Fallback to current time during optimistic updates
+  }
+  if (timestamp instanceof Date) {
+    return timestamp.toISOString();
+  }
+  // Firestore Timestamp or object with toDate() (handles mocks in tests)
+  if (typeof (timestamp as { toDate?: () => Date }).toDate === 'function') {
+    return (timestamp as Timestamp).toDate().toISOString();
+  }
+  return new Date().toISOString(); // Final fallback
 };
 
 /**

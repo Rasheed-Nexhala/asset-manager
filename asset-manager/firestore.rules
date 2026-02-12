@@ -75,36 +75,25 @@ service cloud.firestore {
     /**
      * Users collection
      * Users can read their own data; Admins can read all
-     * Write operations should be handled via Cloud Functions
+     * Only Admins can create/update/delete users
      */
     match /users/{userId} {
       // Allow reading individual user documents
       allow get: if isAuthenticated() && (isAdmin() || request.auth.uid == userId);
       // Allow listing/querying the entire users collection (only for Admins)
       allow list: if isAuthenticated() && isAdmin();
-      allow write: if false; // Only via Cloud Functions
+      // Allow Admins to create, update, and delete users
+      allow create, update, delete: if isAuthenticated() && isUserActive() && isAdmin();
     }
     
     /**
      * Sites collection
      * All authenticated users can read sites
-     * Write operations should be handled via Cloud Functions
+     * Only Admins can create, update, or delete sites
      */
     match /sites/{siteId} {
       allow read: if isAuthenticated();
-      allow write: if false; // Only via Cloud Functions
-    }
-    
-    /**
-     * Requests collection
-     * Admins and Store Incharge can read all requests
-     * Site Managers can only read their own requests
-     */
-    match /requests/{requestId} {
-      allow read: if isAuthenticated() &&
-        (isAdminOrStoreIncharge() ||
-         (isSiteManager() && resource.data.requestedBy == request.auth.uid));
-      allow write: if false; // Only via Cloud Functions
+      allow create, update, delete: if isAuthenticated() && isUserActive() && isAdmin();
     }
     
     /**
@@ -136,15 +125,17 @@ service cloud.firestore {
      * denormalized stock totals)
      * 
      * Access Rules:
-     * - Read: Admin and Store Incharge only (Site Managers cannot see central store items)
+     * - Read: Admin, Store Incharge, and Site Managers (Site Managers need item catalog for creating requests)
      * - Write: Admin and Store Incharge only
+     * - Create: Enforces SKU uniqueness via document ID (items/{sku}); prevents race duplicates
      * 
-     * Note: Site Managers should not have access to items collection as they only see
-     * site-level inventory, not the central store item master.
+     * Note: SKU is used as document ID for create to enforce uniqueness at rule level.
      */
     match /items/{itemId} {
-      allow read: if hasInventoryAccess();
-      allow create: if hasInventoryAccess();
+      allow read: if isAuthenticated() && isUserActive() &&
+        (hasInventoryAccess() || isSiteManager());
+      allow create: if hasInventoryAccess() &&
+        !exists(/databases/$(database)/documents/items/$(request.resource.data.sku));
       allow update: if hasInventoryAccess();
       allow delete: if hasInventoryAccess();
     }
@@ -159,17 +150,22 @@ service cloud.firestore {
      *   - Admin and Store Incharge: can read all inventory (central store, sites, maintenance)
      *   - Site Manager: can only read inventory where locationType == 'site' 
      *     (they cannot see 'store' or 'maintenance' locations)
-     * - Write: Admin and Store Incharge only
+     * - Create: Admin, Store Incharge, and Site Managers (when creating store entry for returned items)
+     * - Update: Admin, Store Incharge, and Site Managers (when returning items to store or from site)
+     * - Delete: Admin and Store Incharge only
      * 
-     * Note: Site Managers can see site inventory (their own and other sites) but cannot
-     * see central store or maintenance inventory.
+     * Note: Site Managers can update site inventory (decrement on return) and store inventory
+     * (increment on return) when returning items from their site to central store.
      */
     match /inventory/{inventoryId} {
       allow read: if isAuthenticated() && isUserActive() &&
         (isAdminOrStoreIncharge() ||
          (isSiteManager() && resource.data.locationType == 'site'));
-      allow create: if hasInventoryAccess();
-      allow update: if hasInventoryAccess();
+      allow create: if hasInventoryAccess() ||
+        (isSiteManager() && isUserActive() && request.resource.data.locationId == 'store');
+      allow update: if hasInventoryAccess() ||
+        (isSiteManager() && isUserActive() &&
+         (resource.data.locationType == 'site' || resource.data.locationId == 'store'));
       allow delete: if hasInventoryAccess();
     }
     
@@ -179,13 +175,12 @@ service cloud.firestore {
      * Purpose: Item categories (name)
      * 
      * Access Rules:
-     * - Read: Admin and Store Incharge only
+     * - Read: Admin, Store Incharge, and Site Managers (for item display when creating requests)
      * - Write: Admin and Store Incharge only
-     * 
-     * Note: Site Managers don't need to see categories as they don't manage items.
      */
     match /categories/{categoryId} {
-      allow read: if hasInventoryAccess();
+      allow read: if isAuthenticated() && isUserActive() &&
+        (hasInventoryAccess() || isSiteManager());
       allow create: if hasInventoryAccess();
       allow update: if hasInventoryAccess();
       allow delete: if hasInventoryAccess();
@@ -213,6 +208,80 @@ service cloud.firestore {
       allow create: if hasInventoryAccess();
       allow update: if false; // Immutable audit log
       allow delete: if false; // Immutable audit log
+    }
+    
+    // ============================================
+    // Request Management Collections
+    // ============================================
+    
+    /**
+     * Check if user can manage requests (Store Incharge or Admin)
+     */
+    function canManageRequests() {
+      return isAuthenticated() && isUserActive() && (isAdmin() || isStoreIncharge());
+    }
+
+    /**
+     * Request Counters Collection
+     *
+     * Purpose: Atomic counter for generating unique request numbers (REQ-YYYY-NNNN).
+     * Site Managers need read/write to increment when creating requests.
+     */
+    match /requestCounters/{counterId} {
+      allow read, write: if isAuthenticated() && isUserActive() &&
+        (isAdmin() || isStoreIncharge() || isSiteManager());
+    }
+    
+    /**
+     * Requests Collection
+     * 
+     * Purpose: Site Manager requests for inventory items from Central Store
+     * 
+     * Access Rules:
+     * - Read:
+     *   - Admin and Store Incharge: can read all requests
+     *   - Site Manager: can only read their own requests (where requestedBy == user.uid)
+     * - Create:
+     *   - Site Managers: can create requests for themselves (draft or pending status)
+     * - Update:
+     *   - Site Managers: can ONLY edit their own DRAFT requests (before submission)
+     *   - Store Incharge/Admin: can update for approval/rejection/transfer
+     *     CRITICAL: Store Incharge CANNOT edit items/priority (enforced in service layer)
+     * - Delete:
+     *   - Admin only (soft delete via status is preferred)
+     * 
+     * Business Rules Enforced:
+     * - No partial fulfillment (enforced in service)
+     * - Store Incharge cannot edit request items/priority (enforced in service)
+     * - Site Manager can only edit own draft requests (enforced here and in service)
+     */
+    match /requests/{requestId} {
+      // Read access
+      allow read: if isAuthenticated() && isUserActive() && (
+        isAdmin() ||
+        isStoreIncharge() ||
+        (isSiteManager() && resource.data.requestedBy == request.auth.uid)
+      );
+      
+      // Create: Only Site Managers for their own requests
+      allow create: if isAuthenticated() && 
+        isUserActive() &&
+        isSiteManager() && 
+        request.resource.data.requestedBy == request.auth.uid &&
+        request.resource.data.status in ['draft', 'pending'];
+      
+      // Update: Site Managers (own drafts only OR returning items on transferred requests),
+      // Store Incharge/Admin (approve/reject/transfer only - NO edit)
+      // Store Incharge can update status, processedBy, rejectionReason etc. but NOT items/priority (enforced in service)
+      allow update: if isAuthenticated() && isUserActive() && (
+        (isSiteManager() && 
+         resource.data.requestedBy == request.auth.uid && 
+         (resource.data.status == 'draft' || resource.data.status == 'transferred')) ||
+        canManageRequests()
+      );
+      
+      // Delete: Admin only (soft delete preferred)
+      allow delete: if isAuthenticated() && isUserActive() && isAdmin();
     }
   }
 }

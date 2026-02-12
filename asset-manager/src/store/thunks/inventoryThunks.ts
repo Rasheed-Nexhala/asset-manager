@@ -4,6 +4,7 @@ import {
   getItemById as getItemByIdService,
   createItem as createItemService,
   updateItem as updateItemService,
+  deleteItem as deleteItemService,
   adjustQuantity as adjustQuantityService,
   getInventoryByLocation,
 } from '../../services/firebase/inventoryService';
@@ -56,6 +57,10 @@ export const fetchItemById = createAsyncThunk(
   }
 );
 
+/** User-friendly message when SKU already exists (security rule or service check) */
+export const SKU_EXISTS_ERROR_MESSAGE =
+  'This SKU already exists. Please use a different SKU.';
+
 /**
  * Create a new item
  */
@@ -74,7 +79,19 @@ export const createItem = createAsyncThunk(
       }
       return createdItem;
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to create item');
+      // Handle Firestore permission-denied (SKU uniqueness rule violation)
+      const code = error?.code ?? error?.error?.code;
+      if (code === 'permission-denied') {
+        return rejectWithValue(SKU_EXISTS_ERROR_MESSAGE);
+      }
+      // Handle service-level duplicate SKU error (checkSkuExists)
+      if (
+        error?.message?.includes('SKU') &&
+        error?.message?.toLowerCase().includes('already exists')
+      ) {
+        return rejectWithValue(SKU_EXISTS_ERROR_MESSAGE);
+      }
+      return rejectWithValue(error?.message || 'Failed to create item');
     }
   }
 );
@@ -102,6 +119,21 @@ export const updateItem = createAsyncThunk(
       return updatedItem;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to update item');
+    }
+  }
+);
+
+/**
+ * Delete an item (and clean up associated images and inventory entries)
+ */
+export const deleteItem = createAsyncThunk(
+  'inventory/deleteItem',
+  async (itemId: string, { rejectWithValue }) => {
+    try {
+      await deleteItemService(itemId);
+      return itemId;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to delete item');
     }
   }
 );

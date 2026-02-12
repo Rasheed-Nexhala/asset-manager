@@ -8,11 +8,13 @@ import {
   ActivityIndicator,
   Image,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { CategorySelector } from './CategorySelector';
 import { UnitSelector } from './UnitSelector';
+import { validateImageFile } from '../../services/firebase/storageService';
 import type { Item, ItemType, ItemStatus, CreateItemData, UpdateItemData } from '../../types/inventory';
 
 /**
@@ -179,11 +181,16 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     }
 
     // Min stock level validation
+    const MIN_STOCK_MAX = 1_000_000;
     const minStock = parseFloat(formData.minStockLevel);
     if (!formData.minStockLevel.trim()) {
       newErrors.minStockLevel = 'Minimum stock level is required';
-    } else if (isNaN(minStock) || minStock < 0) {
-      newErrors.minStockLevel = 'Must be a valid number (0 or greater)';
+    } else if (isNaN(minStock)) {
+      newErrors.minStockLevel = 'Must be a valid number';
+    } else if (minStock < 0) {
+      newErrors.minStockLevel = 'Minimum stock level cannot be negative';
+    } else if (minStock > MIN_STOCK_MAX) {
+      newErrors.minStockLevel = `Minimum stock level seems unreasonably high (max ${MIN_STOCK_MAX.toLocaleString()})`;
     }
 
     setErrors(newErrors);

@@ -6,12 +6,14 @@ import { SignedInScreen } from '../screens/Users/SignedInScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { SiteStackNavigator } from './SiteStackNavigator';
 import { InventoryStackNavigator } from './InventoryStackNavigator';
+import { RequestStackNavigator } from './RequestStackNavigator';
 import { useAppSelector } from '../store/hooks';
 import {
   selectIsAdmin,
   selectIsStoreIncharge,
   selectIsSiteManager,
 } from '../store/selectors/authSelectors';
+import { selectHighPriorityPendingCount } from '../store/selectors/requestSelectors';
 
 const Tab = createBottomTabNavigator();
 
@@ -35,9 +37,13 @@ export const BottomTabNavigator: React.FC = () => {
   const isAdmin = useAppSelector(selectIsAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const isSiteManager = useAppSelector(selectIsSiteManager);
-  
+  const highPriorityCount = useAppSelector(selectHighPriorityPendingCount);
+
   // Inventory tab is visible to Admin, StoreIncharge, and SiteManager
   const showInventoryTab = isAdmin || isStoreIncharge || isSiteManager;
+
+  // Requests tab is visible to Admin, StoreIncharge, and SiteManager
+  const showRequestsTab = isAdmin || isStoreIncharge || isSiteManager;
 
   return (
     <Tab.Navigator
@@ -91,6 +97,19 @@ export const BottomTabNavigator: React.FC = () => {
               <Ionicons name="cube-outline" size={size} color={color} />
             ),
             tabBarLabel: 'Inventory',
+          }}
+        />
+      )}
+      {showRequestsTab && (
+        <Tab.Screen
+          name="Requests"
+          component={RequestStackNavigator}
+          options={{
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="file-tray-full-outline" size={size} color={color} />
+            ),
+            tabBarLabel: 'Requests',
+            tabBarBadge: highPriorityCount > 0 ? highPriorityCount : undefined,
           }}
         />
       )}

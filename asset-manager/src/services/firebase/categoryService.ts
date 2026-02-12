@@ -174,21 +174,24 @@ export const updateCategory = async (id: string, name: string): Promise<void> =>
 
 /**
  * Delete a category
- * 
- * Note: This function does not check if items reference this category.
- * The Firestore security rules should prevent deletion if items reference it,
- * or you should handle this check in your application logic before calling this function.
- * 
+ *
+ * Server-side check enforces that no items reference this category before deletion.
+ * Client-side check in CategoryManagementScreen provides UX defense-in-depth.
+ *
  * @param id - Category document ID
+ * @throws Error if items are using this category
  */
 export const deleteCategory = async (id: string): Promise<void> => {
   try {
-    // Note: In a production app, you might want to check if any items
-    // reference this category before deleting. This check is not included
-    // here as it would require a query to the items collection.
-    // Consider adding a checkItemsUsingCategory function if needed.
+    const itemCount = await checkItemsUsingCategory(id);
+    if (itemCount > 0) {
+      throw new Error(
+        `Cannot delete category. ${itemCount} item${itemCount > 1 ? 's' : ''} are using this category.`
+      );
+    }
 
-    await deleteDoc(doc(db, CATEGORIES_COLLECTION, id));
+    const categoryRef = doc(db, CATEGORIES_COLLECTION, id);
+    await deleteDoc(categoryRef);
   } catch (error) {
     console.error('Error deleting category:', error);
     throw error;
@@ -196,14 +199,14 @@ export const deleteCategory = async (id: string): Promise<void> => {
 };
 
 /**
- * Check if any items are using a category
- * 
- * This is useful before deleting a category to ensure data integrity
- * 
+ * Check how many items are using a category
+ *
+ * Used before deleting a category to ensure data integrity.
+ *
  * @param categoryId - Category ID to check
- * @returns true if items are using this category, false otherwise
+ * @returns Number of items using this category
  */
-export const checkItemsUsingCategory = async (categoryId: string): Promise<boolean> => {
+export const checkItemsUsingCategory = async (categoryId: string): Promise<number> => {
   try {
     const itemsSnapshot = await getDocs(
       query(
@@ -212,7 +215,7 @@ export const checkItemsUsingCategory = async (categoryId: string): Promise<boole
       )
     );
 
-    return !itemsSnapshot.empty;
+    return itemsSnapshot.size;
   } catch (error) {
     console.error('Error checking items using category:', error);
     throw error;

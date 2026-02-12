@@ -10,6 +10,7 @@ import { fetchInventoryByLocation } from '../../store/thunks/inventoryThunks';
 import { selectInventoryByLocation, selectItemsLoading, selectItemsError, selectAllItems } from '../../store/selectors/inventorySelectors';
 import { getSite } from '../../services/firebase/siteService';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
+import { getLocationId } from '../../utils/locationUtils';
 import type { Site } from '../../types/sites';
 import type { InventoryEntry, Item } from '../../types/inventory';
 import type { InventoryStackParamList } from '../../navigation/InventoryStackNavigator';
@@ -39,10 +40,14 @@ export const OtherSiteInventoryScreen: React.FC = () => {
   const [siteLoading, setSiteLoading] = useState<boolean>(true);
   const [siteError, setSiteError] = useState<string | null>(null);
 
-  // Redux state
-  const inventoryEntries = useAppSelector((state) => 
-    selectInventoryByLocation(siteId)(state)
+  // Redux state - use standardized location ID format
+  // Memoize selector to avoid "new reference" warning - only recreate when locationId changes
+  const locationId = siteId ? getLocationId('site', siteId) : '';
+  const selectInventoryForLocation = useMemo(
+    () => selectInventoryByLocation(locationId),
+    [locationId]
   );
+  const inventoryEntries = useAppSelector(selectInventoryForLocation);
   const allItems = useAppSelector(selectAllItems);
   const isLoading = useAppSelector(selectItemsLoading);
   const error = useAppSelector(selectItemsError);
@@ -82,7 +87,7 @@ export const OtherSiteInventoryScreen: React.FC = () => {
 
     const loadInventory = async () => {
       try {
-        await dispatch(fetchInventoryByLocation(siteId)).unwrap();
+        await dispatch(fetchInventoryByLocation(getLocationId('site', siteId))).unwrap();
       } catch (err: any) {
         console.error('Error loading inventory:', err);
       }
@@ -99,8 +104,18 @@ export const OtherSiteInventoryScreen: React.FC = () => {
   }, [dispatch, allItems.length]);
 
   // Map inventory entries to items for display (filter out entries without items)
+  // Also deduplicate entries by entry.id to prevent duplicate key errors
   const inventoryWithItems = useMemo(() => {
-    return inventoryEntries
+    // Use Map to deduplicate by entry.id (keeps only the first occurrence)
+    const uniqueEntriesMap = new Map<string, InventoryEntry>();
+    inventoryEntries.forEach((entry) => {
+      if (!uniqueEntriesMap.has(entry.id)) {
+        uniqueEntriesMap.set(entry.id, entry);
+      }
+    });
+    
+    // Convert map values back to array, enrich with item data, and filter out entries without items
+    return Array.from(uniqueEntriesMap.values())
       .map((entry) => {
         const item = allItems.find((item) => item.id === entry.itemId);
         if (!item) return null;

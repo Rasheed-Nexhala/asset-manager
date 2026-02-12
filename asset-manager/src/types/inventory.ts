@@ -67,8 +67,8 @@ export interface Item {
   centralStoreQuantity: number;
   atSitesQuantity: number;
   inMaintenanceQuantity: number;
-  createdAt: string | null;       // Serialized creation timestamp (ISO string)
-  updatedAt: string | null;       // Serialized last modified timestamp (ISO string)
+  createdAt: string;             // Serialized creation timestamp (ISO string)
+  updatedAt: string;             // Serialized last modified timestamp (ISO string)
 }
 
 /**
@@ -99,7 +99,7 @@ export interface InventoryEntry {
   locationType: LocationType;
   locationName: string;
   quantity: number;
-  updatedAt: string | null;       // Serialized timestamp (ISO string)
+  updatedAt: string;             // Serialized timestamp (ISO string)
 }
 
 /**
@@ -117,7 +117,7 @@ export interface FirestoreCategory {
 export interface Category {
   id: string;
   name: string;
-  createdAt: string | null;        // Serialized creation timestamp (ISO string)
+  createdAt: string;             // Serialized creation timestamp (ISO string)
 }
 
 /**
@@ -137,7 +137,7 @@ export interface CreateItemData {
 
 /**
  * Data for updating an existing item
- * Note: type cannot be changed after first transaction (business rule)
+ * Note: type cannot be changed after first transaction (business rule; enforced in inventoryService)
  */
 export interface UpdateItemData {
   name?: string;
@@ -145,6 +145,7 @@ export interface UpdateItemData {
   description?: string;
   categoryId?: string;
   categoryName?: string;
+  type?: ItemType;  // Validated by service: cannot change after first transaction
   unit?: string;
   imageUrl?: string;
   minStockLevel?: number;
@@ -176,11 +177,25 @@ export interface ItemFilters {
 }
 
 /**
- * Helper function to convert Firestore timestamp to ISO string
+ * Helper function to convert Firestore timestamp to ISO string.
+ * Handles null/undefined from serverTimestamp() during optimistic updates.
+ * Falls back to current time when timestamp is missing to prevent runtime errors.
+ *
+ * @param timestamp - Firebase Timestamp, Date, or null/undefined
+ * @returns ISO string - never null (uses current time as fallback)
  */
-export const timestampToISO = (timestamp: Timestamp | null | undefined): string | null => {
-  if (!timestamp) return null;
-  return timestamp.toDate().toISOString();
+export const timestampToISO = (timestamp: Timestamp | Date | null | undefined): string => {
+  if (!timestamp || timestamp === null) {
+    return new Date().toISOString(); // Fallback to current time during optimistic updates
+  }
+  if (timestamp instanceof Date) {
+    return timestamp.toISOString();
+  }
+  // Firestore Timestamp or object with toDate() (handles mocks in tests)
+  if (typeof (timestamp as { toDate?: () => Date }).toDate === 'function') {
+    return (timestamp as Timestamp).toDate().toISOString();
+  }
+  return new Date().toISOString(); // Final fallback
 };
 
 /**

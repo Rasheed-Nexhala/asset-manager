@@ -6,7 +6,7 @@
  * CIAMS: ScreenLayout, ScreenHeader, list with edit/delete, FAB for add, real-time updates.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -20,7 +20,8 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenHeader, ScreenLayout } from '../../components';
-import { CategoryListItem, CategoryEditModal } from '../../components/Inventory';
+import { CategoryListItem } from '../../components/Inventory/CategoryListItem';
+import { CategoryEditModal } from '../../components/Inventory/CategoryEditModal';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   fetchCategories,
@@ -30,14 +31,14 @@ import {
 } from '../../store/thunks/inventoryThunks';
 import { clearError } from '../../store/slices/inventorySlice';
 import {
-  selectCategories,
-  selectInventoryLoading,
-  selectInventoryError,
-  selectItemsByCategory,
+  selectAllCategories,
+  selectAllItems,
+  selectItemsLoading,
 } from '../../store/selectors/inventorySelectors';
-import { subscribeToCategories } from '../../services/firebase/categoryService';
+import { useInventoryError } from '../../hooks/useInventoryError';
+import { subscribeCategories } from '../../services/firebase/categoryService';
 import { setCategories } from '../../store/slices/inventorySlice';
-import type { Category } from '../../types/inventory';
+import type { Category, Item } from '../../types/inventory';
 
 export const CategoryManagementScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -49,10 +50,20 @@ export const CategoryManagementScreen: React.FC = () => {
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const categories = useAppSelector(selectCategories);
-  const isLoading = useAppSelector(selectInventoryLoading);
-  const error = useAppSelector(selectInventoryError);
-  const itemsByCategory = useAppSelector(selectItemsByCategory);
+  const categories = useAppSelector(selectAllCategories);
+  const allItems = useAppSelector(selectAllItems);
+  const isLoading = useAppSelector(selectItemsLoading);
+  const error = useInventoryError();
+
+  // Compute items grouped by category locally (selectItemsByCategory is a factory, not usable as-is)
+  const itemsByCategory = useMemo(() => {
+    const map: Record<string, Item[]> = {};
+    for (const item of allItems) {
+      if (!map[item.categoryId]) map[item.categoryId] = [];
+      map[item.categoryId].push(item);
+    }
+    return map;
+  }, [allItems]);
 
   // Set up real-time listener for categories
   useEffect(() => {
@@ -60,7 +71,7 @@ export const CategoryManagementScreen: React.FC = () => {
     dispatch(fetchCategories());
 
     // Subscribe to real-time updates
-    const unsubscribe = subscribeToCategories((updatedCategories: Category[]) => {
+    const unsubscribe = subscribeCategories((updatedCategories: Category[]) => {
       dispatch(setCategories(updatedCategories));
     });
 
@@ -107,11 +118,13 @@ export const CategoryManagementScreen: React.FC = () => {
           {
             text: 'Delete',
             style: 'destructive',
-            onPress: async () => {
+              onPress: async () => {
               try {
                 await dispatch(deleteCategory(category.id)).unwrap();
               } catch (err: any) {
-                Alert.alert('Error', err.message || 'Failed to delete category');
+                const message =
+                  typeof err === 'string' ? err : err?.message || 'Failed to delete category';
+                Alert.alert('Cannot Delete Category', message);
               }
             },
           },

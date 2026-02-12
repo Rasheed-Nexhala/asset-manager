@@ -1,14 +1,20 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components';
 import { ItemForm } from '../../components/Inventory/ItemForm';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { createItem, updateItem, fetchItemById } from '../../store/thunks/inventoryThunks';
-import { selectAllCategories, selectItemsLoading, selectItemsError } from '../../store/selectors/inventorySelectors';
-import { uploadItemImage } from '../../services/firebase/storageService';
+import {
+  createItem,
+  updateItem,
+  fetchItemById,
+  SKU_EXISTS_ERROR_MESSAGE,
+} from '../../store/thunks/inventoryThunks';
+import { selectAllCategories, selectItemsLoading } from '../../store/selectors/inventorySelectors';
+import { useInventoryError } from '../../hooks/useInventoryError';
+import { uploadItemImage, deleteItemImageByUrl } from '../../services/firebase/storageService';
 import type { Item, CreateItemData, UpdateItemData } from '../../types/inventory';
 import type { InventoryStackParamList } from '../../navigation/InventoryStackNavigator';
 
@@ -33,7 +39,7 @@ export const AddEditItemScreen: React.FC = () => {
   // Redux state
   const categories = useAppSelector(selectAllCategories);
   const isLoading = useAppSelector(selectItemsLoading);
-  const reduxError = useAppSelector(selectItemsError);
+  const reduxError = useInventoryError();
   
   // Local state
   const [item, setItem] = useState<Item | null>(null);
@@ -63,11 +69,9 @@ export const AddEditItemScreen: React.FC = () => {
     loadItem();
   }, [mode, itemId, dispatch]);
 
-  // Clear error when Redux error changes
+  // Sync Redux error to local state (including when auto-cleared)
   useEffect(() => {
-    if (reduxError) {
-      setError(reduxError);
-    }
+    setError(reduxError ?? null);
   }, [reduxError]);
 
   // Memoize initial data for ItemForm
@@ -136,13 +140,21 @@ export const AddEditItemScreen: React.FC = () => {
           if (imageUri) {
             try {
               imageUrl = await uploadItemImage(imageUri, createdItem.id);
-              // Update item with image URL
-              await dispatch(
-                updateItem({
-                  itemId: createdItem.id,
-                  updates: { imageUrl },
-                })
-              ).unwrap();
+              // Update item with image URL - wrap in try-catch for orphan cleanup
+              try {
+                await dispatch(
+                  updateItem({
+                    itemId: createdItem.id,
+                    updates: { imageUrl },
+                  })
+                ).unwrap();
+              } catch (updateError) {
+                // If update fails after upload, delete orphaned image
+                if (imageUrl) {
+                  await deleteItemImageByUrl(imageUrl);
+                }
+                throw updateError;
+              }
             } catch (imageError: any) {
               console.error('Error uploading image:', imageError);
               // Don't fail the entire operation if image upload fails
@@ -170,6 +182,9 @@ export const AddEditItemScreen: React.FC = () => {
             ? getCategoryName(updateData.categoryId)
             : undefined;
 
+          // Track if we uploaded a new image (for orphan cleanup on update failure)
+          let uploadedImageUrl: string | undefined;
+
           // Handle image upload/update
           // imageUri can be:
           // - undefined: user removed image or no image was set
@@ -186,6 +201,7 @@ export const AddEditItemScreen: React.FC = () => {
             try {
               const imageUrl = await uploadItemImage(imageUri, itemId);
               updateData.imageUrl = imageUrl;
+              uploadedImageUrl = imageUrl;
             } catch (imageError: any) {
               console.error('Error uploading image:', imageError);
               setError('Failed to upload image. Please try again.');
@@ -194,14 +210,22 @@ export const AddEditItemScreen: React.FC = () => {
             }
           }
 
-          // Update item
-          await dispatch(
-            updateItem({
-              itemId,
-              updates: updateData,
-              categoryName,
-            })
-          ).unwrap();
+          // Update item - wrap in try-catch for orphan cleanup if new image was uploaded
+          try {
+            await dispatch(
+              updateItem({
+                itemId,
+                updates: updateData,
+                categoryName,
+              })
+            ).unwrap();
+          } catch (updateError) {
+            // If update fails after uploading new image, delete orphaned image
+            if (uploadedImageUrl) {
+              await deleteItemImageByUrl(uploadedImageUrl);
+            }
+            throw updateError;
+          }
 
           setSuccess(true);
           
@@ -212,16 +236,22 @@ export const AddEditItemScreen: React.FC = () => {
           }, 1000);
         }
       } catch (err: any) {
-        // Handle specific error messages
-        const errorMessage = err.message || 'Failed to save item';
-        
-        // Check for SKU uniqueness error
-        if (errorMessage.includes('SKU') && errorMessage.includes('already exists')) {
-          setError(errorMessage);
-        } else {
-          setError(errorMessage);
+        const errorMessage = err?.message || 'Failed to save item';
+        setError(errorMessage);
+
+        // Show Alert for duplicate SKU - definitive UX feedback for both create and edit
+        const isDuplicateSku =
+          errorMessage === SKU_EXISTS_ERROR_MESSAGE ||
+          (errorMessage.toLowerCase().includes('sku') &&
+            errorMessage.toLowerCase().includes('already exists'));
+        if (isDuplicateSku) {
+          Alert.alert(
+            'Duplicate SKU',
+            SKU_EXISTS_ERROR_MESSAGE,
+            [{ text: 'OK' }]
+          );
         }
-        
+
         console.error('Error saving item:', err);
       } finally {
         setIsSubmitting(false);

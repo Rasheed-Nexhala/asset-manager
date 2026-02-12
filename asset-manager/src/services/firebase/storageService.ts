@@ -8,6 +8,15 @@ import { storage } from '../../../config/firebase';
 const ITEM_IMAGES_PATH = 'itemImages';
 
 /**
+ * ## Orphaned Image Cleanup
+ *
+ * To prevent storage costs from accumulating orphaned files:
+ * - Call `deleteItemImageByUrl(imageUrl)` when deleting items that have images
+ * - Call `deleteItemImageByUrl(imageUrl)` when item creation fails after image upload
+ * - Both delete functions handle missing files gracefully (no throw on object-not-found)
+ */
+
+/**
  * Maximum file size: 5MB (as per storage rules)
  */
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB in bytes
@@ -178,8 +187,29 @@ export const getItemImageUrl = async (
 };
 
 /**
+ * Extract storage path from Firebase Storage download URL.
+ * URL format: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{encodedPath}?alt=media&token=...
+ *
+ * @param imageUrl - Full download URL from Firebase Storage
+ * @returns Storage path or null if URL format is invalid
+ */
+const getStoragePathFromUrl = (imageUrl: string): string | null => {
+  try {
+    const match = imageUrl.match(/\/o\/(.+?)(\?|$)/);
+    if (!match) return null;
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Delete an item image from Firebase Storage
- * 
+ *
+ * Handles errors gracefully - does not throw if the image does not exist
+ * (e.g. storage/object-not-found). Use for cleanup operations to avoid
+ * failing when orphaned references point to already-deleted files.
+ *
  * @param itemId - Item ID
  * @param fileName - File name to delete
  */
@@ -190,8 +220,43 @@ export const deleteItemImage = async (
   try {
     const storageRef = ref(storage, `${ITEM_IMAGES_PATH}/${itemId}/${fileName}`);
     await deleteObject(storageRef);
-  } catch (error) {
+  } catch (error: any) {
+    // Don't throw if file doesn't exist - graceful cleanup for orphaned references
+    if (error?.code === 'storage/object-not-found') {
+      return;
+    }
     console.error('Error deleting item image:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete an item image by its Firebase Storage download URL.
+ *
+ * Used when cleaning up images during item deletion - the item document
+ * stores imageUrl, not the storage path. Extracts path from URL and deletes.
+ * Does not throw if the image does not exist (graceful cleanup).
+ *
+ * @param imageUrl - Full download URL from Firebase Storage
+ */
+export const deleteItemImageByUrl = async (imageUrl: string): Promise<void> => {
+  if (!imageUrl || !imageUrl.trim()) return;
+
+  const path = getStoragePathFromUrl(imageUrl);
+  if (!path) {
+    console.warn('Could not extract storage path from image URL:', imageUrl);
+    return;
+  }
+
+  try {
+    const storageRef = ref(storage, path);
+    await deleteObject(storageRef);
+  } catch (error: any) {
+    // Don't throw if file doesn't exist - graceful cleanup for orphaned references
+    if (error?.code === 'storage/object-not-found') {
+      return;
+    }
+    console.error('Error deleting item image by URL:', error);
     throw error;
   }
 };

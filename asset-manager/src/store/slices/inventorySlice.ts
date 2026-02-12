@@ -5,6 +5,7 @@ import {
   fetchItemById,
   createItem,
   updateItem,
+  deleteItem,
   adjustQuantity,
   fetchInventoryByLocation,
   fetchCategories,
@@ -13,6 +14,10 @@ import {
   deleteCategory,
 } from '../../store/thunks/inventoryThunks';
 
+export interface ClearErrorPayload {
+  reason?: string;
+}
+
 interface InventoryState {
   items: Item[];
   categories: Category[];
@@ -20,6 +25,7 @@ interface InventoryState {
   lowStockItemIds: string[]; // IDs of items at or below minimum stock level
   loading: boolean;
   error: string | null;
+  errorTimestamp: number | null; // When error occurred (for auto-clear and debugging)
   filters: ItemFilters | null; // Current filters applied to items list
 }
 
@@ -30,6 +36,7 @@ const initialState: InventoryState = {
   lowStockItemIds: [],
   loading: false,
   error: null,
+  errorTimestamp: null,
   filters: null,
 };
 
@@ -61,12 +68,14 @@ const inventorySlice = createSlice({
     },
     setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
+      state.errorTimestamp = action.payload ? Date.now() : null;
     },
     setFilters: (state, action: PayloadAction<ItemFilters | null>) => {
       state.filters = action.payload;
     },
-    clearError: (state) => {
+    clearError: (state, action: PayloadAction<ClearErrorPayload | undefined>) => {
       state.error = null;
+      state.errorTimestamp = null;
     },
     // Update a single item in the items array (useful for real-time updates)
     updateItemInState: (state, action: PayloadAction<Item>) => {
@@ -99,6 +108,7 @@ const inventorySlice = createSlice({
       state.lowStockItemIds = [];
       state.filters = null;
       state.error = null;
+      state.errorTimestamp = null;
     },
   },
   extraReducers: (builder) => {
@@ -107,6 +117,7 @@ const inventorySlice = createSlice({
       .addCase(fetchItems.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(fetchItems.fulfilled, (state, action) => {
         state.loading = false;
@@ -116,15 +127,18 @@ const inventorySlice = createSlice({
           .filter((item) => item.totalQuantity <= item.minStockLevel)
           .map((item) => item.id);
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(fetchItems.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+        state.errorTimestamp = Date.now();
       })
       // Fetch item by ID
       .addCase(fetchItemById.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(fetchItemById.fulfilled, (state, action) => {
         state.loading = false;
@@ -141,124 +155,174 @@ const inventorySlice = createSlice({
             .map((item) => item.id);
         }
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(fetchItemById.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+        state.errorTimestamp = Date.now();
       })
       // Create item
       .addCase(createItem.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(createItem.fulfilled, (state) => {
         state.loading = false;
         // Don't manually add the item here - the real-time listener will handle it
         // to avoid duplicate entries when subscribeItems triggers
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(createItem.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+        state.errorTimestamp = Date.now();
       })
       // Update item
       .addCase(updateItem.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(updateItem.fulfilled, (state) => {
         state.loading = false;
         // Don't manually update the item here - the real-time listener will handle it
         // to ensure consistency and avoid race conditions
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(updateItem.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+        state.errorTimestamp = Date.now();
+      })
+      // Delete item
+      .addCase(deleteItem.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(deleteItem.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items = state.items.filter((item) => item.id !== action.payload);
+        state.lowStockItemIds = state.lowStockItemIds.filter((id) => id !== action.payload);
+        // Clear inventory entries for this item from all locations
+        Object.keys(state.inventoryByLocation).forEach((locationId) => {
+          state.inventoryByLocation[locationId] = state.inventoryByLocation[
+            locationId
+          ].filter((entry) => entry.itemId !== action.payload);
+        });
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(deleteItem.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+        state.errorTimestamp = Date.now();
       })
       // Adjust quantity
       .addCase(adjustQuantity.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(adjustQuantity.fulfilled, (state) => {
         state.loading = false;
         // Don't manually update here - real-time listeners will handle updates
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(adjustQuantity.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+        state.errorTimestamp = Date.now();
       })
       // Fetch inventory by location
       .addCase(fetchInventoryByLocation.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(fetchInventoryByLocation.fulfilled, (state, action) => {
         state.loading = false;
         state.inventoryByLocation[action.payload.locationId] = action.payload.inventory;
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(fetchInventoryByLocation.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+        state.errorTimestamp = Date.now();
       })
       // Fetch categories
       .addCase(fetchCategories.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(fetchCategories.fulfilled, (state, action) => {
         state.loading = false;
         state.categories = action.payload;
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(fetchCategories.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+        state.errorTimestamp = Date.now();
       })
       // Create category
       .addCase(createCategory.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(createCategory.fulfilled, (state) => {
         state.loading = false;
         // Don't manually add the category here - the real-time listener will handle it
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(createCategory.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+        state.errorTimestamp = Date.now();
       })
       // Update category
       .addCase(updateCategory.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(updateCategory.fulfilled, (state) => {
         state.loading = false;
         // Don't manually update the category here - the real-time listener will handle it
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(updateCategory.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+        state.errorTimestamp = Date.now();
       })
       // Delete category
       .addCase(deleteCategory.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(deleteCategory.fulfilled, (state) => {
         state.loading = false;
         // Don't manually remove the category here - the real-time listener will handle it
         state.error = null;
+        state.errorTimestamp = null;
       })
       .addCase(deleteCategory.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+        state.errorTimestamp = Date.now();
       });
   },
 });
@@ -278,6 +342,6 @@ export const {
   clearInventory,
 } = inventorySlice.actions;
 
-export { fetchItems, fetchItemById, createItem, updateItem, adjustQuantity, fetchInventoryByLocation, fetchCategories, createCategory, updateCategory, deleteCategory } from '../../store/thunks/inventoryThunks';
+export { fetchItems, fetchItemById, createItem, updateItem, deleteItem, adjustQuantity, fetchInventoryByLocation, fetchCategories, createCategory, updateCategory, deleteCategory } from '../../store/thunks/inventoryThunks';
 
 export default inventorySlice.reducer;

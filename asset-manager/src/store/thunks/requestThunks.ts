@@ -1,0 +1,358 @@
+import { createAsyncThunk } from '@reduxjs/toolkit';
+import { requestService } from '../../services/firebase/requestService';
+import type {
+  CreateRequestData,
+  EditRequestData,
+  RejectRequestData,
+  TransferRequestData,
+  ReturnItemsData,
+} from '../../types/request';
+import {
+  setLoading,
+  setError,
+  clearError,
+  addRequest,
+  updateRequestInState,
+} from '../slices/requestsSlice';
+
+/**
+ * Create a new request
+ */
+export const createRequest = createAsyncThunk(
+  'requests/createRequest',
+  async (
+    {
+      requestData,
+      userId,
+      userName,
+      isDraft,
+    }: {
+      requestData: CreateRequestData;
+      userId: string;
+      userName: string;
+      isDraft?: boolean;
+    },
+    { dispatch, rejectWithValue }
+  ) => {
+    try {
+      dispatch(setLoading(true));
+      dispatch(clearError());
+
+      const requestId = await requestService.createRequest(
+        requestData,
+        userId,
+        userName,
+        isDraft
+      );
+
+      // Fetch the created request
+      const createdRequest = await requestService.getRequestById(requestId);
+      if (createdRequest) {
+        dispatch(addRequest(createdRequest));
+      }
+
+      dispatch(setLoading(false));
+      return requestId;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to create request';
+      dispatch(setError(errorMessage));
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * Edit an existing request
+ */
+export const editRequest = createAsyncThunk(
+  'requests/editRequest',
+  async (
+    {
+      requestId,
+      updates,
+      editedBy,
+      editedByName,
+    }: {
+      requestId: string;
+      updates: EditRequestData;
+      editedBy: string;
+      editedByName: string;
+    },
+    { dispatch, rejectWithValue }
+  ) => {
+    try {
+      dispatch(setLoading(true));
+      dispatch(clearError());
+
+      await requestService.editRequest(requestId, updates, editedBy, editedByName);
+
+      // Fetch updated request
+      const updatedRequest = await requestService.getRequestById(requestId);
+      if (updatedRequest) {
+        dispatch(updateRequestInState(updatedRequest));
+      }
+
+      dispatch(setLoading(false));
+      return updatedRequest;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to edit request';
+      dispatch(setError(errorMessage));
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * Submit a draft request (convert to pending)
+ */
+export const submitDraftRequest = createAsyncThunk(
+  'requests/submitDraftRequest',
+  async (
+    {
+      requestId,
+      userId,
+    }: {
+      requestId: string;
+      userId: string;
+    },
+    { dispatch, rejectWithValue }
+  ) => {
+    try {
+      dispatch(setLoading(true));
+      dispatch(clearError());
+
+      await requestService.submitDraftRequest(requestId, userId);
+
+      // Fetch updated request
+      const updatedRequest = await requestService.getRequestById(requestId);
+      if (updatedRequest) {
+        dispatch(updateRequestInState(updatedRequest));
+      }
+
+      dispatch(setLoading(false));
+      return updatedRequest;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to submit request';
+      dispatch(setError(errorMessage));
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * Approve a request
+ */
+export const approveRequest = createAsyncThunk(
+  'requests/approveRequest',
+  async (
+    {
+      requestId,
+      processedBy,
+      processedByName,
+      storeNotes,
+    }: {
+      requestId: string;
+      processedBy: string;
+      processedByName: string;
+      storeNotes?: string;
+    },
+    { dispatch, rejectWithValue }
+  ) => {
+    try {
+      dispatch(setLoading(true));
+      dispatch(clearError());
+
+      await requestService.approveRequest(
+        requestId,
+        processedBy,
+        processedByName,
+        storeNotes
+      );
+
+      // Fetch updated request
+      const updatedRequest = await requestService.getRequestById(requestId);
+      if (updatedRequest) {
+        dispatch(updateRequestInState(updatedRequest));
+      }
+
+      dispatch(setLoading(false));
+      return updatedRequest;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to approve request';
+      dispatch(setError(errorMessage));
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * Reject a request
+ */
+export const rejectRequest = createAsyncThunk(
+  'requests/rejectRequest',
+  async (
+    {
+      requestId,
+      rejectionData,
+      processedBy,
+      processedByName,
+    }: {
+      requestId: string;
+      rejectionData: RejectRequestData;
+      processedBy: string;
+      processedByName: string;
+    },
+    { dispatch, rejectWithValue }
+  ) => {
+    try {
+      dispatch(setLoading(true));
+      dispatch(clearError());
+
+      await requestService.rejectRequest(
+        requestId,
+        rejectionData,
+        processedBy,
+        processedByName
+      );
+
+      // Fetch updated request
+      const updatedRequest = await requestService.getRequestById(requestId);
+      if (updatedRequest) {
+        dispatch(updateRequestInState(updatedRequest));
+      }
+
+      dispatch(setLoading(false));
+      return updatedRequest;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to reject request';
+      dispatch(setError(errorMessage));
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * Transfer request items
+ */
+export const transferRequest = createAsyncThunk(
+  'requests/transferRequest',
+  async (
+    {
+      requestId,
+      transferData,
+      transferredBy,
+      transferredByName,
+    }: {
+      requestId: string;
+      transferData: TransferRequestData;
+      transferredBy: string;
+      transferredByName: string;
+    },
+    { dispatch, rejectWithValue }
+  ) => {
+    try {
+      dispatch(setLoading(true));
+      dispatch(clearError());
+
+      await requestService.transferRequest(
+        requestId,
+        transferData,
+        transferredBy,
+        transferredByName
+      );
+
+      // Fetch updated request
+      const updatedRequest = await requestService.getRequestById(requestId);
+      if (updatedRequest) {
+        dispatch(updateRequestInState(updatedRequest));
+      }
+
+      dispatch(setLoading(false));
+      return updatedRequest;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to transfer request';
+      dispatch(setError(errorMessage));
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * Return items
+ */
+export const returnItems = createAsyncThunk(
+  'requests/returnItems',
+  async (
+    {
+      requestId,
+      returnData,
+      userId,
+      userName,
+    }: {
+      requestId: string;
+      returnData: ReturnItemsData;
+      userId: string;
+      userName: string;
+    },
+    { dispatch, rejectWithValue }
+  ) => {
+    try {
+      dispatch(setLoading(true));
+      dispatch(clearError());
+
+      await requestService.returnItems(requestId, returnData, userId, userName);
+
+      // Fetch updated request
+      const updatedRequest = await requestService.getRequestById(requestId);
+      if (updatedRequest) {
+        dispatch(updateRequestInState(updatedRequest));
+      }
+
+      dispatch(setLoading(false));
+      return updatedRequest;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to return items';
+      dispatch(setError(errorMessage));
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * Cancel a request
+ */
+export const cancelRequest = createAsyncThunk(
+  'requests/cancelRequest',
+  async (
+    { requestId }: { requestId: string },
+    { dispatch, rejectWithValue }
+  ) => {
+    try {
+      dispatch(setLoading(true));
+      dispatch(clearError());
+
+      await requestService.cancelRequest(requestId);
+
+      // Fetch updated request
+      const updatedRequest = await requestService.getRequestById(requestId);
+      if (updatedRequest) {
+        dispatch(updateRequestInState(updatedRequest));
+      }
+
+      dispatch(setLoading(false));
+      return updatedRequest;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to cancel request';
+      dispatch(setError(errorMessage));
+      return rejectWithValue(errorMessage);
+    }
+  }
+);

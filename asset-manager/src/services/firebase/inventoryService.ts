@@ -14,9 +14,11 @@ import {
   QuerySnapshot,
   writeBatch,
   Timestamp,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import { auth } from '../../../config/firebase';
+import { deleteItemImageByUrl } from './storageService';
 import type {
   FirestoreItem,
   Item,
@@ -29,6 +31,7 @@ import type {
   LocationType,
 } from '../../types/inventory';
 import { timestampToISO } from '../../types/inventory';
+import { getLocationId, getLocationTypeFromId } from '../../utils/locationUtils';
 
 // Collection names
 const ITEMS_COLLECTION = 'items';
@@ -224,8 +227,8 @@ export const createItem = async (
 
     const batch = writeBatch(db);
 
-    // Create item document
-    const itemRef = doc(collection(db, ITEMS_COLLECTION));
+    // Create item document with SKU as document ID (enables Firestore rule for SKU uniqueness)
+    const itemRef = doc(db, ITEMS_COLLECTION, itemData.sku);
     const now = serverTimestamp();
     
     const itemDocData = {
@@ -255,7 +258,7 @@ export const createItem = async (
       itemId: itemRef.id,
       itemName: itemData.name,
       itemSku: itemData.sku,
-      locationId: 'store',
+      locationId: getLocationId('store'),
       locationType: 'store' as LocationType,
       locationName: 'Central Store',
       quantity: itemData.initialQuantity,
@@ -276,10 +279,10 @@ export const createItem = async (
 
 /**
  * Update an existing item
- * 
- * Note: Item type cannot be changed after first transaction (business rule)
- * This is enforced by not allowing type updates in UpdateItemData
- * 
+ *
+ * Enforces business rule: item type cannot be changed after the first transaction
+ * (i.e., once any quantity has been added at any location).
+ *
  * @param id - Item document ID
  * @param updates - Item data to update
  * @param categoryName - Optional category name if categoryId is being updated
@@ -293,6 +296,28 @@ export const updateItem = async (
     const user = auth.currentUser;
     if (!user) {
       throw new Error('User must be authenticated to update items');
+    }
+
+    // Fetch current item for validation (before any database operations)
+    const itemDoc = await getDoc(doc(db, ITEMS_COLLECTION, id));
+    if (!itemDoc.exists()) {
+      throw new Error(`Item with ID ${id} not found`);
+    }
+    const itemData = itemDoc.data();
+
+    // Enforce business rule: type cannot be changed after first transaction
+    if (updates.type !== undefined && updates.type !== itemData.type) {
+      const hasTransactions =
+        (itemData.totalQuantity ?? 0) > 0 ||
+        (itemData.centralStoreQuantity ?? 0) > 0 ||
+        (itemData.atSitesQuantity ?? 0) > 0 ||
+        (itemData.inMaintenanceQuantity ?? 0) > 0;
+
+      if (hasTransactions) {
+        throw new Error(
+          'Item type cannot be changed after inventory transactions have occurred'
+        );
+      }
     }
 
     // If SKU is being updated, check if new SKU already exists
@@ -321,6 +346,62 @@ export const updateItem = async (
 };
 
 /**
+ * Delete an item and clean up associated data
+ *
+ * This function:
+ * 1. Gets the item document to retrieve imageUrl
+ * 2. If imageUrl exists, deletes the image from Storage (prevents orphaned files)
+ * 3. Deletes all inventory entries for this item
+ * 4. Deletes the item document
+ * Uses batch operations for Firestore writes (atomic delete of inventory + item)
+ *
+ * @param id - Item document ID
+ */
+export const deleteItem = async (id: string): Promise<void> => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User must be authenticated to delete items');
+    }
+
+    // Get item to retrieve imageUrl for storage cleanup
+    const itemDoc = await getDoc(doc(db, ITEMS_COLLECTION, id));
+    if (!itemDoc.exists()) {
+      throw new Error(`Item with ID ${id} not found`);
+    }
+
+    const itemData = itemDoc.data();
+    const imageUrl = itemData?.imageUrl;
+
+    // Delete image from storage first (prevents orphaned files)
+    if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim()) {
+      await deleteItemImageByUrl(imageUrl);
+    }
+
+    // Get all inventory entries for this item
+    const inventoryQuery = query(
+      collection(db, INVENTORY_COLLECTION),
+      where('itemId', '==', id)
+    );
+    const inventorySnapshot = await getDocs(inventoryQuery);
+
+    // Use batch for atomic delete (inventory entries + item document)
+    const batch = writeBatch(db);
+
+    inventorySnapshot.docs.forEach((docSnap) => {
+      batch.delete(doc(db, INVENTORY_COLLECTION, docSnap.id));
+    });
+
+    batch.delete(doc(db, ITEMS_COLLECTION, id));
+
+    await batch.commit();
+  } catch (error) {
+    console.error('Error deleting item:', error);
+    throw error;
+  }
+};
+
+/**
  * Adjust inventory quantity at a specific location
  * 
  * This function:
@@ -338,96 +419,95 @@ export const adjustQuantity = async (
       throw new Error('User must be authenticated to adjust inventory');
     }
 
-    // Get current inventory entry
     const inventoryQuery = query(
       collection(db, INVENTORY_COLLECTION),
       where('itemId', '==', adjustmentData.itemId),
       where('locationId', '==', adjustmentData.locationId)
     );
 
-    const inventorySnapshot = await getDocs(inventoryQuery);
-    let inventoryRef: any;
-    let currentQuantity = 0;
-
-    if (inventorySnapshot.empty) {
-      // Create new inventory entry if it doesn't exist
-      inventoryRef = doc(collection(db, INVENTORY_COLLECTION));
-      currentQuantity = 0;
-    } else {
-      inventoryRef = doc(db, INVENTORY_COLLECTION, inventorySnapshot.docs[0].id);
-      currentQuantity = inventorySnapshot.docs[0].data().quantity || 0;
-    }
-
-    // Calculate new quantity
-    const quantityChange =
-      adjustmentData.type === 'add'
-        ? adjustmentData.quantity
-        : -adjustmentData.quantity;
-    const newQuantity = currentQuantity + quantityChange;
-
-    // Prevent negative stock
-    if (newQuantity < 0) {
-      throw new Error(
-        `Cannot reduce stock below zero. Current quantity: ${currentQuantity}, Attempted change: ${quantityChange}`
-      );
-    }
-
-    // Get item data for denormalized fields
-    const itemDoc = await getDoc(doc(db, ITEMS_COLLECTION, adjustmentData.itemId));
-    if (!itemDoc.exists()) {
-      throw new Error(`Item ${adjustmentData.itemId} not found`);
-    }
-
-    const itemData = itemDoc.data();
-    const batch = writeBatch(db);
-
-    // Update or create inventory entry
-    const inventoryUpdateData: any = {
-      itemId: adjustmentData.itemId,
-      itemName: itemData.name,
-      itemSku: itemData.sku,
-      locationId: adjustmentData.locationId,
-      locationType: adjustmentData.locationType,
-      locationName: adjustmentData.locationName,
-      quantity: newQuantity,
-      updatedAt: serverTimestamp(),
-    };
-
-    if (inventorySnapshot.empty) {
-      batch.set(inventoryRef, inventoryUpdateData);
-    } else {
-      batch.update(inventoryRef, inventoryUpdateData);
-    }
-
-    // Update item's denormalized stock totals
     const itemRef = doc(db, ITEMS_COLLECTION, adjustmentData.itemId);
-    const currentTotals = {
-      totalQuantity: itemData.totalQuantity || 0,
-      centralStoreQuantity: itemData.centralStoreQuantity || 0,
-      atSitesQuantity: itemData.atSitesQuantity || 0,
-      inMaintenanceQuantity: itemData.inMaintenanceQuantity || 0,
-    };
 
-    // Calculate new totals based on location type
-    let updatedTotals: any = {};
-    if (adjustmentData.locationType === 'store') {
-      updatedTotals.centralStoreQuantity =
-        currentTotals.centralStoreQuantity + quantityChange;
-    } else if (adjustmentData.locationType === 'site') {
-      updatedTotals.atSitesQuantity =
-        currentTotals.atSitesQuantity + quantityChange;
-    } else if (adjustmentData.locationType === 'maintenance') {
-      updatedTotals.inMaintenanceQuantity =
-        currentTotals.inMaintenanceQuantity + quantityChange;
-    }
+    await runTransaction(db, async (transaction) => {
+      // Read inventory within transaction (atomic with writes)
+      // Note: transaction.get() supports Query at runtime; type assertion needed for TS
+      const inventorySnapshot = (await (
+        transaction as unknown as { get: (ref: unknown) => Promise<QuerySnapshot> }
+      ).get(inventoryQuery)) as QuerySnapshot;
+      let inventoryRef: ReturnType<typeof doc>;
+      let currentQuantity = 0;
 
-    updatedTotals.totalQuantity = currentTotals.totalQuantity + quantityChange;
-    updatedTotals.updatedAt = serverTimestamp();
+      if (inventorySnapshot.empty) {
+        inventoryRef = doc(collection(db, INVENTORY_COLLECTION));
+        currentQuantity = 0;
+      } else {
+        inventoryRef = doc(db, INVENTORY_COLLECTION, inventorySnapshot.docs[0].id);
+        currentQuantity = inventorySnapshot.docs[0].data()?.quantity || 0;
+      }
 
-    batch.update(itemRef, updatedTotals);
+      // Read item within transaction
+      const itemDoc = await transaction.get(itemRef);
+      if (!itemDoc.exists()) {
+        throw new Error(`Item ${adjustmentData.itemId} not found`);
+      }
+      const itemData = itemDoc.data() ?? {};
 
-    // Commit batch
-    await batch.commit();
+      // Calculate new quantity
+      const quantityChange =
+        adjustmentData.type === 'add'
+          ? adjustmentData.quantity
+          : -adjustmentData.quantity;
+      const newQuantity = currentQuantity + quantityChange;
+
+      // Prevent negative stock (atomic check)
+      if (newQuantity < 0) {
+        throw new Error(
+          `Cannot reduce stock below zero. Current quantity: ${currentQuantity}, Attempted change: ${quantityChange}`
+        );
+      }
+
+      // Update or create inventory entry
+      const inventoryUpdateData: Record<string, unknown> = {
+        itemId: adjustmentData.itemId,
+        itemName: itemData.name,
+        itemSku: itemData.sku,
+        locationId: adjustmentData.locationId,
+        locationType: adjustmentData.locationType,
+        locationName: adjustmentData.locationName,
+        quantity: newQuantity,
+        updatedAt: serverTimestamp(),
+      };
+
+      if (inventorySnapshot.empty) {
+        transaction.set(inventoryRef, inventoryUpdateData);
+      } else {
+        transaction.update(inventoryRef, inventoryUpdateData);
+      }
+
+      // Update item's denormalized stock totals
+      const currentTotals = {
+        totalQuantity: itemData.totalQuantity || 0,
+        centralStoreQuantity: itemData.centralStoreQuantity || 0,
+        atSitesQuantity: itemData.atSitesQuantity || 0,
+        inMaintenanceQuantity: itemData.inMaintenanceQuantity || 0,
+      };
+
+      const updatedTotals: Record<string, unknown> = {};
+      if (adjustmentData.locationType === 'store') {
+        updatedTotals.centralStoreQuantity =
+          currentTotals.centralStoreQuantity + quantityChange;
+      } else if (adjustmentData.locationType === 'site') {
+        updatedTotals.atSitesQuantity =
+          currentTotals.atSitesQuantity + quantityChange;
+      } else if (adjustmentData.locationType === 'maintenance') {
+        updatedTotals.inMaintenanceQuantity =
+          currentTotals.inMaintenanceQuantity + quantityChange;
+      }
+
+      updatedTotals.totalQuantity = currentTotals.totalQuantity + quantityChange;
+      updatedTotals.updatedAt = serverTimestamp();
+
+      transaction.update(itemRef, updatedTotals);
+    });
   } catch (error) {
     console.error('Error adjusting quantity:', error);
     throw error;
@@ -518,9 +598,18 @@ export const subscribeInventoryByLocation = (
   locationId: string,
   callback: (inventory: InventoryEntry[]) => void
 ): Unsubscribe => {
+  // Include locationType for Firestore rules: Site Managers can only read
+  // docs where locationType == 'site'; query must filter by it to succeed.
+  const locationType = getLocationTypeFromId(locationId);
+  if (!locationId || !locationType) {
+    callback([]);
+    return () => {};
+  }
+
   const q = query(
     collection(db, INVENTORY_COLLECTION),
     where('locationId', '==', locationId),
+    where('locationType', '==', locationType),
     orderBy('itemName', 'asc')
   );
 
@@ -529,6 +618,7 @@ export const subscribeInventoryByLocation = (
     (snapshot: QuerySnapshot) => {
       const inventory: InventoryEntry[] = [];
 
+      const byId = new Map<string, InventoryEntry>();
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
         const firestoreEntry: FirestoreInventoryEntry = {
@@ -542,10 +632,11 @@ export const subscribeInventoryByLocation = (
           quantity: data.quantity,
           updatedAt: data.updatedAt,
         };
-        inventory.push(firestoreInventoryEntryToInventoryEntry(firestoreEntry));
+        const entry = firestoreInventoryEntryToInventoryEntry(firestoreEntry);
+        if (!byId.has(entry.id)) byId.set(entry.id, entry);
       });
 
-      callback(inventory);
+      callback(Array.from(byId.values()));
     },
     (error) => {
       console.error('Error in inventory subscription:', error);
@@ -564,14 +655,24 @@ export const getInventoryByLocation = async (
   locationId: string
 ): Promise<InventoryEntry[]> => {
   try {
+    // Site Managers can only read inventory where locationType == 'site'.
+    // Firestore requires the query to include locationType so it can verify
+    // the query only returns allowed documents. Without this, the query fails
+    // with "Missing or insufficient permissions" for Site Managers.
+    const locationType = getLocationTypeFromId(locationId);
+    if (!locationId || !locationType) {
+      return [];
+    }
+
     const q = query(
       collection(db, INVENTORY_COLLECTION),
       where('locationId', '==', locationId),
+      where('locationType', '==', locationType),
       orderBy('itemName', 'asc')
     );
 
     const snapshot = await getDocs(q);
-    const inventory: InventoryEntry[] = [];
+    const byId = new Map<string, InventoryEntry>();
 
     snapshot.forEach((docSnap) => {
       const data = docSnap.data();
@@ -586,10 +687,11 @@ export const getInventoryByLocation = async (
         quantity: data.quantity,
         updatedAt: data.updatedAt,
       };
-      inventory.push(firestoreInventoryEntryToInventoryEntry(firestoreEntry));
+      const entry = firestoreInventoryEntryToInventoryEntry(firestoreEntry);
+      if (!byId.has(entry.id)) byId.set(entry.id, entry);
     });
 
-    return inventory;
+    return Array.from(byId.values());
   } catch (error) {
     console.error('Error getting inventory by location:', error);
     throw error;

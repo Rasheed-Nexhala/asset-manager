@@ -13,9 +13,19 @@ describe('firebaseUtils', () => {
       expect(result).toBe('2023-01-01T10:00:00.000Z');
     });
 
-    it('should handle null/undefined timestamps', () => {
-      expect(timestampToISOString(null)).toBe(null);
-      expect(timestampToISOString(undefined)).toBe(null);
+    it('should handle null/undefined timestamps with fallback to current time', () => {
+      const nullResult = timestampToISOString(null);
+      const undefinedResult = timestampToISOString(undefined);
+      expect(nullResult).toBeDefined();
+      expect(undefinedResult).toBeDefined();
+      expect(nullResult).toEqual(undefinedResult);
+      expect(new Date(nullResult).getTime()).not.toBeNaN();
+    });
+
+    it('should handle Date objects', () => {
+      const date = new Date('2024-06-15T14:30:00.000Z');
+      const result = timestampToISOString(date);
+      expect(result).toBe('2024-06-15T14:30:00.000Z');
     });
   });
 

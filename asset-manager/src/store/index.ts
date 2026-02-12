@@ -2,13 +2,16 @@ import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
 import sitesReducer from './slices/sitesSlice';
 import inventoryReducer from './slices/inventorySlice';
+import requestsReducer from './slices/requestsSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     sites: sitesReducer,
     inventory: inventoryReducer,
+    requests: requestsReducer,
   },
+  //Todo: Fix serializableCheck
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
@@ -35,8 +38,30 @@ export const store = configureStore({
           'inventory/fetchCategories/fulfilled',
           'inventory/createCategory/fulfilled',
           'inventory/updateCategory/fulfilled',
+          'requests/setRequests',
+          'requests/setMyRequests',
+          'requests/setSelectedRequest',
+          'requests/addRequest',
+          'requests/updateRequestInState',
+          'requests/createRequest/fulfilled',
+          'requests/editRequest/fulfilled',
+          'requests/submitDraftRequest/fulfilled',
+          'requests/approveRequest/fulfilled',
+          'requests/rejectRequest/fulfilled',
+          'requests/transferRequest/fulfilled',
+          'requests/returnItems/fulfilled',
+          'requests/cancelRequest/fulfilled',
         ],
-        ignoredPaths: ['auth.user', 'sites.sites', 'inventory.items', 'inventory.categories', 'inventory.inventoryByLocation'],
+        ignoredPaths: [
+          'auth.user',
+          'sites.sites',
+          'inventory.items',
+          'inventory.categories',
+          'inventory.inventoryByLocation',
+          'requests.requests',
+          'requests.myRequests',
+          'requests.selectedRequest',
+        ],
       },
     }),
 });

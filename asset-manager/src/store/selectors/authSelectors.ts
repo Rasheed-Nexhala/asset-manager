@@ -45,8 +45,8 @@ export const selectUserDisplayName = createSelector(
 );
 
 export const selectUserId = createSelector(
-  [selectCurrentUser],
-  (user) => user?.uid || null
+  [selectAuthState],
+  (auth) => auth.user?.uid ?? null
 );
 
 export const selectUserRole = createSelector(

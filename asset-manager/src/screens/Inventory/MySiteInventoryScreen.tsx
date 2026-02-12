@@ -5,11 +5,14 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectUserId } from '../../store/selectors/authSelectors';
-import { selectAllSites } from '../../store/selectors/sitesSelectors';
+import { selectAllSites, selectSitesLoading } from '../../store/selectors/sitesSelectors';
 import { selectAllItems, selectInventoryByLocation, selectItemsLoading } from '../../store/selectors/inventorySelectors';
 import { fetchInventoryByLocation } from '../../store/slices/inventorySlice';
+import { fetchSites, setSites } from '../../store/slices/sitesSlice';
+import { subscribeToSites } from '../../services/firebase/siteService';
 import { ScreenLayout, ScreenHeader } from '../../components';
 import { InventoryListItem } from '../../components/Inventory';
+import { getLocationId } from '../../utils/locationUtils';
 import type { InventoryEntry, ItemType } from '../../types/inventory';
 import type { Site } from '../../types/sites';
 import type { InventoryStackParamList } from '../../navigation/InventoryStackNavigator';
@@ -34,11 +37,27 @@ export const MySiteInventoryScreen: React.FC = () => {
   const sites = useAppSelector(selectAllSites);
   const items = useAppSelector(selectAllItems);
   const isLoading = useAppSelector(selectItemsLoading);
+  const sitesLoading = useAppSelector(selectSitesLoading);
   
   // Local state
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [currentSite, setCurrentSite] = useState<Site | null>(null);
   const [isLoadingSite, setIsLoadingSite] = useState<boolean>(true);
+  
+  // Fetch sites and set up real-time listener
+  useEffect(() => {
+    // Initial fetch
+    dispatch(fetchSites());
+
+    // Subscribe to real-time updates
+    const unsubscribe = subscribeToSites((updatedSites: Site[]) => {
+      dispatch(setSites(updatedSites));
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [dispatch]);
   
   // Find the user's site by matching managerId
   useEffect(() => {
@@ -46,28 +65,41 @@ export const MySiteInventoryScreen: React.FC = () => {
       const userSite = sites.find((site) => site.managerId === userId);
       setCurrentSite(userSite || null);
       setIsLoadingSite(false);
-    } else if (sites.length === 0) {
+    } else if (!sitesLoading && sites.length === 0) {
+      // Only mark as loaded if sites have finished loading and still empty
       setIsLoadingSite(false);
     }
-  }, [userId, sites]);
+  }, [userId, sites, sitesLoading]);
   
   // Fetch inventory when site is found
   useEffect(() => {
     if (currentSite) {
-      const locationId = `site_${currentSite.id}`;
-      dispatch(fetchInventoryByLocation(locationId));
+      dispatch(fetchInventoryByLocation(getLocationId('site', currentSite.id)));
     }
   }, [currentSite, dispatch]);
   
-  // Get inventory for current site
-  const siteLocationId = currentSite ? `site_${currentSite.id}` : '';
-  const inventoryEntries = useAppSelector((state) => 
-    selectInventoryByLocation(siteLocationId)(state)
+  // Get inventory for current site (standardized location ID format)
+  // Memoize selector to avoid "new reference" warning - only recreate when siteLocationId changes
+  const siteLocationId = currentSite ? getLocationId('site', currentSite.id) : '';
+  const selectInventoryForSite = useMemo(
+    () => selectInventoryByLocation(siteLocationId),
+    [siteLocationId]
   );
+  const inventoryEntries = useAppSelector(selectInventoryForSite);
   
   // Combine inventory entries with items to get type, unit, and imageUrl
+  // Also deduplicate entries by entry.id to prevent duplicate key errors
   const enrichedInventory = useMemo(() => {
-    return inventoryEntries.map((entry) => {
+    // Use Map to deduplicate by entry.id (keeps only the first occurrence)
+    const uniqueEntriesMap = new Map<string, InventoryEntry>();
+    inventoryEntries.forEach((entry) => {
+      if (!uniqueEntriesMap.has(entry.id)) {
+        uniqueEntriesMap.set(entry.id, entry);
+      }
+    });
+    
+    // Convert map values back to array and enrich with item data
+    return Array.from(uniqueEntriesMap.values()).map((entry) => {
       const item = items.find((i) => i.id === entry.itemId);
       return {
         entry,
@@ -114,7 +146,7 @@ export const MySiteInventoryScreen: React.FC = () => {
   }, []);
   
   // Loading state
-  if (isLoadingSite) {
+  if (isLoadingSite || sitesLoading) {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader title="My Inventory" />
