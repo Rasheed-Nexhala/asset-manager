@@ -126,17 +126,19 @@ service cloud.firestore {
      * 
      * Access Rules:
      * - Read: Admin, Store Incharge, and Site Managers (Site Managers need item catalog for creating requests)
-     * - Write: Admin and Store Incharge only
+     * - Write: Admin and Store Incharge; Site Managers can update denormalized stock totals when returning items
      * - Create: Enforces SKU uniqueness via document ID (items/{sku}); prevents race duplicates
      * 
-     * Note: SKU is used as document ID for create to enforce uniqueness at rule level.
+     * Note: Site Managers need update access to adjust centralStoreQuantity/atSitesQuantity when
+     * returning items from their site to central store.
      */
     match /items/{itemId} {
       allow read: if isAuthenticated() && isUserActive() &&
         (hasInventoryAccess() || isSiteManager());
       allow create: if hasInventoryAccess() &&
         !exists(/databases/$(database)/documents/items/$(request.resource.data.sku));
-      allow update: if hasInventoryAccess();
+      allow update: if hasInventoryAccess() ||
+        (isSiteManager() && isUserActive());
       allow delete: if hasInventoryAccess();
     }
     
@@ -148,19 +150,17 @@ service cloud.firestore {
      * Access Rules:
      * - Read: 
      *   - Admin and Store Incharge: can read all inventory (central store, sites, maintenance)
-     *   - Site Manager: can only read inventory where locationType == 'site' 
-     *     (they cannot see 'store' or 'maintenance' locations)
+     *   - Site Manager: can read/list all inventory documents (needed for queries when returning items)
      * - Create: Admin, Store Incharge, and Site Managers (when creating store entry for returned items)
      * - Update: Admin, Store Incharge, and Site Managers (when returning items to store or from site)
      * - Delete: Admin and Store Incharge only
      * 
-     * Note: Site Managers can update site inventory (decrement on return) and store inventory
-     * (increment on return) when returning items from their site to central store.
+     * Note: Site Managers need full read/list access to query inventory documents when returning items.
+     * The queries filter by itemId and locationId to find the correct inventory documents to update.
      */
     match /inventory/{inventoryId} {
-      allow read: if isAuthenticated() && isUserActive() &&
-        (isAdminOrStoreIncharge() ||
-         (isSiteManager() && resource.data.locationType == 'site'));
+      allow read, list: if isAuthenticated() && isUserActive() &&
+        (isAdminOrStoreIncharge() || isSiteManager());
       allow create: if hasInventoryAccess() ||
         (isSiteManager() && isUserActive() && request.resource.data.locationId == 'store');
       allow update: if hasInventoryAccess() ||

@@ -25,7 +25,6 @@ type NavigationProp = StackNavigationProp<InventoryStackParamList, 'MySiteInvent
  * Features:
  * - Shows inventory items for the user's assigned site
  * - Search functionality
- * - Action buttons (New Request, Return Items)
  * - View other sites section with navigation
  */
 export const MySiteInventoryScreen: React.FC = () => {
@@ -135,16 +134,6 @@ export const MySiteInventoryScreen: React.FC = () => {
     navigation.navigate('OtherSiteInventory', { siteId });
   }, [navigation]);
   
-  const handleNewRequest = useCallback(() => {
-    // Placeholder for New Request action
-    console.log('New Request pressed');
-  }, []);
-  
-  const handleReturnItems = useCallback(() => {
-    // Placeholder for Return Items action
-    console.log('Return Items pressed');
-  }, []);
-  
   // Loading state
   if (isLoadingSite || sitesLoading) {
     return (
@@ -208,31 +197,6 @@ export const MySiteInventoryScreen: React.FC = () => {
               </TouchableOpacity>
             )}
           </View>
-        </View>
-        
-        {/* Action Buttons */}
-        <View className="px-4 pb-4 flex-row gap-3">
-          <TouchableOpacity
-            className="flex-1 bg-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center flex-row"
-            onPress={handleNewRequest}
-            activeOpacity={0.7}
-            accessibilityLabel="Create new request"
-            accessibilityRole="button"
-          >
-            <Ionicons name="add-circle-outline" size={20} color="white" />
-            <Text className="text-[15px] font-semibold text-white ml-2">New Request</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            className="flex-1 border-[1.5px] border-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center flex-row"
-            onPress={handleReturnItems}
-            activeOpacity={0.7}
-            accessibilityLabel="Return items"
-            accessibilityRole="button"
-          >
-            <Ionicons name="return-down-back-outline" size={20} color="#1E40AF" />
-            <Text className="text-[15px] font-semibold text-[#1E40AF] ml-2">Return Items</Text>
-          </TouchableOpacity>
         </View>
         
         {/* Inventory List */}

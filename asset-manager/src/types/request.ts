@@ -107,7 +107,7 @@ export interface CreateRequestData {
   siteId: string;
   siteName: string;
   priority: RequestPriority;
-  purpose: string;
+  purpose?: string;
   items: Array<{
     itemId: string;
     itemName: string;

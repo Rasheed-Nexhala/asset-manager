@@ -3,34 +3,18 @@ import { View, Text, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 /**
- * Common units of measurement for construction and inventory management
+ * Units of measurement for construction and inventory management
  */
 const COMMON_UNITS = [
-  'pcs',
-  'pieces',
-  'bags',
-  'kg',
-  'kilograms',
-  'liters',
-  'litres',
-  'meters',
-  'metres',
-  'boxes',
-  'sets',
-  'rolls',
-  'sheets',
-  'tons',
-  'ft',
-  'feet',
-  'yards',
-  'gallons',
-  'pounds',
-  'lbs',
-  'units',
-  'cartons',
-  'pallets',
-  'bundles',
-  'packs',
+  'Nos',
+  'Bag',
+  'Box',
+  'Set',
+  'Pair',
+  'Roll',
+  'Kg',
+  'Ton (MT)',
+  'Meter',
 ];
 
 export interface UnitSelectorProps {
@@ -81,10 +65,20 @@ export const UnitSelector: React.FC<UnitSelectorProps> = ({
     setModalVisible(false);
   }, []);
 
+  const labelEndsWithRequired = label.endsWith(' *');
+  const labelText = labelEndsWithRequired ? label.slice(0, -2) : label;
+
   return (
     <View className="gap-1.5">
       <Text className="text-[15px] text-[#0F172A]" accessibilityRole="text">
-        {label}
+        {labelEndsWithRequired ? (
+          <>
+            {labelText}
+            <Text className="text-[#DC2626]"> *</Text>
+          </>
+        ) : (
+          label
+        )}
       </Text>
 
       <TouchableOpacity

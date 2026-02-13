@@ -27,11 +27,18 @@ import {
   selectIsAdmin,
 } from '../../store/selectors/authSelectors';
 import { selectRequestById } from '../../store/selectors/requestSelectors';
-import type { Request, ItemAvailability } from '../../types/request';
+import type { Request, ItemAvailability, ItemCondition } from '../../types/request';
 import type { RequestStackParamList } from '../../navigation/RequestStackParamList';
 
 type RouteParams = RouteProp<RequestStackParamList, 'ProcessRequest'>;
 type NavigationProp = StackNavigationProp<RequestStackParamList, 'ProcessRequest'>;
+
+/** Human-readable labels for return condition (visible to Store Incharge / Admin) */
+const CONDITION_LABELS: Record<ItemCondition, string> = {
+  good: 'Good',
+  needs_maintenance: 'Needs maintenance',
+  damaged: 'Damaged',
+};
 
 const priorityConfig = {
   high: { emoji: '🔴', color: '#DC2626' },
@@ -71,20 +78,35 @@ export const ProcessRequestScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(true);
 
-  // Fetch request if not in store (e.g. Site Manager navigated from MyRequests)
+  // Set up real-time subscription for this specific request
   useEffect(() => {
-    if (requestFromStore) {
-      setRequest(requestFromStore);
-      return;
-    }
     let cancelled = false;
-    requestService.getRequestById(requestId).then((r) => {
-      if (!cancelled && r) setRequest(r);
+    
+    // Set up real-time listener for immediate updates
+    const unsubscribe = requestService.subscribeToRequest(requestId, (updatedRequest) => {
+      if (!cancelled && updatedRequest) {
+        setRequest(updatedRequest);
+      }
     });
+    
     return () => {
       cancelled = true;
+      unsubscribe();
     };
-  }, [requestId, requestFromStore]);
+  }, [requestId]);
+
+  // Also update when Redux store changes (for real-time updates from subscriptions)
+  useEffect(() => {
+    if (requestFromStore && requestFromStore.id === requestId) {
+      // Only update if the Redux data is more recent than our current local state
+      const currentUpdatedAt = request?.updatedAt?.toMillis?.() || 0;
+      const reduxUpdatedAt = requestFromStore.updatedAt?.toMillis?.() || 0;
+      
+      if (reduxUpdatedAt >= currentUpdatedAt) {
+        setRequest(requestFromStore);
+      }
+    }
+  }, [requestFromStore, requestId, request]);
 
   const canProcess = isStoreIncharge || isAdmin;
   const allSufficient = availability.length > 0 && availability.every((a) => a.sufficient);
@@ -258,6 +280,84 @@ export const ProcessRequestScreen: React.FC = () => {
               />
             ))}
           </View>
+
+          {/* Return details – shown when status is returned (Store Incharge / Admin can see condition) */}
+          {request.status === 'returned' &&
+            request.returnItems &&
+            request.returnItems.length > 0 && (
+              <View className="bg-[#F0FDF4] rounded-[10px] p-4 border border-[#16A34A]/30">
+                <View className="flex-row items-center gap-2 mb-3">
+                  <Ionicons name="arrow-undo" size={20} color="#16A34A" />
+                  <Text className="text-[17px] font-semibold text-[#0F172A]">
+                    Return details
+                  </Text>
+                </View>
+                <View className="mb-2">
+                  <Text className="text-[13px] text-[#64748B]">Returned</Text>
+                  <Text className="text-[15px] text-[#0F172A]">
+                    {formatDate(request.returnedAt)}
+                  </Text>
+                </View>
+                {request.returnNotes && request.returnNotes.trim() && (
+                  <View className="mb-3">
+                    <Text className="text-[13px] text-[#64748B]">Return notes</Text>
+                    <Text className="text-[15px] text-[#0F172A]">
+                      {request.returnNotes}
+                    </Text>
+                  </View>
+                )}
+                <Text className="text-[13px] font-medium text-[#64748B] mb-2">
+                  Items returned
+                </Text>
+                {request.returnItems.map((ri) => {
+                  const item = request.items.find((i) => i.itemId === ri.itemId);
+                  const itemName = item?.itemName ?? ri.itemId;
+                  const conditionLabel =
+                    CONDITION_LABELS[ri.condition] ?? ri.condition;
+                  const isDamaged = ri.condition === 'damaged';
+                  const needsMaintenance = ri.condition === 'needs_maintenance';
+                  return (
+                    <View
+                      key={ri.itemId}
+                      className="flex-row flex-wrap items-center justify-between py-2 border-b border-[#E2E8F0] last:border-b-0"
+                    >
+                      <Text
+                        className="text-[15px] text-[#0F172A] flex-1"
+                        numberOfLines={1}
+                      >
+                        {itemName}
+                      </Text>
+                      <View className="flex-row items-center gap-2">
+                        <Text className="text-[13px] text-[#64748B]">
+                          Qty: {ri.quantityReturned}
+                        </Text>
+                        <View
+                          className={`rounded-full px-2 py-0.5 ${
+                            isDamaged
+                              ? 'bg-[#DC2626]/20'
+                              : needsMaintenance
+                                ? 'bg-[#D97706]/20'
+                                : 'bg-[#16A34A]/20'
+                          }`}
+                        >
+                          <Text
+                            className={`text-[13px] font-medium ${
+                              isDamaged
+                                ? 'text-[#DC2626]'
+                                : needsMaintenance
+                                  ? 'text-[#D97706]'
+                                  : 'text-[#16A34A]'
+                            }`}
+                          >
+                            {conditionLabel}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
 
           {/* Insufficient Stock Banner - CRITICAL: No Edit button, only wait or reject */}
           {canProcess &&

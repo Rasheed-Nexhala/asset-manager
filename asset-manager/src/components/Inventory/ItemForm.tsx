@@ -264,7 +264,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       <View className="gap-4 px-4 py-4">
         {/* Item Name */}
         <View className="gap-1.5">
-          <Text className="text-[15px] text-[#0F172A]">Item Name *</Text>
+          <Text className="text-[15px] text-[#0F172A]">Item Name <Text className="text-[#DC2626]">*</Text></Text>
           <TextInput
             className={`border rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] ${
               errors.name ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
@@ -286,7 +286,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
 
         {/* SKU */}
         <View className="gap-1.5">
-          <Text className="text-[15px] text-[#0F172A]">SKU *</Text>
+          <Text className="text-[15px] text-[#0F172A]">SKU <Text className="text-[#DC2626]">*</Text></Text>
           <TextInput
             className={`border rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] ${
               errors.sku ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
@@ -338,7 +338,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
 
         {/* Item Type */}
         <View className="gap-1.5">
-          <Text className="text-[15px] text-[#0F172A]">Item Type *</Text>
+          <Text className="text-[15px] text-[#0F172A]">Item Type <Text className="text-[#DC2626]">*</Text></Text>
           <View className="flex-row gap-3">
             <TouchableOpacity
               className={`flex-1 border rounded-lg h-12 items-center justify-center ${
@@ -402,7 +402,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         {/* Initial Quantity (Create mode only) */}
         {mode === 'create' && (
           <View className="gap-1.5">
-            <Text className="text-[15px] text-[#0F172A]">Initial Quantity *</Text>
+            <Text className="text-[15px] text-[#0F172A]">Initial Quantity <Text className="text-[#DC2626]">*</Text></Text>
             <TextInput
               className={`border rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] ${
                 errors.initialQuantity ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
@@ -426,7 +426,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
 
         {/* Minimum Stock Level */}
         <View className="gap-1.5">
-          <Text className="text-[15px] text-[#0F172A]">Minimum Stock Level *</Text>
+          <Text className="text-[15px] text-[#0F172A]">Minimum Stock Level <Text className="text-[#DC2626]">*</Text></Text>
           <TextInput
             className={`border rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] ${
               errors.minStockLevel ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
@@ -449,7 +449,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
 
         {/* Status */}
         <View className="gap-1.5">
-          <Text className="text-[15px] text-[#0F172A]">Status *</Text>
+          <Text className="text-[15px] text-[#0F172A]">Status <Text className="text-[#DC2626]">*</Text></Text>
           <View className="flex-row gap-3">
             <TouchableOpacity
               className={`flex-1 border rounded-lg h-12 items-center justify-center ${

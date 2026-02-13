@@ -72,9 +72,7 @@ export const CreateRequestScreen: React.FC = () => {
       newErrors.items = 'At least one item is required';
     }
 
-    if (!purpose.trim()) {
-      newErrors.purpose = 'Purpose is required';
-    }
+    // Purpose / Notes is optional
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -120,7 +118,7 @@ export const CreateRequestScreen: React.FC = () => {
         siteId: site.id,
         siteName: site.name,
         priority,
-        purpose,
+        purpose: purpose.trim() || undefined,
         items: items.map((item) => ({
           itemId: item.id,
           itemName: item.name,
@@ -257,16 +255,15 @@ export const CreateRequestScreen: React.FC = () => {
             )}
           </View>
 
-          {/* Purpose */}
+          {/* Purpose (optional) */}
           <FormField
-            label="Purpose / Notes"
-            required
+            label="Purpose / Notes (optional)"
             value={purpose}
             onChangeText={(text) => {
               setPurpose(text);
               setErrors((prev) => ({ ...prev, purpose: undefined }));
             }}
-            placeholder="Describe the purpose of this request..."
+            placeholder="Describe the purpose of this request (optional)..."
             error={errors.purpose}
             multiline
             numberOfLines={4}

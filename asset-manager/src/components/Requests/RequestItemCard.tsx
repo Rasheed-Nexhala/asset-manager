@@ -99,8 +99,19 @@ export const RequestItemCard: React.FC<RequestItemCardProps> = ({
                   value={String(quantity)}
                   onChangeText={handleQuantityInput}
                   keyboardType="numeric"
-                  className="w-16 h-10 border border-[#E2E8F0] rounded-lg px-2 text-center text-[15px] font-bold text-[#0F172A]"
+                  className="w-16 border border-[#E2E8F0] rounded-lg px-2 text-center text-[15px] font-bold text-[#0F172A] bg-white"
                   accessibilityLabel="Quantity input"
+                  style={{
+                    color: '#0F172A',
+                    textAlign: 'center',
+                    fontWeight: 'bold',
+                    fontSize: 15,
+                    minHeight: 44,
+                    paddingTop: 10,
+                    paddingBottom: 8,
+                  }}
+                  underlineColorAndroid="transparent"
+                  selectionColor="#1E40AF"
                 />
 
                 <TouchableOpacity

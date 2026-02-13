@@ -28,6 +28,7 @@ import type {
 const REQUESTS_COLLECTION = 'requests';
 const REQUEST_COUNTERS_COLLECTION = 'requestCounters';
 const INVENTORY_COLLECTION = 'inventory';
+const ITEMS_COLLECTION = 'items';
 
 /**
  * Generate unique request number using a counter document.
@@ -88,7 +89,7 @@ export const createRequest = async (
       
       status: isDraft ? 'draft' : 'pending',
       priority: requestData.priority,
-      purpose: requestData.purpose,
+      purpose: requestData.purpose ?? '',
       
       items: requestData.items.map(item => ({
         itemId: item.itemId,
@@ -336,9 +337,55 @@ export const transferRequest = async (
   transferredByName: string
 ): Promise<void> => {
   try {
+    // Step 1: Fetch request data first (outside transaction)
+    const requestRef = doc(db, REQUESTS_COLLECTION, requestId);
+    const requestSnap = await getDoc(requestRef);
+    
+    if (!requestSnap.exists()) {
+      throw new Error('Request not found');
+    }
+    
+    const requestData = requestSnap.data();
+    
+    if (requestData.status !== 'approved') {
+      throw new Error('Only approved requests can be transferred');
+    }
+    
+    // Step 2: Query all inventory documents we'll need (outside transaction)
+    const inventoryRefs: Map<string, { storeRef: any; siteRef: any }> = new Map();
+    
+    for (const item of requestData.items) {
+      // Query central store inventory
+      const centralStoreQuery = query(
+        collection(db, INVENTORY_COLLECTION),
+        where('itemId', '==', item.itemId),
+        where('locationId', '==', 'store'),
+        limit(1)
+      );
+      const centralStoreSnap = await getDocs(centralStoreQuery);
+      const storeRef = centralStoreSnap.empty ? null : centralStoreSnap.docs[0].ref;
+      
+      // Query site inventory
+      const siteLocationId = `site_${requestData.siteId}`;
+      const siteInventoryQuery = query(
+        collection(db, INVENTORY_COLLECTION),
+        where('itemId', '==', item.itemId),
+        where('locationId', '==', siteLocationId),
+        limit(1)
+      );
+      const siteInventorySnap = await getDocs(siteInventoryQuery);
+      const siteRef = siteInventorySnap.empty ? null : siteInventorySnap.docs[0].ref;
+      
+      inventoryRefs.set(item.itemId, { storeRef, siteRef });
+    }
+    
+    // Step 3: Run transaction with the document references we found
     await runTransaction(db, async (transaction) => {
-      // Get request
-      const requestRef = doc(db, REQUESTS_COLLECTION, requestId);
+      // =====================================================
+      // PHASE 1: ALL READS (must complete before any writes)
+      // =====================================================
+      
+      // Re-read request inside transaction to ensure consistency
       const requestSnap = await transaction.get(requestRef);
       
       if (!requestSnap.exists()) {
@@ -351,48 +398,81 @@ export const transferRequest = async (
         throw new Error('Only approved requests can be transferred');
       }
       
-      // For each item, update inventory
+      // Prepare array to collect all read data
+      interface TransactionReadData {
+        item: any;
+        quantity: number;
+        itemRef: any;
+        itemData: any;
+        refs: { storeRef: any; siteRef: any };
+        storeDoc: any;
+        siteDoc: any;
+      }
+      const readsData: TransactionReadData[] = [];
+      
+      // Read all documents upfront
       for (const item of requestData.items) {
         const quantity = item.quantityApproved;
+
+        const refs = inventoryRefs.get(item.itemId);
+        if (!refs) continue;
+        
+        // Read item document (for denormalized totals)
+        const itemRef = doc(db, ITEMS_COLLECTION, item.itemId);
+        const itemSnap = await transaction.get(itemRef);
+        const itemData = itemSnap.exists() ? itemSnap.data() : null;
+        
+        // Read central store inventory
+        let storeDoc = null;
+        if (refs.storeRef) {
+          storeDoc = await transaction.get(refs.storeRef);
+        }
+        
+        // Read site inventory
+        let siteDoc = null;
+        if (refs.siteRef) {
+          siteDoc = await transaction.get(refs.siteRef);
+        }
+        
+        // Store all read data for this item
+        readsData.push({
+          item,
+          quantity,
+          itemRef,
+          itemData,
+          refs,
+          storeDoc,
+          siteDoc,
+        });
+      }
+      
+      // =====================================================
+      // PHASE 2: ALL WRITES (after all reads are complete)
+      // =====================================================
+      
+      // Process all writes based on the read data
+      for (const data of readsData) {
+        const { item, quantity, itemRef, itemData, refs, storeDoc, siteDoc } = data;
         
         // Decrement central store
-        const centralStoreQuery = query(
-          collection(db, INVENTORY_COLLECTION),
-          where('itemId', '==', item.itemId),
-          where('locationId', '==', 'store'),
-          limit(1)
-        );
-        const centralStoreSnap = await getDocs(centralStoreQuery);
-        
-        if (!centralStoreSnap.empty) {
-          const inventoryDoc = centralStoreSnap.docs[0];
-          const currentQty = inventoryDoc.data().quantity;
-          transaction.update(inventoryDoc.ref, {
+        if (storeDoc && storeDoc.exists()) {
+          const currentQty = storeDoc.data().quantity;
+          transaction.update(refs.storeRef, {
             quantity: currentQty - quantity,
             updatedAt: serverTimestamp(),
           });
         }
         
-        // Increment site inventory
-        const siteLocationId = `site_${requestData.siteId}`;
-        const siteInventoryQuery = query(
-          collection(db, INVENTORY_COLLECTION),
-          where('itemId', '==', item.itemId),
-          where('locationId', '==', siteLocationId),
-          limit(1)
-        );
-        const siteInventorySnap = await getDocs(siteInventoryQuery);
-        
-        if (!siteInventorySnap.empty) {
-          // Update existing
-          const inventoryDoc = siteInventorySnap.docs[0];
-          const currentQty = inventoryDoc.data().quantity;
-          transaction.update(inventoryDoc.ref, {
+        // Increment or create site inventory
+        if (siteDoc && siteDoc.exists()) {
+          const currentQty = siteDoc.data().quantity;
+          transaction.update(refs.siteRef, {
             quantity: currentQty + quantity,
             updatedAt: serverTimestamp(),
           });
         } else {
           // Create new inventory entry
+          const siteLocationId = `site_${requestData.siteId}`;
           const newInventoryRef = doc(collection(db, INVENTORY_COLLECTION));
           transaction.set(newInventoryRef, {
             itemId: item.itemId,
@@ -402,6 +482,15 @@ export const transferRequest = async (
             locationType: 'site',
             locationName: requestData.siteName,
             quantity: quantity,
+            updatedAt: serverTimestamp(),
+          });
+        }
+
+        // Update item's denormalized stock totals
+        if (itemData) {
+          transaction.update(itemRef, {
+            centralStoreQuantity: (itemData.centralStoreQuantity || 0) - quantity,
+            atSitesQuantity: (itemData.atSitesQuantity || 0) + quantity,
             updatedAt: serverTimestamp(),
           });
         }
@@ -443,8 +532,56 @@ export const returnItems = async (
   userName: string
 ): Promise<void> => {
   try {
+    // Step 1: Fetch request data first (outside transaction)
+    const requestRef = doc(db, REQUESTS_COLLECTION, requestId);
+    const requestSnap = await getDoc(requestRef);
+    
+    if (!requestSnap.exists()) {
+      throw new Error('Request not found');
+    }
+    
+    const requestData = requestSnap.data();
+    
+    // Step 2: Query all inventory documents we'll need (outside transaction)
+    const inventoryRefs: Map<string, { siteRef: any; storeRef: any }> = new Map();
+    
+    for (const returnItem of returnData.items) {
+      const item = requestData.items.find((i: any) => i.itemId === returnItem.itemId);
+      if (!item || item.itemType === 'consumable') {
+        continue; // Skip consumables
+      }
+      
+      // Query site inventory
+      const siteLocationId = `site_${requestData.siteId}`;
+      const siteInventoryQuery = query(
+        collection(db, INVENTORY_COLLECTION),
+        where('itemId', '==', returnItem.itemId),
+        where('locationId', '==', siteLocationId),
+        limit(1)
+      );
+      const siteInventorySnap = await getDocs(siteInventoryQuery);
+      const siteRef = siteInventorySnap.empty ? null : siteInventorySnap.docs[0].ref;
+      
+      // Query store inventory
+      const targetInventoryQuery = query(
+        collection(db, INVENTORY_COLLECTION),
+        where('itemId', '==', returnItem.itemId),
+        where('locationId', '==', 'store'),
+        limit(1)
+      );
+      const targetInventorySnap = await getDocs(targetInventoryQuery);
+      const storeRef = targetInventorySnap.empty ? null : targetInventorySnap.docs[0].ref;
+      
+      inventoryRefs.set(returnItem.itemId, { siteRef, storeRef });
+    }
+    
+    // Step 3: Run transaction with the document references we found
     await runTransaction(db, async (transaction) => {
-      const requestRef = doc(db, REQUESTS_COLLECTION, requestId);
+      // =====================================================
+      // PHASE 1: ALL READS (must complete before any writes)
+      // =====================================================
+      
+      // Re-read request inside transaction to ensure consistency
       const requestSnap = await transaction.get(requestRef);
       
       if (!requestSnap.exists()) {
@@ -453,48 +590,78 @@ export const returnItems = async (
       
       const requestData = requestSnap.data();
       
-      // Update inventory based on condition
+      // Prepare array to collect all read data
+      interface TransactionReadData {
+        returnItem: any;
+        item: any;
+        itemRef: any;
+        itemData: any;
+        refs: { siteRef: any; storeRef: any };
+        siteDoc: any;
+        storeDoc: any;
+      }
+      const readsData: TransactionReadData[] = [];
+      
+      // Read all documents upfront
       for (const returnItem of returnData.items) {
         const item = requestData.items.find((i: any) => i.itemId === returnItem.itemId);
         if (!item || item.itemType === 'consumable') {
           continue; // Skip consumables
         }
+
+        const refs = inventoryRefs.get(returnItem.itemId);
+        if (!refs) continue;
+        
+        // Read item document (for denormalized totals)
+        const itemRef = doc(db, ITEMS_COLLECTION, returnItem.itemId);
+        const itemSnap = await transaction.get(itemRef);
+        const itemData = itemSnap.exists() ? itemSnap.data() : null;
+        
+        // Read site inventory
+        let siteDoc = null;
+        if (refs.siteRef) {
+          siteDoc = await transaction.get(refs.siteRef);
+        }
+        
+        // Read store inventory
+        let storeDoc = null;
+        if (refs.storeRef) {
+          storeDoc = await transaction.get(refs.storeRef);
+        }
+        
+        // Store all read data for this item
+        readsData.push({
+          returnItem,
+          item,
+          itemRef,
+          itemData,
+          refs,
+          siteDoc,
+          storeDoc,
+        });
+      }
+      
+      // =====================================================
+      // PHASE 2: ALL WRITES (after all reads are complete)
+      // =====================================================
+      
+      // Process all writes based on the read data
+      for (const data of readsData) {
+        const { returnItem, item, itemRef, itemData, refs, siteDoc, storeDoc } = data;
         
         // Decrement site inventory
-        const siteLocationId = `site_${requestData.siteId}`;
-        const siteInventoryQuery = query(
-          collection(db, INVENTORY_COLLECTION),
-          where('itemId', '==', returnItem.itemId),
-          where('locationId', '==', siteLocationId),
-          limit(1)
-        );
-        const siteInventorySnap = await getDocs(siteInventoryQuery);
-        
-        if (!siteInventorySnap.empty) {
-          const inventoryDoc = siteInventorySnap.docs[0];
-          const currentQty = inventoryDoc.data().quantity;
-          transaction.update(inventoryDoc.ref, {
+        if (siteDoc && siteDoc.exists()) {
+          const currentQty = siteDoc.data().quantity;
+          transaction.update(refs.siteRef, {
             quantity: currentQty - returnItem.quantityReturned,
             updatedAt: serverTimestamp(),
           });
         }
         
-        // Always return to Central Store first (regardless of condition)
-        // Store Incharge will verify condition and move to maintenance if needed
-        const targetLocationId = 'store';
-        
-        const targetInventoryQuery = query(
-          collection(db, INVENTORY_COLLECTION),
-          where('itemId', '==', returnItem.itemId),
-          where('locationId', '==', targetLocationId),
-          limit(1)
-        );
-        const targetInventorySnap = await getDocs(targetInventoryQuery);
-        
-        if (!targetInventorySnap.empty) {
-          const inventoryDoc = targetInventorySnap.docs[0];
-          const currentQty = inventoryDoc.data().quantity;
-          transaction.update(inventoryDoc.ref, {
+        // Increment or create store inventory
+        if (storeDoc && storeDoc.exists()) {
+          const currentQty = storeDoc.data().quantity;
+          transaction.update(refs.storeRef, {
             quantity: currentQty + returnItem.quantityReturned,
             updatedAt: serverTimestamp(),
           });
@@ -512,9 +679,18 @@ export const returnItems = async (
             updatedAt: serverTimestamp(),
           });
         }
+
+        // Update item's denormalized stock totals
+        if (itemData) {
+          transaction.update(itemRef, {
+            centralStoreQuantity: (itemData.centralStoreQuantity || 0) + returnItem.quantityReturned,
+            atSitesQuantity: (itemData.atSitesQuantity || 0) - returnItem.quantityReturned,
+            updatedAt: serverTimestamp(),
+          });
+        }
       }
       
-      // Update request
+      // Update request status
       transaction.update(requestRef, {
         status: 'returned',
         returnedAt: serverTimestamp(),
@@ -661,6 +837,39 @@ export const subscribeToRequests = (
   }
 };
 
+/**
+ * Subscribe to a single request for real-time updates
+ */
+export const subscribeToRequest = (
+  requestId: string,
+  callback: (request: Request | null) => void
+): (() => void) => {
+  try {
+    const requestRef = doc(db, REQUESTS_COLLECTION, requestId);
+    
+    const unsubscribe = onSnapshot(
+      requestRef,
+      (doc) => {
+        if (doc.exists()) {
+          const request = { id: doc.id, ...doc.data() } as Request;
+          callback(request);
+        } else {
+          callback(null);
+        }
+      },
+      (error) => {
+        console.error('Error in single request subscription:', error);
+        callback(null);
+      }
+    );
+    
+    return unsubscribe;
+  } catch (error) {
+    console.error('Error setting up single request subscription:', error);
+    return () => {};
+  }
+};
+
 export const requestService = {
   createRequest,
   checkItemsAvailability,
@@ -673,4 +882,5 @@ export const requestService = {
   cancelRequest,
   getRequestById,
   subscribeToRequests,
+  subscribeToRequest,
 };

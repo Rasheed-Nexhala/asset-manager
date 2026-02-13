@@ -76,23 +76,30 @@ const requestsSlice = createSlice({
     },
 
     updateRequestInState: (state, action: PayloadAction<Request>) => {
-      const index = state.requests.findIndex((r) => r.id === action.payload.id);
-      if (index !== -1) {
-        state.requests[index] = action.payload;
-      }
-      // If draft was submitted (status → pending), add to requests for Store Incharge
-      if (action.payload.status !== 'draft' && index === -1) {
-        const exists = state.requests.some((r) => r.id === action.payload.id);
-        if (!exists) state.requests.unshift(action.payload);
-      }
-
-      const myIndex = state.myRequests.findIndex((r) => r.id === action.payload.id);
-      if (myIndex !== -1) {
-        state.myRequests[myIndex] = action.payload;
+      const updatedRequest = action.payload;
+      
+      // Update in requests array (for Store Incharge/Admin view)
+      const requestIndex = state.requests.findIndex((r) => r.id === updatedRequest.id);
+      if (requestIndex !== -1) {
+        state.requests[requestIndex] = updatedRequest;
+      } else if (updatedRequest.status !== 'draft') {
+        // If not found and not a draft, add it (e.g., draft was submitted)
+        state.requests.unshift(updatedRequest);
       }
 
-      if (state.selectedRequest?.id === action.payload.id) {
-        state.selectedRequest = action.payload;
+      // Update in myRequests array (for Site Manager's own requests)
+      const myRequestIndex = state.myRequests.findIndex((r) => r.id === updatedRequest.id);
+      if (myRequestIndex !== -1) {
+        state.myRequests[myRequestIndex] = updatedRequest;
+      } else {
+        // If not found in myRequests, add it if it belongs to this user
+        // Note: We can't check ownership here since we don't have user context,
+        // but the subscription will handle adding user-owned requests properly
+      }
+
+      // Update selectedRequest if it matches
+      if (state.selectedRequest?.id === updatedRequest.id) {
+        state.selectedRequest = updatedRequest;
       }
     },
 

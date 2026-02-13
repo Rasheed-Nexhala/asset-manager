@@ -17,14 +17,34 @@ export const selectRequestsError = (state: RootState) => state.requests.error;
 
 export const selectRequestsFilters = (state: RootState) => state.requests.filters;
 
+// Helper to get timestamp in milliseconds for comparison
+const getUpdatedAtMs = (request: { updatedAt?: { toMillis?: () => number } | null }): number => {
+  const t = request.updatedAt;
+  if (!t || typeof t.toMillis !== 'function') return 0;
+  return t.toMillis();
+};
+
 // Memoized selectors
 export const selectRequestById = (requestId: string) =>
   createSelector(
     [selectAllRequests, selectMyRequests],
-    (requests, myRequests) =>
-      requests.find((r) => r.id === requestId) ??
-      myRequests.find((r) => r.id === requestId) ??
-      null
+    (requests, myRequests) => {
+      const requestFromRequests = requests.find((r) => r.id === requestId);
+      const requestFromMyRequests = myRequests.find((r) => r.id === requestId);
+      
+      // If both exist, return the one with more recent updatedAt timestamp
+      if (requestFromRequests && requestFromMyRequests) {
+        const requestsTimestamp = getUpdatedAtMs(requestFromRequests);
+        const myRequestsTimestamp = getUpdatedAtMs(requestFromMyRequests);
+        
+        return myRequestsTimestamp >= requestsTimestamp 
+          ? requestFromMyRequests 
+          : requestFromRequests;
+      }
+      
+      // Return whichever one exists
+      return requestFromRequests ?? requestFromMyRequests ?? null;
+    }
   );
 
 /**
