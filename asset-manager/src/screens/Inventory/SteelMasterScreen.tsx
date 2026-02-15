@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { ScreenHeader, ScreenLayout } from '../../components';
+import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { SteelMasterForm } from '../../components/Inventory/SteelMasterForm';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
@@ -183,9 +183,41 @@ export const SteelMasterScreen: React.FC = () => {
     [handleEdit, handleDelete]
   );
 
+  const renderCustomHeader = () => (
+    <View className="bg-white border-b border-[#E2E8F0] px-4 flex-row items-center justify-between" style={{ height: 56 }}>
+      <TouchableOpacity
+        className="w-11 h-11 items-center justify-center"
+        onPress={() => navigation.goBack()}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+      >
+        <Ionicons name="arrow-back" size={24} color="#0F172A" />
+      </TouchableOpacity>
+      
+      <Text 
+        className="text-[22px] font-semibold text-[#0F172A] flex-1 text-center" 
+        accessibilityRole="header"
+        numberOfLines={1}
+      >
+        Steel Master
+      </Text>
+      
+      <TouchableOpacity
+        className="w-11 h-11 items-center justify-center rounded-[10px]"
+        onPress={handleAdd}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Add steel master"
+      >
+        <Ionicons name="add-circle" size={24} color="#1E40AF" />
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <ScreenLayout edges={['top']}>
-      <ScreenHeader title="Steel Master" showBack onBackPress={() => navigation.goBack()} rightAction={{ icon: 'add-circle', onPress: handleAdd, accessibilityLabel: 'Add steel master' }} />
+      {renderCustomHeader()}
 
       {isLoading && steelMasters.length === 0 ? (
         <View className="flex-1 items-center justify-center">

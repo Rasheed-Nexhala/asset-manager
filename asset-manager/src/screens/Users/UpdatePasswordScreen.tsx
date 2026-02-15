@@ -1,8 +1,9 @@
 import React, { useCallback } from 'react';
-import { View, ScrollView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { UpdatePasswordForm } from '../../components/UpdatePasswordForm';
-import { ScreenHeader, ScreenLayout } from '../../components';
+import { ScreenLayout } from '../../components';
 
 /**
  * Props for the UpdatePasswordScreen component.
@@ -70,7 +71,29 @@ export const UpdatePasswordScreen: React.FC<UpdatePasswordScreenProps> = ({
 
   return (
     <ScreenLayout edges={['top', 'left', 'right']} keyboardAware>
-      <ScreenHeader title="Update Password" showBack onBackPress={handleBack} />
+      {/* Header with Back Button */}
+      <View className="bg-white border-b border-[#E2E8F0] h-14 px-4 flex-row items-center justify-between">
+        {/* Back Button - 48px touch target */}
+        <TouchableOpacity
+          onPress={handleBack}
+          className="w-11 h-11 items-center justify-center"
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Go back to profile"
+        >
+          <Ionicons name="arrow-back" size={24} color="#0F172A" />
+        </TouchableOpacity>
+
+        {/* Screen Title - centered when header has back button */}
+        <Text 
+          className="text-[22px] font-semibold text-[#0F172A] flex-1 text-center"
+          accessibilityRole="header"
+        >
+          Update Password
+        </Text>
+
+        <View className="w-11 h-11" />
+      </View>
 
       {/* Main Content */}
       <ScrollView 

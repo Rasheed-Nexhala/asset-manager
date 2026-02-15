@@ -95,28 +95,24 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
 
   const showBackButton = showBack && typeof onBackPress === 'function';
 
-  const hasLeftOrRight = showBackButton || showRightAction;
-
   return (
     <View
       className="bg-white border-b border-[#E2E8F0] px-4 flex-row items-center justify-between"
       style={{ height: HEADER_HEIGHT }}
     >
-      {/* Left: flex-1 for equal width with right, ensuring title stays centered */}
-      {hasLeftOrRight ? (
-        <View className="flex-1 flex-row items-center justify-start min-w-0">
-          {showBackButton ? (
-            <TouchableOpacity
-              className="w-11 h-11 items-center justify-center -ml-1"
-              onPress={onBackPress}
-              activeOpacity={0.7}
-              accessibilityLabel="Go back"
-              accessibilityRole="button"
-            >
-              <Ionicons name="arrow-back" size={24} color="#0F172A" />
-            </TouchableOpacity>
-          ) : null}
-        </View>
+      {/* Left: Back button, or spacer when no back but has right action (for centering) */}
+      {showBackButton ? (
+        <TouchableOpacity
+          className="w-11 h-11 items-center justify-center -ml-1"
+          onPress={onBackPress}
+          activeOpacity={0.7}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
+          <Ionicons name="arrow-back" size={24} color="#0F172A" />
+        </TouchableOpacity>
+      ) : showRightAction ? (
+        <View className="w-11" />
       ) : null}
 
       {/* Title: always centered via flex-1 text-center */}
@@ -128,25 +124,23 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
         {title}
       </Text>
 
-      {/* Right: flex-1 for equal width with left, ensuring title stays centered */}
-      {hasLeftOrRight ? (
-        <View className="flex-1 flex-row items-center justify-end min-w-0">
-          {showRightAction ? (
-            <TouchableOpacity
-              className={`min-w-[48px] h-12 items-center justify-center rounded-[10px] ${
-                isLoading ? 'opacity-50' : ''
-              }`}
-              activeOpacity={0.7}
-              onPress={rightAction.onPress}
-              disabled={isLoading}
-              accessibilityLabel={getAccessibilityLabel()}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: isLoading, busy: isLoading }}
-            >
-              {renderActionContent()}
-            </TouchableOpacity>
-          ) : null}
-        </View>
+      {/* Right: Action, or spacer for balance when back is shown */}
+      {showRightAction ? (
+        <TouchableOpacity
+          className={`min-w-[48px] h-12 items-center justify-center rounded-[10px] ${
+            isLoading ? 'opacity-50' : ''
+          }`}
+          activeOpacity={0.7}
+          onPress={rightAction.onPress}
+          disabled={isLoading}
+          accessibilityLabel={getAccessibilityLabel()}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: isLoading, busy: isLoading }}
+        >
+          {renderActionContent()}
+        </TouchableOpacity>
+      ) : showBackButton ? (
+        <View className="w-11" />
       ) : null}
     </View>
   );
