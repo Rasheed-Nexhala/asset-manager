@@ -68,6 +68,10 @@ export const ProcessRequestScreen: React.FC = () => {
   const route = useRoute<RouteParams>();
   const navigation = useNavigation<NavigationProp>();
   const dispatch = useAppDispatch();
+
+  const handleBack = useCallback(() => {
+    navigation.goBack();
+  }, [navigation]);
   const { requestId } = route.params;
 
   const userId = useAppSelector(selectUserId);
@@ -216,7 +220,7 @@ export const ProcessRequestScreen: React.FC = () => {
   if (!request) {
     return (
       <ScreenLayout edges={['top']}>
-        <ScreenHeader title="Process Request" />
+        <ScreenHeader title="Process Request" showBack onBackPress={handleBack} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#1E40AF" />
           <Text className="text-[15px] text-[#64748B] mt-4">
@@ -231,7 +235,7 @@ export const ProcessRequestScreen: React.FC = () => {
 
   return (
     <ScreenLayout edges={['top']}>
-      <ScreenHeader title="Process Request" />
+      <ScreenHeader title="Process Request" showBack onBackPress={handleBack} />
 
       <ScrollView className="flex-1 px-4">
         <View className="gap-4 py-4">

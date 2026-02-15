@@ -46,6 +46,10 @@ export const EditRequestScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const { requestId } = route.params;
 
+  const handleBack = React.useCallback(() => {
+    navigation.goBack();
+  }, [navigation]);
+
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
 
@@ -200,7 +204,7 @@ export const EditRequestScreen: React.FC = () => {
   if (isLoading || !request) {
     return (
       <ScreenLayout edges={['top']}>
-        <ScreenHeader title="Edit Request" />
+        <ScreenHeader title="Edit Request" showBack onBackPress={handleBack} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#1E40AF" />
           <Text className="text-[15px] text-[#64748B] mt-4">
@@ -213,7 +217,7 @@ export const EditRequestScreen: React.FC = () => {
 
   return (
     <ScreenLayout edges={['top']}>
-      <ScreenHeader title="Edit Request" />
+      <ScreenHeader title="Edit Request" showBack onBackPress={handleBack} />
 
       <ScrollView className="flex-1 px-4">
         <View className="gap-4 py-4">

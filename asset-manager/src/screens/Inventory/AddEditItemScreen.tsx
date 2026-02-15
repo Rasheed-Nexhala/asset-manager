@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { ScreenLayout } from '../../components';
+import { ScreenHeader, ScreenLayout } from '../../components';
 import { ItemForm } from '../../components/Inventory/ItemForm';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
@@ -275,30 +275,11 @@ export const AddEditItemScreen: React.FC = () => {
   if (loadingItem) {
     return (
       <ScreenLayout edges={['top']}>
-        {/* Header with Back Button */}
-        <View className="bg-white border-b border-[#E2E8F0] h-14 px-4 flex-row items-center justify-between">
-          {/* Back Button */}
-          <TouchableOpacity
-            onPress={handleCancel}
-            className="w-11 h-11 items-center justify-center"
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Ionicons name="arrow-back" size={24} color="#0F172A" />
-          </TouchableOpacity>
-
-          {/* Screen Title */}
-          <Text
-            className="text-[22px] font-semibold text-[#0F172A]"
-            accessibilityRole="header"
-          >
-            {mode === 'create' ? 'Add New Item' : 'Edit Item'}
-          </Text>
-
-          {/* Right spacer to center title */}
-          <View className="w-11 h-11" />
-        </View>
+        <ScreenHeader
+          title={mode === 'create' ? 'Add New Item' : 'Edit Item'}
+          showBack
+          onBackPress={handleCancel}
+        />
         <View className="flex-1 items-center justify-center px-4">
           <Text className="text-[15px] text-[#64748B]">Loading item data...</Text>
         </View>
@@ -308,30 +289,11 @@ export const AddEditItemScreen: React.FC = () => {
 
   return (
     <ScreenLayout edges={['top']} keyboardAware>
-      {/* Header with Back Button */}
-      <View className="bg-white border-b border-[#E2E8F0] h-14 px-4 flex-row items-center justify-between">
-        {/* Back Button */}
-        <TouchableOpacity
-          onPress={handleCancel}
-          className="w-11 h-11 items-center justify-center"
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Ionicons name="arrow-back" size={24} color="#0F172A" />
-        </TouchableOpacity>
-
-        {/* Screen Title */}
-        <Text
-          className="text-[22px] font-semibold text-[#0F172A]"
-          accessibilityRole="header"
-        >
-          {mode === 'create' ? 'Add New Item' : 'Edit Item'}
-        </Text>
-
-        {/* Right spacer to center title */}
-        <View className="w-11 h-11" />
-      </View>
+      <ScreenHeader
+        title={mode === 'create' ? 'Add New Item' : 'Edit Item'}
+        showBack
+        onBackPress={handleCancel}
+      />
 
       {/* Success Message */}
       {success && (

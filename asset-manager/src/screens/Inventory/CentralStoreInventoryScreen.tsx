@@ -215,15 +215,16 @@ export const CentralStoreInventoryScreen: React.FC = () => {
 
   // CIAMS Standard Header Component - Responsive Layout
   const renderCustomHeader = () => (
-    <View className="bg-white border-b border-[#E2E8F0] px-4 flex-row items-center" style={{ height: 56 }}>
+    <View className="bg-white border-b border-[#E2E8F0] px-4 flex-row items-center justify-between" style={{ height: 56 }}>
+      <View className="flex-1 min-w-0" />
       <Text 
-        className="text-[22px] font-semibold text-[#0F172A] flex-1 flex-shrink" 
+        className="text-[22px] font-semibold text-[#0F172A] flex-1 text-center" 
         accessibilityRole="header"
         numberOfLines={1}
       >
         Central Store
       </Text>
-      <View className="flex-row items-center ml-2">
+      <View className="flex-1 flex-row items-center justify-end min-w-0">
         <TouchableOpacity
           className="w-12 h-12 items-center justify-center rounded-[10px]"
           onPress={handleToggleFilters}

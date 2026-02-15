@@ -11,6 +11,11 @@ import type { SiteFormData } from '../../types/sites';
 export const AddSiteScreen: React.FC = () => {
   const navigation = useNavigation();
   const dispatch = useAppDispatch();
+
+  const handleBack = useCallback(() => {
+    // @ts-ignore - navigation typing varies by navigator
+    navigation.goBack();
+  }, [navigation]);
   const isLoading = useAppSelector(selectSitesLoading);
   const error = useAppSelector(selectSitesError);
 
@@ -38,6 +43,8 @@ export const AddSiteScreen: React.FC = () => {
     <ScreenLayout edges={['top']} keyboardAware>
       <ScreenHeader
         title="Add New Site"
+        showBack
+        onBackPress={handleBack}
         rightAction={{
           label: 'Cancel',
           onPress: handleCancel,

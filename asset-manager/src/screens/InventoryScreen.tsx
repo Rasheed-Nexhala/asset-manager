@@ -1,18 +1,11 @@
 import React from 'react';
 import { View, Text, ScrollView } from 'react-native';
-import { ScreenLayout } from '../components';
+import { ScreenHeader, ScreenLayout } from '../components';
 
 export const InventoryScreen: React.FC = () => {
   return (
     <ScreenLayout edges={['top']}>
-      <View className="bg-white border-b border-[#E2E8F0] px-4 py-3">
-        <Text
-          className="text-[22px] font-semibold text-[#0F172A]"
-          accessibilityRole="header"
-        >
-          Inventory
-        </Text>
-      </View>
+      <ScreenHeader title="Inventory" />
       <ScrollView
         className="flex-1"
         contentContainerClassName="px-4 py-6"

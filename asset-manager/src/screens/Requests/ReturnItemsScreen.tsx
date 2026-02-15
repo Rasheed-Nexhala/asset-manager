@@ -56,6 +56,10 @@ export const ReturnItemsScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const { requestId } = route.params;
 
+  const handleBack = React.useCallback(() => {
+    navigation.goBack();
+  }, [navigation]);
+
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
   const { viewMode, toggleViewMode } = useWeightViewPreference();
@@ -180,7 +184,7 @@ export const ReturnItemsScreen: React.FC = () => {
   if (isLoading) {
     return (
       <ScreenLayout edges={['top']}>
-        <ScreenHeader title="Return Items" />
+        <ScreenHeader title="Return Items" showBack onBackPress={handleBack} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#1E40AF" />
           <Text className="text-[15px] text-[#64748B] mt-4">
@@ -199,7 +203,7 @@ export const ReturnItemsScreen: React.FC = () => {
   if (items.length === 0) {
     return (
       <ScreenLayout edges={['top']}>
-        <ScreenHeader title="Return Items" />
+        <ScreenHeader title="Return Items" showBack onBackPress={handleBack} />
         <View className="flex-1 items-center justify-center px-4">
           <Ionicons name="cube-outline" size={80} color="#64748B" />
           <Text className="text-[22px] font-semibold text-[#0F172A] text-center mb-2 mt-4">
@@ -223,7 +227,7 @@ export const ReturnItemsScreen: React.FC = () => {
   if (items.length > 0 && !hasItemsToReturn) {
     return (
       <ScreenLayout edges={['top']}>
-        <ScreenHeader title="Return Items" />
+        <ScreenHeader title="Return Items" showBack onBackPress={handleBack} />
         <View className="flex-1 items-center justify-center px-4">
           <Ionicons name="checkmark-circle-outline" size={80} color="#16A34A" />
           <Text className="text-[22px] font-semibold text-[#0F172A] text-center mb-2 mt-4">
@@ -259,7 +263,7 @@ export const ReturnItemsScreen: React.FC = () => {
 
   return (
     <ScreenLayout edges={['top']}>
-      <ScreenHeader title="Return Items" />
+      <ScreenHeader title="Return Items" showBack onBackPress={handleBack} />
 
       <ScrollView className="flex-1 px-4">
         <View className="gap-4 py-4">

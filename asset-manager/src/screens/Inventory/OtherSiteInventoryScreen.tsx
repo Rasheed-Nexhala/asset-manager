@@ -3,7 +3,7 @@ import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'rea
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { ScreenLayout } from '../../components';
+import { ScreenHeader, ScreenLayout } from '../../components';
 import { InventoryListItem } from '../../components/Inventory/InventoryListItem';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchInventoryByLocation } from '../../store/thunks/inventoryThunks';
@@ -138,19 +138,7 @@ export const OtherSiteInventoryScreen: React.FC = () => {
   if (siteLoading || isLoading) {
     return (
       <ScreenLayout edges={['top']}>
-        <View className="bg-white border-b border-[#E2E8F0] px-4 h-14 flex-row items-center justify-between">
-          <TouchableOpacity
-            className="w-11 h-11 items-center justify-center -ml-2"
-            onPress={handleBack}
-            activeOpacity={0.7}
-            accessibilityLabel="Go back"
-            accessibilityRole="button"
-          >
-            <Ionicons name="arrow-back" size={24} color="#0F172A" />
-          </TouchableOpacity>
-          <Text className="text-[22px] font-semibold text-[#0F172A]">Loading...</Text>
-          <View className="w-11" />
-        </View>
+        <ScreenHeader title="Loading..." showBack onBackPress={handleBack} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#1E40AF" />
           <Text className="text-[15px] text-[#64748B] mt-4">
@@ -165,21 +153,11 @@ export const OtherSiteInventoryScreen: React.FC = () => {
   if (siteError || error) {
     return (
       <ScreenLayout edges={['top']}>
-        <View className="bg-white border-b border-[#E2E8F0] px-4 h-14 flex-row items-center justify-between">
-          <TouchableOpacity
-            className="w-11 h-11 items-center justify-center -ml-2"
-            onPress={handleBack}
-            activeOpacity={0.7}
-            accessibilityLabel="Go back"
-            accessibilityRole="button"
-          >
-            <Ionicons name="arrow-back" size={24} color="#0F172A" />
-          </TouchableOpacity>
-          <Text className="text-[22px] font-semibold text-[#0F172A]">
-            {site?.name || 'Site'} Inventory
-          </Text>
-          <View className="w-11" />
-        </View>
+        <ScreenHeader
+          title={`${site?.name || 'Site'} Inventory`}
+          showBack
+          onBackPress={handleBack}
+        />
         <View className="flex-1 items-center justify-center px-4">
           <Ionicons name="alert-circle-outline" size={48} color="#DC2626" />
           <Text className="text-[22px] font-semibold text-[#0F172A] mt-4 mb-2 text-center">
@@ -199,22 +177,11 @@ export const OtherSiteInventoryScreen: React.FC = () => {
 
   return (
     <ScreenLayout edges={['top']}>
-      {/* Custom Header with Back Button */}
-      <View className="bg-white border-b border-[#E2E8F0] px-4 h-14 flex-row items-center justify-between">
-        <TouchableOpacity
-          className="w-11 h-11 items-center justify-center -ml-2"
-          onPress={handleBack}
-          activeOpacity={0.7}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="arrow-back" size={24} color="#0F172A" />
-        </TouchableOpacity>
-        <Text className="text-[22px] font-semibold text-[#0F172A] flex-1 text-center">
-          {siteName} Inventory – Read-only
-        </Text>
-        <View className="w-11" />
-      </View>
+      <ScreenHeader
+        title={`${siteName} Inventory`}
+        showBack
+        onBackPress={handleBack}
+      />
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {/* Info Banner */}

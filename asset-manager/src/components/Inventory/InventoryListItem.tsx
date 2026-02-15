@@ -61,15 +61,8 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
     lengthPerPiece: effectiveLength,
   });
 
-  return (
-    <TouchableOpacity
-      className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] min-h-[48px]"
-      onPress={onPress}
-      activeOpacity={0.7}
-      accessibilityRole="button"
-      accessibilityLabel={`Item: ${entry.itemName}. SKU: ${entry.itemSku}. Type: ${itemTypeLabel}. Quantity: ${entry.quantity} ${unit}`}
-    >
-      <View className="flex-row gap-3 items-center">
+  const cardContent = (
+    <View className="flex-row gap-3 items-center">
         {/* Item Image - Small, left side */}
         <View className="w-12 h-12 rounded-lg bg-[#F1F5F9] items-center justify-center overflow-hidden flex-shrink-0">
           {imageUrl ? (
@@ -126,6 +119,31 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
           </View>
         </View>
       </View>
-    </TouchableOpacity>
+  );
+
+  const accessibilityLabel = `Item: ${entry.itemName}. SKU: ${entry.itemSku}. Type: ${itemTypeLabel}. Quantity: ${entry.quantity} ${unit}`;
+
+  if (onPress) {
+    return (
+      <TouchableOpacity
+        className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] min-h-[48px]"
+        onPress={onPress}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+      >
+        {cardContent}
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <View
+      className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] min-h-[48px]"
+      accessibilityRole="text"
+      accessibilityLabel={accessibilityLabel}
+    >
+      {cardContent}
+    </View>
   );
 };

@@ -110,7 +110,7 @@ export const ItemDetailScreen: React.FC = () => {
   if (isLoading && !item) {
     return (
       <ScreenLayout edges={['top']}>
-        <ScreenHeader title="Item Details" />
+        <ScreenHeader title="Item Details" showBack onBackPress={handleBack} />
         <View className="flex-1 items-center justify-center px-4">
           <ActivityIndicator size="large" color="#1E40AF" />
           <Text className="text-[15px] text-[#64748B] mt-4">Loading item details...</Text>
@@ -123,7 +123,7 @@ export const ItemDetailScreen: React.FC = () => {
   if (error && !item) {
     return (
       <ScreenLayout edges={['top']}>
-        <ScreenHeader title="Item Details" />
+        <ScreenHeader title="Item Details" showBack onBackPress={handleBack} />
         <View className="flex-1 items-center justify-center px-4">
           <Ionicons name="alert-circle-outline" size={48} color="#DC2626" />
           <Text className="text-[17px] font-semibold text-[#0F172A] mt-4 text-center">
@@ -150,7 +150,7 @@ export const ItemDetailScreen: React.FC = () => {
   if (!item) {
     return (
       <ScreenLayout edges={['top']}>
-        <ScreenHeader title="Item Details" />
+        <ScreenHeader title="Item Details" showBack onBackPress={handleBack} />
         <View className="flex-1 items-center justify-center px-4">
           <Ionicons name="cube-outline" size={48} color="#94A3B8" />
           <Text className="text-[17px] font-semibold text-[#0F172A] mt-4 text-center">
@@ -177,6 +177,8 @@ export const ItemDetailScreen: React.FC = () => {
     <ScreenLayout edges={['top']}>
       <ScreenHeader
         title="Item Details"
+        showBack
+        onBackPress={handleBack}
         rightAction={{
           icon: 'create-outline',
           onPress: handleEdit,

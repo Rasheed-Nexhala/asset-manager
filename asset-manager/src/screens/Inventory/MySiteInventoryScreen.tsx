@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  Modal,
+  FlatList,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,6 +51,7 @@ export const MySiteInventoryScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [currentSite, setCurrentSite] = useState<Site | null>(null);
   const [isLoadingSite, setIsLoadingSite] = useState<boolean>(true);
+  const [showOtherSitesModal, setShowOtherSitesModal] = useState<boolean>(false);
   
   // Fetch sites and set up real-time listener
   useEffect(() => {
@@ -130,9 +140,21 @@ export const MySiteInventoryScreen: React.FC = () => {
   }, [sites, currentSite]);
   
   // Navigation handlers
-  const handleNavigateToOtherSite = useCallback((siteId: string) => {
-    navigation.navigate('OtherSiteInventory', { siteId });
-  }, [navigation]);
+  const handleNavigateToOtherSite = useCallback(
+    (siteId: string) => {
+      setShowOtherSitesModal(false);
+      navigation.navigate('OtherSiteInventory', { siteId });
+    },
+    [navigation]
+  );
+
+  const handleOpenOtherSitesModal = useCallback(() => {
+    setShowOtherSitesModal(true);
+  }, []);
+
+  const handleCloseOtherSitesModal = useCallback(() => {
+    setShowOtherSitesModal(false);
+  }, []);
   
   // Loading state
   if (isLoadingSite || sitesLoading) {
@@ -167,8 +189,19 @@ export const MySiteInventoryScreen: React.FC = () => {
   
   return (
     <ScreenLayout edges={['top']}>
-      <ScreenHeader title={`My Inventory – ${currentSite.name}`} />
-      
+      <ScreenHeader
+        title={`My Inventory`}
+        rightAction={
+          otherSites.length > 0
+            ? {
+                icon: 'business-outline',
+                onPress: handleOpenOtherSitesModal,
+                accessibilityLabel: 'View inventory at other sites',
+              }
+            : undefined
+        }
+      />
+
       <ScrollView
         className="flex-1"
         contentContainerClassName="pb-6"
@@ -198,7 +231,36 @@ export const MySiteInventoryScreen: React.FC = () => {
             )}
           </View>
         </View>
-        
+
+        {/* View Other Sites - Quick Action (above inventory, always visible) */}
+        {otherSites.length > 0 && (
+          <View className="px-4 pb-4">
+            <TouchableOpacity
+              className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] flex-row items-center justify-between min-h-[48px]"
+              onPress={handleOpenOtherSitesModal}
+              activeOpacity={0.7}
+              accessibilityLabel="View inventory at other sites"
+              accessibilityRole="button"
+            >
+              <View className="flex-row items-center flex-1">
+                <View className="w-10 h-10 rounded-full bg-[#1E40AF]/15 items-center justify-center mr-3">
+                  <Ionicons name="business-outline" size={22} color="#1E40AF" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-[15px] font-semibold text-[#0F172A]">
+                    View Other Sites
+                  </Text>
+                  <Text className="text-[13px] text-[#64748B] mt-0.5">
+                    Browse inventory at {otherSites.length} other site
+                    {otherSites.length !== 1 ? 's' : ''}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Inventory List */}
         <View className="px-4">
           {isLoading ? (
@@ -238,40 +300,80 @@ export const MySiteInventoryScreen: React.FC = () => {
             </View>
           )}
         </View>
-        
-        {/* View Other Sites Section */}
-        {otherSites.length > 0 && (
-          <View className="px-4 mt-6">
-            <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">
-              View Other Sites
-            </Text>
-            <View className="gap-3">
-              {otherSites.map((site) => (
+      </ScrollView>
+
+      {/* Other Sites Selection Modal - CIAMS bottom sheet pattern */}
+      <Modal
+        visible={showOtherSitesModal}
+        animationType="slide"
+        transparent
+        onRequestClose={handleCloseOtherSitesModal}
+      >
+        <View className="flex-1">
+          <TouchableOpacity
+            className="absolute inset-0 bg-black/50"
+            activeOpacity={1}
+            onPress={handleCloseOtherSitesModal}
+            accessibilityLabel="Close modal"
+            accessibilityRole="button"
+          />
+          <View className="flex-1 justify-end">
+            <View className="bg-white rounded-t-2xl max-h-[85%]">
+            {/* Handle Bar - CIAMS bottom sheet */}
+            <View className="w-10 h-1 bg-[#E2E8F0] rounded-full self-center mt-2 mb-4" />
+
+            {/* Header */}
+            <View className="px-4 pb-3 border-b border-[#E2E8F0]">
+              <View className="flex-row justify-between items-center">
+                <Text className="text-[22px] font-semibold text-[#0F172A]">
+                  Other Sites
+                </Text>
                 <TouchableOpacity
-                  key={site.id}
-                  className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] flex-row items-center justify-between"
+                  onPress={handleCloseOtherSitesModal}
+                  className="w-12 h-12 items-center justify-center rounded-[10px]"
+                  accessibilityLabel="Close"
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="close" size={24} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+              <Text className="text-[13px] text-[#64748B] mt-1">
+                View inventory at other sites
+              </Text>
+            </View>
+
+            {/* Sites List */}
+            <FlatList
+              data={otherSites}
+              keyExtractor={(site) => site.id}
+              className="max-h-96"
+              contentContainerStyle={{ paddingBottom: 24 }}
+              renderItem={({ item: site }) => (
+                <TouchableOpacity
+                  className="px-4 py-4 border-b border-[#E2E8F0] flex-row items-center justify-between min-h-[56px]"
                   onPress={() => handleNavigateToOtherSite(site.id)}
                   activeOpacity={0.7}
                   accessibilityLabel={`View inventory for ${site.name}`}
                   accessibilityRole="button"
                 >
                   <View className="flex-1">
-                    <Text className="text-[15px] font-semibold text-[#0F172A] mb-1">
+                    <Text className="text-[15px] font-semibold text-[#0F172A]">
                       {site.name}
                     </Text>
                     {site.address && (
-                      <Text className="text-[13px] text-[#64748B]" numberOfLines={1}>
+                      <Text className="text-[13px] text-[#64748B] mt-0.5" numberOfLines={1}>
                         {site.address}
                       </Text>
                     )}
                   </View>
                   <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
                 </TouchableOpacity>
-              ))}
+              )}
+            />
             </View>
           </View>
-        )}
-      </ScrollView>
+        </View>
+      </Modal>
     </ScreenLayout>
   );
 };

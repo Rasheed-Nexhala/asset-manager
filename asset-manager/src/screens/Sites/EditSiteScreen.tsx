@@ -83,12 +83,19 @@ export const EditSiteScreen: React.FC = () => {
     navigation.goBack();
   }, [navigation]);
 
+  const handleBack = useCallback(() => {
+    // @ts-ignore - navigation typing varies by navigator
+    navigation.goBack();
+  }, [navigation]);
+
   // Loading state
   if (loading) {
     return (
       <ScreenLayout edges={['top']} keyboardAware>
         <ScreenHeader
           title="Edit Site"
+          showBack
+          onBackPress={handleBack}
           rightAction={{
             label: 'Cancel',
             onPress: handleCancel,
@@ -109,6 +116,8 @@ export const EditSiteScreen: React.FC = () => {
       <ScreenLayout edges={['top']} keyboardAware>
         <ScreenHeader
           title="Edit Site"
+          showBack
+          onBackPress={handleBack}
           rightAction={{
             label: 'Cancel',
             onPress: handleCancel,
@@ -140,6 +149,8 @@ export const EditSiteScreen: React.FC = () => {
     <ScreenLayout edges={['top']} keyboardAware>
       <ScreenHeader
         title="Edit Site"
+        showBack
+        onBackPress={handleBack}
         rightAction={{
           label: 'Cancel',
           onPress: handleCancel,

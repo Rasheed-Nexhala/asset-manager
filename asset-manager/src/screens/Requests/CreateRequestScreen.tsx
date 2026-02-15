@@ -44,6 +44,10 @@ export const CreateRequestScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const { siteId } = route.params;
 
+  const handleBack = React.useCallback(() => {
+    navigation.goBack();
+  }, [navigation]);
+
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
   const site = useAppSelector(selectSiteById(siteId));
@@ -70,7 +74,7 @@ export const CreateRequestScreen: React.FC = () => {
   if (siteId && sitesLoading && !site) {
     return (
       <ScreenLayout edges={['top']}>
-        <ScreenHeader title="New Request" />
+        <ScreenHeader title="New Request" showBack onBackPress={handleBack} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#1E40AF" />
           <Text className="text-[15px] text-[#64748B] mt-4">
@@ -188,7 +192,7 @@ export const CreateRequestScreen: React.FC = () => {
 
   return (
     <ScreenLayout edges={['top']}>
-      <ScreenHeader title="New Request" />
+      <ScreenHeader title="New Request" showBack onBackPress={handleBack} />
 
       <ScrollView className="flex-1 px-4">
         <View className="gap-4 py-4">
