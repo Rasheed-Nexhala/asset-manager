@@ -58,7 +58,8 @@ export const CategoryManagementScreen: React.FC = () => {
   // Compute items grouped by category locally (selectItemsByCategory is a factory, not usable as-is)
   const itemsByCategory = useMemo(() => {
     const map: Record<string, Item[]> = {};
-    for (const item of allItems) {
+    const safeItems = Array.isArray(allItems) ? allItems : [];
+    for (const item of safeItems) {
       if (!map[item.categoryId]) map[item.categoryId] = [];
       map[item.categoryId].push(item);
     }
@@ -173,10 +174,13 @@ export const CategoryManagementScreen: React.FC = () => {
     }
   }, [dispatch, newCategoryName]);
 
-  // Filter categories based on search query
-  const filteredCategories = categories.filter((category) =>
-    category.name.toLowerCase().includes(searchQuery.toLowerCase().trim())
-  );
+  // Filter categories based on search query (safe: categories can be undefined on mount)
+  const safeCategories = Array.isArray(categories) ? categories : [];
+  const filteredCategories = safeCategories.filter((category) => {
+    const name = (category?.name ?? '').toLowerCase();
+    const query = (searchQuery ?? '').toLowerCase().trim();
+    return name.includes(query);
+  });
 
   const getItemCount = useCallback(
     (categoryId: string) => {
@@ -200,7 +204,7 @@ export const CategoryManagementScreen: React.FC = () => {
   const keyExtractor = useCallback((item: Category) => item.id, []);
 
   const ListEmptyComponent = useCallback(() => {
-    if (isLoading && categories.length === 0) return null;
+    if (isLoading && safeCategories.length === 0) return null;
     return (
       <View className="flex-1 items-center justify-center px-4 py-12">
         <Ionicons name="pricetags-outline" size={80} color="#94A3B8" />
@@ -224,9 +228,9 @@ export const CategoryManagementScreen: React.FC = () => {
         )}
       </View>
     );
-  }, [isLoading, categories.length, searchQuery]);
+  }, [isLoading, safeCategories.length, searchQuery]);
 
-  if (isLoading && categories.length === 0 && !refreshing) {
+  if (isLoading && safeCategories.length === 0 && !refreshing) {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader

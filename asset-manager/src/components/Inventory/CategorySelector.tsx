@@ -15,6 +15,8 @@ export interface CategorySelectorProps {
   label?: string;
   /** Optional error message to display */
   error?: string;
+  /** Whether the selector is disabled */
+  disabled?: boolean;
 }
 
 export const CategorySelector: React.FC<CategorySelectorProps> = ({
@@ -22,6 +24,7 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
   onSelect,
   label = 'Category',
   error,
+  disabled = false,
 }) => {
   const dispatch = useAppDispatch();
   const categories = useAppSelector(selectAllCategories);
@@ -114,8 +117,10 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
         className={`border rounded-lg h-12 px-4 bg-white flex-row items-center justify-between ${
           hasError ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
         }`}
-        onPress={() => setModalVisible(true)}
+        onPress={() => !disabled && setModalVisible(true)}
         activeOpacity={0.7}
+        disabled={disabled}
+        style={disabled ? { opacity: 0.6 } : undefined}
         accessibilityRole="button"
         accessibilityLabel={`Select category. Current: ${displayText}`}
       >

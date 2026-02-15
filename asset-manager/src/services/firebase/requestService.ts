@@ -274,16 +274,17 @@ export const approveRequest = async (
     }
     
     const requestData = requestSnap.data();
+    const items = Array.isArray(requestData?.items) ? requestData.items : [];
     const availability = await checkItemsAvailability(
-      requestData.items.map((item: any) => ({
+      items.map((item: { itemId: string; itemName: string; quantityRequested: number }) => ({
         itemId: item.itemId,
-        itemName: item.itemName,
-        quantityRequested: item.quantityRequested,
+        itemName: item.itemName ?? item.itemId,
+        quantityRequested: item.quantityRequested ?? 0,
       }))
     );
-    
+
     // Ensure all items sufficient
-    const allSufficient = availability.every(item => item.sufficient);
+    const allSufficient = Array.isArray(availability) && availability.every((item) => item.sufficient);
     if (!allSufficient) {
       throw new Error('Cannot approve: insufficient stock for some items');
     }
@@ -330,8 +331,11 @@ export const rejectRequest = async (
   }
 };
 
+const MAX_TRANSFER_RETRIES = 3;
+
 /**
  * Transfer request items (atomic inventory update)
+ * Uses retry logic for transient failures (network, etc.)
  */
 export const transferRequest = async (
   requestId: string,
@@ -339,48 +343,56 @@ export const transferRequest = async (
   transferredBy: string,
   transferredByName: string
 ): Promise<void> => {
-  try {
-    // Step 1: Fetch request data first (outside transaction)
-    const requestRef = doc(db, REQUESTS_COLLECTION, requestId);
-    const requestSnap = await getDoc(requestRef);
-    
-    if (!requestSnap.exists()) {
-      throw new Error('Request not found');
-    }
-    
-    const requestData = requestSnap.data();
-    
-    if (requestData.status !== 'approved') {
-      throw new Error('Only approved requests can be transferred');
-    }
-    
-    // Step 2: Query all inventory documents we'll need (outside transaction)
-    const inventoryRefs: Map<string, { storeRef: any; siteRef: any }> = new Map();
-    
-    for (const item of requestData.items) {
-      // Query central store inventory
-      const centralStoreQuery = query(
-        collection(db, INVENTORY_COLLECTION),
-        where('itemId', '==', item.itemId),
-        where('locationId', '==', 'store'),
-        limit(1)
-      );
-      const centralStoreSnap = await getDocs(centralStoreQuery);
-      const storeRef = centralStoreSnap.empty ? null : centralStoreSnap.docs[0].ref;
-      
-      // Query site inventory
-      const siteLocationId = `site_${requestData.siteId}`;
-      const siteInventoryQuery = query(
-        collection(db, INVENTORY_COLLECTION),
-        where('itemId', '==', item.itemId),
-        where('locationId', '==', siteLocationId),
-        limit(1)
-      );
-      const siteInventorySnap = await getDocs(siteInventoryQuery);
-      const siteRef = siteInventorySnap.empty ? null : siteInventorySnap.docs[0].ref;
-      
-      inventoryRefs.set(item.itemId, { storeRef, siteRef });
-    }
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= MAX_TRANSFER_RETRIES; attempt++) {
+    try {
+      // Step 1: Fetch request data first (outside transaction)
+      const requestRef = doc(db, REQUESTS_COLLECTION, requestId);
+      const requestSnap = await getDoc(requestRef);
+
+      if (!requestSnap.exists()) {
+        throw new Error('Request not found');
+      }
+
+      const requestData = requestSnap.data();
+
+      if (requestData.status !== 'approved') {
+        throw new Error('Only approved requests can be transferred');
+      }
+
+      const items = Array.isArray(requestData?.items) ? requestData.items : [];
+      if (items.length === 0) {
+        throw new Error('Request has no items to transfer');
+      }
+
+      // Step 2: Query all inventory documents we'll need (outside transaction)
+      const inventoryRefs: Map<string, { storeRef: any; siteRef: any }> = new Map();
+
+      for (const item of items) {
+        // Query central store inventory
+        const centralStoreQuery = query(
+          collection(db, INVENTORY_COLLECTION),
+          where('itemId', '==', item.itemId),
+          where('locationId', '==', 'store'),
+          limit(1)
+        );
+        const centralStoreSnap = await getDocs(centralStoreQuery);
+        const storeRef = centralStoreSnap.empty ? null : centralStoreSnap.docs[0].ref;
+
+        // Query site inventory
+        const siteLocationId = `site_${requestData.siteId}`;
+        const siteInventoryQuery = query(
+          collection(db, INVENTORY_COLLECTION),
+          where('itemId', '==', item.itemId),
+          where('locationId', '==', siteLocationId),
+          limit(1)
+        );
+        const siteInventorySnap = await getDocs(siteInventoryQuery);
+        const siteRef = siteInventorySnap.empty ? null : siteInventorySnap.docs[0].ref;
+
+        inventoryRefs.set(item.itemId, { storeRef, siteRef });
+      }
     
     // Step 3: Run transaction with the document references we found
     await runTransaction(db, async (transaction) => {
@@ -521,10 +533,33 @@ export const transferRequest = async (
         updatedAt: serverTimestamp(),
       });
     });
-  } catch (error) {
-    console.error('Error transferring request:', error);
-    throw new Error('Failed to complete transfer. Please try again.');
+      return;
+    } catch (error) {
+      lastError = error;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorCode = (error as { code?: string })?.code ?? '';
+      const isRetryable =
+        errorCode === 'unavailable' ||
+        errorCode === 'resource-exhausted' ||
+        errorCode === 'aborted' ||
+        errorCode === 'deadline-exceeded' ||
+        errorMessage.toLowerCase().includes('network') ||
+        errorMessage.toLowerCase().includes('timeout');
+
+      if (isRetryable && attempt < MAX_TRANSFER_RETRIES) {
+        const delay = 1000 * Math.pow(2, attempt - 1);
+        console.warn(
+          `transferRequest attempt ${attempt}/${MAX_TRANSFER_RETRIES} failed, retrying in ${delay}ms...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      } else {
+        console.error('Error transferring request:', error);
+        throw new Error('Failed to complete transfer. Please try again.');
+      }
+    }
   }
+  console.error('Error transferring request:', lastError);
+  throw new Error('Failed to complete transfer. Please try again.');
 };
 
 /**
@@ -922,14 +957,16 @@ export const subscribeToRequests = (
 
 /**
  * Subscribe to a single request for real-time updates
+ * @param onError - Optional callback when subscription fails (e.g. permission, network)
  */
 export const subscribeToRequest = (
   requestId: string,
-  callback: (request: Request | null) => void
+  callback: (request: Request | null) => void,
+  onError?: (error: Error) => void
 ): (() => void) => {
   try {
     const requestRef = doc(db, REQUESTS_COLLECTION, requestId);
-    
+
     const unsubscribe = onSnapshot(
       requestRef,
       (doc) => {
@@ -942,13 +979,15 @@ export const subscribeToRequest = (
       },
       (error) => {
         console.error('Error in single request subscription:', error);
+        onError?.(error instanceof Error ? error : new Error(String(error)));
         callback(null);
       }
     );
-    
+
     return unsubscribe;
   } catch (error) {
     console.error('Error setting up single request subscription:', error);
+    onError?.(error instanceof Error ? error : new Error(String(error)));
     return () => {};
   }
 };

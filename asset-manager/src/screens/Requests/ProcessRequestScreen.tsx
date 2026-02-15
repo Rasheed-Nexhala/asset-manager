@@ -85,23 +85,38 @@ export const ProcessRequestScreen: React.FC = () => {
   const [storeNotes, setStoreNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(true);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   // Set up real-time subscription for this specific request
   useEffect(() => {
     let cancelled = false;
-    
-    // Set up real-time listener for immediate updates
-    const unsubscribe = requestService.subscribeToRequest(requestId, (updatedRequest) => {
-      if (!cancelled && updatedRequest) {
-        setRequest(updatedRequest);
+    setSubscriptionError(null);
+
+    const unsubscribe = requestService.subscribeToRequest(
+      requestId,
+      (updatedRequest) => {
+        if (!cancelled) {
+          if (updatedRequest) {
+            setRequest(updatedRequest);
+            setSubscriptionError(null);
+          } else {
+            setRequest(null);
+          }
+        }
+      },
+      (error) => {
+        if (!cancelled) {
+          setSubscriptionError(error?.message ?? 'Failed to load request. Pull to retry.');
+        }
       }
-    });
-    
+    );
+
     return () => {
       cancelled = true;
       unsubscribe();
     };
-  }, [requestId]);
+  }, [requestId, retryKey]);
 
   // Also update when Redux store changes (for real-time updates from subscriptions)
   useEffect(() => {
@@ -136,7 +151,8 @@ export const ProcessRequestScreen: React.FC = () => {
     const check = async () => {
       setIsCheckingAvailability(true);
       try {
-        const itemsToCheck = request.items.map((item) => ({
+        const items = Array.isArray(request.items) ? request.items : [];
+        const itemsToCheck = items.map((item) => ({
           itemId: item.itemId,
           itemName: item.itemName,
           quantityRequested: item.quantityRequested,
@@ -221,17 +237,39 @@ export const ProcessRequestScreen: React.FC = () => {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader title="Process Request" showBack onBackPress={handleBack} />
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#1E40AF" />
-          <Text className="text-[15px] text-[#64748B] mt-4">
-            Loading request...
-          </Text>
+        <View className="flex-1 items-center justify-center px-4">
+          {subscriptionError ? (
+            <>
+              <Ionicons name="alert-circle-outline" size={64} color="#DC2626" />
+              <Text className="text-[17px] font-semibold text-[#0F172A] mt-4 text-center">
+                Unable to Load Request
+              </Text>
+              <Text className="text-[15px] text-[#64748B] mt-2 text-center">
+                {subscriptionError}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setRetryKey((k) => k + 1)}
+                className="mt-6 bg-[#1E40AF] rounded-[10px] h-[50px] px-8 items-center justify-center"
+              >
+                <Text className="text-[15px] font-semibold text-white">Retry</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <ActivityIndicator size="large" color="#1E40AF" />
+              <Text className="text-[15px] text-[#64748B] mt-4">
+                Loading request...
+              </Text>
+            </>
+          )}
         </View>
       </ScreenLayout>
     );
   }
 
-  const priorityInfo = priorityConfig[request.priority];
+  const priorityInfo =
+    priorityConfig[request.priority as keyof typeof priorityConfig] ??
+    priorityConfig.medium;
 
   return (
     <ScreenLayout edges={['top']}>
@@ -284,11 +322,11 @@ export const ProcessRequestScreen: React.FC = () => {
               <Text className="text-[17px] font-semibold text-[#0F172A]">
                 Items
               </Text>
-              {request.items.some((i) => isWeightBasedItem({ weightPerMeter: i.weightPerMeter })) && (
+              {(Array.isArray(request.items) ? request.items : []).some((i) => isWeightBasedItem({ weightPerMeter: i.weightPerMeter })) && (
                 <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} compact />
               )}
             </View>
-            {request.items.map((item) => (
+            {(Array.isArray(request.items) ? request.items : []).map((item) => (
               <RequestItemCard
                 key={item.itemId}
                 item={item}

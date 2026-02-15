@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo, useState } from 'react';
+import React, { useEffect, useCallback, useMemo, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -48,6 +48,7 @@ export const MyRequestsScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [refreshing, setRefreshing] = useState(false);
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const userId = useAppSelector(selectUserId);
   const isSiteManager = useAppSelector(selectIsSiteManager);
@@ -74,10 +75,21 @@ export const MyRequestsScreen: React.FC = () => {
     return unsubscribe;
   }, [dispatch, userId]);
 
+  useEffect(() => {
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    // Subscription is real-time; data is kept current. Brief delay for UX.
-    setTimeout(() => setRefreshing(false), 800);
+    if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+    refreshTimeoutRef.current = setTimeout(() => {
+      refreshTimeoutRef.current = null;
+      setRefreshing(false);
+    }, 800);
   }, []);
 
   const handleCreateRequest = useCallback(() => {

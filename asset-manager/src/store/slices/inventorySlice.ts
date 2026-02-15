@@ -1,5 +1,15 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { Item, Category, InventoryEntry, ItemFilters } from '../../types/inventory';
+
+/** Safely extract error message from thunk rejection payload */
+const getErrorMessage = (payload: unknown): string => {
+  if (typeof payload === 'string') return payload;
+  if (payload instanceof Error) return payload.message;
+  if (payload && typeof payload === 'object' && 'message' in payload) {
+    return String((payload as { message: unknown }).message);
+  }
+  return 'An unexpected error occurred';
+};
 import {
   fetchItems,
   fetchItemById,
@@ -48,7 +58,10 @@ const inventorySlice = createSlice({
       state.items = action.payload;
       // Update low stock item IDs whenever items change
       state.lowStockItemIds = action.payload
-        .filter((item) => item.totalQuantity <= item.minStockLevel)
+        .filter(
+          (item) =>
+            (item.totalQuantity ?? 0) <= (item.minStockLevel ?? 0)
+        )
         .map((item) => item.id);
     },
     setCategories: (state, action: PayloadAction<Category[]>) => {
@@ -84,7 +97,10 @@ const inventorySlice = createSlice({
         state.items[index] = action.payload;
         // Update low stock item IDs
         state.lowStockItemIds = state.items
-          .filter((item) => item.totalQuantity <= item.minStockLevel)
+          .filter(
+            (item) =>
+              (item.totalQuantity ?? 0) <= (item.minStockLevel ?? 0)
+          )
           .map((item) => item.id);
       }
     },
@@ -92,7 +108,10 @@ const inventorySlice = createSlice({
     addItem: (state, action: PayloadAction<Item>) => {
       state.items.push(action.payload);
       // Update low stock item IDs
-      if (action.payload.totalQuantity <= action.payload.minStockLevel) {
+      if (
+        (action.payload.totalQuantity ?? 0) <=
+        (action.payload.minStockLevel ?? 0)
+      ) {
         state.lowStockItemIds.push(action.payload.id);
       }
     },
@@ -124,14 +143,17 @@ const inventorySlice = createSlice({
         state.items = action.payload;
         // Update low stock item IDs
         state.lowStockItemIds = action.payload
-          .filter((item) => item.totalQuantity <= item.minStockLevel)
+          .filter(
+            (item) =>
+              (item.totalQuantity ?? 0) <= (item.minStockLevel ?? 0)
+          )
           .map((item) => item.id);
         state.error = null;
         state.errorTimestamp = null;
       })
       .addCase(fetchItems.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = getErrorMessage(action.payload);
         state.errorTimestamp = Date.now();
       })
       // Fetch item by ID
@@ -151,7 +173,10 @@ const inventorySlice = createSlice({
           }
           // Update low stock item IDs
           state.lowStockItemIds = state.items
-            .filter((item) => item.totalQuantity <= item.minStockLevel)
+            .filter(
+              (item) =>
+                (item.totalQuantity ?? 0) <= (item.minStockLevel ?? 0)
+            )
             .map((item) => item.id);
         }
         state.error = null;
@@ -159,7 +184,7 @@ const inventorySlice = createSlice({
       })
       .addCase(fetchItemById.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = getErrorMessage(action.payload);
         state.errorTimestamp = Date.now();
       })
       // Create item
@@ -177,7 +202,7 @@ const inventorySlice = createSlice({
       })
       .addCase(createItem.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = getErrorMessage(action.payload);
         state.errorTimestamp = Date.now();
       })
       // Update item
@@ -195,7 +220,7 @@ const inventorySlice = createSlice({
       })
       .addCase(updateItem.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = getErrorMessage(action.payload);
         state.errorTimestamp = Date.now();
       })
       // Delete item
@@ -219,7 +244,7 @@ const inventorySlice = createSlice({
       })
       .addCase(deleteItem.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = getErrorMessage(action.payload);
         state.errorTimestamp = Date.now();
       })
       // Adjust quantity
@@ -236,7 +261,7 @@ const inventorySlice = createSlice({
       })
       .addCase(adjustQuantity.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = getErrorMessage(action.payload);
         state.errorTimestamp = Date.now();
       })
       // Fetch inventory by location
@@ -253,7 +278,7 @@ const inventorySlice = createSlice({
       })
       .addCase(fetchInventoryByLocation.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = getErrorMessage(action.payload);
         state.errorTimestamp = Date.now();
       })
       // Fetch categories
@@ -270,7 +295,7 @@ const inventorySlice = createSlice({
       })
       .addCase(fetchCategories.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = getErrorMessage(action.payload);
         state.errorTimestamp = Date.now();
       })
       // Create category
@@ -287,7 +312,7 @@ const inventorySlice = createSlice({
       })
       .addCase(createCategory.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = getErrorMessage(action.payload);
         state.errorTimestamp = Date.now();
       })
       // Update category
@@ -304,7 +329,7 @@ const inventorySlice = createSlice({
       })
       .addCase(updateCategory.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = getErrorMessage(action.payload);
         state.errorTimestamp = Date.now();
       })
       // Delete category
@@ -321,7 +346,7 @@ const inventorySlice = createSlice({
       })
       .addCase(deleteCategory.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = getErrorMessage(action.payload);
         state.errorTimestamp = Date.now();
       });
   },

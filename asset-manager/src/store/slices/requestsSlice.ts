@@ -77,14 +77,18 @@ const requestsSlice = createSlice({
 
     updateRequestInState: (state, action: PayloadAction<Request>) => {
       const updatedRequest = action.payload;
-      
+      if (!updatedRequest?.id) return;
+
       // Update in requests array (for Store Incharge/Admin view)
       const requestIndex = state.requests.findIndex((r) => r.id === updatedRequest.id);
       if (requestIndex !== -1) {
         state.requests[requestIndex] = updatedRequest;
       } else if (updatedRequest.status !== 'draft') {
-        // If not found and not a draft, add it (e.g., draft was submitted)
-        state.requests.unshift(updatedRequest);
+        // Only add if not already present (prevents duplicates from race conditions)
+        const existsInRequests = state.requests.some((r) => r.id === updatedRequest.id);
+        if (!existsInRequests) {
+          state.requests.unshift(updatedRequest);
+        }
       }
 
       // Update in myRequests array (for Site Manager's own requests)
@@ -92,9 +96,7 @@ const requestsSlice = createSlice({
       if (myRequestIndex !== -1) {
         state.myRequests[myRequestIndex] = updatedRequest;
       } else {
-        // If not found in myRequests, add it if it belongs to this user
-        // Note: We can't check ownership here since we don't have user context,
-        // but the subscription will handle adding user-owned requests properly
+        // If not found in myRequests, subscription will handle adding user-owned requests
       }
 
       // Update selectedRequest if it matches

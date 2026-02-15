@@ -44,8 +44,10 @@ export const RequestCard: React.FC<RequestCardProps> = ({
   showAvailability = false,
   isAllSufficient = false,
 }) => {
-  const priorityInfo = priorityConfig[request.priority];
-  const itemCount = request.items.length;
+  const priorityInfo =
+    priorityConfig[request?.priority as keyof typeof priorityConfig] ??
+    priorityConfig.medium;
+  const itemCount = Array.isArray(request?.items) ? request.items.length : 0;
 
   return (
     <TouchableOpacity
@@ -60,7 +62,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         <View className="flex-row items-center gap-2 flex-1">
           <Text className="text-lg">{priorityInfo.emoji}</Text>
           <Text className="text-[15px] font-semibold text-[#0F172A] flex-1">
-            {request.requestNumber}
+            {request?.requestNumber ?? '—'}
           </Text>
         </View>
         <RequestStatusBadge status={request.status} />
@@ -70,7 +72,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
       <View className="flex-row gap-4 mb-3">
         <View className="flex-1">
           <Text className="text-[13px] text-[#64748B]">Site</Text>
-          <Text className="text-[15px] text-[#0F172A]">{request.siteName}</Text>
+          <Text className="text-[15px] text-[#0F172A]">{request?.siteName ?? '—'}</Text>
         </View>
         <View className="flex-1">
           <Text className="text-[13px] text-[#64748B]">Items</Text>

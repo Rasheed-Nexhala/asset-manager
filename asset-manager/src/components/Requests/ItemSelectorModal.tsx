@@ -30,14 +30,21 @@ export const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
-  // Filter items
-  const filteredItems = allItems.filter((item) => {
+  // Safe array - Redux selector can return undefined during initialization
+  const safeItems = Array.isArray(allItems) ? allItems : [];
+
+  // Filter items with null-safe string operations
+  const filteredItems = safeItems.filter((item) => {
+    if (!item?.id) return false;
     if (excludeItemIds.includes(item.id)) return false;
     if (item.status !== 'active') return false;
 
+    const searchLower = searchQuery?.toLowerCase?.() ?? '';
+    const nameLower = (item.name ?? '').toLowerCase();
+    const skuLower = (item.sku ?? '').toLowerCase();
+
     const matchesSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchQuery.toLowerCase());
+      nameLower.includes(searchLower) || skuLower.includes(searchLower);
 
     return matchesSearch;
   });
@@ -53,7 +60,7 @@ export const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({
   };
 
   const handleConfirm = () => {
-    const selected = allItems.filter((item) => selectedItems.has(item.id));
+    const selected = safeItems.filter((item) => item?.id && selectedItems.has(item.id));
     onSelect(selected);
     setSelectedItems(new Set());
     setSearchQuery('');
@@ -110,13 +117,14 @@ export const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({
           {/* Items List */}
           <FlatList
             data={filteredItems}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item, index) => item?.id ?? `item-${index}`}
             renderItem={({ item }) => {
-              const isSelected = selectedItems.has(item.id);
+              const itemId = item?.id ?? '';
+              const isSelected = selectedItems.has(itemId);
 
               return (
                 <TouchableOpacity
-                  onPress={() => toggleItem(item.id)}
+                  onPress={() => itemId && toggleItem(itemId)}
                   className="px-4 py-3 border-b border-[#E2E8F0]"
                   activeOpacity={0.7}
                 >
@@ -149,10 +157,10 @@ export const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({
                     {/* Item Info */}
                     <View className="flex-1">
                       <Text className="text-[15px] font-semibold text-[#0F172A]">
-                        {item.name}
+                        {item.name ?? 'Unnamed Item'}
                       </Text>
                       <Text className="text-[13px] text-[#64748B]">
-                        {item.sku} • {item.categoryName}
+                        {item.sku ?? '—'} • {item.categoryName ?? '—'}
                       </Text>
                     </View>
                   </View>

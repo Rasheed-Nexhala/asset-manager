@@ -120,7 +120,8 @@ export const listItems = async (filters?: ItemFilters): Promise<Item[]> => {
     // Apply low stock filter in memory (after fetching)
     if (filters?.lowStockOnly) {
       return items.filter(
-        (item) => item.totalQuantity <= item.minStockLevel
+        (item) =>
+          (item.totalQuantity ?? 0) <= (item.minStockLevel ?? 0)
       );
     }
 
@@ -460,24 +461,28 @@ export const deleteItem = async (id: string): Promise<void> => {
  * 
  * @param adjustmentData - Adjustment data including itemId, locationId, type, quantity, reason, notes
  */
+const MAX_TRANSACTION_RETRIES = 3;
+
 export const adjustQuantity = async (
   adjustmentData: AdjustmentData
 ): Promise<void> => {
-  try {
-    const user = auth.currentUser;
-    if (!user) {
-      throw new Error('User must be authenticated to adjust inventory');
-    }
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('User must be authenticated to adjust inventory');
+  }
 
-    const inventoryQuery = query(
-      collection(db, INVENTORY_COLLECTION),
-      where('itemId', '==', adjustmentData.itemId),
-      where('locationId', '==', adjustmentData.locationId)
-    );
+  const inventoryQuery = query(
+    collection(db, INVENTORY_COLLECTION),
+    where('itemId', '==', adjustmentData.itemId),
+    where('locationId', '==', adjustmentData.locationId)
+  );
 
-    const itemRef = doc(db, ITEMS_COLLECTION, adjustmentData.itemId);
+  const itemRef = doc(db, ITEMS_COLLECTION, adjustmentData.itemId);
 
-    await runTransaction(db, async (transaction) => {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= MAX_TRANSACTION_RETRIES; attempt++) {
+    try {
+      await runTransaction(db, async (transaction) => {
       // Read inventory within transaction (atomic with writes)
       // Note: transaction.get() supports Query at runtime; type assertion needed for TS
       const inventorySnapshot = (await (
@@ -561,10 +566,31 @@ export const adjustQuantity = async (
 
       transaction.update(itemRef, updatedTotals);
     });
-  } catch (error) {
-    console.error('Error adjusting quantity:', error);
-    throw error;
+      return;
+    } catch (error) {
+      lastError = error;
+      const isRetryable =
+        (error as { code?: string })?.code === 'unavailable' ||
+        (error as { code?: string })?.code === 'resource-exhausted' ||
+        (error as { code?: string })?.code === 'aborted' ||
+        (error as { code?: string })?.code === 'deadline-exceeded' ||
+        String(error).toLowerCase().includes('network') ||
+        String(error).toLowerCase().includes('timeout');
+
+      if (isRetryable && attempt < MAX_TRANSACTION_RETRIES) {
+        const delay = 1000 * Math.pow(2, attempt - 1);
+        console.warn(
+          `adjustQuantity attempt ${attempt}/${MAX_TRANSACTION_RETRIES} failed, retrying in ${delay}ms...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      } else {
+        console.error('Error adjusting quantity:', error);
+        throw error;
+      }
+    }
   }
+  console.error('Error adjusting quantity:', lastError);
+  throw lastError;
 };
 
 /**
@@ -626,7 +652,8 @@ export const subscribeItems = (
       // Apply low stock filter in memory
       if (filters?.lowStockOnly) {
         const filteredItems = items.filter(
-          (item) => item.totalQuantity <= item.minStockLevel
+          (item) =>
+            (item.totalQuantity ?? 0) <= (item.minStockLevel ?? 0)
         );
         callback(filteredItems);
       } else {

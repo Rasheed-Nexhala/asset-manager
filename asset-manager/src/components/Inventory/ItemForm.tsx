@@ -496,6 +496,12 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       return;
     }
 
+    const categoryId = formData.categoryId?.trim();
+    if (!categoryId) {
+      setErrors((e) => ({ ...e, categoryId: 'Category is required' }));
+      return;
+    }
+
     // Resolve weight config (from steel master when selected)
     let weightPerMeter: number | undefined;
     let lengthPerPiece: number | undefined;
@@ -532,7 +538,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         name: formData.name.trim(),
         sku: formData.sku.trim(),
         description: formData.description.trim() || undefined,
-        categoryId: formData.categoryId!,
+        categoryId,
         type: formData.type,
         unit: formData.unit.trim(),
         minStockLevel: minStockLevelPieces,
@@ -548,7 +554,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         name: formData.name.trim(),
         sku: formData.sku.trim(),
         description: formData.description.trim() || undefined,
-        categoryId: formData.categoryId!,
+        categoryId,
         unit: formData.unit.trim(),
         minStockLevel: minStockLevelPieces,
         status: formData.status,

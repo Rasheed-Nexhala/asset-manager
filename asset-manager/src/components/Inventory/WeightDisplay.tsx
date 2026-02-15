@@ -43,7 +43,11 @@ export const WeightDisplay: React.FC<WeightDisplayProps> = ({
     );
   }
 
-  const totalKg = calculateTotalWeight(quantity, weightPerMeter!, lengthPerPiece!);
+  const totalKg = calculateTotalWeight(
+    quantity,
+    weightPerMeter ?? 0,
+    lengthPerPiece ?? 0
+  );
   const weightDisplay =
     unit === 'Ton (MT)'
       ? formatWeight(totalKg, 'Ton (MT)')

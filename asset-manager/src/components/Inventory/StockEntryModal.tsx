@@ -101,9 +101,12 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
 
     const num = parseFloat(amount);
     let quantity: number;
-    if (isWeightBased) {
-      quantity =
-        (entryMode === 'kg' || entryMode === 'ton') ? conversionResult!.pieces : num;
+    if (isWeightBased && (entryMode === 'kg' || entryMode === 'ton')) {
+      if (!conversionResult?.pieces) {
+        setErrors((e) => ({ ...e, submit: 'Invalid weight conversion' }));
+        return;
+      }
+      quantity = conversionResult.pieces;
     } else {
       quantity = num;
     }

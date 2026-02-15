@@ -70,11 +70,12 @@ export const MySiteInventoryScreen: React.FC = () => {
   
   // Find the user's site by matching managerId
   useEffect(() => {
-    if (userId && sites.length > 0) {
-      const userSite = sites.find((site) => site.managerId === userId);
+    const safeSites = Array.isArray(sites) ? sites : [];
+    if (userId && safeSites.length > 0) {
+      const userSite = safeSites.find((site) => site.managerId === userId);
       setCurrentSite(userSite || null);
       setIsLoadingSite(false);
-    } else if (!sitesLoading && sites.length === 0) {
+    } else if (!sitesLoading && safeSites.length === 0) {
       // Only mark as loaded if sites have finished loading and still empty
       setIsLoadingSite(false);
     }
@@ -127,16 +128,18 @@ export const MySiteInventoryScreen: React.FC = () => {
     }
     
     const query = searchQuery.toLowerCase().trim();
-    return enrichedInventory.filter(({ entry }) =>
-      entry.itemName.toLowerCase().includes(query) ||
-      entry.itemSku.toLowerCase().includes(query)
-    );
+    return enrichedInventory.filter(({ entry }) => {
+      const itemName = (entry?.itemName ?? '').toLowerCase();
+      const itemSku = (entry?.itemSku ?? '').toLowerCase();
+      return itemName.includes(query) || itemSku.includes(query);
+    });
   }, [enrichedInventory, searchQuery]);
   
   // Get other sites (excluding current site)
   const otherSites = useMemo(() => {
-    if (!currentSite) return sites;
-    return sites.filter((site) => site.id !== currentSite.id && site.status === 'active');
+    const safeSites = Array.isArray(sites) ? sites : [];
+    if (!currentSite) return safeSites;
+    return safeSites.filter((site) => site.id !== currentSite.id && site.status === 'active');
   }, [sites, currentSite]);
   
   // Navigation handlers

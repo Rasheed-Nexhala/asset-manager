@@ -148,7 +148,8 @@ export const selectFilteredItems = createSelector(
     // Filter by low stock (must be applied last as it depends on totalQuantity)
     if (filters.lowStockOnly) {
       filtered = filtered.filter(
-        (item) => item.totalQuantity <= item.minStockLevel
+        (item) =>
+          (item.totalQuantity ?? 0) <= (item.minStockLevel ?? 0)
       );
     }
 
@@ -178,10 +179,10 @@ export const selectItemsBySearchQuery = createSelector(
     const lowerQuery = trimmedQuery.toLowerCase();
     return items.filter(
       (item) =>
-        item.name.toLowerCase().includes(lowerQuery) ||
-        item.sku.toLowerCase().includes(lowerQuery) ||
+        (item.name ?? '').toLowerCase().includes(lowerQuery) ||
+        (item.sku ?? '').toLowerCase().includes(lowerQuery) ||
         (item.description && item.description.toLowerCase().includes(lowerQuery)) ||
-        item.categoryName.toLowerCase().includes(lowerQuery)
+        (item.categoryName ?? '').toLowerCase().includes(lowerQuery)
     );
   }
 );
@@ -200,10 +201,10 @@ export const selectItemsBySearchQueryFactory = (searchQuery: string) =>
       const lowerQuery = trimmedQuery.toLowerCase();
       return items.filter(
         (item) =>
-          item.name.toLowerCase().includes(lowerQuery) ||
-          item.sku.toLowerCase().includes(lowerQuery) ||
+          (item.name ?? '').toLowerCase().includes(lowerQuery) ||
+          (item.sku ?? '').toLowerCase().includes(lowerQuery) ||
           (item.description && item.description.toLowerCase().includes(lowerQuery)) ||
-          item.categoryName.toLowerCase().includes(lowerQuery)
+          (item.categoryName ?? '').toLowerCase().includes(lowerQuery)
       );
     }
   );

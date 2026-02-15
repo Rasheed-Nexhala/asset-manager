@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -72,9 +72,24 @@ export const ReturnItemsScreen: React.FC = () => {
   const [errors, setErrors] = useState<{ items?: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const safeGoBack = useCallback(() => {
+    if (isMountedRef.current && navigation.canGoBack?.()) {
+      navigation.goBack();
+    }
+  }, [navigation]);
 
   const nonConsumableItems = useCallback((req: Request) => {
-    return req.items.filter((i) => i.itemType === 'non_consumable');
+    const items = Array.isArray(req?.items) ? req.items : [];
+    return items.filter((i) => i.itemType === 'non_consumable');
   }, []);
 
   useEffect(() => {
@@ -104,15 +119,20 @@ export const ReturnItemsScreen: React.FC = () => {
         Alert.alert(
           'Error',
           'Only transferred or partially returned requests have items that can be returned',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
+          [{ text: 'OK', onPress: safeGoBack }]
         );
+      }
+      setIsLoading(false);
+    }).catch(() => {
+      if (!cancelled) {
+        Alert.alert('Error', 'Failed to load request', [{ text: 'OK', onPress: safeGoBack }]);
       }
       setIsLoading(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [requestId, navigation, nonConsumableItems]);
+  }, [requestId, safeGoBack, nonConsumableItems]);
 
   const updateItem = useCallback(
     (itemId: string, updates: Partial<ReturnItemState>) => {
@@ -169,7 +189,7 @@ export const ReturnItemsScreen: React.FC = () => {
       ).unwrap();
 
       Alert.alert('Success', 'Items returned successfully', [
-        { text: 'OK', onPress: () => navigation.goBack() },
+        { text: 'OK', onPress: safeGoBack },
       ]);
     } catch (error: unknown) {
       Alert.alert(
@@ -215,7 +235,7 @@ export const ReturnItemsScreen: React.FC = () => {
           </Text>
           <TouchableOpacity
             className="mt-6 px-6 py-3 bg-[#1E40AF] rounded-[10px]"
-            onPress={() => navigation.goBack()}
+            onPress={safeGoBack}
           >
             <Text className="text-[15px] font-semibold text-white">Go Back</Text>
           </TouchableOpacity>
@@ -238,7 +258,7 @@ export const ReturnItemsScreen: React.FC = () => {
           </Text>
           <TouchableOpacity
             className="mt-6 px-6 py-3 bg-[#1E40AF] rounded-[10px]"
-            onPress={() => navigation.goBack()}
+            onPress={safeGoBack}
           >
             <Text className="text-[15px] font-semibold text-white">Go Back</Text>
           </TouchableOpacity>

@@ -56,19 +56,33 @@ export const ConfirmTransferScreen: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
-    requestService.getRequestById(requestId).then((r) => {
-      if (!cancelled && r && r.status === 'approved') {
-        setRequest(r);
-        setSelectedItems(new Set(r.items.map((i) => i.itemId)));
-      } else if (!cancelled) {
-        Alert.alert(
-          'Error',
-          'Only approved requests can be transferred',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
-        );
-      }
-      setIsLoading(false);
-    });
+    requestService
+      .getRequestById(requestId)
+      .then((r) => {
+        if (cancelled) return;
+        if (r && r.status === 'approved') {
+          setRequest(r);
+          const items = Array.isArray(r.items) ? r.items : [];
+          const itemIds = items.map((i) => i?.itemId).filter(Boolean) as string[];
+          setSelectedItems(new Set(itemIds));
+        } else {
+          Alert.alert(
+            'Error',
+            'Only approved requests can be transferred',
+            [{ text: 'OK', onPress: () => navigation.goBack() }]
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          Alert.alert('Error', 'Failed to load request details', [
+            { text: 'OK', onPress: () => navigation.goBack() },
+          ]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -165,7 +179,7 @@ export const ConfirmTransferScreen: React.FC = () => {
                 Items to Transfer
               </Text>
             </View>
-            {request.items.map((item) => {
+            {(Array.isArray(request.items) ? request.items : []).map((item) => {
               const isSelected = selectedItems.has(item.itemId);
               const isSteelItem = isWeightBasedItem({ weightPerMeter: item.weightPerMeter });
               return (

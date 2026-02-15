@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -47,6 +47,16 @@ export const AddEditItemScreen: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const navigateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear any pending navigation timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (navigateTimeoutRef.current) {
+        clearTimeout(navigateTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Load item data for edit mode
   useEffect(() => {
@@ -166,9 +176,11 @@ export const AddEditItemScreen: React.FC = () => {
           }
 
           setSuccess(true);
-          
-          // Navigate back after a short delay to show success message
-          setTimeout(() => {
+
+          // Navigate back after a short delay to show success message (cleaned up on unmount)
+          if (navigateTimeoutRef.current) clearTimeout(navigateTimeoutRef.current);
+          navigateTimeoutRef.current = setTimeout(() => {
+            navigateTimeoutRef.current = null;
             // @ts-ignore - navigation typing varies by navigator
             navigation.goBack();
           }, 1000);
@@ -231,9 +243,11 @@ export const AddEditItemScreen: React.FC = () => {
           }
 
           setSuccess(true);
-          
-          // Navigate back after a short delay to show success message
-          setTimeout(() => {
+
+          // Navigate back after a short delay to show success message (cleaned up on unmount)
+          if (navigateTimeoutRef.current) clearTimeout(navigateTimeoutRef.current);
+          navigateTimeoutRef.current = setTimeout(() => {
+            navigateTimeoutRef.current = null;
             // @ts-ignore - navigation typing varies by navigator
             navigation.goBack();
           }, 1000);

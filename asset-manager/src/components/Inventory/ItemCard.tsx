@@ -14,7 +14,8 @@ export interface ItemCardProps {
 
 export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
   const { viewMode, toggleViewMode } = useWeightViewPreference();
-  const isLowStock = item.totalQuantity <= item.minStockLevel;
+  const isLowStock =
+    (item.totalQuantity ?? 0) <= (item.minStockLevel ?? 0);
   const itemTypeLabel = item.type === 'consumable' ? 'Consumable' : 'Non-Consumable';
   const isConsumable = item.type === 'consumable';
   const isSteelItem = isWeightViewSupported(item);
