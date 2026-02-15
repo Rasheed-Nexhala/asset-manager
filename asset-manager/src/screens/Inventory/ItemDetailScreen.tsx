@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -6,11 +6,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { StockStatusBadge, type StockStatus } from '../../components/Inventory/StockStatusBadge';
+import { StockEntryModal } from '../../components/Inventory/StockEntryModal';
+import { WeightDisplay } from '../../components/Inventory/WeightDisplay';
+import { ViewModeToggle } from '../../components/Inventory/ViewModeToggle';
+import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
+import { isWeightViewSupported } from '../../utils/weightConversionUtils';
 import type { InventoryStackParamList } from '../../navigation/InventoryStackNavigator';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { fetchItemById } from '../../store/thunks/inventoryThunks';
+import {
+  fetchItemById,
+  adjustQuantity,
+  fetchInventoryByLocation,
+} from '../../store/thunks/inventoryThunks';
 import { selectItemById, selectItemsLoading, selectItemsError } from '../../store/selectors/inventorySelectors';
-import type { Item } from '../../types/inventory';
+import { getLocationId } from '../../utils/locationUtils';
+import type { Item, AdjustmentData } from '../../types/inventory';
 
 type NavigationProp = StackNavigationProp<InventoryStackParamList, 'ItemDetail'>;
 
@@ -38,6 +48,10 @@ export const ItemDetailScreen: React.FC = () => {
   const item = useAppSelector((state) => selectItemById(itemId)(state));
   const isLoading = useAppSelector(selectItemsLoading);
   const error = useAppSelector(selectItemsError);
+  const { viewMode, toggleViewMode } = useWeightViewPreference();
+  const [showStockModal, setShowStockModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSteelItem = item ? isWeightViewSupported(item) : false;
 
   // Fetch item if not in store
   useEffect(() => {
@@ -70,6 +84,27 @@ export const ItemDetailScreen: React.FC = () => {
   const handleBack = useCallback(() => {
     navigation.goBack();
   }, [navigation]);
+
+  const handleAddStock = useCallback(() => {
+    setShowStockModal(true);
+  }, []);
+
+  const handleStockSubmit = useCallback(
+    async (adjustmentData: AdjustmentData) => {
+      setIsSubmitting(true);
+      try {
+        await dispatch(adjustQuantity(adjustmentData)).unwrap();
+        await dispatch(fetchInventoryByLocation(getLocationId('store')));
+        await dispatch(fetchItemById(itemId));
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Failed to add stock';
+        throw new Error(msg);
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [dispatch, itemId]
+  );
 
   // Loading state
   if (isLoading && !item) {
@@ -211,7 +246,12 @@ export const ItemDetailScreen: React.FC = () => {
 
         {/* Stock Distribution Section */}
         <View className="mb-3">
-          <Text className="text-[17px] font-semibold text-[#0F172A] mb-3 px-1">Stock Distribution</Text>
+          <View className="flex-row items-center justify-between mb-3 px-1">
+            <Text className="text-[17px] font-semibold text-[#0F172A]">Stock Distribution</Text>
+            {isSteelItem && (
+              <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} />
+            )}
+          </View>
           
           <ScrollView
             horizontal
@@ -225,11 +265,15 @@ export const ItemDetailScreen: React.FC = () => {
                 <View className="mb-2">
                   <Ionicons name="cube-outline" size={32} color="#1E40AF" />
                 </View>
-                <Text className="text-[32px] font-bold text-[#0F172A]">
-                  {item.totalQuantity}
-                </Text>
+                <WeightDisplay
+                  quantity={item.totalQuantity}
+                  weightPerMeter={item.weightPerMeter}
+                  lengthPerPiece={item.lengthPerPiece}
+                  viewMode={viewMode}
+                  unit={item.unit}
+                  size="large"
+                />
                 <Text className="text-[13px] text-[#64748B] mt-1">Total Stock</Text>
-                <Text className="text-[13px] text-[#64748B]">{item.unit}</Text>
               </View>
 
               {/* Central Store KPI */}
@@ -237,11 +281,15 @@ export const ItemDetailScreen: React.FC = () => {
                 <View className="mb-2">
                   <Ionicons name="business-outline" size={32} color="#1E40AF" />
                 </View>
-                <Text className="text-[32px] font-bold text-[#0F172A]">
-                  {item.centralStoreQuantity}
-                </Text>
+                <WeightDisplay
+                  quantity={item.centralStoreQuantity}
+                  weightPerMeter={item.weightPerMeter}
+                  lengthPerPiece={item.lengthPerPiece}
+                  viewMode={viewMode}
+                  unit={item.unit}
+                  size="large"
+                />
                 <Text className="text-[13px] text-[#64748B] mt-1">Central Store</Text>
-                <Text className="text-[13px] text-[#64748B]">{item.unit}</Text>
               </View>
 
               {/* At Sites KPI */}
@@ -249,11 +297,15 @@ export const ItemDetailScreen: React.FC = () => {
                 <View className="mb-2">
                   <Ionicons name="construct-outline" size={32} color="#1E40AF" />
                 </View>
-                <Text className="text-[32px] font-bold text-[#0F172A]">
-                  {item.atSitesQuantity}
-                </Text>
+                <WeightDisplay
+                  quantity={item.atSitesQuantity}
+                  weightPerMeter={item.weightPerMeter}
+                  lengthPerPiece={item.lengthPerPiece}
+                  viewMode={viewMode}
+                  unit={item.unit}
+                  size="large"
+                />
                 <Text className="text-[13px] text-[#64748B] mt-1">At Sites</Text>
-                <Text className="text-[13px] text-[#64748B]">{item.unit}</Text>
               </View>
 
               {/* Maintenance KPI */}
@@ -261,11 +313,15 @@ export const ItemDetailScreen: React.FC = () => {
                 <View className="mb-2">
                   <Ionicons name="build-outline" size={32} color="#1E40AF" />
                 </View>
-                <Text className="text-[32px] font-bold text-[#0F172A]">
-                  {item.inMaintenanceQuantity}
-                </Text>
+                <WeightDisplay
+                  quantity={item.inMaintenanceQuantity}
+                  weightPerMeter={item.weightPerMeter}
+                  lengthPerPiece={item.lengthPerPiece}
+                  viewMode={viewMode}
+                  unit={item.unit}
+                  size="large"
+                />
                 <Text className="text-[13px] text-[#64748B] mt-1">Maintenance</Text>
-                <Text className="text-[13px] text-[#64748B]">{item.unit}</Text>
               </View>
             </View>
           </ScrollView>
@@ -279,9 +335,19 @@ export const ItemDetailScreen: React.FC = () => {
             {/* Minimum Stock Level */}
             <View className="flex-row justify-between items-center">
               <Text className="text-[13px] text-[#64748B]">Minimum Stock Level</Text>
-              <Text className="text-[15px] text-[#0F172A]">
-                {item.minStockLevel} {item.unit}
-              </Text>
+              {isSteelItem ? (
+                <WeightDisplay
+                  quantity={item.minStockLevel}
+                  weightPerMeter={item.weightPerMeter}
+                  lengthPerPiece={item.lengthPerPiece}
+                  viewMode={viewMode}
+                  unit={item.unit}
+                />
+              ) : (
+                <Text className="text-[15px] text-[#0F172A]">
+                  {item.minStockLevel} {item.unit}
+                </Text>
+              )}
             </View>
 
             {/* Current Status */}
@@ -301,9 +367,29 @@ export const ItemDetailScreen: React.FC = () => {
             <View className="mt-2">
               <View className="flex-row justify-between items-center mb-1.5">
                 <Text className="text-[13px] text-[#64748B]">Stock Level</Text>
-                <Text className="text-[13px] text-[#64748B]">
-                  {item.totalQuantity} / {item.minStockLevel} {item.unit}
-                </Text>
+                {isSteelItem ? (
+                  <View className="flex-row items-center gap-1">
+                    <WeightDisplay
+                      quantity={item.totalQuantity}
+                      weightPerMeter={item.weightPerMeter}
+                      lengthPerPiece={item.lengthPerPiece}
+                      viewMode={viewMode}
+                      unit={item.unit}
+                    />
+                    <Text className="text-[13px] text-[#64748B]">/</Text>
+                    <WeightDisplay
+                      quantity={item.minStockLevel}
+                      weightPerMeter={item.weightPerMeter}
+                      lengthPerPiece={item.lengthPerPiece}
+                      viewMode={viewMode}
+                      unit={item.unit}
+                    />
+                  </View>
+                ) : (
+                  <Text className="text-[13px] text-[#64748B]">
+                    {item.totalQuantity} / {item.minStockLevel} {item.unit}
+                  </Text>
+                )}
               </View>
               {/* Progress bar */}
               <View className="h-2 bg-[#E2E8F0] rounded-full overflow-hidden">
@@ -324,19 +410,37 @@ export const ItemDetailScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Action Button */}
-        <View className="mb-6 mt-2">
+        {/* Action Buttons */}
+        <View className="mb-6 mt-2 gap-3">
           <TouchableOpacity
-            className="bg-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
+            className="bg-[#16A34A] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
+            onPress={handleAddStock}
+            activeOpacity={0.7}
+            accessibilityLabel="Add stock"
+            accessibilityRole="button"
+          >
+            <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+            <Text className="text-[15px] font-semibold text-white">Add Stock</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            className="border-[1.5px] border-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
             onPress={handleEdit}
             activeOpacity={0.7}
             accessibilityLabel="Edit item"
             accessibilityRole="button"
           >
-            <Ionicons name="create-outline" size={20} color="#FFFFFF" />
-            <Text className="text-[15px] font-semibold text-white">Edit Item</Text>
+            <Ionicons name="create-outline" size={20} color="#1E40AF" />
+            <Text className="text-[15px] font-semibold text-[#1E40AF]">Edit Item</Text>
           </TouchableOpacity>
         </View>
+
+        <StockEntryModal
+          visible={showStockModal}
+          item={item}
+          onSubmit={handleStockSubmit}
+          onCancel={() => setShowStockModal(false)}
+          loading={isSubmitting}
+        />
       </ScrollView>
     </ScreenLayout>
   );

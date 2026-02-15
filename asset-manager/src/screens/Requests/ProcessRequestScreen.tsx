@@ -14,7 +14,10 @@ import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { RequestItemCard } from '../../components/Requests/RequestItemCard';
 import { RequestStatusBadge } from '../../components/Requests/RequestStatusBadge';
+import { ViewModeToggle } from '../../components/Inventory/ViewModeToggle';
 import { FormField } from '../../components/FormField';
+import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
+import { isWeightBasedItem } from '../../utils/weightConversionUtils';
 import { requestService } from '../../services/firebase/requestService';
 import {
   approveRequest,
@@ -72,6 +75,7 @@ export const ProcessRequestScreen: React.FC = () => {
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const isAdmin = useAppSelector(selectIsAdmin);
   const requestFromStore = useAppSelector(selectRequestById(requestId));
+  const { viewMode, toggleViewMode } = useWeightViewPreference();
   const [request, setRequest] = useState<Request | null>(requestFromStore ?? null);
   const [availability, setAvailability] = useState<ItemAvailability[]>([]);
   const [storeNotes, setStoreNotes] = useState('');
@@ -195,11 +199,19 @@ export const ProcessRequestScreen: React.FC = () => {
   }, [navigation, requestId]);
 
   const isTransferred = request?.status === 'transferred';
+  const isPartiallyReturned = request?.status === 'partially_returned';
   const isApproved = request?.status === 'approved';
   const showConfirmTransfer = isApproved && canProcess;
   const isRequestOwner = request?.requestedBy === userId;
+  const nonConsumables = request?.items?.filter((i) => i.itemType === 'non_consumable') ?? [];
+  const hasItemsToReturn = nonConsumables.some(
+    (i) => (i.quantityReturned ?? 0) < i.quantityApproved
+  );
   const showReturnItems =
-    isTransferred && isRequestOwner && !canProcess;
+    (isTransferred || isPartiallyReturned) &&
+    isRequestOwner &&
+    !canProcess &&
+    hasItemsToReturn;
 
   if (!request) {
     return (
@@ -264,9 +276,14 @@ export const ProcessRequestScreen: React.FC = () => {
 
           {/* Items List */}
           <View className="gap-2">
-            <Text className="text-[17px] font-semibold text-[#0F172A]">
-              Items
-            </Text>
+            <View className="flex-row items-center justify-between">
+              <Text className="text-[17px] font-semibold text-[#0F172A]">
+                Items
+              </Text>
+              {request.items.some((i) => isWeightBasedItem({ weightPerMeter: i.weightPerMeter })) && (
+                <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} compact />
+              )}
+            </View>
             {request.items.map((item) => (
               <RequestItemCard
                 key={item.itemId}
@@ -281,81 +298,148 @@ export const ProcessRequestScreen: React.FC = () => {
             ))}
           </View>
 
-          {/* Return details – shown when status is returned (Store Incharge / Admin can see condition) */}
-          {request.status === 'returned' &&
-            request.returnItems &&
-            request.returnItems.length > 0 && (
+          {/* Return history – shown when status is returned or partially_returned */}
+          {((request.returnHistory && request.returnHistory.length > 0) ||
+            (request.status === 'returned' &&
+              request.returnItems &&
+              request.returnItems.length > 0)) && (
               <View className="bg-[#F0FDF4] rounded-[10px] p-4 border border-[#16A34A]/30">
                 <View className="flex-row items-center gap-2 mb-3">
                   <Ionicons name="arrow-undo" size={20} color="#16A34A" />
                   <Text className="text-[17px] font-semibold text-[#0F172A]">
-                    Return details
+                    Return History
                   </Text>
                 </View>
-                <View className="mb-2">
-                  <Text className="text-[13px] text-[#64748B]">Returned</Text>
-                  <Text className="text-[15px] text-[#0F172A]">
-                    {formatDate(request.returnedAt)}
-                  </Text>
-                </View>
-                {request.returnNotes && request.returnNotes.trim() && (
-                  <View className="mb-3">
-                    <Text className="text-[13px] text-[#64748B]">Return notes</Text>
-                    <Text className="text-[15px] text-[#0F172A]">
-                      {request.returnNotes}
-                    </Text>
-                  </View>
-                )}
-                <Text className="text-[13px] font-medium text-[#64748B] mb-2">
-                  Items returned
-                </Text>
-                {request.returnItems.map((ri) => {
-                  const item = request.items.find((i) => i.itemId === ri.itemId);
-                  const itemName = item?.itemName ?? ri.itemId;
-                  const conditionLabel =
-                    CONDITION_LABELS[ri.condition] ?? ri.condition;
-                  const isDamaged = ri.condition === 'damaged';
-                  const needsMaintenance = ri.condition === 'needs_maintenance';
-                  return (
+                {request.returnHistory && request.returnHistory.length > 0 ? (
+                  request.returnHistory.map((returnEvent) => (
                     <View
-                      key={ri.itemId}
-                      className="flex-row flex-wrap items-center justify-between py-2 border-b border-[#E2E8F0] last:border-b-0"
+                      key={returnEvent.returnId}
+                      className="mb-4 pb-3 border-b border-[#E2E8F0] last:border-b-0 last:mb-0 last:pb-0"
                     >
-                      <Text
-                        className="text-[15px] text-[#0F172A] flex-1"
-                        numberOfLines={1}
-                      >
-                        {itemName}
+                      <Text className="text-[15px] font-medium text-[#0F172A] mb-2">
+                        {formatDate(returnEvent.returnedAt)} by {returnEvent.returnedByName}
                       </Text>
-                      <View className="flex-row items-center gap-2">
-                        <Text className="text-[13px] text-[#64748B]">
-                          Qty: {ri.quantityReturned}
+                      {returnEvent.returnNotes && returnEvent.returnNotes.trim() && (
+                        <Text className="text-[13px] text-[#64748B] mb-2">
+                          {returnEvent.returnNotes}
                         </Text>
+                      )}
+                      {returnEvent.items.map((ri) => {
+                        const conditionLabel =
+                          CONDITION_LABELS[ri.condition as ItemCondition] ?? ri.condition;
+                        const isDamaged = ri.condition === 'damaged';
+                        const needsMaintenance = ri.condition === 'needs_maintenance';
+                        return (
+                          <View
+                            key={`${returnEvent.returnId}-${ri.itemId}`}
+                            className="flex-row flex-wrap items-center justify-between py-2 border-b border-[#E2E8F0]/50 last:border-b-0"
+                          >
+                            <Text
+                              className="text-[15px] text-[#0F172A] flex-1"
+                              numberOfLines={1}
+                            >
+                              {ri.itemName}
+                            </Text>
+                            <View className="flex-row items-center gap-2">
+                              <Text className="text-[13px] text-[#64748B]">
+                                Qty: {ri.quantityReturned} (Total: {ri.cumulativeReturned})
+                              </Text>
+                              <View
+                                className={`rounded-full px-2 py-0.5 ${
+                                  isDamaged
+                                    ? 'bg-[#DC2626]/20'
+                                    : needsMaintenance
+                                      ? 'bg-[#D97706]/20'
+                                      : 'bg-[#16A34A]/20'
+                                }`}
+                              >
+                                <Text
+                                  className={`text-[13px] font-medium ${
+                                    isDamaged
+                                      ? 'text-[#DC2626]'
+                                      : needsMaintenance
+                                        ? 'text-[#D97706]'
+                                        : 'text-[#16A34A]'
+                                  }`}
+                                >
+                                  {conditionLabel}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ))
+                ) : (
+                  /* Legacy: single return (returnItems) */
+                  <>
+                    <View className="mb-2">
+                      <Text className="text-[13px] text-[#64748B]">Returned</Text>
+                      <Text className="text-[15px] text-[#0F172A]">
+                        {formatDate(request.returnedAt)}
+                      </Text>
+                    </View>
+                    {request.returnNotes && request.returnNotes.trim() && (
+                      <View className="mb-3">
+                        <Text className="text-[13px] text-[#64748B]">Return notes</Text>
+                        <Text className="text-[15px] text-[#0F172A]">
+                          {request.returnNotes}
+                        </Text>
+                      </View>
+                    )}
+                    <Text className="text-[13px] font-medium text-[#64748B] mb-2">
+                      Items returned
+                    </Text>
+                    {request.returnItems?.map((ri) => {
+                      const item = request.items.find((i) => i.itemId === ri.itemId);
+                      const itemName = item?.itemName ?? ri.itemId;
+                      const conditionLabel =
+                        CONDITION_LABELS[ri.condition] ?? ri.condition;
+                      const isDamaged = ri.condition === 'damaged';
+                      const needsMaintenance = ri.condition === 'needs_maintenance';
+                      return (
                         <View
-                          className={`rounded-full px-2 py-0.5 ${
-                            isDamaged
-                              ? 'bg-[#DC2626]/20'
-                              : needsMaintenance
-                                ? 'bg-[#D97706]/20'
-                                : 'bg-[#16A34A]/20'
-                          }`}
+                          key={ri.itemId}
+                          className="flex-row flex-wrap items-center justify-between py-2 border-b border-[#E2E8F0] last:border-b-0"
                         >
                           <Text
-                            className={`text-[13px] font-medium ${
-                              isDamaged
-                                ? 'text-[#DC2626]'
-                                : needsMaintenance
-                                  ? 'text-[#D97706]'
-                                  : 'text-[#16A34A]'
-                            }`}
+                            className="text-[15px] text-[#0F172A] flex-1"
+                            numberOfLines={1}
                           >
-                            {conditionLabel}
+                            {itemName}
                           </Text>
+                          <View className="flex-row items-center gap-2">
+                            <Text className="text-[13px] text-[#64748B]">
+                              Qty: {ri.quantityReturned}
+                            </Text>
+                            <View
+                              className={`rounded-full px-2 py-0.5 ${
+                                isDamaged
+                                  ? 'bg-[#DC2626]/20'
+                                  : needsMaintenance
+                                    ? 'bg-[#D97706]/20'
+                                    : 'bg-[#16A34A]/20'
+                              }`}
+                            >
+                              <Text
+                                className={`text-[13px] font-medium ${
+                                  isDamaged
+                                    ? 'text-[#DC2626]'
+                                    : needsMaintenance
+                                      ? 'text-[#D97706]'
+                                      : 'text-[#16A34A]'
+                                }`}
+                              >
+                                {conditionLabel}
+                              </Text>
+                            </View>
+                          </View>
                         </View>
-                      </View>
-                    </View>
-                  );
-                })}
+                      );
+                    })}
+                  </>
+                )}
               </View>
             )}
 

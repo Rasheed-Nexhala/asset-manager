@@ -13,7 +13,6 @@ import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
-import { ScreenHeader } from '../../components/ScreenHeader';
 import { ItemCard } from '../../components/Inventory/ItemCard';
 import type { InventoryStackParamList } from '../../navigation/InventoryStackNavigator';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -43,7 +42,10 @@ interface FilterState {
   stock: StockFilter;
 }
 
-type NavigationProp = StackNavigationProp<InventoryStackParamList, 'CentralStoreInventory'>;
+type NavigationProp = StackNavigationProp<
+  InventoryStackParamList,
+  'CentralStoreInventory'
+>;
 
 export const CentralStoreInventoryScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
@@ -53,6 +55,7 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   const [filters, setLocalFilters] = useState<FilterState>({
     stock: 'all',
   });
+  const [showFilters, setShowFilters] = useState<boolean>(false);
 
   // Redux selectors
   const allItems = useAppSelector(selectAllItems);
@@ -127,6 +130,10 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     navigation.navigate('AddEditItem');
   }, [navigation]);
 
+  const handleSteelMaster = useCallback(() => {
+    navigation.navigate('SteelMaster');
+  }, [navigation]);
+
   const handleItemPress = useCallback(
     (item: Item) => {
       navigation.navigate('ItemDetail', { itemId: item.id });
@@ -162,6 +169,10 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     }));
   }, []);
 
+  const handleToggleFilters = useCallback(() => {
+    setShowFilters(prev => !prev);
+  }, []);
+
   const renderItemCard = useCallback(
     ({ item }: { item: Item }) => (
       <ItemCard item={item} onPress={() => handleItemPress(item)} />
@@ -179,7 +190,7 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     ) => (
       <TouchableOpacity
         key={key}
-        className={`px-4 py-2 rounded-full border ${
+        className={`px-4 py-2 rounded-full border min-h-[48px] items-center justify-center ${
           isActive
             ? 'bg-[#1E40AF] border-[#1E40AF]'
             : 'bg-white border-[#E2E8F0]'
@@ -202,18 +213,57 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     []
   );
 
-  // Loading state
-  if (isLoading && filteredItems.length === 0) {
+  // CIAMS Standard Header Component - Responsive Layout
+  const renderCustomHeader = () => (
+    <View className="bg-white border-b border-[#E2E8F0] px-4 flex-row items-center" style={{ height: 56 }}>
+      <Text 
+        className="text-[22px] font-semibold text-[#0F172A] flex-1 flex-shrink" 
+        accessibilityRole="header"
+        numberOfLines={1}
+      >
+        Central Store
+      </Text>
+      <View className="flex-row items-center ml-2">
+        <TouchableOpacity
+          className="w-12 h-12 items-center justify-center rounded-[10px]"
+          onPress={handleToggleFilters}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Toggle filters"
+        >
+          <Ionicons 
+            name={showFilters ? "filter" : "filter-outline"} 
+            size={22} 
+            color={showFilters ? "#1E40AF" : "#64748B"} 
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          className="w-12 h-12 items-center justify-center rounded-[10px]"
+          onPress={handleSteelMaster}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Steel Master"
+        >
+          <Ionicons name="construct-outline" size={22} color="#1E40AF" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          className="w-12 h-12 items-center justify-center rounded-[10px]"
+          onPress={handleAddItem}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Add new item"
+        >
+          <Ionicons name="add-circle" size={22} color="#1E40AF" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  // Loading state (only full-screen when no data at all, like Sites)
+  if (isLoading && allItems.length === 0) {
     return (
       <ScreenLayout edges={['top']}>
-        <ScreenHeader
-          title="Central Store Inventory"
-          rightAction={{
-            icon: 'add-circle',
-            onPress: handleAddItem,
-            accessibilityLabel: 'Add new item',
-          }}
-        />
+        {renderCustomHeader()}
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#1E40AF" />
           <Text className="text-[15px] text-[#64748B] mt-4">Loading items...</Text>
@@ -223,17 +273,10 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   }
 
   // Error state (only if no items loaded)
-  if (error && filteredItems.length === 0) {
+  if (error && allItems.length === 0) {
     return (
       <ScreenLayout edges={['top']}>
-        <ScreenHeader
-          title="Central Store Inventory"
-          rightAction={{
-            icon: 'add-circle',
-            onPress: handleAddItem,
-            accessibilityLabel: 'Add new item',
-          }}
-        />
+        {renderCustomHeader()}
         <View className="flex-1 items-center justify-center px-4">
           <Ionicons name="alert-circle" size={80} color="#DC2626" />
           <Text className="text-[22px] font-semibold text-[#0F172A] mb-2 mt-4">
@@ -261,23 +304,14 @@ export const CentralStoreInventoryScreen: React.FC = () => {
 
   return (
     <ScreenLayout edges={['top']}>
-      <ScreenHeader
-        title="Central Store Inventory"
-        rightAction={{
-          icon: 'add-circle',
-          onPress: handleAddItem,
-          accessibilityLabel: 'Add new item',
-        }}
-      />
+      {renderCustomHeader()}
 
-      {/* Search Bar */}
+      {/* CIAMS Search Bar */}
       <View className="bg-white border-b border-[#E2E8F0] px-4 py-3">
-        <View className="relative">
-          <View className="absolute left-4 top-0 h-12 items-center justify-center z-10">
-            <Ionicons name="search" size={24} color="#94A3B8" />
-          </View>
+        <View className="bg-[#F1F5F9] rounded-full h-12 px-4 flex-row items-center">
+          <Ionicons name="search" size={20} color="#94A3B8" />
           <TextInput
-            className="border border-[#E2E8F0] rounded-lg h-12 pl-12 pr-4 bg-white text-[15px] text-[#0F172A]"
+            className="flex-1 ml-3 text-[15px] text-[#0F172A]"
             placeholder="Search items by name, SKU, or category..."
             placeholderTextColor="#94A3B8"
             value={searchQuery}
@@ -285,113 +319,136 @@ export const CentralStoreInventoryScreen: React.FC = () => {
             accessibilityLabel="Search items"
             accessibilityRole="search"
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => handleSearchChange('')}
+              className="w-8 h-8 items-center justify-center"
+              accessibilityLabel="Clear search"
+              accessibilityRole="button"
+            >
+              <Ionicons name="close-circle" size={20} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {/* Filters */}
-      <View className="bg-white border-b border-[#E2E8F0] px-4 py-3">
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8 }}
-        >
-          {/* Category Filter */}
-          <View className="flex-row items-center gap-2">
-            <Text className="text-[13px] text-[#64748B]">Category:</Text>
-            {renderFilterChip(
-              'All',
-              !filters.categoryId,
-              () => handleCategoryFilter(undefined),
-              'Filter by all categories',
-              'category-all'
-            )}
-            {categories.map((category) =>
-              renderFilterChip(
-                category.name,
-                filters.categoryId === category.id,
-                () => handleCategoryFilter(category.id),
-                `Filter by ${category.name} category`,
-                category.id
-              )
-            )}
-          </View>
-        </ScrollView>
+      {/* CIAMS Filters Section */}
+      {showFilters && (
+        <View className="bg-white border-b border-[#E2E8F0] px-4 py-4">
+          <View className="gap-4">
+            {/* Category Filter */}
+            <View className="gap-1.5">
+              <Text className="text-[15px] text-[#0F172A]">Category</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8 }}
+              >
+                <View className="flex-row items-center gap-2">
+                  {renderFilterChip(
+                    'All',
+                    !filters.categoryId,
+                    () => handleCategoryFilter(undefined),
+                    'Filter by all categories',
+                    'category-all'
+                  )}
+                  {categories.map((category) =>
+                    renderFilterChip(
+                      category.name,
+                      filters.categoryId === category.id,
+                      () => handleCategoryFilter(category.id),
+                      `Filter by ${category.name} category`,
+                      category.id
+                    )
+                  )}
+                </View>
+              </ScrollView>
+            </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8, marginTop: 8 }}
-        >
-          {/* Type Filter */}
-          <View className="flex-row items-center gap-2">
-            <Text className="text-[13px] text-[#64748B]">Type:</Text>
-            {renderFilterChip(
-              'All',
-              !filters.type,
-              () => handleTypeFilter(undefined),
-              'Filter by all types',
-              'type-all'
-            )}
-            {renderFilterChip(
-              'Consumable',
-              filters.type === 'consumable',
-              () => handleTypeFilter('consumable'),
-              'Filter by consumable items',
-              'type-consumable'
-            )}
-            {renderFilterChip(
-              'Non-Consumable',
-              filters.type === 'non_consumable',
-              () => handleTypeFilter('non_consumable'),
-              'Filter by non-consumable items',
-              'type-non-consumable'
-            )}
-          </View>
-        </ScrollView>
+            {/* Type Filter */}
+            <View className="gap-1.5">
+              <Text className="text-[15px] text-[#0F172A]">Type</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8 }}
+              >
+                <View className="flex-row items-center gap-2">
+                  {renderFilterChip(
+                    'All',
+                    !filters.type,
+                    () => handleTypeFilter(undefined),
+                    'Filter by all types',
+                    'type-all'
+                  )}
+                  {renderFilterChip(
+                    'Consumable',
+                    filters.type === 'consumable',
+                    () => handleTypeFilter('consumable'),
+                    'Filter by consumable items',
+                    'type-consumable'
+                  )}
+                  {renderFilterChip(
+                    'Non-Consumable',
+                    filters.type === 'non_consumable',
+                    () => handleTypeFilter('non_consumable'),
+                    'Filter by non-consumable items',
+                    'type-non-consumable'
+                  )}
+                </View>
+              </ScrollView>
+            </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8, marginTop: 8 }}
-        >
-          {/* Stock Filter */}
-          <View className="flex-row items-center gap-2">
-            <Text className="text-[13px] text-[#64748B]">Stock:</Text>
-            {renderFilterChip(
-              'All',
-              filters.stock === 'all',
-              () => handleStockFilter('all'),
-              'Show all stock levels',
-              'stock-all'
-            )}
-            {renderFilterChip(
-              'Low Stock',
-              filters.stock === 'low_stock',
-              () => handleStockFilter('low_stock'),
-              'Show only low stock items',
-              'stock-low'
-            )}
+            {/* Stock Filter */}
+            <View className="gap-1.5">
+              <Text className="text-[15px] text-[#0F172A]">Stock Level</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8 }}
+              >
+                <View className="flex-row items-center gap-2">
+                  {renderFilterChip(
+                    'All',
+                    filters.stock === 'all',
+                    () => handleStockFilter('all'),
+                    'Show all stock levels',
+                    'stock-all'
+                  )}
+                  {renderFilterChip(
+                    'Low Stock',
+                    filters.stock === 'low_stock',
+                    () => handleStockFilter('low_stock'),
+                    'Show only low stock items',
+                    'stock-low'
+                  )}
+                </View>
+              </ScrollView>
+            </View>
           </View>
-        </ScrollView>
-      </View>
-
-      {/* Error Banner */}
-      {error && (
-        <View className="bg-[#D97706]/15 px-4 py-2 mx-4 mt-3 rounded-lg flex-row items-center gap-2">
-          <Ionicons name="warning" size={24} color="#D97706" />
-          <Text className="text-[13px] text-[#D97706] flex-1">{error}</Text>
         </View>
       )}
 
-      {/* Content */}
+      {/* CIAMS Error Banner */}
+      {error && (
+        <View className="bg-[#DC2626]/15 px-4 py-3 mx-4 mt-4 rounded-lg flex-row items-center gap-3">
+          <Ionicons name="alert-circle" size={24} color="#DC2626" />
+          <Text className="text-[15px] text-[#DC2626] flex-1">{error}</Text>
+        </View>
+      )}
+
+      {/* CIAMS Empty State */}
       {hasNoItems ? (
         <View className="flex-1 items-center justify-center px-4">
-          <Ionicons name="cube-outline" size={80} color="#64748B" />
-          <Text className="text-[22px] font-semibold text-[#0F172A] text-center mb-2 mt-4">
+          {/* Icon - using emoji as per CIAMS pattern */}
+          <Text className="text-6xl mb-4">📦</Text>
+          
+          <Text className="text-[22px] font-semibold text-[#0F172A] text-center mb-2">
             {searchQuery || filters.categoryId || filters.type || filters.stock !== 'all'
               ? 'No Items Match Filters'
-              : 'No Items Found'}
+              : 'No Items Yet'}
           </Text>
+          
           <Text className="text-[15px] text-[#64748B] text-center mb-6">
             {searchQuery
               ? 'No items match your search. Try a different search term.'
@@ -399,16 +456,18 @@ export const CentralStoreInventoryScreen: React.FC = () => {
               ? 'Try adjusting your filters to see more items.'
               : 'Get started by adding your first inventory item.'}
           </Text>
-          <TouchableOpacity
-            className="bg-[#1E40AF] rounded-[10px] h-[50px] px-6 items-center justify-center flex-row gap-2"
-            onPress={handleAddItem}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Add new item"
-          >
-            <Ionicons name="add-circle" size={22} color="#FFFFFF" />
-            <Text className="text-[15px] font-semibold text-white">Add Item</Text>
-          </TouchableOpacity>
+          
+          {!searchQuery && !(filters.categoryId || filters.type || filters.stock !== 'all') && (
+            <TouchableOpacity
+              className="bg-[#1E40AF] rounded-[10px] h-[50px] px-6 items-center justify-center"
+              onPress={handleAddItem}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Add new item"
+            >
+              <Text className="text-[15px] font-semibold text-white">Add First Item</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <View className="flex-1">
@@ -416,7 +475,8 @@ export const CentralStoreInventoryScreen: React.FC = () => {
             data={filteredItems}
             renderItem={renderItemCard}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 80 }}
+            contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+            ItemSeparatorComponent={() => <View className="h-3" />}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -427,18 +487,19 @@ export const CentralStoreInventoryScreen: React.FC = () => {
             showsVerticalScrollIndicator={false}
           />
 
-          {/* Footer */}
-          <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-[#E2E8F0] px-4 py-3 flex-row justify-between items-center">
-            <View className="flex-row items-center gap-4">
-              <Text className="text-[13px] text-[#64748B]">
-                Total: <Text className="text-[#0F172A] font-semibold">{filteredItems.length}</Text>
+          {/* CIAMS Footer with Status Info */}
+          <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-[#E2E8F0] px-4 py-4">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-[15px] text-[#64748B]">
+                <Text className="text-[#0F172A] font-semibold">{filteredItems.length}</Text> items found
               </Text>
               {filteredLowStockCount > 0 && (
-                <View className="flex-row items-center gap-1">
-                  <Ionicons name="warning" size={16} color="#D97706" />
-                  <Text className="text-[13px] text-[#D97706]">
-                    Low Stock: <Text className="font-semibold">{filteredLowStockCount}</Text>
-                  </Text>
+                <View className="flex-row items-center gap-2">
+                  <View className="px-2 py-1 rounded-full bg-[#D97706]/15">
+                    <Text className="text-[12px] font-medium text-[#D97706]">
+                      {filteredLowStockCount} Low Stock
+                    </Text>
+                  </View>
                 </View>
               )}
             </View>

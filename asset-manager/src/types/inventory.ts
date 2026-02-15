@@ -43,6 +43,13 @@ export interface FirestoreItem {
   atSitesQuantity: number;        // Total quantity at all sites
   inMaintenanceQuantity: number;  // Quantity in maintenance
   
+  // Weight-based item configuration (optional)
+  weightPerMeter?: number;        // kg/m (if custom or copied from steelMaster)
+  lengthPerPiece?: number;        // meters (default length)
+  steelMasterId?: string;         // Reference to steelMaster collection (if linked)
+  steelMasterName?: string;       // Denormalized name for display
+  isWeightBased?: boolean;        // Flag for quick identification (derived from weightPerMeter)
+  
   createdAt: Timestamp;           // Creation timestamp
   updatedAt: Timestamp;           // Last modified timestamp
 }
@@ -67,6 +74,11 @@ export interface Item {
   centralStoreQuantity: number;
   atSitesQuantity: number;
   inMaintenanceQuantity: number;
+  weightPerMeter?: number;
+  lengthPerPiece?: number;
+  steelMasterId?: string;
+  steelMasterName?: string;
+  isWeightBased?: boolean;
   createdAt: string;             // Serialized creation timestamp (ISO string)
   updatedAt: string;             // Serialized last modified timestamp (ISO string)
 }
@@ -84,6 +96,7 @@ export interface FirestoreInventoryEntry {
   locationType: LocationType;     // store, site, or maintenance
   locationName: string;            // Denormalized location name
   quantity: number;                // Current quantity at this location
+  lengthPerPiece?: number;        // meters, length of pieces at this location
   updatedAt: Timestamp;           // Last modified timestamp
 }
 
@@ -99,6 +112,7 @@ export interface InventoryEntry {
   locationType: LocationType;
   locationName: string;
   quantity: number;
+  lengthPerPiece?: number;
   updatedAt: string;             // Serialized timestamp (ISO string)
 }
 
@@ -133,6 +147,10 @@ export interface CreateItemData {
   imageUrl?: string;
   minStockLevel: number;
   initialQuantity: number;        // Initial quantity to add to central store
+  weightPerMeter?: number;
+  lengthPerPiece?: number;
+  steelMasterId?: string;
+  steelMasterName?: string;
 }
 
 /**
@@ -150,6 +168,8 @@ export interface UpdateItemData {
   imageUrl?: string;
   minStockLevel?: number;
   status?: ItemStatus;
+  weightPerMeter?: number;
+  lengthPerPiece?: number;
 }
 
 /**
@@ -161,9 +181,12 @@ export interface AdjustmentData {
   locationType: LocationType;
   locationName: string;
   type: AdjustmentType;            // add or remove
-  quantity: number;                // Amount to add or remove
+  quantity: number;                // Amount to add or remove (pieces for weight-based items)
   reason: string;                  // Required reason
   notes: string;                   // Required notes
+  entryMode?: 'kg' | 'ton' | 'pieces';    // How user entered the data (for weight-based items)
+  enteredValue?: number;          // What user actually typed (for audit)
+  lengthPerPiece?: number;         // Required when adding stock for weight-based items
 }
 
 /**

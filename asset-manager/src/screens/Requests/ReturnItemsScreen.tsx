@@ -13,6 +13,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { FormField } from '../../components/FormField';
+import { WeightDisplay } from '../../components/Inventory/WeightDisplay';
+import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
+import { ViewModeToggle } from '../../components/Inventory/ViewModeToggle';
+import { isWeightBasedItem } from '../../utils/weightConversionUtils';
 import { returnItems } from '../../store/thunks/requestThunks';
 import { requestService } from '../../services/firebase/requestService';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -40,8 +44,8 @@ const CONDITIONS: Array<{ value: ItemCondition; label: string }> = [
 interface ReturnItemState {
   itemId: string;
   itemName: string;
-  quantityApproved: number;
-  quantityReturned: number;
+  remainingQuantity: number; // Max returnable: quantityApproved - quantityReturned (from request)
+  quantityReturned: number; // Amount to return in this batch (1 to remainingQuantity)
   condition: ItemCondition;
   selected: boolean;
 }
@@ -54,6 +58,7 @@ export const ReturnItemsScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
+  const { viewMode, toggleViewMode } = useWeightViewPreference();
 
   const [request, setRequest] = useState<Request | null>(null);
   const [returnItemsState, setReturnItemsState] = useState<ReturnItemState[]>(
@@ -71,15 +76,22 @@ export const ReturnItemsScreen: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
     requestService.getRequestById(requestId).then((r) => {
-      if (!cancelled && r && r.status === 'transferred') {
+      if (!cancelled && r && (r.status === 'transferred' || r.status === 'partially_returned')) {
         setRequest(r);
         const items = nonConsumableItems(r);
+        const itemsWithRemaining = items
+          .map((item) => {
+            const currentReturned = item.quantityReturned ?? 0;
+            const remaining = item.quantityApproved - currentReturned;
+            return { ...item, remaining };
+          })
+          .filter((item) => item.remaining > 0);
         setReturnItemsState(
-          items.map((item) => ({
+          itemsWithRemaining.map((item) => ({
             itemId: item.itemId,
             itemName: item.itemName,
-            quantityApproved: item.quantityApproved,
-            quantityReturned: item.quantityApproved,
+            remainingQuantity: item.remaining,
+            quantityReturned: 1,
             condition: 'good' as ItemCondition,
             selected: false,
           }))
@@ -87,7 +99,7 @@ export const ReturnItemsScreen: React.FC = () => {
       } else if (!cancelled) {
         Alert.alert(
           'Error',
-          'Only transferred requests have items that can be returned',
+          'Only transferred or partially returned requests have items that can be returned',
           [{ text: 'OK', onPress: () => navigation.goBack() }]
         );
       }
@@ -171,6 +183,9 @@ export const ReturnItemsScreen: React.FC = () => {
         <ScreenHeader title="Return Items" />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#1E40AF" />
+          <Text className="text-[15px] text-[#64748B] mt-4">
+            Loading request...
+          </Text>
         </View>
       </ScreenLayout>
     );
@@ -179,6 +194,8 @@ export const ReturnItemsScreen: React.FC = () => {
   if (!request) return null;
 
   const items = nonConsumableItems(request);
+  const hasItemsToReturn = returnItemsState.length > 0;
+
   if (items.length === 0) {
     return (
       <ScreenLayout edges={['top']}>
@@ -203,6 +220,43 @@ export const ReturnItemsScreen: React.FC = () => {
     );
   }
 
+  if (items.length > 0 && !hasItemsToReturn) {
+    return (
+      <ScreenLayout edges={['top']}>
+        <ScreenHeader title="Return Items" />
+        <View className="flex-1 items-center justify-center px-4">
+          <Ionicons name="checkmark-circle-outline" size={80} color="#16A34A" />
+          <Text className="text-[22px] font-semibold text-[#0F172A] text-center mb-2 mt-4">
+            All Items Returned
+          </Text>
+          <Text className="text-[15px] text-[#64748B] text-center">
+            All non-consumable items in this request have been returned to the central store.
+          </Text>
+          <TouchableOpacity
+            className="mt-6 px-6 py-3 bg-[#1E40AF] rounded-[10px]"
+            onPress={() => navigation.goBack()}
+          >
+            <Text className="text-[15px] font-semibold text-white">Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </ScreenLayout>
+    );
+  }
+
+  const formatDate = (ts: { toDate?: () => Date } | null | undefined): string => {
+    if (!ts) return '';
+    const date = typeof (ts as { toDate?: () => Date }).toDate === 'function'
+      ? (ts as { toDate: () => Date }).toDate()
+      : new Date();
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
   return (
     <ScreenLayout edges={['top']}>
       <ScreenHeader title="Return Items" />
@@ -218,12 +272,39 @@ export const ReturnItemsScreen: React.FC = () => {
             </Text>
           </View>
 
+          {/* Previous return history */}
+          {request.returnHistory && request.returnHistory.length > 0 && (
+            <View className="bg-[#F8FAFC] rounded-lg p-4 border border-[#E2E8F0]">
+              <Text className="text-[15px] font-semibold text-[#0F172A] mb-2">
+                Previous Returns
+              </Text>
+              {request.returnHistory.map((returnEvent) => (
+                <View key={returnEvent.returnId} className="mb-2 pb-2 border-b border-[#E2E8F0] last:border-b-0 last:mb-0 last:pb-0">
+                  <Text className="text-[13px] text-[#64748B]">
+                    {formatDate(returnEvent.returnedAt)} by {returnEvent.returnedByName} – {returnEvent.items.length} item(s)
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
           {/* Non-consumable items with checkbox, quantity slider, condition */}
           <View className="gap-3">
-            <Text className="text-[17px] font-semibold text-[#0F172A]">
-              Select Items to Return
-            </Text>
-            {returnItemsState.map((item) => (
+            <View className="flex-row items-center justify-between">
+              <Text className="text-[17px] font-semibold text-[#0F172A]">
+                Select Items to Return
+              </Text>
+              {returnItemsState.some((i) => {
+                const ri = request.items.find((r) => r.itemId === i.itemId);
+                return ri ? isWeightBasedItem({ weightPerMeter: ri.weightPerMeter }) : false;
+              }) && (
+                <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} compact />
+              )}
+            </View>
+            {returnItemsState.map((item) => {
+              const requestItem = request.items.find((i) => i.itemId === item.itemId) as RequestItem | undefined;
+              const isSteelItem = requestItem ? isWeightBasedItem({ weightPerMeter: requestItem.weightPerMeter }) : false;
+              return (
               <View
                 key={item.itemId}
                 className="bg-white rounded-[10px] p-4 border border-[#E2E8F0]"
@@ -254,49 +335,77 @@ export const ReturnItemsScreen: React.FC = () => {
                   <Text className="text-[15px] font-semibold text-[#0F172A] flex-1">
                     {item.itemName}
                   </Text>
-                  <Text className="text-[13px] text-[#64748B]">
-                    Max: {item.quantityApproved}
-                  </Text>
+                  <View className="flex-row items-center gap-1">
+                    <Text className="text-[13px] text-[#64748B]">Max: </Text>
+                    {isSteelItem && requestItem?.weightPerMeter != null && requestItem?.lengthPerPiece != null ? (
+                      <WeightDisplay
+                        quantity={item.remainingQuantity}
+                        weightPerMeter={requestItem.weightPerMeter}
+                        lengthPerPiece={requestItem.lengthPerPiece}
+                        viewMode={viewMode}
+                        unit="Pcs"
+                      />
+                    ) : (
+                      <Text className="text-[13px] text-[#64748B]">{item.remainingQuantity}</Text>
+                    )}
+                  </View>
                 </TouchableOpacity>
 
                 {item.selected && (
                   <View className="gap-3 mt-2 pt-3 border-t border-[#E2E8F0]">
                     {/* Quantity */}
-                    <View className="flex-row items-center justify-between">
-                      <Text className="text-[13px] text-[#64748B]">
-                        Quantity to return
-                      </Text>
-                      <View className="flex-row items-center gap-2">
-                        <TouchableOpacity
-                          onPress={() =>
-                            updateItem(item.itemId, {
-                              quantityReturned: Math.max(
-                                1,
-                                item.quantityReturned - 1
-                              ),
-                            })
-                          }
-                          className="w-8 h-8 border border-[#E2E8F0] rounded-full items-center justify-center"
-                        >
-                          <Text className="text-[#1E40AF] text-lg">−</Text>
-                        </TouchableOpacity>
-                        <Text className="text-[15px] font-semibold w-8 text-center">
-                          {item.quantityReturned}
+                    <View>
+                      <View className="flex-row items-center justify-between">
+                        <Text className="text-[13px] text-[#64748B]">
+                          Quantity to return
                         </Text>
-                        <TouchableOpacity
-                          onPress={() =>
-                            updateItem(item.itemId, {
-                              quantityReturned: Math.min(
-                                item.quantityApproved,
-                                item.quantityReturned + 1
-                              ),
-                            })
-                          }
-                          className="w-8 h-8 border border-[#1E40AF] rounded-full items-center justify-center bg-[#1E40AF]"
-                        >
-                          <Text className="text-white text-lg">+</Text>
-                        </TouchableOpacity>
+                        <View className="flex-row items-center gap-2">
+                          <TouchableOpacity
+                            onPress={() =>
+                              updateItem(item.itemId, {
+                                quantityReturned: Math.max(
+                                  1,
+                                  item.quantityReturned - 1
+                                ),
+                              })
+                            }
+                            className="w-8 h-8 border border-[#E2E8F0] rounded-full items-center justify-center"
+                          >
+                            <Text className="text-[#1E40AF] text-lg">−</Text>
+                          </TouchableOpacity>
+                          <Text className="text-[15px] font-semibold w-8 text-center">
+                            {item.quantityReturned}
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() =>
+                              updateItem(item.itemId, {
+                                quantityReturned: Math.min(
+                                  item.remainingQuantity,
+                                  item.quantityReturned + 1
+                                ),
+                              })
+                            }
+                            className="w-8 h-8 border border-[#1E40AF] rounded-full items-center justify-center bg-[#1E40AF]"
+                          >
+                            <Text className="text-white text-lg">+</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
+                      {isSteelItem &&
+                        requestItem?.weightPerMeter != null &&
+                        requestItem?.lengthPerPiece != null &&
+                        item.quantityReturned > 0 && (
+                          <View className="flex-row items-center gap-1 mt-1">
+                            <Text className="text-[13px] text-[#64748B]">≈ </Text>
+                            <WeightDisplay
+                              quantity={item.quantityReturned}
+                              weightPerMeter={requestItem.weightPerMeter}
+                              lengthPerPiece={requestItem.lengthPerPiece}
+                              viewMode={viewMode}
+                              unit="Pcs"
+                            />
+                          </View>
+                        )}
                     </View>
 
                     {/* Condition */}
@@ -333,7 +442,8 @@ export const ReturnItemsScreen: React.FC = () => {
                   </View>
                 )}
               </View>
-            ))}
+            );
+            })}
           </View>
 
           {errors.items && (

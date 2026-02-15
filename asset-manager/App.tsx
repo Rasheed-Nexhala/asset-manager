@@ -16,6 +16,7 @@ import {
   selectIsRoleLoaded 
 } from './src/store/selectors/authSelectors';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { WeightViewPreferenceProvider } from './src/hooks/useWeightViewPreference';
 
 // Suppress SafeAreaView deprecation warning
 // We're already using react-native-safe-area-context correctly
@@ -41,7 +42,9 @@ export default function App() {
   return (
     <Provider store={store}>
       <SafeAreaProvider>
-        <AppContent />
+        <WeightViewPreferenceProvider>
+          <AppContent />
+        </WeightViewPreferenceProvider>
       </SafeAreaProvider>
     </Provider>
   );

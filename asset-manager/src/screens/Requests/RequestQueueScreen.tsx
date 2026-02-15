@@ -245,6 +245,18 @@ export const RequestQueueScreen: React.FC = () => {
               () => dispatch(setFilters({ status: 'transferred' })),
               'Filter by transferred'
             )}
+            {renderFilterChip(
+              'Partially Returned',
+              filters.status === 'partially_returned',
+              () => dispatch(setFilters({ status: 'partially_returned' })),
+              'Filter by partially returned'
+            )}
+            {renderFilterChip(
+              'Returned',
+              filters.status === 'returned',
+              () => dispatch(setFilters({ status: 'returned' })),
+              'Filter by returned'
+            )}
           </View>
         </ScrollView>
       </View>

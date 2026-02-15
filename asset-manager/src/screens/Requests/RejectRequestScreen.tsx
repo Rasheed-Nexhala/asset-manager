@@ -126,6 +126,9 @@ export const RejectRequestScreen: React.FC = () => {
         <ScreenHeader title="Reject Request" />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#1E40AF" />
+          <Text className="text-[15px] text-[#64748B] mt-4">
+            Loading request...
+          </Text>
         </View>
       </ScreenLayout>
     );

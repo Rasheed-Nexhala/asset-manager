@@ -106,6 +106,11 @@ export const listItems = async (filters?: ItemFilters): Promise<Item[]> => {
         centralStoreQuantity: data.centralStoreQuantity || 0,
         atSitesQuantity: data.atSitesQuantity || 0,
         inMaintenanceQuantity: data.inMaintenanceQuantity || 0,
+        weightPerMeter: data.weightPerMeter,
+        lengthPerPiece: data.lengthPerPiece,
+        steelMasterId: data.steelMasterId,
+        steelMasterName: data.steelMasterName,
+        isWeightBased: data.isWeightBased,
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
       };
@@ -157,6 +162,11 @@ export const getItemById = async (id: string): Promise<Item | null> => {
       centralStoreQuantity: data.centralStoreQuantity || 0,
       atSitesQuantity: data.atSitesQuantity || 0,
       inMaintenanceQuantity: data.inMaintenanceQuantity || 0,
+      weightPerMeter: data.weightPerMeter,
+      lengthPerPiece: data.lengthPerPiece,
+      steelMasterId: data.steelMasterId,
+      steelMasterName: data.steelMasterName,
+      isWeightBased: data.isWeightBased,
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
     };
@@ -164,6 +174,35 @@ export const getItemById = async (id: string): Promise<Item | null> => {
     return firestoreItemToItem(firestoreItem);
   } catch (error) {
     console.error('Error getting item by ID:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get all SKUs that start with the given prefix
+ * Used for HSN-based SKU auto-generation (e.g., prefix "721699-" returns ["721699-001", "721699-002"])
+ *
+ * @param prefix - SKU prefix (e.g., "721699-")
+ * @returns Array of SKUs matching the prefix
+ */
+export const getSkusWithPrefix = async (prefix: string): Promise<string[]> => {
+  try {
+    if (!prefix || !prefix.trim()) {
+      return [];
+    }
+    const trimmedPrefix = prefix.trim();
+    // Firestore prefix query: >= prefix and <= prefix + high Unicode char
+    const endPrefix = trimmedPrefix + '\uf8ff';
+    const snapshot = await getDocs(
+      query(
+        collection(db, ITEMS_COLLECTION),
+        where('sku', '>=', trimmedPrefix),
+        where('sku', '<=', endPrefix)
+      )
+    );
+    return snapshot.docs.map((docSnap) => docSnap.id).filter(Boolean);
+  } catch (error) {
+    console.error('Error getting SKUs with prefix:', error);
     throw error;
   }
 };
@@ -231,7 +270,12 @@ export const createItem = async (
     const itemRef = doc(db, ITEMS_COLLECTION, itemData.sku);
     const now = serverTimestamp();
     
-    const itemDocData = {
+    const isWeightBased = Boolean(itemData.weightPerMeter);
+    const lengthPerPiece = itemData.lengthPerPiece;
+    const steelMasterId = itemData.steelMasterId;
+    const steelMasterName = itemData.steelMasterName ?? undefined;
+
+    const itemDocData: Record<string, unknown> = {
       name: itemData.name,
       sku: itemData.sku,
       description: itemData.description || '',
@@ -249,12 +293,17 @@ export const createItem = async (
       createdAt: now,
       updatedAt: now,
     };
+    if (itemData.weightPerMeter != null) itemDocData.weightPerMeter = itemData.weightPerMeter;
+    if (lengthPerPiece != null) itemDocData.lengthPerPiece = lengthPerPiece;
+    if (steelMasterId) itemDocData.steelMasterId = steelMasterId;
+    if (steelMasterName) itemDocData.steelMasterName = steelMasterName;
+    if (isWeightBased) itemDocData.isWeightBased = true;
 
     batch.set(itemRef, itemDocData);
 
     // Create initial inventory entry for central store
     const inventoryRef = doc(collection(db, INVENTORY_COLLECTION));
-    const inventoryDocData = {
+    const inventoryDocData: Record<string, unknown> = {
       itemId: itemRef.id,
       itemName: itemData.name,
       itemSku: itemData.sku,
@@ -264,6 +313,7 @@ export const createItem = async (
       quantity: itemData.initialQuantity,
       updatedAt: now,
     };
+    if (lengthPerPiece != null) inventoryDocData.lengthPerPiece = lengthPerPiece;
 
     batch.set(inventoryRef, inventoryDocData);
 
@@ -476,6 +526,9 @@ export const adjustQuantity = async (
         quantity: newQuantity,
         updatedAt: serverTimestamp(),
       };
+      if (adjustmentData.lengthPerPiece != null) {
+        inventoryUpdateData.lengthPerPiece = adjustmentData.lengthPerPiece;
+      }
 
       if (inventorySnapshot.empty) {
         transaction.set(inventoryRef, inventoryUpdateData);
@@ -630,6 +683,7 @@ export const subscribeInventoryByLocation = (
           locationType: data.locationType,
           locationName: data.locationName,
           quantity: data.quantity,
+          lengthPerPiece: data.lengthPerPiece,
           updatedAt: data.updatedAt,
         };
         const entry = firestoreInventoryEntryToInventoryEntry(firestoreEntry);
@@ -685,6 +739,7 @@ export const getInventoryByLocation = async (
         locationType: data.locationType,
         locationName: data.locationName,
         quantity: data.quantity,
+        lengthPerPiece: data.lengthPerPiece,
         updatedAt: data.updatedAt,
       };
       const entry = firestoreInventoryEntryToInventoryEntry(firestoreEntry);

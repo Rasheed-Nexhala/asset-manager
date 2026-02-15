@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
  */
 const COMMON_UNITS = [
   'Nos',
+  'Pcs',
   'Bag',
   'Box',
   'Set',
@@ -15,6 +16,15 @@ const COMMON_UNITS = [
   'Kg',
   'Ton (MT)',
   'Meter',
+];
+
+/**
+ * Steel master specific units (restricted set)
+ */
+const STEEL_MASTER_UNITS = [
+  'Pcs',
+  'Kg',
+  'Ton (MT)',
 ];
 
 export interface UnitSelectorProps {
@@ -28,6 +38,12 @@ export interface UnitSelectorProps {
   error?: string;
   /** Whether the selector is disabled */
   disabled?: boolean;
+  /** Show auto-fill indicator */
+  autoFilled?: boolean;
+  /** Text to show for auto-fill source */
+  autoFilledFrom?: string;
+  /** Whether this is for a steel master item (restricts available units) */
+  steelMasterItem?: boolean;
 }
 
 /**
@@ -40,12 +56,17 @@ export const UnitSelector: React.FC<UnitSelectorProps> = ({
   label = 'Unit of Measurement *',
   error,
   disabled = false,
+  autoFilled = false,
+  autoFilledFrom,
+  steelMasterItem = false,
 }) => {
   const [modalVisible, setModalVisible] = useState<boolean>(false);
 
   const displayText = selectedUnit || 'Select unit';
-
   const hasError = Boolean(error);
+  
+  // Use restricted units for steel master items
+  const availableUnits = steelMasterItem ? STEEL_MASTER_UNITS : COMMON_UNITS;
 
   /**
    * Handle unit selection
@@ -70,6 +91,14 @@ export const UnitSelector: React.FC<UnitSelectorProps> = ({
 
   return (
     <View className="gap-1.5">
+      {autoFilled && (
+        <View className="flex-row items-center gap-1 mb-1">
+          <Ionicons name="flash" size={14} color="#16A34A" />
+          <Text className="text-[12px] text-[#16A34A]">
+            Auto-filled{autoFilledFrom ? `: ${autoFilledFrom}` : ''}
+          </Text>
+        </View>
+      )}
       <Text className="text-[15px] text-[#0F172A]" accessibilityRole="text">
         {labelEndsWithRequired ? (
           <>
@@ -121,14 +150,14 @@ export const UnitSelector: React.FC<UnitSelectorProps> = ({
 
             <ScrollView className="max-h-[400px]" showsVerticalScrollIndicator={false}>
               <View className="gap-2">
-                {COMMON_UNITS.length === 0 ? (
+                {availableUnits.length === 0 ? (
                   <View className="py-8 items-center">
                     <Text className="text-[15px] text-[#64748B] text-center mb-4">
                       No units available
                     </Text>
                   </View>
                 ) : (
-                  COMMON_UNITS.map((unit) => {
+                  availableUnits.map((unit) => {
                     const isSelected = selectedUnit?.toLowerCase() === unit.toLowerCase();
 
                     return (

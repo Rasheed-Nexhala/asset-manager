@@ -32,6 +32,11 @@ const statusConfig = {
     text: 'text-[#16A34A]',
     label: 'Transferred',
   },
+  partially_returned: {
+    bg: 'bg-[#FEF3C7]',
+    text: 'text-[#CA8A04]',
+    label: 'Partially Returned',
+  },
   returned: {
     bg: 'bg-[#475569]/15',
     text: 'text-[#475569]',
@@ -46,6 +51,18 @@ const statusConfig = {
 
 export const RequestStatusBadge: React.FC<RequestStatusBadgeProps> = ({ status }) => {
   const config = statusConfig[status];
+
+  // Fallback for unknown status
+  if (!config) {
+    console.warn(`Unknown request status: ${status}`);
+    return (
+      <View className="px-2 py-1 rounded-full bg-[#64748B]/15">
+        <Text className="text-[12px] font-medium text-[#64748B]">
+          {status}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View className={`px-2 py-1 rounded-full ${config.bg}`}>

@@ -9,7 +9,7 @@ isProject: false
 
 ## Summary
 
-Add support for steel items with standard chartered weights per meter. Formula: **Total Weight = Weight per meter × Length per piece × Quantity**. All existing flows (create item, request, transfer, return, display) remain unchanged in behavior; we add optional fields and conditional UI/display only when items have `weightPerMeter`.
+Add support for steel items with standard chartered weights. Users enter **total KG received**, and the system calculates pieces using: **Pieces = Total KG ÷ (Weight per meter × Standard Length)**. System validates whole pieces and rejects decimals with helpful error messages. All views display both pieces and weight (convertible). Ton (MT) works same as KG (1 Ton = 1,000 KG).
 
 ---
 
@@ -139,30 +139,45 @@ Populate these when creating/editing requests from the selected item.
 
 ---
 
-## Flow Diagram
+## Flow Diagrams
 
+### Item Creation Flow
+```mermaid
+flowchart LR
+    A[User: Name, Weight/m, Length] --> B[Calculate: Weight per piece]
+    B --> C[Store Item Master]
+    C --> D[Weight per piece = 53.4 kg]
+```
+
+### Stock Entry Flow (Weight-Based)
 ```mermaid
 flowchart TB
-    subgraph ItemCreation [Item Creation]
-        A1[ItemForm: name, sku, unit, weightPerMeter, lengthPerPiece, initialQty]
-        A2[createItem: persist item + initial inventory with lengthPerPiece]
-    end
+    A[User selects: ISMB-100] --> B[User enters: 1,500 KG]
+    B --> C{Calculate Pieces<br/>1500 ÷ 53.4}
+    C -->|28.09 decimal| D[❌ Show Error]
+    D --> E[Suggest: 1,495.2 kg = 28 pcs<br/>or 1,549.6 kg = 29 pcs]
+    E --> F[User corrects to 1,495.2 kg]
+    F --> C
+    C -->|28 whole| G[✓ Store 28 pieces]
+```
 
-    subgraph RequestFlow [Request Flow]
-        B1[Site requests X pcs]
-        B2[Store approves X pcs]
-        B3[Display: X pcs, Y kg if weight-based]
-    end
+### Display Flow
+```mermaid
+flowchart LR
+    A[Inventory: 28 pcs] --> B{Weight-based?}
+    B -->|Yes| C[Calculate: 28 × 53.4 = 1,495.2]
+    C --> D[Display: 28 pcs - 1,495.2 kg]
+    B -->|No| E[Display: 28 pcs only]
+```
 
-    subgraph TransferFlow [Transfer Flow]
-        C1[Transfer X pcs store to site]
-        C2[Copy lengthPerPiece to site inventory]
-        C3[Display: X pcs, Y kg]
-    end
-
-    A1 --> A2
-    B1 --> B2 --> B3
-    C1 --> C2 --> C3
+### Request & Transfer Flow
+```mermaid
+flowchart TB
+    A[Site requests: 10 pcs] --> B[Display: 10 pcs - 534 kg]
+    B --> C[Store approves: 10 pcs]
+    C --> D[Transfer: 10 pcs]
+    D --> E[Site inventory: +10 pcs]
+    E --> F[Display: 10 pcs - 534 kg]
 ```
 
 

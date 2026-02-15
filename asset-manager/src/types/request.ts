@@ -9,6 +9,7 @@ export type RequestStatus =
   | 'approved' 
   | 'rejected' 
   | 'transferred' 
+  | 'partially_returned' 
   | 'returned' 
   | 'cancelled';
 
@@ -36,7 +37,9 @@ export interface RequestItem {
   quantityRequested: number;
   quantityApproved: number;
   quantityReturned: number;
-  status: 'pending' | 'approved' | 'transferred' | 'returned';
+  status: 'pending' | 'approved' | 'transferred' | 'partially_returned' | 'returned';
+  weightPerMeter?: number;
+  lengthPerPiece?: number;
 }
 
 /**
@@ -75,14 +78,29 @@ export interface Request {
   receivedBy: string | null;
   receivedByName: string | null;
   
-  // Return
-  returnedAt: Timestamp | null;
-  returnItems: Array<{
+  // Return (new: returnHistory for partial returns with full history)
+  returnHistory: Array<{
+    returnId: string;
+    returnedAt: Timestamp;
+    returnedBy: string;
+    returnedByName: string;
+    items: Array<{
+      itemId: string;
+      itemName: string;
+      quantityReturned: number;
+      condition: ItemCondition;
+      cumulativeReturned: number;
+    }>;
+    returnNotes: string | null;
+  }> | null;
+  // Legacy fields (backward compatibility for existing returned requests)
+  returnedAt?: Timestamp | null;
+  returnItems?: Array<{
     itemId: string;
     quantityReturned: number;
     condition: ItemCondition;
   }> | null;
-  returnNotes: string | null;
+  returnNotes?: string | null;
   
   // Audit
   createdAt: Timestamp;
@@ -117,6 +135,8 @@ export interface CreateRequestData {
     categoryName: string;
     imageUrl?: string;
     quantity: number;
+    weightPerMeter?: number;
+    lengthPerPiece?: number;
   }>;
 }
 

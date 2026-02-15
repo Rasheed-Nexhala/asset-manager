@@ -31,7 +31,7 @@ import type { RequestStackParamList } from '../../navigation/RequestStackParamLi
 
 type NavigationProp = StackNavigationProp<RequestStackParamList, 'MyRequests'>;
 
-type TabKey = 'all' | 'pending' | 'approved' | 'rejected' | 'transferred';
+type TabKey = 'all' | 'pending' | 'approved' | 'rejected' | 'transferred' | 'partially_returned' | 'returned';
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'all', label: 'All' },
@@ -39,6 +39,8 @@ const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'approved', label: 'Approved' },
   { key: 'rejected', label: 'Rejected' },
   { key: 'transferred', label: 'Transferred' },
+  { key: 'partially_returned', label: 'Partially Returned' },
+  { key: 'returned', label: 'Returned' },
 ];
 
 export const MyRequestsScreen: React.FC = () => {

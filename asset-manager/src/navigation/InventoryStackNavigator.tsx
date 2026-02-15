@@ -12,6 +12,7 @@ import {
   ItemDetailScreen,
   MySiteInventoryScreen,
   OtherSiteInventoryScreen,
+  SteelMasterScreen,
 } from '../screens';
 
 /**
@@ -22,6 +23,7 @@ export type InventoryStackParamList = {
   CentralStoreInventory: undefined;
   AddEditItem: { itemId?: string } | undefined;
   ItemDetail: { itemId: string };
+  SteelMaster: undefined;
   
   // Site Manager screens
   MySiteInventory: undefined;
@@ -79,6 +81,14 @@ export const InventoryStackNavigator: React.FC = () => {
           <Stack.Screen
             name="ItemDetail"
             component={ItemDetailScreen}
+            options={{
+              presentation: 'card',
+              gestureEnabled: true,
+            }}
+          />
+          <Stack.Screen
+            name="SteelMaster"
+            component={SteelMasterScreen}
             options={{
               presentation: 'card',
               gestureEnabled: true,

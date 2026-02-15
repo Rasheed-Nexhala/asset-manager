@@ -153,6 +153,9 @@ export const OtherSiteInventoryScreen: React.FC = () => {
         </View>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#1E40AF" />
+          <Text className="text-[15px] text-[#64748B] mt-4">
+            Loading site inventory...
+          </Text>
         </View>
       </ScreenLayout>
     );
@@ -270,6 +273,8 @@ export const OtherSiteInventoryScreen: React.FC = () => {
                   imageUrl={item.imageUrl}
                   type={item.type}
                   unit={item.unit}
+                  weightPerMeter={item.weightPerMeter}
+                  lengthPerPiece={item.lengthPerPiece ?? entry.lengthPerPiece}
                   // Read-only, so no onPress handler
                 />
               ))}

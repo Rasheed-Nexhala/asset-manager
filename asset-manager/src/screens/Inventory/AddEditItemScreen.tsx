@@ -87,6 +87,9 @@ export const AddEditItemScreen: React.FC = () => {
         minStockLevel: item.minStockLevel,
         status: item.status,
         imageUrl: item.imageUrl,
+        weightPerMeter: item.weightPerMeter,
+        lengthPerPiece: item.lengthPerPiece,
+        steelMasterId: item.steelMasterId,
       };
     }
     return undefined;
@@ -374,6 +377,7 @@ export const AddEditItemScreen: React.FC = () => {
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         loading={isSubmitting || isLoading}
+        onManageSteelMaster={() => navigation.navigate('SteelMaster')}
       />
     </ScreenLayout>
   );

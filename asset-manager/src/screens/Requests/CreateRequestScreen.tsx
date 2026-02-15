@@ -18,11 +18,12 @@ import { RequestItemCard } from '../../components/Requests/RequestItemCard';
 import { ItemSelectorModal } from '../../components/Requests/ItemSelectorModal';
 import { createRequest } from '../../store/thunks/requestThunks';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
+import { fetchSites } from '../../store/slices/sitesSlice';
 import {
   selectUserId,
   selectUserDisplayName,
 } from '../../store/selectors/authSelectors';
-import { selectSiteById } from '../../store/selectors/sitesSelectors';
+import { selectSiteById, selectSitesLoading } from '../../store/selectors/sitesSelectors';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import type { RequestPriority, CreateRequestData } from '../../types/request';
 import type { Item } from '../../types/inventory';
@@ -46,6 +47,7 @@ export const CreateRequestScreen: React.FC = () => {
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
   const site = useAppSelector(selectSiteById(siteId));
+  const sitesLoading = useAppSelector(selectSitesLoading);
 
   const [priority, setPriority] = useState<RequestPriority>('medium');
   const [items, setItems] = useState<Array<Item & { quantity: number }>>([]);
@@ -56,10 +58,28 @@ export const CreateRequestScreen: React.FC = () => {
   const isBusy = isSubmittingRequest || isSavingDraft;
   const [itemSelectorVisible, setItemSelectorVisible] = useState(false);
 
-  // Ensure items catalog is loaded (required for Site Managers who may not have visited Central Store)
+  // Ensure sites and items are loaded when creating a request
   useEffect(() => {
+    if (siteId && !site) {
+      dispatch(fetchSites());
+    }
     dispatch(fetchItems());
-  }, [dispatch]);
+  }, [dispatch, siteId, site]);
+
+  // Full-screen loader when site is still loading (same pattern as Sites)
+  if (siteId && sitesLoading && !site) {
+    return (
+      <ScreenLayout edges={['top']}>
+        <ScreenHeader title="New Request" />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#1E40AF" />
+          <Text className="text-[15px] text-[#64748B] mt-4">
+            Loading site information...
+          </Text>
+        </View>
+      </ScreenLayout>
+    );
+  }
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -128,6 +148,8 @@ export const CreateRequestScreen: React.FC = () => {
           categoryName: item.categoryName,
           imageUrl: item.imageUrl,
           quantity: item.quantity,
+          weightPerMeter: item.weightPerMeter,
+          lengthPerPiece: item.lengthPerPiece,
         })),
       };
 
@@ -226,6 +248,8 @@ export const CreateRequestScreen: React.FC = () => {
                       quantityApproved: item.quantity,
                       quantityReturned: 0,
                       status: 'pending',
+                      weightPerMeter: item.weightPerMeter,
+                      lengthPerPiece: item.lengthPerPiece,
                     }}
                     mode="create"
                     onQuantityChange={handleQuantityChange}

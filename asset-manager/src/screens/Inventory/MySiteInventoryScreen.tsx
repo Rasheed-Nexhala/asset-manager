@@ -220,13 +220,15 @@ export const MySiteInventoryScreen: React.FC = () => {
             </View>
           ) : (
             <View className="gap-3">
-              {filteredInventory.map(({ entry, type, unit, imageUrl }) => (
+              {filteredInventory.map(({ entry, item, type, unit, imageUrl }) => (
                 <InventoryListItem
                   key={entry.id}
                   entry={entry}
                   type={type}
                   unit={unit}
                   imageUrl={imageUrl}
+                  weightPerMeter={item?.weightPerMeter}
+                  lengthPerPiece={item?.lengthPerPiece ?? entry.lengthPerPiece}
                   onPress={() => {
                     // Navigate to item detail screen (to be implemented)
                     console.log('Item pressed:', entry.id);

@@ -170,6 +170,22 @@ service cloud.firestore {
     }
     
     /**
+     * Steel Master Collection
+     *
+     * Purpose: Standard steel item specifications for KG-to-pieces conversion
+     * (name, code, type, weightPerMeter, standardLengths, defaultLength, hsnCode)
+     *
+     * Access Rules:
+     * - Read: Admin, Store Incharge, and Site Managers (for item display when creating requests)
+     * - Write: Admin and Store Incharge only
+     */
+    match /steelMaster/{masterId} {
+      allow read: if isAuthenticated() && isUserActive() &&
+        (hasInventoryAccess() || isSiteManager());
+      allow create, update, delete: if hasInventoryAccess();
+    }
+
+    /**
      * Categories Collection
      * 
      * Purpose: Item categories (name)
@@ -208,6 +224,22 @@ service cloud.firestore {
       allow create: if hasInventoryAccess();
       allow update: if false; // Immutable audit log
       allow delete: if false; // Immutable audit log
+    }
+
+    /**
+     * Activity Logs Collection
+     *
+     * Purpose: Immutable audit trail of all system activities
+     * (auth, users, sites, inventory, requests, POs, maintenance, vendors)
+     *
+     * Access Rules (per 08_Activity_Logging_and_Audit_Trail):
+     * - Write: Denied (only Cloud Functions create logs - server-side only)
+     * - Read: Admin can read all; users can read only their own logs (userId match)
+     */
+    match /activityLogs/{logId} {
+      allow read: if isAuthenticated() && isUserActive() &&
+        (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create, update, delete: if false; // Only Cloud Functions
     }
     
     // ============================================
@@ -270,13 +302,13 @@ service cloud.firestore {
         request.resource.data.requestedBy == request.auth.uid &&
         request.resource.data.status in ['draft', 'pending'];
       
-      // Update: Site Managers (own drafts only OR returning items on transferred requests),
+      // Update: Site Managers (own drafts only OR returning items on transferred/partially_returned requests),
       // Store Incharge/Admin (approve/reject/transfer only - NO edit)
       // Store Incharge can update status, processedBy, rejectionReason etc. but NOT items/priority (enforced in service)
       allow update: if isAuthenticated() && isUserActive() && (
         (isSiteManager() && 
          resource.data.requestedBy == request.auth.uid && 
-         (resource.data.status == 'draft' || resource.data.status == 'transferred')) ||
+         resource.data.status in ['draft', 'transferred', 'partially_returned']) ||
         canManageRequests()
       );
       

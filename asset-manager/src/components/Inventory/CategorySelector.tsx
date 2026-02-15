@@ -164,7 +164,6 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
                     }}
                     autoFocus={true}
                     accessibilityLabel="Category name input"
-                    accessibilityRole="none"
                   />
                   {createError && (
                     <Text className="text-[13px] text-[#DC2626]" accessibilityLiveRegion="polite">

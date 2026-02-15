@@ -3,6 +3,7 @@ import authReducer from './slices/authSlice';
 import sitesReducer from './slices/sitesSlice';
 import inventoryReducer from './slices/inventorySlice';
 import requestsReducer from './slices/requestsSlice';
+import steelMasterReducer from './slices/steelMasterSlice';
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     sites: sitesReducer,
     inventory: inventoryReducer,
     requests: requestsReducer,
+    steelMaster: steelMasterReducer,
   },
   //Todo: Fix serializableCheck
   middleware: (getDefaultMiddleware) =>
@@ -51,6 +53,11 @@ export const store = configureStore({
           'requests/transferRequest/fulfilled',
           'requests/returnItems/fulfilled',
           'requests/cancelRequest/fulfilled',
+          'steelMaster/fetchSteelMasters/fulfilled',
+          'steelMaster/fetchSteelMasterById/fulfilled',
+          'steelMaster/createSteelMaster/fulfilled',
+          'steelMaster/updateSteelMaster/fulfilled',
+          'steelMaster/deleteSteelMaster/fulfilled',
         ],
         ignoredPaths: [
           'auth.user',
@@ -61,6 +68,8 @@ export const store = configureStore({
           'requests.requests',
           'requests.myRequests',
           'requests.selectedRequest',
+          'steelMaster.steelMasters',
+          'steelMaster.selectedSteelMaster',
         ],
       },
     }),

@@ -13,6 +13,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { FormField } from '../../components/FormField';
+import { WeightDisplay } from '../../components/Inventory/WeightDisplay';
+import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
+import { isWeightBasedItem } from '../../utils/weightConversionUtils';
 import { transferRequest } from '../../store/thunks/requestThunks';
 import { requestService } from '../../services/firebase/requestService';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -37,6 +40,7 @@ export const ConfirmTransferScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
+  const { viewMode } = useWeightViewPreference();
 
   const [request, setRequest] = useState<Request | null>(null);
   const [receivedBy, setReceivedBy] = useState('');
@@ -126,6 +130,9 @@ export const ConfirmTransferScreen: React.FC = () => {
         <ScreenHeader title="Confirm Transfer" />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#1E40AF" />
+          <Text className="text-[15px] text-[#64748B] mt-4">
+            Loading transfer details...
+          </Text>
         </View>
       </ScreenLayout>
     );
@@ -149,11 +156,14 @@ export const ConfirmTransferScreen: React.FC = () => {
 
           {/* Items Checklist */}
           <View className="gap-2">
-            <Text className="text-[17px] font-semibold text-[#0F172A]">
-              Items to Transfer
-            </Text>
+            <View className="flex-row items-center justify-between">
+              <Text className="text-[17px] font-semibold text-[#0F172A]">
+                Items to Transfer
+              </Text>
+            </View>
             {request.items.map((item) => {
               const isSelected = selectedItems.has(item.itemId);
+              const isSteelItem = isWeightBasedItem({ weightPerMeter: item.weightPerMeter });
               return (
                 <TouchableOpacity
                   key={item.itemId}
@@ -177,9 +187,20 @@ export const ConfirmTransferScreen: React.FC = () => {
                     <Text className="text-[15px] font-semibold text-[#0F172A]">
                       {item.itemName}
                     </Text>
-                    <Text className="text-[13px] text-[#64748B]">
-                      Qty: {item.quantityApproved}
-                    </Text>
+                    <View className="flex-row items-center gap-1">
+                      <Text className="text-[13px] text-[#64748B]">Qty: </Text>
+                      {isSteelItem && item.weightPerMeter != null && item.lengthPerPiece != null ? (
+                        <WeightDisplay
+                          quantity={item.quantityApproved}
+                          weightPerMeter={item.weightPerMeter}
+                          lengthPerPiece={item.lengthPerPiece}
+                          viewMode={viewMode}
+                          unit="Pcs"
+                        />
+                      ) : (
+                        <Text className="text-[13px] text-[#64748B]">{item.quantityApproved}</Text>
+                      )}
+                    </View>
                   </View>
                 </TouchableOpacity>
               );

@@ -1,6 +1,10 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { WeightDisplay } from './WeightDisplay';
+import { ViewModeToggle } from './ViewModeToggle';
+import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
+import { isWeightViewSupported } from '../../utils/weightConversionUtils';
 import type { InventoryEntry, ItemType } from '../../types/inventory';
 
 export interface InventoryListItemProps {
@@ -8,6 +12,8 @@ export interface InventoryListItemProps {
   imageUrl?: string;
   type: ItemType;
   unit: string;
+  weightPerMeter?: number;
+  lengthPerPiece?: number;
   onPress?: () => void;
 }
 
@@ -41,11 +47,19 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
   imageUrl,
   type,
   unit,
+  weightPerMeter,
+  lengthPerPiece,
   onPress,
 }) => {
+  const { viewMode, toggleViewMode } = useWeightViewPreference();
   const itemTypeLabel = type === 'consumable' ? 'Consumable' : 'Non-Consumable';
   const itemTypeColor = type === 'consumable' ? '#475569' : '#0D9488';
   const formattedDate = formatTimestamp(entry.updatedAt);
+  const effectiveLength = lengthPerPiece ?? entry.lengthPerPiece;
+  const isSteelItem = isWeightViewSupported({
+    weightPerMeter,
+    lengthPerPiece: effectiveLength,
+  });
 
   return (
     <TouchableOpacity
@@ -78,9 +92,13 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
             </Text>
             <View className="flex-row items-center gap-2 flex-wrap">
               <Text className="text-[13px] text-[#64748B]">SKU: {entry.itemSku}</Text>
-              <Text className="text-[13px] text-[#0F172A] font-medium">
-                {entry.quantity} {unit}
-              </Text>
+              <WeightDisplay
+                quantity={entry.quantity}
+                weightPerMeter={weightPerMeter}
+                lengthPerPiece={effectiveLength}
+                viewMode={viewMode}
+                unit={unit}
+              />
             </View>
             {entry.updatedAt && (
               <Text className="text-[12px] text-[#64748B] mt-0.5">
@@ -89,17 +107,22 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
             )}
           </View>
 
-          {/* Item Type Badge */}
-          <View
-            className="px-2 py-1 rounded-full flex-shrink-0"
-            style={{ backgroundColor: `${itemTypeColor}15` }}
-          >
-            <Text
-              className="text-[12px] font-medium"
-              style={{ color: itemTypeColor }}
+          {/* Right: Pcs/Kg toggle (steel only) + Item Type Badge */}
+          <View className="items-end gap-1.5 flex-shrink-0">
+            {isSteelItem && (
+              <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} compact />
+            )}
+            <View
+              className="px-2 py-1 rounded-full"
+              style={{ backgroundColor: `${itemTypeColor}15` }}
             >
-              {itemTypeLabel}
-            </Text>
+              <Text
+                className="text-[12px] font-medium"
+                style={{ color: itemTypeColor }}
+              >
+                {itemTypeLabel}
+              </Text>
+            </View>
           </View>
         </View>
       </View>
