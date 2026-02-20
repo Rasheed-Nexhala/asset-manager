@@ -147,15 +147,21 @@ export function CategoryEditModal({
               </TouchableOpacity>
 
               <TouchableOpacity
-                className="flex-1 bg-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center"
+                className={`flex-1 rounded-[10px] h-[50px] items-center justify-center flex-row gap-2 ${
+                  isLoading ? 'bg-[#1E40AF]/70' : 'bg-[#1E40AF]'
+                }`}
                 onPress={handleSave}
                 disabled={isLoading || !name.trim()}
                 activeOpacity={0.7}
                 accessibilityRole="button"
-                accessibilityLabel="Save category"
+                accessibilityLabel={isLoading ? 'Saving category, please wait' : 'Save category'}
+                accessibilityState={{ disabled: isLoading || !name.trim(), busy: isLoading }}
               >
                 {isLoading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <Text className="text-[15px] font-semibold text-white">Please wait…</Text>
+                  </>
                 ) : (
                   <Text className="text-[15px] font-semibold text-white">
                     Save

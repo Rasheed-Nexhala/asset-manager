@@ -163,7 +163,8 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onGoToLogin }) => {
                 accessibilityLiveRegion="polite"
               >
                 <View className="flex-row items-start gap-2">
-                  <Text className="text-[18px] mt-0.5">⚠️</Text>
+                  <Ionicons name="warning" size={20} color="#D97706" />
+                  <Text className="text-[18px] mt-0.5 font-semibold text-[#D97706]">Warning</Text>
                   <Text className="text-[14px] text-[#DC2626] flex-1 leading-5">
                     {authError}
                   </Text>

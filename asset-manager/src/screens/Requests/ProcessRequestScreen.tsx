@@ -374,40 +374,50 @@ export const ProcessRequestScreen: React.FC = () => {
                         return (
                           <View
                             key={`${returnEvent.returnId}-${ri.itemId}`}
-                            className="flex-row flex-wrap items-center justify-between py-2 border-b border-[#E2E8F0]/50 last:border-b-0"
+                            className="mb-2"
                           >
-                            <Text
-                              className="text-[15px] text-[#0F172A] flex-1"
-                              numberOfLines={1}
-                            >
-                              {ri.itemName}
-                            </Text>
-                            <View className="flex-row items-center gap-2">
-                              <Text className="text-[13px] text-[#64748B]">
-                                Qty: {ri.quantityReturned} (Total: {ri.cumulativeReturned})
-                              </Text>
-                              <View
-                                className={`rounded-full px-2 py-0.5 ${
-                                  isDamaged
-                                    ? 'bg-[#DC2626]/20'
-                                    : needsMaintenance
-                                      ? 'bg-[#D97706]/20'
-                                      : 'bg-[#16A34A]/20'
-                                }`}
+                            <View className="flex-row items-center justify-between py-2">
+                              <Text
+                                className="text-[15px] text-[#0F172A] flex-1"
+                                numberOfLines={1}
                               >
-                                <Text
-                                  className={`text-[13px] font-medium ${
+                                {ri.itemName}
+                              </Text>
+                              <View className="flex-row items-center gap-2">
+                                <Text className="text-[13px] text-[#64748B]">
+                                  Qty: {ri.quantityReturned} (Total: {ri.cumulativeReturned})
+                                </Text>
+                                <View
+                                  className={`rounded-full px-2 py-0.5 ${
                                     isDamaged
-                                      ? 'text-[#DC2626]'
+                                      ? 'bg-[#DC2626]/20'
                                       : needsMaintenance
-                                        ? 'text-[#D97706]'
-                                        : 'text-[#16A34A]'
+                                        ? 'bg-[#D97706]/20'
+                                        : 'bg-[#16A34A]/20'
                                   }`}
                                 >
-                                  {conditionLabel}
-                                </Text>
+                                  <Text
+                                    className={`text-[13px] font-medium ${
+                                      isDamaged
+                                        ? 'text-[#DC2626]'
+                                        : needsMaintenance
+                                          ? 'text-[#D97706]'
+                                          : 'text-[#16A34A]'
+                                    }`}
+                                  >
+                                    {conditionLabel}
+                                  </Text>
+                                </View>
                               </View>
                             </View>
+                            {isDamaged && returnEvent.returnNotes && (
+                              <View className="flex-row items-center gap-1 mt-1">
+                                <Ionicons name="warning" size={16} color="#D97706" />
+                                <Text className="text-[13px] text-[#D97706]">
+                                  Damaged • {returnEvent.returnNotes}
+                                </Text>
+                              </View>
+                            )}
                           </View>
                         );
                       })}
@@ -443,40 +453,50 @@ export const ProcessRequestScreen: React.FC = () => {
                       return (
                         <View
                           key={ri.itemId}
-                          className="flex-row flex-wrap items-center justify-between py-2 border-b border-[#E2E8F0] last:border-b-0"
+                          className="mb-2"
                         >
-                          <Text
-                            className="text-[15px] text-[#0F172A] flex-1"
-                            numberOfLines={1}
-                          >
-                            {itemName}
-                          </Text>
-                          <View className="flex-row items-center gap-2">
-                            <Text className="text-[13px] text-[#64748B]">
-                              Qty: {ri.quantityReturned}
-                            </Text>
-                            <View
-                              className={`rounded-full px-2 py-0.5 ${
-                                isDamaged
-                                  ? 'bg-[#DC2626]/20'
-                                  : needsMaintenance
-                                    ? 'bg-[#D97706]/20'
-                                    : 'bg-[#16A34A]/20'
-                              }`}
+                          <View className="flex-row flex-wrap items-center justify-between py-2">
+                            <Text
+                              className="text-[15px] text-[#0F172A] flex-1"
+                              numberOfLines={1}
                             >
-                              <Text
-                                className={`text-[13px] font-medium ${
+                              {itemName}
+                            </Text>
+                            <View className="flex-row items-center gap-2">
+                              <Text className="text-[13px] text-[#64748B]">
+                                Qty: {ri.quantityReturned}
+                              </Text>
+                              <View
+                                className={`rounded-full px-2 py-0.5 ${
                                   isDamaged
-                                    ? 'text-[#DC2626]'
+                                    ? 'bg-[#DC2626]/20'
                                     : needsMaintenance
-                                      ? 'text-[#D97706]'
-                                      : 'text-[#16A34A]'
+                                      ? 'bg-[#D97706]/20'
+                                      : 'bg-[#16A34A]/20'
                                 }`}
                               >
-                                {conditionLabel}
-                              </Text>
+                                <Text
+                                  className={`text-[13px] font-medium ${
+                                    isDamaged
+                                      ? 'text-[#DC2626]'
+                                      : needsMaintenance
+                                        ? 'text-[#D97706]'
+                                        : 'text-[#16A34A]'
+                                  }`}
+                                >
+                                  {conditionLabel}
+                                </Text>
+                              </View>
                             </View>
                           </View>
+                          {isDamaged && request.returnNotes && (
+                            <View className="flex-row items-center gap-1 mt-1">
+                              <Ionicons name="warning" size={16} color="#D97706" />
+                              <Text className="text-[13px] text-[#D97706]">
+                                Damaged • {request.returnNotes}
+                              </Text>
+                            </View>
+                          )}
                         </View>
                       );
                     })}

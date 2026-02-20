@@ -43,7 +43,7 @@ export function CategoryListItem({
         <View className="flex-row items-center gap-2">
           {/* Edit Button */}
           <TouchableOpacity
-            className="w-11 h-11 rounded-lg border border-[#E2E8F0] bg-white items-center justify-center"
+            className="min-w-[48px] min-h-[48px] w-12 h-12 rounded-lg border border-[#E2E8F0] bg-white items-center justify-center"
             onPress={onEdit}
             activeOpacity={0.7}
             accessibilityRole="button"
@@ -54,7 +54,7 @@ export function CategoryListItem({
 
           {/* Delete Button */}
           <TouchableOpacity
-            className="w-11 h-11 rounded-lg border border-[#DC2626]/30 bg-[#DC2626]/10 items-center justify-center"
+            className="min-w-[48px] min-h-[48px] w-12 h-12 rounded-lg border border-[#DC2626]/30 bg-[#DC2626]/10 items-center justify-center"
             onPress={onDelete}
             activeOpacity={0.7}
             accessibilityRole="button"

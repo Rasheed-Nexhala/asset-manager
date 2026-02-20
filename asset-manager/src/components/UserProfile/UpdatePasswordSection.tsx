@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { UpdatePasswordForm } from '../UpdatePasswordForm';
 
 export interface UpdatePasswordSectionProps {
@@ -57,7 +58,7 @@ export const UpdatePasswordSection: React.FC<UpdatePasswordSectionProps> = ({
           accessibilityLiveRegion="polite"
         >
           <View className="flex-row items-center gap-2">
-            <Text className="text-lg">✅</Text>
+            <Ionicons name="checkmark-circle" size={20} color="#16A34A" />
             <Text className="text-[13px] text-[#16A34A] flex-1">
               Password updated successfully
             </Text>

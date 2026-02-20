@@ -4,6 +4,8 @@ import sitesReducer from './slices/sitesSlice';
 import inventoryReducer from './slices/inventorySlice';
 import requestsReducer from './slices/requestsSlice';
 import steelMasterReducer from './slices/steelMasterSlice';
+import maintenanceReducer from './slices/maintenanceSlice';
+import activityLogReducer from './slices/activityLogSlice';
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +14,8 @@ export const store = configureStore({
     inventory: inventoryReducer,
     requests: requestsReducer,
     steelMaster: steelMasterReducer,
+    maintenance: maintenanceReducer,
+    activityLog: activityLogReducer,
   },
   //Todo: Fix serializableCheck
   middleware: (getDefaultMiddleware) =>
@@ -58,6 +62,18 @@ export const store = configureStore({
           'steelMaster/createSteelMaster/fulfilled',
           'steelMaster/updateSteelMaster/fulfilled',
           'steelMaster/deleteSteelMaster/fulfilled',
+          'maintenance/setMaintenanceRecords',
+          'maintenance/addMaintenanceRecord',
+          'maintenance/updateMaintenanceInState',
+          'maintenance/fetchRecords/fulfilled',
+          'maintenance/fetchById/fulfilled',
+          'maintenance/addToMaintenance/fulfilled',
+          'maintenance/returnFromMaintenance/fulfilled',
+          'maintenance/writeOffItem/fulfilled',
+          'maintenance/addUpdate/fulfilled',
+          'activityLog/fetchLogs/fulfilled',
+          'activityLog/loadMore/fulfilled',
+          'activityLog/fetchMyActivity/fulfilled',
         ],
         ignoredPaths: [
           'auth.user',
@@ -70,6 +86,11 @@ export const store = configureStore({
           'requests.selectedRequest',
           'steelMaster.steelMasters',
           'steelMaster.selectedSteelMaster',
+          'maintenance.maintenanceRecords',
+          'maintenance.selectedMaintenance',
+          'activityLog.logs',
+          'activityLog.myRecentActivity',
+          'activityLog.lastDoc',
         ],
       },
     }),

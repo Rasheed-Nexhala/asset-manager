@@ -47,6 +47,7 @@ export const SiteForm: React.FC<SiteFormProps> = ({
   const [showInactiveConfirmation, setShowInactiveConfirmation] = useState<boolean>(false);
   const [pendingStatus, setPendingStatus] = useState<SiteStatus | null>(null);
   const [managerName, setManagerName] = useState<string>('the assigned manager');
+  const [statusChangeLoading, setStatusChangeLoading] = useState<boolean>(false);
 
   useEffect(() => {
     if (initialData) {
@@ -87,6 +88,7 @@ export const SiteForm: React.FC<SiteFormProps> = ({
       // If changing to inactive and there's a manager assigned, show confirmation
       if (status === 'inactive' && formData.managerId) {
         try {
+          setStatusChangeLoading(true);
           // Get manager name for the confirmation message
           const users = await getAllUsers();
           const manager = users.find((user) => user.id === formData.managerId);
@@ -100,6 +102,8 @@ export const SiteForm: React.FC<SiteFormProps> = ({
           setManagerName('the assigned manager');
           setPendingStatus(status);
           setShowInactiveConfirmation(true);
+        } finally {
+          setStatusChangeLoading(false);
         }
       } else {
         // No manager assigned or changing to active - proceed immediately
@@ -247,33 +251,43 @@ export const SiteForm: React.FC<SiteFormProps> = ({
                 formData.status === 'inactive'
                   ? 'bg-[#DC2626]/15 border-[#DC2626]'
                   : 'bg-white border-[#E2E8F0]'
-              }`}
+              } ${statusChangeLoading ? 'opacity-70' : ''}`}
               onPress={() => handleStatusChange('inactive')}
               activeOpacity={0.7}
+              disabled={statusChangeLoading}
               accessibilityRole="button"
-              accessibilityLabel="Set status to Inactive"
-              accessibilityState={{ selected: formData.status === 'inactive' }}
+              accessibilityLabel={statusChangeLoading ? 'Checking manager, please wait' : 'Set status to Inactive'}
+              accessibilityState={{ selected: formData.status === 'inactive', disabled: statusChangeLoading, busy: statusChangeLoading }}
             >
-              <Ionicons
-                name="close-circle"
-                size={24}
-                color={formData.status === 'inactive' ? '#DC2626' : '#64748B'}
-              />
-              <Text
-                className={`text-[15px] font-semibold ${
-                  formData.status === 'inactive' ? 'text-[#DC2626]' : 'text-[#64748B]'
-                }`}
-              >
-                Inactive
-              </Text>
+              {statusChangeLoading ? (
+                <>
+                  <ActivityIndicator size="small" color="#DC2626" />
+                  <Text className="text-[15px] font-semibold text-[#64748B]">Please wait…</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons
+                    name="close-circle"
+                    size={24}
+                    color={formData.status === 'inactive' ? '#DC2626' : '#64748B'}
+                  />
+                  <Text
+                    className={`text-[15px] font-semibold ${
+                      formData.status === 'inactive' ? 'text-[#DC2626]' : 'text-[#64748B]'
+                    }`}
+                  >
+                    Inactive
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </View>
       </View>
 
       <TouchableOpacity
-        className={`bg-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center mt-4 ${
-          isLoading ? 'opacity-70' : ''
+        className={`rounded-[10px] h-[50px] items-center justify-center mt-4 flex-row gap-2 ${
+          isLoading ? 'bg-[#1E40AF]/70' : 'bg-[#1E40AF]'
         }`}
         onPress={handleSubmit}
         disabled={isLoading}

@@ -28,6 +28,10 @@ import {
   selectLowStockCount,
   selectTotalItemsCount,
 } from '../../store/selectors/inventorySelectors';
+import {
+  selectIsAdmin,
+  selectIsStoreIncharge,
+} from '../../store/selectors/authSelectors';
 import { useInventoryError } from '../../hooks/useInventoryError';
 import { subscribeItems } from '../../services/firebase/inventoryService';
 import { subscribeCategories } from '../../services/firebase/categoryService';
@@ -64,6 +68,8 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   const error = useInventoryError();
   const lowStockCount = useAppSelector(selectLowStockCount);
   const totalItemsCount = useAppSelector(selectTotalItemsCount);
+  const isAdmin = useAppSelector(selectIsAdmin);
+  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
 
   // Apply search filter using optimized selector
   const searchedItems = useAppSelector((state) => 
@@ -132,6 +138,10 @@ export const CentralStoreInventoryScreen: React.FC = () => {
 
   const handleSteelMaster = useCallback(() => {
     navigation.navigate('SteelMaster');
+  }, [navigation]);
+
+  const handleMaintenance = useCallback(() => {
+    navigation.navigate('Maintenance');
   }, [navigation]);
 
   const handleItemPress = useCallback(
@@ -215,7 +225,7 @@ export const CentralStoreInventoryScreen: React.FC = () => {
 
   // CIAMS Standard Header Component - Responsive Layout
   const renderCustomHeader = () => (
-    <View className="bg-white border-b border-[#E2E8F0] px-4 flex-row items-center" style={{ height: 56 }}>
+    <View className="bg-white border-b border-[#E2E8F0] px-4 flex-row items-center h-14">
       <Text 
         className="text-[22px] font-semibold text-[#0F172A] flex-1 flex-shrink" 
         accessibilityRole="header"
@@ -237,6 +247,17 @@ export const CentralStoreInventoryScreen: React.FC = () => {
             color={showFilters ? "#1E40AF" : "#64748B"} 
           />
         </TouchableOpacity>
+        {(isAdmin || isStoreIncharge) && (
+          <TouchableOpacity
+            className="w-12 h-12 items-center justify-center rounded-[10px]"
+            onPress={handleMaintenance}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Maintenance"
+          >
+            <Ionicons name="build-outline" size={22} color="#1E40AF" />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           className="w-12 h-12 items-center justify-center rounded-[10px]"
           onPress={handleSteelMaster}
@@ -244,7 +265,7 @@ export const CentralStoreInventoryScreen: React.FC = () => {
           accessibilityRole="button"
           accessibilityLabel="Steel Master"
         >
-          <Ionicons name="construct-outline" size={22} color="#1E40AF" />
+          <Ionicons name="analytics-outline" size={22} color="#1E40AF" />
         </TouchableOpacity>
         <TouchableOpacity
           className="w-12 h-12 items-center justify-center rounded-[10px]"
@@ -440,8 +461,7 @@ export const CentralStoreInventoryScreen: React.FC = () => {
       {/* CIAMS Empty State */}
       {hasNoItems ? (
         <View className="flex-1 items-center justify-center px-4">
-          {/* Icon - using emoji as per CIAMS pattern */}
-          <Text className="text-6xl mb-4">📦</Text>
+          <Ionicons name="cube-outline" size={80} color="#94A3B8" />
           
           <Text className="text-[22px] font-semibold text-[#0F172A] text-center mb-2">
             {searchQuery || filters.categoryId || filters.type || filters.stock !== 'all'

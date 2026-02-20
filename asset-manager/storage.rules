@@ -85,6 +85,24 @@ service firebase.storage {
     }
     
     /**
+     * Maintenance Photos Path
+     *
+     * Purpose: Store photos for maintenance records (damage/issue documentation)
+     * Path pattern: maintenancePhotos/{maintenanceId}/{fileName}
+     *
+     * Access Rules:
+     * - Read: All authenticated users (to view photos on maintenance detail)
+     * - Write: Admin and Store Incharge only (they manage maintenance)
+     */
+    match /maintenancePhotos/{maintenanceId}/{fileName} {
+      allow read: if isAuthenticated() && isUserActive();
+      allow write: if hasItemImageAccess()
+        && request.resource.size < 5 * 1024 * 1024 // Max 5MB
+        && request.resource.contentType.matches('image/.*'); // Images only
+      allow delete: if hasItemImageAccess();
+    }
+    
+    /**
      * Default rule: Deny all other paths
      * Add additional paths above this rule as needed
      */

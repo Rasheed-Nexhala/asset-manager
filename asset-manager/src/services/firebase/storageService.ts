@@ -8,6 +8,12 @@ import { storage } from '../../../config/firebase';
 const ITEM_IMAGES_PATH = 'itemImages';
 
 /**
+ * Storage path pattern for maintenance photos
+ * Format: maintenancePhotos/{maintenanceId}/{fileName}
+ */
+const MAINTENANCE_PHOTOS_PATH = 'maintenancePhotos';
+
+/**
  * ## Orphaned Image Cleanup
  *
  * To prevent storage costs from accumulating orphaned files:
@@ -31,6 +37,31 @@ const ALLOWED_IMAGE_TYPES = [
   'image/webp',
   'image/gif',
 ];
+
+/**
+ * Infer content type from file URI extension.
+ * On React Native Android, fetch(localUri) often returns blob.type === '',
+ * so we fall back to extension. Defaults to image/jpeg.
+ */
+function getContentTypeFromUri(fileUri: string): string {
+  const lower = fileUri.toLowerCase();
+  if (lower.includes('.png')) return 'image/png';
+  if (lower.includes('.webp')) return 'image/webp';
+  if (lower.includes('.gif')) return 'image/gif';
+  if (lower.includes('.jpg') || lower.includes('.jpeg')) return 'image/jpeg';
+  return 'image/jpeg';
+}
+
+/**
+ * Resolve content type for upload: use blob.type if valid, else infer from URI.
+ * Fixes Android where blob.type can be empty when fetching local file URIs.
+ */
+function resolveImageContentType(blob: Blob, fileUri: string): string {
+  if (blob.type && ALLOWED_IMAGE_TYPES.includes(blob.type)) {
+    return blob.type;
+  }
+  return getContentTypeFromUri(fileUri);
+}
 
 /**
  * Upload an item image to Firebase Storage
@@ -91,22 +122,22 @@ export const uploadItemImage = async (
       );
     }
 
-    // Validate file type
-    if (!ALLOWED_IMAGE_TYPES.includes(blob.type)) {
+    const contentType = resolveImageContentType(blob, fileUri);
+    if (!ALLOWED_IMAGE_TYPES.includes(contentType)) {
       throw new Error(
-        `File type "${blob.type}" is not allowed. Allowed types: ${ALLOWED_IMAGE_TYPES.join(', ')}`
+        `File type is not allowed. Allowed types: ${ALLOWED_IMAGE_TYPES.join(', ')}`
       );
     }
 
-    // Generate file name if not provided
-    const finalFileName = fileName || `image_${Date.now()}.${blob.type.split('/')[1]}`;
+    const extension = contentType.split('/')[1] || 'jpg';
+    const finalFileName = fileName || `image_${Date.now()}.${extension}`;
 
     // Create storage reference
     const storageRef = ref(storage, `${ITEM_IMAGES_PATH}/${itemId}/${finalFileName}`);
 
-    // Upload file
+    // Upload file (use resolved contentType; blob.type can be empty on Android)
     const snapshot = await uploadBytes(storageRef, blob, {
-      contentType: blob.type,
+      contentType,
     });
 
     // Get download URL
@@ -115,6 +146,68 @@ export const uploadItemImage = async (
     return downloadURL;
   } catch (error) {
     console.error('Error uploading item image:', error);
+    throw error;
+  }
+};
+
+/**
+ * Result of uploading a maintenance photo
+ */
+export interface MaintenancePhotoUploadResult {
+  url: string;
+  fileName: string;
+}
+
+/**
+ * Upload a maintenance photo to Firebase Storage
+ *
+ * Uses the same validation as item images (max 5MB, allowed image types).
+ * Path: maintenancePhotos/{maintenanceId}/{fileName}
+ *
+ * @param fileUri - Local file URI (from React Native ImagePicker)
+ * @param maintenanceId - Maintenance record ID to associate the photo with
+ * @param fileName - Optional custom file name. If not provided, generates one from timestamp
+ * @returns Object with download URL and file name for MaintenancePhoto metadata
+ */
+export const uploadMaintenancePhoto = async (
+  fileUri: string,
+  maintenanceId: string,
+  fileName?: string
+): Promise<MaintenancePhotoUploadResult> => {
+  try {
+    const response = await fetch(fileUri);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch file: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+
+    if (blob.size > MAX_FILE_SIZE) {
+      throw new Error(
+        `File size (${(blob.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum allowed size (5MB)`
+      );
+    }
+
+    const contentType = resolveImageContentType(blob, fileUri);
+    if (!ALLOWED_IMAGE_TYPES.includes(contentType)) {
+      throw new Error(
+        `File type is not allowed. Allowed types: ${ALLOWED_IMAGE_TYPES.join(', ')}`
+      );
+    }
+
+    const extension = contentType.split('/')[1] || 'jpg';
+    const finalFileName = fileName || `image_${Date.now()}.${extension}`;
+    const storageRef = ref(storage, `${MAINTENANCE_PHOTOS_PATH}/${maintenanceId}/${finalFileName}`);
+
+    const snapshot = await uploadBytes(storageRef, blob, {
+      contentType,
+    });
+
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    return { url: downloadURL, fileName: finalFileName };
+  } catch (error) {
+    console.error('Error uploading maintenance photo:', error);
     throw error;
   }
 };

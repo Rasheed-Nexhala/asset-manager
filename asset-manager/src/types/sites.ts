@@ -62,6 +62,10 @@ export interface CreateSiteData {
   managerId?: string | null;
   managerName?: string | null;
   status: SiteStatus;
+  /** User who created the site (for activity log) */
+  createdBy?: string;
+  createdByName?: string;
+  createdByRole?: string;
 }
 
 /**
@@ -75,4 +79,8 @@ export interface UpdateSiteData {
   managerId?: string | null;
   managerName?: string | null;
   status?: SiteStatus;
+  /** User who updated the site (for activity log) */
+  updatedBy?: string;
+  updatedByName?: string;
+  updatedByRole?: string;
 }

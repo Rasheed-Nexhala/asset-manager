@@ -76,7 +76,7 @@ export const UpdatePasswordScreen: React.FC<UpdatePasswordScreenProps> = ({
         {/* Back Button - 48px touch target */}
         <TouchableOpacity
           onPress={handleBack}
-          className="w-11 h-11 items-center justify-center"
+          className="min-w-[48px] min-h-[48px] w-12 h-12 items-center justify-center"
           activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel="Go back to profile"
@@ -92,7 +92,7 @@ export const UpdatePasswordScreen: React.FC<UpdatePasswordScreenProps> = ({
           Update Password
         </Text>
 
-        <View className="w-11 h-11" />
+        <View className="w-12 h-12" />
       </View>
 
       {/* Main Content */}

@@ -151,6 +151,10 @@ export interface CreateItemData {
   lengthPerPiece?: number;
   steelMasterId?: string;
   steelMasterName?: string;
+  /** User who created the item (for activity log) */
+  createdBy?: string;
+  createdByName?: string;
+  createdByRole?: string;
 }
 
 /**
@@ -170,6 +174,10 @@ export interface UpdateItemData {
   status?: ItemStatus;
   weightPerMeter?: number;
   lengthPerPiece?: number;
+  /** User who updated the item (for activity log) */
+  updatedBy?: string;
+  updatedByName?: string;
+  updatedByRole?: string;
 }
 
 /**

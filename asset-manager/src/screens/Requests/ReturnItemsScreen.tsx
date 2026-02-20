@@ -16,6 +16,7 @@ import { FormField } from '../../components/FormField';
 import { WeightDisplay } from '../../components/Inventory/WeightDisplay';
 import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
 import { ViewModeToggle } from '../../components/Inventory/ViewModeToggle';
+import { QuickMoveToMaintenanceButton } from '../../components';
 import { isWeightBasedItem } from '../../utils/weightConversionUtils';
 import { returnItems } from '../../store/thunks/requestThunks';
 import { requestService } from '../../services/firebase/requestService';
@@ -23,6 +24,8 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   selectUserId,
   selectUserDisplayName,
+  selectIsAdmin,
+  selectIsStoreIncharge,
 } from '../../store/selectors/authSelectors';
 import type {
   Request,
@@ -62,6 +65,8 @@ export const ReturnItemsScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
+  const isAdmin = useAppSelector(selectIsAdmin);
+  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const { viewMode, toggleViewMode } = useWeightViewPreference();
 
   const [request, setRequest] = useState<Request | null>(null);
@@ -303,10 +308,50 @@ export const ReturnItemsScreen: React.FC = () => {
                 Previous Returns
               </Text>
               {request.returnHistory.map((returnEvent) => (
-                <View key={returnEvent.returnId} className="mb-2 pb-2 border-b border-[#E2E8F0] last:border-b-0 last:mb-0 last:pb-0">
-                  <Text className="text-[13px] text-[#64748B]">
+                <View key={returnEvent.returnId} className="mb-3 pb-3 border-b border-[#E2E8F0] last:border-b-0 last:mb-0 last:pb-0">
+                  <Text className="text-[13px] text-[#64748B] mb-2">
                     {formatDate(returnEvent.returnedAt)} by {returnEvent.returnedByName} – {returnEvent.items.length} item(s)
                   </Text>
+                  {returnEvent.items.map((returnedItem) => {
+                    const isDamaged = returnedItem.condition === 'damaged';
+                    const hasNotes = returnEvent.returnNotes && returnEvent.returnNotes.trim();
+                    return (
+                      <View key={returnedItem.itemId} className="mb-2">
+                        <View className="flex-row justify-between">
+                          <Text className="text-[15px] text-[#0F172A]">
+                            {returnedItem.itemName}
+                          </Text>
+                          <Text className="text-[15px] text-[#0F172A]">
+                            {returnedItem.quantityReturned} returned
+                          </Text>
+                        </View>
+                        {isDamaged && (
+                          <View className="flex-row items-center gap-1 mt-1">
+                            <Ionicons name="warning" size={16} color="#D97706" />
+                            <Text className="text-[13px] text-[#D97706]">
+                              Damaged{hasNotes && ` • ${returnEvent.returnNotes}`}
+                            </Text>
+                          </View>
+                        )}
+                        {isDamaged && (isAdmin || isStoreIncharge) && (
+                          <View className="mt-2">
+                            <QuickMoveToMaintenanceButton
+                              itemId={returnedItem.itemId}
+                              itemName={returnedItem.itemName}
+                              itemSku={request.items.find(i => i.itemId === returnedItem.itemId)?.itemSku || ''}
+                              quantity={returnedItem.quantityReturned}
+                              issueDescription={`Returned damaged from ${request.siteName}. ${returnEvent.returnNotes || ''}`}
+                              sourceRequestId={request.id}
+                              sourceReturnDate={typeof returnEvent.returnedAt.toDate === 'function' ? returnEvent.returnedAt.toDate() : new Date()}
+                              onSuccess={() => {
+                                Alert.alert('Success', 'Item moved to maintenance');
+                              }}
+                            />
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
                 </View>
               ))}
             </View>

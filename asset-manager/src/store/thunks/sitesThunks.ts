@@ -10,6 +10,7 @@ import {
 import { getAllUsers } from '../../services/firebase/userRoleService';
 import type { CreateSiteData, UpdateSiteData, Site } from '../../types/sites';
 import type { SiteFormData } from '../../types/sites';
+import type { RootState } from '../index';
 
 /**
  * Fetch all sites
@@ -31,7 +32,7 @@ export const fetchSites = createAsyncThunk(
  */
 export const createSite = createAsyncThunk(
   'sites/createSite',
-  async (formData: SiteFormData, { rejectWithValue }) => {
+  async (formData: SiteFormData, { getState, rejectWithValue }) => {
     try {
       // Validate site name uniqueness
       const nameExists = await checkSiteNameExists(formData.name);
@@ -60,6 +61,12 @@ export const createSite = createAsyncThunk(
         }
       }
 
+      const state = getState() as RootState;
+      const { user, userRole } = state.auth;
+      const userId = user?.uid ?? null;
+      const userName = user?.displayName ?? user?.email ?? 'Unknown';
+      const userRoleType = userRole?.role ?? 'Admin';
+
       const createData: CreateSiteData = {
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
@@ -68,6 +75,9 @@ export const createSite = createAsyncThunk(
         managerId: formData.managerId || null,
         managerName,
         status: formData.status,
+        createdBy: userId ?? undefined,
+        createdByName: userId ? userName : undefined,
+        createdByRole: userId ? userRoleType : undefined,
       };
 
       const siteId = await createSiteService(createData);
@@ -92,7 +102,7 @@ export const updateSite = createAsyncThunk(
   'sites/updateSite',
   async (
     { siteId, formData }: { siteId: string; formData: SiteFormData },
-    { rejectWithValue }
+    { getState, rejectWithValue }
   ) => {
     try {
       // Validate site name uniqueness (excluding current site)
@@ -122,6 +132,12 @@ export const updateSite = createAsyncThunk(
         }
       }
 
+      const state = getState() as RootState;
+      const { user, userRole } = state.auth;
+      const userId = user?.uid ?? null;
+      const userName = user?.displayName ?? user?.email ?? 'Unknown';
+      const userRoleType = userRole?.role ?? 'Admin';
+
       const updateData: UpdateSiteData = {
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
@@ -130,6 +146,9 @@ export const updateSite = createAsyncThunk(
         managerId: formData.managerId || null,
         managerName,
         status: formData.status,
+        updatedBy: userId ?? undefined,
+        updatedByName: userId ? userName : undefined,
+        updatedByRole: userId ? userRoleType : undefined,
       };
 
       await updateSiteService(siteId, updateData);

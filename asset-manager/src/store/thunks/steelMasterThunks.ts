@@ -4,13 +4,13 @@ import {
   getSteelMasterById as getSteelMasterByIdService,
   createSteelMaster as createSteelMasterService,
   updateSteelMaster as updateSteelMasterService,
-  deleteSteelMaster as deleteSteelMasterService,
 } from '../../services/firebase/steelMasterService';
 import type {
   SteelMaster,
   CreateSteelMasterData,
   UpdateSteelMasterData,
 } from '../../types/steelMaster';
+import type { RootState } from '../index';
 
 /**
  * Fetch steel masters with optional active-only filter
@@ -59,9 +59,22 @@ export const fetchSteelMasterById = createAsyncThunk(
  */
 export const createSteelMaster = createAsyncThunk(
   'steelMaster/createSteelMaster',
-  async (data: CreateSteelMasterData, { rejectWithValue }) => {
+  async (data: CreateSteelMasterData, { getState, rejectWithValue }) => {
     try {
-      const id = await createSteelMasterService(data);
+      const state = getState() as RootState;
+      const { user, userRole } = state.auth;
+      const userId = user?.uid ?? null;
+      const userName = user?.displayName ?? user?.email ?? 'Unknown';
+      const userRoleType = userRole?.role ?? 'Admin';
+
+      const dataWithAudit: CreateSteelMasterData = {
+        ...data,
+        createdBy: userId ?? undefined,
+        createdByName: userId ? userName : undefined,
+        createdByRole: userId ? userRoleType : undefined,
+      };
+
+      const id = await createSteelMasterService(dataWithAudit);
       const created = await getSteelMasterByIdService(id);
       if (!created) {
         throw new Error('Failed to retrieve created steel master');
@@ -84,10 +97,23 @@ export const updateSteelMaster = createAsyncThunk(
   'steelMaster/updateSteelMaster',
   async (
     { id, updates }: { id: string; updates: UpdateSteelMasterData },
-    { rejectWithValue }
+    { getState, rejectWithValue }
   ) => {
     try {
-      await updateSteelMasterService(id, updates);
+      const state = getState() as RootState;
+      const { user, userRole } = state.auth;
+      const userId = user?.uid ?? null;
+      const userName = user?.displayName ?? user?.email ?? 'Unknown';
+      const userRoleType = userRole?.role ?? 'Admin';
+
+      const updatesWithAudit: UpdateSteelMasterData = {
+        ...updates,
+        updatedBy: userId ?? undefined,
+        updatedByName: userId ? userName : undefined,
+        updatedByRole: userId ? userRoleType : undefined,
+      };
+
+      await updateSteelMasterService(id, updatesWithAudit);
       const updated = await getSteelMasterByIdService(id);
       if (!updated) {
         throw new Error('Failed to retrieve updated steel master');
@@ -104,13 +130,13 @@ export const updateSteelMaster = createAsyncThunk(
 );
 
 /**
- * Delete (soft delete) a steel master
+ * Delete (soft delete) a steel master - uses updateSteelMaster so audit fields are set
  */
 export const deleteSteelMaster = createAsyncThunk(
   'steelMaster/deleteSteelMaster',
-  async (id: string, { rejectWithValue }) => {
+  async (id: string, { dispatch, rejectWithValue }) => {
     try {
-      await deleteSteelMasterService(id);
+      await dispatch(updateSteelMaster({ id, updates: { isActive: false } })).unwrap();
       return id;
     } catch (error: unknown) {
       const message =

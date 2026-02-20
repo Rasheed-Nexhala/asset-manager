@@ -27,3 +27,19 @@ export {
   ItemSelectorModal,
   AvailabilityIndicator,
 } from './Requests';
+
+// Maintenance components
+export { default as MaintenanceCard } from './Maintenance/MaintenanceCard';
+export { default as MaintenanceStatusBadge } from './Maintenance/MaintenanceStatusBadge';
+export { default as IssueTypeSelector } from './Maintenance/IssueTypeSelector';
+export { default as WriteOffReasonSelector } from './Maintenance/WriteOffReasonSelector';
+export { default as ItemSelectorForMaintenance } from './Maintenance/ItemSelectorForMaintenance';
+export { default as QuickMoveToMaintenanceButton } from './Maintenance/QuickMoveToMaintenanceButton';
+
+// Activity Log components
+export {
+  ActivityLogCard,
+  ActivityLogFilterModal,
+  ActivityLogDetailModal,
+  MyRecentActivityWidget,
+} from './ActivityLog';

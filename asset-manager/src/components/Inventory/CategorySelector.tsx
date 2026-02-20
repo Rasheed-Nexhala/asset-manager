@@ -114,13 +114,12 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
       </Text>
       
       <TouchableOpacity
-        className={`border rounded-lg h-12 px-4 bg-white flex-row items-center justify-between ${
+        className={`border rounded-lg h-12 px-4 bg-white flex-row items-center justify-between min-h-[48px] ${
           hasError ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
-        }`}
+        } ${disabled ? 'opacity-60' : ''}`}
         onPress={() => !disabled && setModalVisible(true)}
         activeOpacity={0.7}
         disabled={disabled}
-        style={disabled ? { opacity: 0.6 } : undefined}
         accessibilityRole="button"
         accessibilityLabel={`Select category. Current: ${displayText}`}
       >
@@ -146,7 +145,7 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-2xl p-4">
             {/* Handle Bar */}
-            <View className="w-10 h-1 bg-gray-300 rounded-full self-center mb-4" />
+            <View className="w-10 h-1 bg-[#E2E8F0] rounded-full self-center mb-4" />
 
             <Text className="text-[22px] font-semibold text-[#0F172A] mb-4">
               Select Category
@@ -190,15 +189,21 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    className="flex-1 bg-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center"
+                    className={`flex-1 rounded-[10px] h-[50px] items-center justify-center flex-row gap-2 ${
+                      isCreating ? 'bg-[#1E40AF]/70' : 'bg-[#1E40AF]'
+                    }`}
                     onPress={handleCreateCategory}
                     activeOpacity={0.7}
-                    accessibilityLabel="Create category"
+                    accessibilityLabel={isCreating ? 'Creating category, please wait' : 'Create category'}
                     accessibilityRole="button"
+                    accessibilityState={{ disabled: isCreating || !newCategoryName.trim(), busy: isCreating }}
                     disabled={isCreating || !newCategoryName.trim()}
                   >
                     {isCreating ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
+                      <>
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                        <Text className="text-[15px] font-semibold text-white">Please wait…</Text>
+                      </>
                     ) : (
                       <Text className="text-[15px] font-semibold text-white">Create</Text>
                     )}

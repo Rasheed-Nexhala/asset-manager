@@ -302,19 +302,20 @@ export const Users: React.FC = () => {
                 <Text className="text-[15px] font-semibold text-[#64748B]">Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                className={`flex-1 bg-[#1E40AF] rounded-[10px] h-[48px] flex-row items-center justify-center gap-2 ${
-                  isSaving ? 'opacity-50' : ''
+                className={`flex-1 rounded-[10px] h-[48px] flex-row items-center justify-center gap-2 ${
+                  isSaving ? 'bg-[#1E40AF]/70' : 'bg-[#1E40AF]'
                 }`}
                 onPress={() => handleSaveChanges(item.id)}
                 disabled={isSaving}
                 activeOpacity={0.7}
-                accessibilityLabel="Save changes"
+                accessibilityLabel={isSaving ? 'Saving changes, please wait' : 'Save changes'}
                 accessibilityRole="button"
+                accessibilityState={{ disabled: isSaving, busy: isSaving }}
               >
                 {isSaving ? (
                   <>
                     <ActivityIndicator size="small" color="#FFFFFF" />
-                    <Text className="text-[15px] font-semibold text-white">Saving...</Text>
+                    <Text className="text-[15px] font-semibold text-white">Please wait…</Text>
                   </>
                 ) : (
                   <Text className="text-[15px] font-semibold text-white">Save</Text>
@@ -350,7 +351,7 @@ export const Users: React.FC = () => {
       <View className="flex-1 bg-black/50 justify-end">
         <View className="bg-white rounded-t-2xl p-4">
           {/* Handle Bar */}
-          <View className="w-10 h-1 bg-gray-300 rounded-full self-center mb-4" />
+          <View className="w-10 h-1 bg-[#E2E8F0] rounded-full self-center mb-4" />
 
           {/* Title */}
           <Text className="text-[22px] font-semibold text-[#0F172A] mb-4">

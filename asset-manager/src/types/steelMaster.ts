@@ -37,6 +37,10 @@ export interface CreateSteelMasterData {
   weightPerMeter: number;
   defaultLength: number;
   hsnCode: string;
+  /** User who created (for activity log) */
+  createdBy?: string;
+  createdByName?: string;
+  createdByRole?: string;
 }
 
 /**
@@ -48,4 +52,8 @@ export interface UpdateSteelMasterData {
   defaultLength?: number;
   hsnCode?: string;
   isActive?: boolean;
+  /** User who updated (for activity log) */
+  updatedBy?: string;
+  updatedByName?: string;
+  updatedByRole?: string;
 }

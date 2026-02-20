@@ -6,6 +6,11 @@ import {
   updateUserProfile,
 } from '../../services/firebase/authService';
 import { createDefaultUserDocument } from '../../services/firebase/userRoleService';
+import { clearActivityLogs } from '../slices/activityLogSlice';
+import {
+  unsubscribeFromActivityLogs,
+  unsubscribeFromMyRecentActivity,
+} from './activityLogThunks';
 import type { SignUpCredentials, SignInCredentials } from '../../types/auth';
 
 export const signUpUser = createAsyncThunk(
@@ -46,9 +51,12 @@ export const signInUser = createAsyncThunk(
 
 export const signOutUser = createAsyncThunk(
   'auth/signOut',
-  async (_, { rejectWithValue }) => {
+  async (_, { dispatch, rejectWithValue }) => {
     try {
+      dispatch(unsubscribeFromActivityLogs());
+      dispatch(unsubscribeFromMyRecentActivity());
       await logout();
+      dispatch(clearActivityLogs());
       return null;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Sign out failed. Please try again.');

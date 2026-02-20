@@ -895,16 +895,26 @@ export const ItemForm: React.FC<ItemFormProps> = ({
                 
                 <View className="flex-row gap-3">
                   <TouchableOpacity
-                    className="flex-1 border-[1.5px] border-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center"
+                    className={`flex-1 border-[1.5px] border-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2 ${
+                      imageLoading ? 'opacity-70' : ''
+                    }`}
                     onPress={handleImagePick}
                     activeOpacity={0.7}
                     disabled={loading || imageLoading}
-                    accessibilityLabel="Change image"
+                    accessibilityLabel={imageLoading ? 'Changing image, please wait' : 'Change image'}
                     accessibilityRole="button"
+                    accessibilityState={{ disabled: loading || imageLoading, busy: imageLoading }}
                   >
-                    <Text className="text-[15px] font-semibold text-[#1E40AF]">
-                      Change Image
-                    </Text>
+                    {imageLoading ? (
+                      <>
+                        <ActivityIndicator size="small" color="#1E40AF" />
+                        <Text className="text-[15px] font-semibold text-[#1E40AF]">Please wait…</Text>
+                      </>
+                    ) : (
+                      <Text className="text-[15px] font-semibold text-[#1E40AF]">
+                        Change Image
+                      </Text>
+                    )}
                   </TouchableOpacity>
                   
                   <TouchableOpacity
@@ -962,17 +972,21 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           )}
           
           <TouchableOpacity
-            className={`flex-1 rounded-[10px] h-[50px] items-center justify-center ${
+            className={`flex-1 rounded-[10px] h-[50px] items-center justify-center flex-row gap-2 ${
               !isFormValid || loading ? 'bg-[#94A3B8]' : 'bg-[#1E40AF]'
             }`}
             onPress={handleSubmit}
             activeOpacity={0.7}
             disabled={!isFormValid || loading}
-            accessibilityLabel={mode === 'create' ? 'Submit new item' : 'Save changes'}
+            accessibilityLabel={loading ? 'Saving, please wait' : mode === 'create' ? 'Submit new item' : 'Save changes'}
             accessibilityRole="button"
+            accessibilityState={{ disabled: !isFormValid || loading, busy: loading }}
           >
             {loading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+                <Text className="text-[15px] font-semibold text-white">Please wait…</Text>
+              </>
             ) : (
               <Text className="text-[15px] font-semibold text-white">
                 {mode === 'create' ? 'Submit' : 'Save Changes'}

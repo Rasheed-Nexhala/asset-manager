@@ -164,7 +164,7 @@ export const SiteManagerSelector: React.FC<SiteManagerSelectorProps> = ({
       >
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-2xl p-4">
-            <View className="w-10 h-1 bg-gray-300 rounded-full self-center mb-4" />
+            <View className="w-10 h-1 bg-[#E2E8F0] rounded-full self-center mb-4" />
 
             <Text className="text-[22px] font-semibold text-[#0F172A] mb-4">
               Select Site Manager

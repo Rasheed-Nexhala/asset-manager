@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { SignedInScreen } from '../screens/Users/SignedInScreen';
-import { DashboardScreen } from '../screens/DashboardScreen';
+import { DashboardStackNavigator } from './DashboardStackNavigator';
 import { SiteStackNavigator } from './SiteStackNavigator';
 import { InventoryStackNavigator } from './InventoryStackNavigator';
 import { RequestStackNavigator } from './RequestStackNavigator';
@@ -80,7 +80,7 @@ export const BottomTabNavigator: React.FC = () => {
       />
       <Tab.Screen
         name="Dashboard"
-        component={DashboardScreen}
+        component={DashboardStackNavigator}
         options={{
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="grid-outline" size={size} color={color} />

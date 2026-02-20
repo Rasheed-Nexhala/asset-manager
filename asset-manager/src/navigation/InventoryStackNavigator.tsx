@@ -14,6 +14,7 @@ import {
   OtherSiteInventoryScreen,
   SteelMasterScreen,
 } from '../screens';
+import { MaintenanceStackNavigator } from './MaintenanceStackNavigator';
 
 /**
  * Navigation parameter types for Inventory Stack
@@ -24,6 +25,7 @@ export type InventoryStackParamList = {
   AddEditItem: { itemId?: string } | undefined;
   ItemDetail: { itemId: string };
   SteelMaster: undefined;
+  Maintenance: undefined;
   
   // Site Manager screens
   MySiteInventory: undefined;
@@ -89,6 +91,14 @@ export const InventoryStackNavigator: React.FC = () => {
           <Stack.Screen
             name="SteelMaster"
             component={SteelMasterScreen}
+            options={{
+              presentation: 'card',
+              gestureEnabled: true,
+            }}
+          />
+          <Stack.Screen
+            name="Maintenance"
+            component={MaintenanceStackNavigator}
             options={{
               presentation: 'card',
               gestureEnabled: true,

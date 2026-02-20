@@ -117,7 +117,7 @@ export const createSteelMaster = async (
   data: CreateSteelMasterData
 ): Promise<string> => {
   try {
-    const docRef = await addDoc(collection(db, STEEL_MASTER_COLLECTION), {
+    const docData: Record<string, unknown> = {
       name: data.name.trim(),
       weightPerMeter: data.weightPerMeter,
       defaultLength: data.defaultLength,
@@ -125,7 +125,12 @@ export const createSteelMaster = async (
       isActive: true,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    });
+    };
+    if (data.createdBy) docData.createdBy = data.createdBy;
+    if (data.createdByName) docData.createdByName = data.createdByName;
+    if (data.createdByRole) docData.createdByRole = data.createdByRole;
+
+    const docRef = await addDoc(collection(db, STEEL_MASTER_COLLECTION), docData);
 
     return docRef.id;
   } catch (error) {
@@ -154,6 +159,9 @@ export const updateSteelMaster = async (
     if (updates.hsnCode !== undefined)
       updateData.hsnCode = updates.hsnCode.trim();
     if (updates.isActive !== undefined) updateData.isActive = updates.isActive;
+    if (updates.updatedBy) updateData.updatedBy = updates.updatedBy;
+    if (updates.updatedByName) updateData.updatedByName = updates.updatedByName;
+    if (updates.updatedByRole) updateData.updatedByRole = updates.updatedByRole;
 
     await updateDoc(doc(db, STEEL_MASTER_COLLECTION, id), updateData);
   } catch (error) {

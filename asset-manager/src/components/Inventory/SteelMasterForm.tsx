@@ -128,7 +128,7 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
             </Text>
             <TouchableOpacity
               onPress={onCancel}
-              className="w-11 h-11 items-center justify-center"
+              className="min-w-[48px] min-h-[48px] w-12 h-12 items-center justify-center"
               disabled={loading}
               accessibilityRole="button"
               accessibilityLabel="Close"
@@ -256,15 +256,21 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
 
               {/* Submit Button */}
               <TouchableOpacity
-                className="bg-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
+                className={`rounded-[10px] h-[50px] items-center justify-center flex-row gap-2 ${
+                  loading ? 'bg-[#1E40AF]/70' : 'bg-[#1E40AF]'
+                }`}
                 onPress={handleSubmit}
                 disabled={loading}
                 activeOpacity={0.7}
                 accessibilityRole="button"
-                accessibilityLabel={mode === 'create' ? 'Add Steel Master' : 'Save changes'}
+                accessibilityLabel={loading ? 'Saving, please wait' : mode === 'create' ? 'Add Steel Master' : 'Save changes'}
+                accessibilityState={{ disabled: loading, busy: loading }}
               >
                 {loading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <Text className="text-[15px] font-semibold text-white">Please wait…</Text>
+                  </>
                 ) : (
                   <>
                     <Ionicons name="checkmark" size={22} color="#FFFFFF" />

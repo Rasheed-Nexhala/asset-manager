@@ -22,7 +22,6 @@ export interface ScreenHeaderProps {
   rightAction?: ScreenHeaderRightAction;
 }
 
-const HEADER_HEIGHT = 56;
 const DEFAULT_ICON_SIZE = 24;
 const DEFAULT_ICON_COLOR = '#1E40AF';
 
@@ -61,7 +60,14 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
 
   const renderActionContent = () => {
     if (isLoading) {
-      return <ActivityIndicator size="small" color={DEFAULT_ICON_COLOR} />;
+      return (
+        <View className="flex-row items-center">
+          <ActivityIndicator size="small" color={DEFAULT_ICON_COLOR} />
+          <Text className="text-[15px] font-semibold text-[#1E40AF] ml-2">
+            Please wait…
+          </Text>
+        </View>
+      );
     }
 
     const content: React.ReactNode[] = [];
@@ -96,14 +102,11 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   const showBackButton = showBack && typeof onBackPress === 'function';
 
   return (
-    <View
-      className="bg-white border-b border-[#E2E8F0] px-4 flex-row items-center justify-between"
-      style={{ height: HEADER_HEIGHT }}
-    >
+    <View className="bg-white border-b border-[#E2E8F0] px-4 flex-row items-center justify-between h-14">
       {/* Left: Back button, or spacer when no back but has right action (for centering) */}
       {showBackButton ? (
         <TouchableOpacity
-          className="w-11 h-11 items-center justify-center -ml-1"
+          className="min-w-[48px] min-h-[48px] w-12 h-12 items-center justify-center -ml-1"
           onPress={onBackPress}
           activeOpacity={0.7}
           accessibilityLabel="Go back"
@@ -112,7 +115,7 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
           <Ionicons name="arrow-back" size={24} color="#0F172A" />
         </TouchableOpacity>
       ) : showRightAction ? (
-        <View className="w-11" />
+        <View className="min-w-[48px] w-12" />
       ) : null}
 
       {/* Title: always centered via flex-1 text-center */}
@@ -140,7 +143,7 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
           {renderActionContent()}
         </TouchableOpacity>
       ) : showBackButton ? (
-        <View className="w-11" />
+        <View className="min-w-[48px] w-12" />
       ) : null}
     </View>
   );

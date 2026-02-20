@@ -145,7 +145,7 @@ export const SteelMasterScreen: React.FC = () => {
           </Text>
           <View className="flex-row gap-2">
             <TouchableOpacity
-              className="w-10 h-10 items-center justify-center rounded-lg border border-[#E2E8F0]"
+              className="min-w-[48px] min-h-[48px] w-12 h-12 items-center justify-center rounded-lg border border-[#E2E8F0]"
               onPress={() => handleEdit(item)}
               accessibilityRole="button"
               accessibilityLabel={`Edit ${item.name}`}
@@ -153,7 +153,7 @@ export const SteelMasterScreen: React.FC = () => {
               <Ionicons name="pencil" size={18} color="#1E40AF" />
             </TouchableOpacity>
             <TouchableOpacity
-              className="w-10 h-10 items-center justify-center rounded-lg border border-[#E2E8F0]"
+              className="min-w-[48px] min-h-[48px] w-12 h-12 items-center justify-center rounded-lg border border-[#E2E8F0]"
               onPress={() => handleDelete(item)}
               accessibilityRole="button"
               accessibilityLabel={`Deactivate ${item.name}`}
@@ -184,9 +184,9 @@ export const SteelMasterScreen: React.FC = () => {
   );
 
   const renderCustomHeader = () => (
-    <View className="bg-white border-b border-[#E2E8F0] px-4 flex-row items-center justify-between" style={{ height: 56 }}>
+    <View className="bg-white border-b border-[#E2E8F0] px-4 flex-row items-center justify-between h-14">
       <TouchableOpacity
-        className="w-11 h-11 items-center justify-center"
+        className="min-w-[48px] min-h-[48px] w-12 h-12 items-center justify-center"
         onPress={() => navigation.goBack()}
         activeOpacity={0.7}
         accessibilityRole="button"
@@ -204,7 +204,7 @@ export const SteelMasterScreen: React.FC = () => {
       </Text>
       
       <TouchableOpacity
-        className="w-11 h-11 items-center justify-center rounded-[10px]"
+        className="min-w-[48px] min-h-[48px] w-12 h-12 items-center justify-center rounded-[10px]"
         onPress={handleAdd}
         activeOpacity={0.7}
         accessibilityRole="button"

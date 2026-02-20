@@ -203,6 +203,19 @@ service cloud.firestore {
     }
     
     /**
+     * Maintenance Collection
+     *
+     * Purpose: Items sent for repair/maintenance (quantity, issueType, status, etc.)
+     * Tracks items moved from central store to maintenance and their return/write-off.
+     *
+     * Access Rules:
+     * - Read, Create, Update, Delete: Admin and Store Incharge only
+     */
+    match /maintenance/{maintenanceId} {
+      allow read, create, update, delete: if hasInventoryAccess();
+    }
+
+    /**
      * Inventory Adjustments Collection
      * 
      * Purpose: Audit log for every quantity change
@@ -229,17 +242,29 @@ service cloud.firestore {
     /**
      * Activity Logs Collection
      *
-     * Purpose: Immutable audit trail of all system activities
-     * (auth, users, sites, inventory, requests, POs, maintenance, vendors)
+     * Purpose: Immutable audit trail of all system activities across CIAMS modules
+     * (authentication, users, sites, inventory, requests, purchase orders,
+     * maintenance, vendors). Logs are server-side generated via Cloud Functions
+     * and cannot be modified or deleted by any client.
      *
-     * Access Rules (per 08_Activity_Logging_and_Audit_Trail):
-     * - Write: Denied (only Cloud Functions create logs - server-side only)
-     * - Read: Admin can read all; users can read only their own logs (userId match)
+     * Access Rules (per 08_Activity_Logging_and_Audit_Trail / Phase 1.3):
+     * - Read (Admin): Full access to all logs for audit and compliance
+     * - Read (User): Restricted to own logs only (userId == request.auth.uid)
+     * - Write: Denied for all clients - only Cloud Functions create logs
+     *
+     * Immutability: create, update, delete are explicitly denied to enforce
+     * tamper-proof audit trail. All writes occur server-side via Cloud Functions.
      */
     match /activityLogs/{logId} {
+      // Admin can read all logs for audit purposes
+      allow read: if isAuthenticated() && isUserActive() && isAdmin();
+
+      // Users can read only their own logs (userId match)
       allow read: if isAuthenticated() && isUserActive() &&
-        (isAdmin() || resource.data.userId == request.auth.uid);
-      allow create, update, delete: if false; // Only Cloud Functions
+        resource.data.userId == request.auth.uid;
+
+      // No client writes allowed - only Cloud Functions create logs
+      allow create, update, delete: if false;
     }
     
     // ============================================

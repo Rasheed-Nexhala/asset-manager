@@ -7,10 +7,11 @@ import {
   FlatList,
   TextInput,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
-import { selectAllItems } from '../../store/selectors/inventorySelectors';
+import { selectAllItems, selectItemsLoading } from '../../store/selectors/inventorySelectors';
 import type { Item } from '../../types/inventory';
 
 interface ItemSelectorModalProps {
@@ -27,6 +28,7 @@ export const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({
   excludeItemIds = [],
 }) => {
   const allItems = useSelector(selectAllItems);
+  const isLoading = useSelector(selectItemsLoading);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
@@ -83,7 +85,7 @@ export const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({
       <View className="flex-1 bg-black/50 justify-end">
         <View className="bg-white rounded-t-2xl h-[80%]">
           {/* Handle Bar */}
-          <View className="w-10 h-1 bg-gray-300 rounded-full self-center mt-2 mb-4" />
+          <View className="w-10 h-1 bg-[#E2E8F0] rounded-full self-center mt-2 mb-4" />
 
           {/* Header */}
           <View className="px-4 pb-3 border-b border-[#E2E8F0]">
@@ -115,6 +117,14 @@ export const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({
           </View>
 
           {/* Items List */}
+          {isLoading && safeItems.length === 0 ? (
+            <View className="flex-1 items-center justify-center py-12 min-h-[200px]">
+              <ActivityIndicator size="large" color="#1E40AF" />
+              <Text className="text-[15px] text-[#64748B] mt-4">
+                Loading items...
+              </Text>
+            </View>
+          ) : (
           <FlatList
             data={filteredItems}
             keyExtractor={(item, index) => item?.id ?? `item-${index}`}
@@ -177,6 +187,7 @@ export const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({
             }
             contentContainerStyle={{ paddingBottom: 100 }}
           />
+          )}
 
           {/* Footer */}
           <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-[#E2E8F0] px-4 py-3">

@@ -35,7 +35,9 @@ export const SiteCard: React.FC<SiteCardProps> = ({ site, onPress }) => {
 
       <View className="gap-2">
         <View className="flex-row items-start gap-2">
-          <Ionicons name="person" size={18} color="#64748B" style={{ marginTop: 2 }} />
+          <View className="mt-0.5">
+            <Ionicons name="person" size={18} color="#64748B" />
+          </View>
           <View className="flex-1">
             <Text className="text-[13px] text-[#64748B] mb-1">Manager</Text>
             <Text className="text-[15px] text-[#0F172A]">
@@ -45,7 +47,9 @@ export const SiteCard: React.FC<SiteCardProps> = ({ site, onPress }) => {
         </View>
 
         <View className="flex-row items-start gap-2">
-          <Ionicons name="location" size={18} color="#64748B" style={{ marginTop: 2 }} />
+          <View className="mt-0.5">
+            <Ionicons name="location" size={18} color="#64748B" />
+          </View>
           <View className="flex-1">
             <Text className="text-[13px] text-[#64748B] mb-1">Location</Text>
             <Text className="text-[15px] text-[#0F172A]" numberOfLines={2}>
@@ -56,7 +60,9 @@ export const SiteCard: React.FC<SiteCardProps> = ({ site, onPress }) => {
 
         {site.description && (
           <View className="flex-row items-start gap-2">
-            <Ionicons name="document-text" size={18} color="#64748B" style={{ marginTop: 2 }} />
+            <View className="mt-0.5">
+              <Ionicons name="document-text" size={18} color="#64748B" />
+            </View>
             <View className="flex-1">
               <Text className="text-[13px] text-[#64748B] mb-1">Description</Text>
               <Text className="text-[15px] text-[#0F172A]" numberOfLines={2}>
@@ -67,9 +73,11 @@ export const SiteCard: React.FC<SiteCardProps> = ({ site, onPress }) => {
         )}
 
         {site.contactNumber && (
-          <View className="flex-row items-start gap-2">
-            <Ionicons name="call" size={18} color="#64748B" style={{ marginTop: 2 }} />
-            <View className="flex-1">
+<View className="flex-row items-start gap-2">
+          <View className="mt-0.5">
+            <Ionicons name="call" size={18} color="#64748B" />
+          </View>
+          <View className="flex-1">
               <Text className="text-[13px] text-[#64748B] mb-1">Contact</Text>
               <Text className="text-[15px] text-[#0F172A]">{site.contactNumber}</Text>
             </View>

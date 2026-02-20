@@ -1,0 +1,216 @@
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { ActivityLog, ActivityLogFiltersStore } from '../../types/activityLog';
+import { dateToIso } from '../../utils/dateSerialization';
+import {
+  fetchActivityLogs,
+  fetchMyRecentActivity,
+  loadMoreActivityLogs,
+  exportActivityLogsThunk,
+} from '../thunks/activityLogThunks';
+
+const PAGE_SIZE = 20;
+
+interface ActivityLogState {
+  /** Full activity logs (Admin only) */
+  logs: ActivityLog[];
+  hasMore: boolean;
+  lastDoc: unknown | null;
+
+  /** My recent activity (all users) */
+  myRecentActivity: ActivityLog[];
+
+  /** Filters */
+  filters: ActivityLogFiltersStore;
+
+  /** Loading states */
+  loading: boolean;
+  loadingMore: boolean;
+  exportLoading: boolean;
+  myActivityLoading: boolean;
+
+  /** Errors */
+  error: string | null;
+  errorTimestamp: number | null;
+}
+
+const initialState: ActivityLogState = {
+  logs: [],
+  hasMore: true,
+  lastDoc: null,
+  myRecentActivity: [],
+  filters: {
+    startDate: null,
+    endDate: null,
+    userId: null,
+    actionCategory: 'all',
+    actionType: 'all',
+    searchQuery: '',
+  },
+  loading: false,
+  loadingMore: false,
+  exportLoading: false,
+  myActivityLoading: false,
+  error: null,
+  errorTimestamp: null,
+};
+
+const activityLogSlice = createSlice({
+  name: 'activityLog',
+  initialState,
+  reducers: {
+    setFilters: (state, action: PayloadAction<Partial<ActivityLogFiltersStore & { startDate?: Date | null; endDate?: Date | null }>>) => {
+      const payload = action.payload;
+      const normalized = {
+        ...payload,
+        startDate: 'startDate' in payload ? dateToIso(payload.startDate) : state.filters.startDate,
+        endDate: 'endDate' in payload ? dateToIso(payload.endDate) : state.filters.endDate,
+      };
+      state.filters = { ...state.filters, ...normalized };
+      state.logs = [];
+      state.hasMore = true;
+      state.lastDoc = null;
+    },
+
+    clearFilters: (state) => {
+      state.filters = initialState.filters;
+      state.logs = [];
+      state.hasMore = true;
+      state.lastDoc = null;
+    },
+
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.loading = action.payload;
+    },
+
+    setMyActivityLoading: (state, action: PayloadAction<boolean>) => {
+      state.myActivityLoading = action.payload;
+    },
+
+    setError: (state, action: PayloadAction<string>) => {
+      state.error = action.payload;
+      state.errorTimestamp = Date.now();
+      state.loading = false;
+      state.loadingMore = false;
+      state.exportLoading = false;
+      state.myActivityLoading = false;
+    },
+
+    clearError: (state) => {
+      state.error = null;
+      state.errorTimestamp = null;
+    },
+
+    clearActivityLogs: (state) => {
+      state.logs = [];
+      state.myRecentActivity = [];
+      state.hasMore = true;
+      state.lastDoc = null;
+      state.filters = initialState.filters;
+      state.loading = false;
+      state.loadingMore = false;
+      state.exportLoading = false;
+      state.myActivityLoading = false;
+      state.error = null;
+      state.errorTimestamp = null;
+    },
+
+    /**
+     * Real-time snapshot updates
+     * Real-time mode uses a fixed window (no pagination) - hasMore always false
+     */
+    updateLogsFromSnapshot: (state, action: PayloadAction<ActivityLog[]>) => {
+      state.logs = action.payload;
+      state.loading = false;
+      state.error = null;
+      state.errorTimestamp = null;
+      state.hasMore = false;
+    },
+
+    updateMyActivityFromSnapshot: (state, action: PayloadAction<ActivityLog[]>) => {
+      state.myRecentActivity = action.payload;
+      state.myActivityLoading = false;
+      state.error = null;
+      state.errorTimestamp = null;
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchActivityLogs.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(fetchActivityLogs.fulfilled, (state, action) => {
+        state.loading = false;
+        state.logs = action.payload.logs;
+        state.lastDoc = action.payload.lastDoc;
+        state.hasMore = action.payload.logs.length >= PAGE_SIZE;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(fetchActivityLogs.rejected, (state, action) => {
+        state.loading = false;
+        state.error = (action.payload as string) ?? 'Failed to fetch activity logs';
+        state.errorTimestamp = Date.now();
+      })
+
+      .addCase(loadMoreActivityLogs.pending, (state) => {
+        state.loadingMore = true;
+        state.error = null;
+      })
+      .addCase(loadMoreActivityLogs.fulfilled, (state, action) => {
+        state.loadingMore = false;
+        state.logs = [...state.logs, ...action.payload.logs];
+        state.lastDoc = action.payload.lastDoc;
+        state.hasMore = action.payload.logs.length >= PAGE_SIZE;
+      })
+      .addCase(loadMoreActivityLogs.rejected, (state, action) => {
+        state.loadingMore = false;
+        state.error = (action.payload as string) ?? 'Failed to load more activity logs';
+        state.errorTimestamp = Date.now();
+      })
+
+      .addCase(fetchMyRecentActivity.pending, (state) => {
+        state.myActivityLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchMyRecentActivity.fulfilled, (state, action) => {
+        state.myActivityLoading = false;
+        state.myRecentActivity = action.payload;
+        state.error = null;
+      })
+      .addCase(fetchMyRecentActivity.rejected, (state, action) => {
+        state.myActivityLoading = false;
+        state.error = (action.payload as string) ?? 'Failed to fetch recent activity';
+        state.errorTimestamp = Date.now();
+      })
+
+      .addCase(exportActivityLogsThunk.pending, (state) => {
+        state.exportLoading = true;
+        state.error = null;
+      })
+      .addCase(exportActivityLogsThunk.fulfilled, (state) => {
+        state.exportLoading = false;
+        state.error = null;
+      })
+      .addCase(exportActivityLogsThunk.rejected, (state, action) => {
+        state.exportLoading = false;
+        state.error = (action.payload as string) ?? 'Failed to export activity logs';
+        state.errorTimestamp = Date.now();
+      });
+  },
+});
+
+export const {
+  setFilters,
+  clearFilters,
+  setLoading,
+  setMyActivityLoading,
+  setError,
+  clearError,
+  clearActivityLogs,
+  updateLogsFromSnapshot,
+  updateMyActivityFromSnapshot,
+} = activityLogSlice.actions;
+
+export default activityLogSlice.reducer;

@@ -12,7 +12,9 @@ import {
   UserCredential,
   AuthError,
 } from 'firebase/auth';
-import { auth } from '../../../config/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { auth, functions } from '../../../config/firebase';
+import { getUserRole } from './userRoleService';
 
 export interface ProfileUpdateData {
   displayName?: string;
@@ -39,6 +41,126 @@ export const signUp = async (
   }
 };
 
+/**
+ * Log authentication event via Cloud Function (login/logout)
+ * Uses try-catch to not block auth flow on logging failure
+ */
+async function logAuthEventToCloud(
+  actionType: 'user_login' | 'user_logout',
+  userName: string,
+  userRole: string
+): Promise<void> {
+  try {
+    const logAuthEventFn = httpsCallable<
+      { actionType: string; userName: string; userRole: string; details?: string; deviceInfo?: string; appVersion?: string },
+      { success: boolean }
+    >(functions, 'logAuthEvent');
+    await logAuthEventFn({
+      actionType,
+      userName,
+      userRole,
+      details: '',
+      deviceInfo: 'React Native',
+      appVersion: '1.0.0',
+    });
+  } catch (error: unknown) {
+    const code = (error as { code?: string })?.code ?? '';
+    const message = (error as { message?: string })?.message ?? String(error);
+    // Not-found/unavailable = Cloud Function not deployed or unreachable; avoid noisy ERROR
+    if (code === 'functions/not-found' || code === 'functions/unavailable' || message.includes('not-found')) {
+      if (__DEV__) {
+        console.info(
+          'Activity log (logAuthEvent) unavailable. Deploy Cloud Functions to enable auth event logging.'
+        );
+      }
+      return;
+    }
+    // Unauthenticated = token not ready or expired when request was sent; avoid noisy ERROR
+    if (code === 'unauthenticated' || message.includes('unauthenticated')) {
+      if (__DEV__) {
+        console.info('Activity log (logAuthEvent): request was unauthenticated; event not logged.');
+      }
+      return;
+    }
+    console.error('Failed to log auth event:', error);
+    // Don't throw - logging failure should not block auth
+  }
+}
+
+/**
+ * Log failed login attempt via Cloud Function (unauthenticated call)
+ * Uses try-catch to not block auth flow on logging failure
+ */
+async function logLoginFailedToCloud(
+  email: string,
+  details: string
+): Promise<void> {
+  try {
+    const logAuthEventFn = httpsCallable<
+      { actionType: string; email: string; details?: string; deviceInfo?: string; appVersion?: string },
+      { success: boolean }
+    >(functions, 'logAuthEvent');
+    await logAuthEventFn({
+      actionType: 'login_failed',
+      email,
+      details,
+      deviceInfo: 'React Native',
+      appVersion: '1.0.0',
+    });
+  } catch (error: unknown) {
+    const code = (error as { code?: string })?.code ?? '';
+    const message = (error as { message?: string })?.message ?? String(error);
+    if (code === 'functions/not-found' || code === 'functions/unavailable' || message.includes('not-found')) {
+      if (__DEV__) {
+        console.info(
+          'Activity log (logAuthEvent) unavailable. Deploy Cloud Functions to enable auth event logging.'
+        );
+      }
+      return;
+    }
+    if (__DEV__) {
+      console.info('Failed to log login_failed event:', error);
+    }
+    // Don't throw - logging failure should not block auth
+  }
+}
+
+/**
+ * Log password change via Cloud Function
+ * Called after successful password update - uses try-catch to not block flow
+ */
+export async function logPasswordChanged(): Promise<void> {
+  try {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const userRole = await getUserRole(user.uid);
+    const logPasswordChangedFn = httpsCallable<
+      { userRole?: string; deviceInfo?: string; appVersion?: string },
+      { success: boolean }
+    >(functions, 'logPasswordChanged');
+    await logPasswordChangedFn({
+      userRole: userRole?.role ?? 'Unassigned',
+      deviceInfo: 'React Native',
+      appVersion: '1.0.0',
+    });
+  } catch (error: unknown) {
+    const code = (error as { code?: string })?.code ?? '';
+    const message = (error as { message?: string })?.message ?? String(error);
+    if (code === 'functions/not-found' || code === 'functions/unavailable' || message.includes('not-found')) {
+      if (__DEV__) {
+        console.info(
+          'Activity log (logPasswordChanged) unavailable. Deploy Cloud Functions to enable logging.'
+        );
+      }
+      return;
+    }
+    if (__DEV__) {
+      console.info('Failed to log password_changed event:', error);
+    }
+  }
+}
+
 export const signIn = async (
   email: string,
   password: string
@@ -49,16 +171,44 @@ export const signIn = async (
       email,
       password
     );
+
+    // Ensure the new user's ID token is ready before calling the Cloud Function.
+    // Without this, the callable can be sent with a stale/missing token and return "unauthenticated".
+    await userCredential.user.getIdToken(true);
+
+    // Log login event (non-blocking)
+    const userRole = await getUserRole(userCredential.user.uid);
+    await logAuthEventToCloud(
+      'user_login',
+      userCredential.user.displayName ?? userCredential.user.email ?? email,
+      userRole?.role ?? 'Unassigned'
+    );
+
     return userCredential;
   } catch (error) {
     const authError = error as AuthError;
     console.error('Sign in error:', authError.code, authError.message);
+    // Log failed login attempt (non-blocking, user is not authenticated)
+    logLoginFailedToCloud(email, authError.message ?? authError.code ?? 'Unknown error').catch(() => {});
     throw handleAuthError(authError);
   }
 };
 
 export const logout = async (): Promise<void> => {
   try {
+    // Log logout event BEFORE signOut (user must be authenticated for Cloud Function)
+    const user = auth.currentUser;
+    if (user) {
+      // Ensure we have a fresh token so the callable request is authenticated
+      await user.getIdToken(true);
+      const userRole = await getUserRole(user.uid);
+      await logAuthEventToCloud(
+        'user_logout',
+        user.displayName ?? user.email ?? 'User',
+        userRole?.role ?? 'Unassigned'
+      );
+    }
+
     await signOut(auth);
   } catch (error) {
     const authError = error as AuthError;

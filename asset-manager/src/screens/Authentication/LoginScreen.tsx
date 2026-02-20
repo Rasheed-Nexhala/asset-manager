@@ -6,6 +6,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components';
 import { FormField } from '../../components/FormField';
 import { AuthLogo } from '../../components/AuthLogo';
@@ -127,7 +128,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onGoToSignup }) => {
                 accessibilityLiveRegion="polite"
               >
                 <View className="flex-row items-start gap-2">
-                  <Text className="text-[18px] mt-0.5">⚠️</Text>
+                  <Ionicons name="warning" size={20} color="#D97706" />
+                  <Text className="text-[18px] mt-0.5 font-semibold text-[#D97706]">Warning</Text>
                   <Text className="text-[14px] text-[#DC2626] flex-1 leading-5">
                     {authError}
                   </Text>

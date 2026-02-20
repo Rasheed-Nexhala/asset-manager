@@ -8,6 +8,7 @@ import {
   adjustQuantity as adjustQuantityService,
   getInventoryByLocation,
 } from '../../services/firebase/inventoryService';
+import type { RootState } from '../index';
 import {
   listCategories,
   createCategory as createCategoryService,
@@ -68,10 +69,23 @@ export const createItem = createAsyncThunk(
   'inventory/createItem',
   async (
     { itemData, categoryName }: { itemData: CreateItemData; categoryName: string },
-    { rejectWithValue }
+    { getState, rejectWithValue }
   ) => {
     try {
-      const itemId = await createItemService(itemData, categoryName);
+      const state = getState() as RootState;
+      const { user, userRole } = state.auth;
+      const userId = user?.uid ?? null;
+      const userName = user?.displayName ?? user?.email ?? 'Unknown';
+      const userRoleType = userRole?.role ?? 'Admin';
+
+      const dataWithAudit: CreateItemData = {
+        ...itemData,
+        createdBy: userId ?? undefined,
+        createdByName: userId ? userName : undefined,
+        createdByRole: userId ? userRoleType : undefined,
+      };
+
+      const itemId = await createItemService(dataWithAudit, categoryName);
       // Fetch the created item to return full data
       const createdItem = await getItemByIdService(itemId);
       if (!createdItem) {
@@ -107,10 +121,23 @@ export const updateItem = createAsyncThunk(
       updates,
       categoryName,
     }: { itemId: string; updates: UpdateItemData; categoryName?: string },
-    { rejectWithValue }
+    { getState, rejectWithValue }
   ) => {
     try {
-      await updateItemService(itemId, updates, categoryName);
+      const state = getState() as RootState;
+      const { user, userRole } = state.auth;
+      const userId = user?.uid ?? null;
+      const userName = user?.displayName ?? user?.email ?? 'Unknown';
+      const userRoleType = userRole?.role ?? 'Admin';
+
+      const updatesWithAudit: UpdateItemData = {
+        ...updates,
+        updatedBy: userId ?? undefined,
+        updatedByName: userId ? userName : undefined,
+        updatedByRole: userId ? userRoleType : undefined,
+      };
+
+      await updateItemService(itemId, updatesWithAudit, categoryName);
       // Fetch the updated item to return full data
       const updatedItem = await getItemByIdService(itemId);
       if (!updatedItem) {

@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FormField } from './FormField';
-import { reauthenticateAndUpdatePassword } from '../services/firebase/authService';
+import {
+  reauthenticateAndUpdatePassword,
+  logPasswordChanged,
+} from '../services/firebase/authService';
 
 export interface UpdatePasswordFormProps {
   onSuccess?: () => void;
@@ -77,6 +80,7 @@ export const UpdatePasswordForm: React.FC<UpdatePasswordFormProps> = ({
 
     try {
       await reauthenticateAndUpdatePassword(currentPassword, newPassword);
+      await logPasswordChanged();
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -176,7 +180,7 @@ export const UpdatePasswordForm: React.FC<UpdatePasswordFormProps> = ({
           accessibilityLiveRegion="polite"
         >
           <View className="flex-row items-center gap-2">
-            <Text className="text-lg">✅</Text>
+            <Ionicons name="checkmark-circle" size={20} color="#16A34A" />
             <Text className="text-[13px] text-[#16A34A] flex-1">
               Password updated successfully
             </Text>
@@ -194,18 +198,21 @@ export const UpdatePasswordForm: React.FC<UpdatePasswordFormProps> = ({
       ) : null}
 
       <TouchableOpacity
-        className={`bg-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center ${
-          isLoading ? 'opacity-70' : ''
+        className={`rounded-[10px] h-[50px] items-center justify-center flex-row gap-2 ${
+          isLoading ? 'bg-[#1E40AF]/70' : 'bg-[#1E40AF]'
         }`}
         onPress={handleSubmit}
         disabled={isLoading}
         activeOpacity={0.7}
         accessibilityRole="button"
-        accessibilityLabel="Update password"
-        accessibilityState={{ disabled: isLoading }}
+        accessibilityLabel={isLoading ? 'Updating password, please wait' : 'Update password'}
+        accessibilityState={{ disabled: isLoading, busy: isLoading }}
       >
         {isLoading ? (
-          <ActivityIndicator color="#FFFFFF" size="small" />
+          <>
+            <ActivityIndicator color="#FFFFFF" size="small" />
+            <Text className="text-[15px] font-semibold text-white">Please wait…</Text>
+          </>
         ) : (
           <Text className="text-[15px] font-semibold text-white">
             Update Password

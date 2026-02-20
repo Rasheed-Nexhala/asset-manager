@@ -294,6 +294,9 @@ export const createItem = async (
       createdAt: now,
       updatedAt: now,
     };
+    if (itemData.createdBy) itemDocData.createdBy = itemData.createdBy;
+    if (itemData.createdByName) itemDocData.createdByName = itemData.createdByName;
+    if (itemData.createdByRole) itemDocData.createdByRole = itemData.createdByRole;
     if (itemData.weightPerMeter != null) itemDocData.weightPerMeter = itemData.weightPerMeter;
     if (lengthPerPiece != null) itemDocData.lengthPerPiece = lengthPerPiece;
     if (steelMasterId) itemDocData.steelMasterId = steelMasterId;
@@ -379,7 +382,7 @@ export const updateItem = async (
       }
     }
 
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       ...updates,
       updatedAt: serverTimestamp(),
     };
@@ -388,6 +391,11 @@ export const updateItem = async (
     if (updates.categoryId && categoryName) {
       updateData.categoryName = categoryName;
     }
+
+    // Activity log audit fields (Cloud Function reads these)
+    if (updates.updatedBy) updateData.updatedBy = updates.updatedBy;
+    if (updates.updatedByName) updateData.updatedByName = updates.updatedByName;
+    if (updates.updatedByRole) updateData.updatedByRole = updates.updatedByRole;
 
     await updateDoc(doc(db, ITEMS_COLLECTION, id), updateData);
   } catch (error) {

@@ -238,7 +238,12 @@ export const SiteManagementScreen: React.FC = () => {
           className="flex-1"
           contentContainerStyle={{ padding: 16 }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#1E40AF" />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={['#1E40AF']}
+              tintColor="#1E40AF"
+            />
           }
           showsVerticalScrollIndicator={false}
         >
