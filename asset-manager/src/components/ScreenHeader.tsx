@@ -19,6 +19,8 @@ export interface ScreenHeaderProps {
   showBack?: boolean;
   /** Called when back button is pressed. Required when showBack is true. */
   onBackPress?: () => void;
+  /** Optional left action (icon or label). Ignored when showBack is true. */
+  leftAction?: ScreenHeaderRightAction;
   rightAction?: ScreenHeaderRightAction;
 }
 
@@ -29,37 +31,52 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   title,
   showBack = false,
   onBackPress,
+  leftAction,
   rightAction,
 }) => {
-  const isLoading = rightAction?.loading ?? false;
-  const hasLabel = Boolean(rightAction?.label);
-  const hasIcon = Boolean(rightAction?.icon);
-  const showRightAction = rightAction != null && (hasLabel || hasIcon);
+  const hasLeftLabel = Boolean(leftAction?.label);
+  const hasLeftIcon = Boolean(leftAction?.icon);
+  const showLeftAction =
+    !showBack &&
+    leftAction != null &&
+    (hasLeftLabel || hasLeftIcon);
 
-  if (rightAction && !hasLabel && !hasIcon) {
+  const rightLoading = rightAction?.loading ?? false;
+  const hasRightLabel = Boolean(rightAction?.label);
+  const hasRightIcon = Boolean(rightAction?.icon);
+  const showRightAction = rightAction != null && (hasRightLabel || hasRightIcon);
+
+  if (rightAction && !hasRightLabel && !hasRightIcon) {
     console.warn(
       'ScreenHeader: rightAction must have either a label or icon property. Action will not be rendered.'
     );
   }
+  if (leftAction && !hasLeftLabel && !hasLeftIcon) {
+    console.warn(
+      'ScreenHeader: leftAction must have either a label or icon property. Action will not be rendered.'
+    );
+  }
 
-  const iconSize = rightAction?.iconSize ?? DEFAULT_ICON_SIZE;
-  const iconColor = rightAction?.iconColor ?? DEFAULT_ICON_COLOR;
+  const rightIconSize = rightAction?.iconSize ?? DEFAULT_ICON_SIZE;
+  const rightIconColor = rightAction?.iconColor ?? DEFAULT_ICON_COLOR;
+  const leftIconSize = leftAction?.iconSize ?? DEFAULT_ICON_SIZE;
+  const leftIconColor = leftAction?.iconColor ?? DEFAULT_ICON_COLOR;
 
-  const getAccessibilityLabel = () => {
-    if (isLoading) {
+  const getRightAccessibilityLabel = () => {
+    if (rightLoading) {
       return (
         rightAction?.accessibilityLabelLoading ??
-        (hasLabel ? `${rightAction?.label}, please wait` : 'Loading, please wait')
+        (hasRightLabel ? `${rightAction?.label}, please wait` : 'Loading, please wait')
       );
     }
     return (
       rightAction?.accessibilityLabel ??
-      (hasLabel ? rightAction?.label : (hasIcon ? 'Action button' : undefined))
+      (hasRightLabel ? rightAction?.label : (hasRightIcon ? 'Action button' : undefined))
     );
   };
 
-  const renderActionContent = () => {
-    if (isLoading) {
+  const renderRightActionContent = () => {
+    if (rightLoading) {
       return (
         <View className="flex-row items-center">
           <ActivityIndicator size="small" color={DEFAULT_ICON_COLOR} />
@@ -72,24 +89,54 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
 
     const content: React.ReactNode[] = [];
 
-    if (hasIcon) {
+    if (hasRightIcon) {
       content.push(
         <Ionicons
           key="icon"
           name={rightAction!.icon!}
-          size={iconSize}
-          color={iconColor}
+          size={rightIconSize}
+          color={rightIconColor}
         />
       );
     }
 
-    if (hasLabel) {
+    if (hasRightLabel) {
       content.push(
         <Text
           key="label"
-          className={`text-[15px] font-semibold text-[#1E40AF] ${hasIcon ? 'ml-2' : ''}`}
+          className={`text-[15px] font-semibold text-[#1E40AF] ${hasRightIcon ? 'ml-2' : ''}`}
         >
           {rightAction!.label}
+        </Text>
+      );
+    }
+
+    return content.length > 0 ? (
+      <View className="flex-row items-center">{content}</View>
+    ) : null;
+  };
+
+  const renderLeftActionContent = () => {
+    const content: React.ReactNode[] = [];
+
+    if (hasLeftIcon) {
+      content.push(
+        <Ionicons
+          key="icon"
+          name={leftAction!.icon!}
+          size={leftIconSize}
+          color={leftIconColor}
+        />
+      );
+    }
+
+    if (hasLeftLabel) {
+      content.push(
+        <Text
+          key="label"
+          className={`text-[15px] font-semibold text-[#1E40AF] ${hasLeftIcon ? 'ml-2' : ''}`}
+        >
+          {leftAction!.label}
         </Text>
       );
     }
@@ -103,7 +150,7 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
 
   return (
     <View className="bg-white border-b border-[#E2E8F0] px-4 flex-row items-center justify-between h-14">
-      {/* Left: Back button, or spacer when no back but has right action (for centering) */}
+      {/* Left: Back button, left action, or spacer when no back/left but has right action (for centering) */}
       {showBackButton ? (
         <TouchableOpacity
           className="min-w-[48px] min-h-[48px] w-12 h-12 items-center justify-center -ml-1"
@@ -113,6 +160,19 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
           accessibilityRole="button"
         >
           <Ionicons name="arrow-back" size={24} color="#0F172A" />
+        </TouchableOpacity>
+      ) : showLeftAction ? (
+        <TouchableOpacity
+          className="min-w-[48px] min-h-[48px] w-12 h-12 items-center justify-center -ml-1 rounded-[10px]"
+          onPress={leftAction!.onPress}
+          activeOpacity={0.7}
+          accessibilityLabel={
+            leftAction?.accessibilityLabel ??
+            (hasLeftLabel ? leftAction?.label : (hasLeftIcon ? 'Action button' : undefined))
+          }
+          accessibilityRole="button"
+        >
+          {renderLeftActionContent()}
         </TouchableOpacity>
       ) : showRightAction ? (
         <View className="min-w-[48px] w-12" />
@@ -131,16 +191,16 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
       {showRightAction ? (
         <TouchableOpacity
           className={`min-w-[48px] h-12 items-center justify-center rounded-[10px] ${
-            isLoading ? 'opacity-50' : ''
+            rightLoading ? 'opacity-50' : ''
           }`}
           activeOpacity={0.7}
           onPress={rightAction.onPress}
-          disabled={isLoading}
-          accessibilityLabel={getAccessibilityLabel()}
+          disabled={rightLoading}
+          accessibilityLabel={getRightAccessibilityLabel()}
           accessibilityRole="button"
-          accessibilityState={{ disabled: isLoading, busy: isLoading }}
+          accessibilityState={{ disabled: rightLoading, busy: rightLoading }}
         >
-          {renderActionContent()}
+          {renderRightActionContent()}
         </TouchableOpacity>
       ) : showBackButton ? (
         <View className="min-w-[48px] w-12" />

@@ -4,6 +4,8 @@ import {
   DashboardScreen,
   ActivityLogScreen,
   MyActivityScreen,
+  ProfileScreen,
+  UsersScreen,
 } from '../screens';
 import { useAppSelector } from '../store/hooks';
 import { selectIsAdmin } from '../store/selectors/authSelectors';
@@ -46,6 +48,24 @@ export const DashboardStackNavigator: React.FC = () => {
           gestureEnabled: true,
         }}
       />
+      <Stack.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          presentation: 'card',
+          gestureEnabled: true,
+        }}
+      />
+      {isAdmin && (
+        <Stack.Screen
+          name="Users"
+          component={UsersScreen}
+          options={{
+            presentation: 'card',
+            gestureEnabled: true,
+          }}
+        />
+      )}
     </Stack.Navigator>
   );
 };

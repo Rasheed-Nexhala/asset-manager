@@ -38,16 +38,17 @@ export const MyActivityScreen: React.FC = () => {
   const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
 
-  // Subscribe to real-time activity on mount
+  // Subscribe to real-time activity on mount.
+  // Only unsubscribe if we actually subscribed (userId was truthy) to avoid ref-count desync
+  // when Screen unmounts without having subscribed (e.g. userId was null during auth loading).
   useEffect(() => {
     if (userId) {
       dispatch(subscribeToMyRecentActivityRealtime(userId));
+      return () => {
+        dispatch(unsubscribeFromMyRecentActivity());
+      };
     }
-
-    // Cleanup: unsubscribe on unmount
-    return () => {
-      dispatch(unsubscribeFromMyRecentActivity());
-    };
+    return undefined;
   }, [dispatch, userId]);
 
   // Refresh handler (resubscribe to force refresh)
@@ -68,6 +69,23 @@ export const MyActivityScreen: React.FC = () => {
     setSelectedLog(log);
     setDetailModalVisible(true);
   }, []);
+
+  // Full-screen initial loader: show when loading and no data yet (prevents page flash)
+  if (loading && recentActivity.length === 0) {
+    return (
+      <ScreenLayout edges={['top']}>
+        <ScreenHeader title="My Recent Activity" />
+        <View
+          className="flex-1 items-center justify-center px-4"
+          accessibilityLabel="Loading recent activity"
+          accessibilityState={{ busy: true }}
+        >
+          <ActivityIndicator size="large" color="#1E40AF" />
+          <Text className="text-[15px] text-[#64748B] mt-4">Loading...</Text>
+        </View>
+      </ScreenLayout>
+    );
+  }
 
   return (
     <ScreenLayout edges={['top']}>

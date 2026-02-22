@@ -139,7 +139,11 @@ export const OtherSiteInventoryScreen: React.FC = () => {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader title="Loading..." showBack onBackPress={handleBack} />
-        <View className="flex-1 items-center justify-center">
+        <View
+          className="flex-1 items-center justify-center px-4"
+          accessibilityLabel="Loading site inventory"
+          accessibilityState={{ busy: true }}
+        >
           <ActivityIndicator size="large" color="#1E40AF" />
           <Text className="text-[15px] text-[#64748B] mt-4">
             Loading site inventory...

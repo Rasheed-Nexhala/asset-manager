@@ -5,4 +5,6 @@ export type DashboardStackParamList = {
   DashboardHome: undefined;
   ActivityLog: undefined;
   MyActivity: undefined;
+  Profile: undefined;
+  Users: undefined;
 };

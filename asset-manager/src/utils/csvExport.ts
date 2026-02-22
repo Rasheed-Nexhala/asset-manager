@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
 /**
@@ -14,7 +14,11 @@ export async function saveCsvAndShare(
   try {
     const timestamp = new Date().toISOString().split('T')[0];
     const fullFilename = `${filename}-${timestamp}.csv`;
-    const fileUri = `${FileSystem.documentDirectory}${fullFilename}`;
+    const documentDir = FileSystem.documentDirectory;
+    if (!documentDir) {
+      throw new Error('Document directory is not available');
+    }
+    const fileUri = `${documentDir}${fullFilename}`;
 
     await FileSystem.writeAsStringAsync(fileUri, csvString, {
       encoding: FileSystem.EncodingType.UTF8,

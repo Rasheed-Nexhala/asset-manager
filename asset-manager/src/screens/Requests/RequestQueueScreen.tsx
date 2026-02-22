@@ -16,7 +16,7 @@ import { ScreenHeader } from '../../components/ScreenHeader';
 import { RequestCard } from '../../components/Requests/RequestCard';
 import { requestService } from '../../services/firebase/requestService';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { setRequests } from '../../store/slices/requestsSlice';
+import { setRequests, setLoading } from '../../store/slices/requestsSlice';
 import {
   selectRequestsByPriority,
   selectRequestsLoading,
@@ -79,6 +79,7 @@ export const RequestQueueScreen: React.FC = () => {
   }, [dispatch]);
 
   useEffect(() => {
+    dispatch(setLoading(true));
     const unsubscribe = requestService.subscribeToRequests(
       {
         status: filters.status,
@@ -173,7 +174,11 @@ export const RequestQueueScreen: React.FC = () => {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader title="Request Queue" />
-        <View className="flex-1 items-center justify-center">
+        <View
+          className="flex-1 items-center justify-center px-4"
+          accessibilityLabel="Loading requests"
+          accessibilityState={{ busy: true }}
+        >
           <ActivityIndicator size="large" color="#1E40AF" />
           <Text className="text-[15px] text-[#64748B] mt-4">
             Loading requests...

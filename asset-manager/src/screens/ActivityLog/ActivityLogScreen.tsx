@@ -125,6 +125,23 @@ export const ActivityLogScreen: React.FC = () => {
     (filters.actionCategory && filters.actionCategory !== 'all') ||
     (filters.actionType && filters.actionType !== 'all');
 
+  // Full-screen initial loader: show when loading and no data yet (prevents page flash)
+  if (loading && logs.length === 0) {
+    return (
+      <ScreenLayout edges={['top']}>
+        <ScreenHeader title="Activity Log" />
+        <View
+          className="flex-1 items-center justify-center px-4"
+          accessibilityLabel="Loading activity logs"
+          accessibilityState={{ busy: true }}
+        >
+          <ActivityIndicator size="large" color="#1E40AF" />
+          <Text className="text-[15px] text-[#64748B] mt-4">Loading...</Text>
+        </View>
+      </ScreenLayout>
+    );
+  }
+
   return (
     <ScreenLayout edges={['top']}>
       <ScreenHeader
@@ -204,32 +221,23 @@ export const ActivityLogScreen: React.FC = () => {
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         ListEmptyComponent={
-          loading ? (
-            <View className="items-center justify-center py-12">
-              <ActivityIndicator size="large" color="#1E40AF" />
-              <Text className="text-[15px] text-[#64748B] mt-4">
-                Loading activity logs...
-              </Text>
-            </View>
-          ) : (
-            <View className="items-center justify-center py-12 px-4">
-              <Ionicons
-                name="document-text-outline"
-                size={80}
-                color="#94A3B8"
-              />
-              <Text className="text-[22px] font-semibold text-[#0F172A] text-center mt-4 mb-2">
-                {hasActiveFilters
-                  ? 'No Logs Match Your Filters'
-                  : 'No Activity Logs Yet'}
-              </Text>
-              <Text className="text-[15px] text-[#64748B] text-center">
-                {hasActiveFilters
-                  ? 'Try adjusting your filters to see more results'
-                  : 'Activity will appear here as users interact with the system'}
-              </Text>
-            </View>
-          )
+          <View className="items-center justify-center py-12 px-4">
+            <Ionicons
+              name="document-text-outline"
+              size={80}
+              color="#94A3B8"
+            />
+            <Text className="text-[22px] font-semibold text-[#0F172A] text-center mt-4 mb-2">
+              {hasActiveFilters
+                ? 'No Logs Match Your Filters'
+                : 'No Activity Logs Yet'}
+            </Text>
+            <Text className="text-[15px] text-[#64748B] text-center">
+              {hasActiveFilters
+                ? 'Try adjusting your filters to see more results'
+                : 'Activity will appear here as users interact with the system'}
+            </Text>
+          </View>
         }
         ListFooterComponent={
           loadingMore ? (

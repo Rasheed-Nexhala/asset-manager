@@ -131,7 +131,11 @@ export const SiteManagementScreen: React.FC = () => {
             accessibilityLabel: 'Add new site',
           }}
         />
-        <View className="flex-1 items-center justify-center">
+        <View
+          className="flex-1 items-center justify-center px-4"
+          accessibilityLabel="Loading sites"
+          accessibilityState={{ busy: true }}
+        >
           <ActivityIndicator size="large" color="#1E40AF" />
           <Text className="text-[15px] text-[#64748B] mt-4">Loading sites...</Text>
         </View>

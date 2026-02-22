@@ -1,11 +1,10 @@
-import React, { useCallback } from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
@@ -53,20 +52,18 @@ export default function MyRecentActivityWidget({
   const recentActivity = useAppSelector(selectMyRecentActivitySorted);
   const loading = useAppSelector(selectMyActivityLoading);
 
-  // Subscribe to real-time updates when Dashboard is focused; unsubscribe when it loses focus.
-  // This ensures maintenance and other activity logs auto-update when the user returns to the Dashboard.
-  useFocusEffect(
-    useCallback(() => {
-      if (userId) {
-        dispatch(subscribeToMyRecentActivityRealtime(userId));
-      }
-
-      // Cleanup: unsubscribe when tab/screen loses focus (e.g. user switches to Inventory)
+  // Subscribe when userId is available. useEffect runs when userId changes (e.g. from null
+  // after auth loads), unlike useFocusEffect which only runs on focus. This fixes the case
+  // where userId loads after the Dashboard mounts and we never subscribed.
+  useEffect(() => {
+    if (userId) {
+      dispatch(subscribeToMyRecentActivityRealtime(userId));
       return () => {
         dispatch(unsubscribeFromMyRecentActivity());
       };
-    }, [dispatch, userId])
-  );
+    }
+    return undefined;
+  }, [dispatch, userId]);
 
   if (loading) {
     return (

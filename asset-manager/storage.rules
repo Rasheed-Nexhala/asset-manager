@@ -103,6 +103,25 @@ service firebase.storage {
     }
     
     /**
+     * PO Invoices/Documents Path
+     *
+     * Purpose: Store invoices and documents for purchase order receipts
+     * Path pattern: poInvoices/{poId}/{fileName}
+     *
+     * Access Rules:
+     * - Read/Write: Admin and Store Incharge only
+     * - Allowed types: PDF and images (for invoice photos)
+     */
+    match /poInvoices/{poId}/{fileName} {
+      allow read: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge();
+      allow write: if hasItemImageAccess()
+        && request.resource.size < 5 * 1024 * 1024 // Max 5MB
+        && (request.resource.contentType == 'application/pdf'
+            || request.resource.contentType.matches('image/.*'));
+      allow delete: if hasItemImageAccess();
+    }
+    
+    /**
      * Default rule: Deny all other paths
      * Add additional paths above this rule as needed
      */

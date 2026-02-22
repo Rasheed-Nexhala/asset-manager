@@ -32,6 +32,7 @@ let activityLogsUnsubscribe: (() => void) | null = null;
 let myActivityUnsubscribe: (() => void) | null = null;
 let myActivityRefCount = 0;
 let myActivitySubscribedUserId: string | null = null;
+let myActivityTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Fetch activity logs with filters and pagination
@@ -133,6 +134,9 @@ export const exportActivityLogsThunk = createAsyncThunk(
 /** Minimum time (ms) to show loader so users can see it when Firestore returns from cache instantly */
 const MIN_LOADER_DISPLAY_MS = 400;
 
+/** Max time (ms) to wait for subscription callback before treating as failed (prevents infinite loading) */
+const MY_ACTIVITY_SUBSCRIPTION_TIMEOUT_MS = 15_000;
+
 /**
  * Subscribe to real-time activity logs updates
  * Automatically unsubscribes from previous subscription if exists
@@ -188,6 +192,10 @@ export const subscribeToMyRecentActivityRealtime = (userId: string) => {
     }
 
     // Different userId or no subscription: unsubscribe existing, then subscribe
+    if (myActivityTimeoutId) {
+      clearTimeout(myActivityTimeoutId);
+      myActivityTimeoutId = null;
+    }
     if (myActivityUnsubscribe) {
       myActivityUnsubscribe();
       myActivityUnsubscribe = null;
@@ -201,9 +209,22 @@ export const subscribeToMyRecentActivityRealtime = (userId: string) => {
     const startTime = Date.now();
     dispatch(setMyActivityLoading(true));
 
+    // Fallback: if subscription never fires within timeout, clear loading and show error
+    let timeoutFired = false;
+    myActivityTimeoutId = setTimeout(() => {
+      timeoutFired = true;
+      myActivityTimeoutId = null;
+      dispatch(setError('Loading activity timed out. Please try again.'));
+    }, MY_ACTIVITY_SUBSCRIPTION_TIMEOUT_MS);
+
     myActivityUnsubscribe = subscribeToMyRecentActivity(
       userId,
       (logs) => {
+        if (timeoutFired) return;
+        if (myActivityTimeoutId) {
+          clearTimeout(myActivityTimeoutId);
+          myActivityTimeoutId = null;
+        }
         // Firestore onSnapshot fires almost immediately (often from cache).
         // Delay clearing loader so users actually see it.
         const elapsed = Date.now() - startTime;
@@ -216,6 +237,11 @@ export const subscribeToMyRecentActivityRealtime = (userId: string) => {
         }
       },
       (error) => {
+        if (timeoutFired) return;
+        if (myActivityTimeoutId) {
+          clearTimeout(myActivityTimeoutId);
+          myActivityTimeoutId = null;
+        }
         dispatch(setError(error.message ?? 'Failed to subscribe to recent activity'));
       }
     );
@@ -239,12 +265,19 @@ export const unsubscribeFromActivityLogs = () => {
  * Ref-counted: only unsubscribes when ref count hits 0
  */
 export const unsubscribeFromMyRecentActivity = () => {
-  return () => {
+  return (dispatch: AppDispatch) => {
     myActivityRefCount = Math.max(0, myActivityRefCount - 1);
-    if (myActivityRefCount === 0 && myActivityUnsubscribe) {
-      myActivityUnsubscribe();
-      myActivityUnsubscribe = null;
-      myActivitySubscribedUserId = null;
+    if (myActivityRefCount === 0) {
+      if (myActivityTimeoutId) {
+        clearTimeout(myActivityTimeoutId);
+        myActivityTimeoutId = null;
+      }
+      if (myActivityUnsubscribe) {
+        myActivityUnsubscribe();
+        myActivityUnsubscribe = null;
+        myActivitySubscribedUserId = null;
+      }
+      dispatch(setMyActivityLoading(false));
     }
   };
 };

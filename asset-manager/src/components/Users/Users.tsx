@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -34,12 +34,17 @@ interface PendingChanges {
   isActive?: boolean;
 }
 
+interface UsersProps {
+  /** Called when loading state changes; used by parent for full-screen initial loader */
+  onLoadingChange?: (loading: boolean, hasData: boolean) => void;
+}
+
 /**
  * Users — Component for listing and managing users.
  * Accessible to all authenticated users.
  * Changes are saved only when the Save button is clicked.
  */
-export const Users: React.FC = () => {
+export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +54,8 @@ export const Users: React.FC = () => {
   const [selectedUserCurrentRole, setSelectedUserCurrentRole] = useState<UserRole | null>(null);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [pendingChanges, setPendingChanges] = useState<Record<string, PendingChanges>>({});
+  const onLoadingChangeRef = useRef(onLoadingChange);
+  onLoadingChangeRef.current = onLoadingChange;
 
   /**
    * Set up real-time listener for all users
@@ -56,6 +63,7 @@ export const Users: React.FC = () => {
   useEffect(() => {
     setLoading(true);
     setError(null);
+    onLoadingChangeRef.current?.(true, false);
 
     // Subscribe to real-time updates
     const unsubscribe = subscribeToAllUsers((usersList) => {
@@ -63,9 +71,9 @@ export const Users: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
       setError(null);
+      onLoadingChangeRef.current?.(false, usersList.length > 0);
     });
 
-    // Cleanup subscription on unmount
     return () => {
       unsubscribe();
     };

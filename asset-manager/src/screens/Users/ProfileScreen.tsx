@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { View, ScrollView } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { ScreenHeader, ScreenLayout, UserProfile } from '../../components';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { signOutUser } from '../../store/slices/authSlice';
@@ -14,6 +15,7 @@ import {
 } from '../../store/selectors/authSelectors';
 
 export const ProfileScreen: React.FC = () => {
+  const navigation = useNavigation();
   const dispatch = useAppDispatch();
   const isLoading = useAppSelector(selectAuthLoading);
   const displayName = useAppSelector(selectUserDisplayName);
@@ -35,6 +37,8 @@ export const ProfileScreen: React.FC = () => {
     <ScreenLayout edges={['top']}>
       <ScreenHeader
         title="Profile"
+        showBack
+        onBackPress={() => navigation.goBack()}
         rightAction={{
           label: 'Sign out',
           onPress: handleLogout,

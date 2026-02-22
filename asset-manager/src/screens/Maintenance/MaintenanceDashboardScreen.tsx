@@ -14,7 +14,10 @@ import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import MaintenanceCard from '../../components/Maintenance/MaintenanceCard';
 import { subscribeToMaintenance } from '../../services/firebase/maintenanceService';
-import { setMaintenanceRecords } from '../../store/slices/maintenanceSlice';
+import {
+  setMaintenanceRecords,
+  setLoading,
+} from '../../store/slices/maintenanceSlice';
 import {
   selectActiveMaintenanceRecords,
   selectMaintenanceHistory,
@@ -40,9 +43,12 @@ export const MaintenanceDashboardScreen: React.FC = () => {
   const loading = useAppSelector(selectMaintenanceLoading);
   
   const displayedRecords = activeTab === 'active' ? activeRecords : historyRecords;
-  
+  const hasNoData =
+    activeRecords.length === 0 && historyRecords.length === 0;
+
   // Set up real-time subscription
   useEffect(() => {
+    dispatch(setLoading(true));
     const unsubscribe = subscribeToMaintenance((records) => {
       dispatch(setMaintenanceRecords(records));
     });
@@ -72,6 +78,30 @@ export const MaintenanceDashboardScreen: React.FC = () => {
     navigation.navigate('MaintenanceDetail', { maintenanceId: maintenance.id });
   }, [navigation]);
   
+  // Full-screen initial loader: show when loading and no data yet (prevents page flash)
+  if (loading && hasNoData) {
+    return (
+      <ScreenLayout edges={['top']}>
+        <ScreenHeader
+          title="Maintenance"
+          rightAction={{
+            icon: 'add',
+            onPress: handleAddToMaintenance,
+            accessibilityLabel: 'Add to maintenance',
+          }}
+        />
+        <View
+          className="flex-1 items-center justify-center px-4"
+          accessibilityLabel="Loading maintenance records"
+          accessibilityState={{ busy: true }}
+        >
+          <ActivityIndicator size="large" color="#1E40AF" />
+          <Text className="text-[15px] text-[#64748B] mt-4">Loading...</Text>
+        </View>
+      </ScreenLayout>
+    );
+  }
+
   // Render tab button
   const renderTabButton = (tab: TabType, label: string, count: number) => {
     const isActive = activeTab === tab;

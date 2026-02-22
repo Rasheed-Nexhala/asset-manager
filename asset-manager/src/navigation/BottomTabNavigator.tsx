@@ -2,11 +2,11 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { SignedInScreen } from '../screens/Users/SignedInScreen';
 import { DashboardStackNavigator } from './DashboardStackNavigator';
 import { SiteStackNavigator } from './SiteStackNavigator';
 import { InventoryStackNavigator } from './InventoryStackNavigator';
 import { RequestStackNavigator } from './RequestStackNavigator';
+import { PurchaseOrderStackNavigator } from './PurchaseOrderStackNavigator';
 import { useAppSelector } from '../store/hooks';
 import {
   selectIsAdmin,
@@ -14,6 +14,7 @@ import {
   selectIsSiteManager,
 } from '../store/selectors/authSelectors';
 import { selectHighPriorityPendingCount } from '../store/selectors/requestSelectors';
+import { selectPendingApprovalCount } from '../store/selectors/purchaseOrderSelectors';
 
 const Tab = createBottomTabNavigator();
 
@@ -38,6 +39,10 @@ export const BottomTabNavigator: React.FC = () => {
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const isSiteManager = useAppSelector(selectIsSiteManager);
   const highPriorityCount = useAppSelector(selectHighPriorityPendingCount);
+  const pendingApprovalCount = useAppSelector(selectPendingApprovalCount);
+
+  // Purchase Orders tab is visible to Admin and StoreIncharge only
+  const showPurchaseOrdersTab = isAdmin || isStoreIncharge;
 
   // Inventory tab is visible to Admin, StoreIncharge, and SiteManager
   const showInventoryTab = isAdmin || isStoreIncharge || isSiteManager;
@@ -68,16 +73,6 @@ export const BottomTabNavigator: React.FC = () => {
         },
       }}
     >
-      <Tab.Screen
-        name="Users"
-        component={SignedInScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people-outline" size={size} color={color} />
-          ),
-          tabBarLabel: 'Users',
-        }}
-      />
       <Tab.Screen
         name="Dashboard"
         component={DashboardStackNavigator}
@@ -110,6 +105,19 @@ export const BottomTabNavigator: React.FC = () => {
             ),
             tabBarLabel: 'Requests',
             tabBarBadge: highPriorityCount > 0 ? highPriorityCount : undefined,
+          }}
+        />
+      )}
+      {showPurchaseOrdersTab && (
+        <Tab.Screen
+          name="PurchaseOrders"
+          component={PurchaseOrderStackNavigator}
+          options={{
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="receipt-outline" size={size} color={color} />
+            ),
+            tabBarLabel: 'Purchase',
+            tabBarBadge: isAdmin && pendingApprovalCount > 0 ? pendingApprovalCount : undefined,
           }}
         />
       )}

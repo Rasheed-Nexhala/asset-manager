@@ -14,6 +14,12 @@ const ITEM_IMAGES_PATH = 'itemImages';
 const MAINTENANCE_PHOTOS_PATH = 'maintenancePhotos';
 
 /**
+ * Storage path pattern for PO invoice/documents
+ * Format: poInvoices/{poId}/{fileName}
+ */
+const PO_INVOICES_PATH = 'poInvoices';
+
+/**
  * ## Orphaned Image Cleanup
  *
  * To prevent storage costs from accumulating orphaned files:
@@ -39,6 +45,18 @@ const ALLOWED_IMAGE_TYPES = [
 ];
 
 /**
+ * Allowed PO invoice/document MIME types (PDF + images for invoice photos)
+ */
+const ALLOWED_PO_INVOICE_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+];
+
+/**
  * Infer content type from file URI extension.
  * On React Native Android, fetch(localUri) often returns blob.type === '',
  * so we fall back to extension. Defaults to image/jpeg.
@@ -49,7 +67,19 @@ function getContentTypeFromUri(fileUri: string): string {
   if (lower.includes('.webp')) return 'image/webp';
   if (lower.includes('.gif')) return 'image/gif';
   if (lower.includes('.jpg') || lower.includes('.jpeg')) return 'image/jpeg';
+  if (lower.includes('.pdf')) return 'application/pdf';
   return 'image/jpeg';
+}
+
+/**
+ * Resolve content type for PO invoice upload: use blob.type if valid, else infer from URI.
+ * Supports PDF and images.
+ */
+function resolveInvoiceContentType(blob: Blob, fileUri: string): string {
+  if (blob.type && ALLOWED_PO_INVOICE_TYPES.includes(blob.type)) {
+    return blob.type;
+  }
+  return getContentTypeFromUri(fileUri);
 }
 
 /**
@@ -208,6 +238,68 @@ export const uploadMaintenancePhoto = async (
     return { url: downloadURL, fileName: finalFileName };
   } catch (error) {
     console.error('Error uploading maintenance photo:', error);
+    throw error;
+  }
+};
+
+/**
+ * Result of uploading a PO invoice/document
+ */
+export interface POInvoiceUploadResult {
+  url: string;
+  fileName: string;
+}
+
+/**
+ * Upload a PO invoice or document to Firebase Storage
+ *
+ * Supports PDF and images (for invoice photos). Path: poInvoices/{poId}/{fileName}
+ * Max 5MB per file.
+ *
+ * @param fileUri - Local file URI (from document picker or image picker)
+ * @param poId - Purchase Order ID to associate the document with
+ * @param fileName - Optional custom file name. If not provided, generates one from timestamp
+ * @returns Object with download URL and file name for PO document metadata
+ */
+export const uploadPOInvoice = async (
+  fileUri: string,
+  poId: string,
+  fileName?: string
+): Promise<POInvoiceUploadResult> => {
+  try {
+    const response = await fetch(fileUri);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch file: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+
+    if (blob.size > MAX_FILE_SIZE) {
+      throw new Error(
+        `File size (${(blob.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum allowed size (5MB)`
+      );
+    }
+
+    const contentType = resolveInvoiceContentType(blob, fileUri);
+    if (!ALLOWED_PO_INVOICE_TYPES.includes(contentType)) {
+      throw new Error(
+        `File type is not allowed. Allowed types: PDF, images (jpg, png, webp, gif)`
+      );
+    }
+
+    const extension = contentType === 'application/pdf' ? 'pdf' : contentType.split('/')[1] || 'jpg';
+    const finalFileName = fileName || `invoice_${Date.now()}.${extension}`;
+    const storageRef = ref(storage, `${PO_INVOICES_PATH}/${poId}/${finalFileName}`);
+
+    const snapshot = await uploadBytes(storageRef, blob, {
+      contentType,
+    });
+
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    return { url: downloadURL, fileName: finalFileName };
+  } catch (error) {
+    console.error('Error uploading PO invoice:', error);
     throw error;
   }
 };
@@ -405,6 +497,31 @@ export const validateImageFile = (blob: Blob): { isValid: boolean; error?: strin
     return {
       isValid: false,
       error: `File type "${blob.type}" is not allowed. Allowed types: ${ALLOWED_IMAGE_TYPES.join(', ')}`,
+    };
+  }
+
+  return { isValid: true };
+};
+
+/**
+ * Validate PO invoice file before upload
+ *
+ * @param blob - Blob to validate
+ * @returns Object with isValid flag and error message if invalid
+ */
+export const validateInvoiceFile = (blob: Blob): { isValid: boolean; error?: string } => {
+  if (blob.size > MAX_FILE_SIZE) {
+    return {
+      isValid: false,
+      error: `File size (${(blob.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum allowed size (5MB)`,
+    };
+  }
+
+  const allowedTypes = ALLOWED_PO_INVOICE_TYPES;
+  if (blob.type && !allowedTypes.includes(blob.type)) {
+    return {
+      isValid: false,
+      error: `File type "${blob.type}" is not allowed. Allowed types: PDF, images (jpg, png, webp, gif)`,
     };
   }
 

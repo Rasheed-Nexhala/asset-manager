@@ -1,20 +1,41 @@
-import React from 'react';
-import { View, Text } from 'react-native';
-import { ScreenLayout, Users } from '../../components';
+import React, { useState, useCallback } from 'react';
+import { View, ActivityIndicator, Text } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { ScreenHeader, ScreenLayout, Users } from '../../components';
 
 export const UsersScreen: React.FC = () => {
+  const navigation = useNavigation();
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [hasData, setHasData] = useState(false);
+
+  const handleLoadingChange = useCallback((loading: boolean, dataReceived: boolean) => {
+    setInitialLoading(loading);
+    setHasData(dataReceived);
+  }, []);
+
+  const showFullScreenLoader = initialLoading && !hasData;
+
   return (
     <ScreenLayout edges={['top']}>
-      <View className="bg-white border-b border-[#E2E8F0] px-4 py-3">
-        <Text
-          className="text-[22px] font-semibold text-[#0F172A]"
-          accessibilityRole="header"
-        >
-          Users
-        </Text>
-      </View>
+      <ScreenHeader
+        title="Users"
+        showBack
+        onBackPress={() => navigation.goBack()}
+      />
       <View className="flex-1">
-        <Users />
+        {/* Users must always mount to subscribe and trigger onLoadingChange */}
+        <Users onLoadingChange={handleLoadingChange} />
+        {/* Full-screen initial loader overlay: prevents page flash until data loads */}
+        {showFullScreenLoader && (
+          <View
+            className="absolute inset-0 bg-white items-center justify-center"
+            accessibilityLabel="Loading users"
+            accessibilityState={{ busy: true }}
+          >
+            <ActivityIndicator size="large" color="#1E40AF" />
+            <Text className="text-[15px] text-[#64748B] mt-4">Loading...</Text>
+          </View>
+        )}
       </View>
     </ScreenLayout>
   );

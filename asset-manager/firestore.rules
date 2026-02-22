@@ -98,20 +98,28 @@ service cloud.firestore {
     
     /**
      * Purchase Orders collection
-     * Only Admins and Store Incharge can read purchase orders
+     * Admin and Store Incharge can read and write (create, update) purchase orders
      */
     match /purchaseOrders/{poId} {
-      allow read: if isAuthenticated() && isAdminOrStoreIncharge();
-      allow write: if false; // Only via Cloud Functions
+      allow read, create, update: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge();
+      allow delete: if false; // Soft delete via status preferred
     }
     
     /**
      * Vendors collection
-     * Only Admins and Store Incharge can read vendors
+     * Admin and Store Incharge can read and write vendors
      */
     match /vendors/{vendorId} {
-      allow read: if isAuthenticated() && isAdminOrStoreIncharge();
-      allow write: if false; // Only via Cloud Functions
+      allow read, create, update: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge();
+      allow delete: if false; // Preserve vendor history
+    }
+    
+    /**
+     * PO Counters collection
+     * Purpose: Atomic counter for generating unique PO numbers (PO-YYYY-NNNN)
+     */
+    match /poCounters/{counterId} {
+      allow read, write: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge();
     }
     
     // ============================================

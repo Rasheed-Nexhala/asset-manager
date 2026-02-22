@@ -58,7 +58,7 @@ const activityLogSlice = createSlice({
   name: 'activityLog',
   initialState,
   reducers: {
-    setFilters: (state, action: PayloadAction<Partial<ActivityLogFiltersStore & { startDate?: Date | null; endDate?: Date | null }>>) => {
+    setFilters: (state, action: PayloadAction<Partial<Omit<ActivityLogFiltersStore, 'startDate' | 'endDate'> & { startDate?: Date | string | null; endDate?: Date | string | null }>>) => {
       const payload = action.payload;
       const normalized = {
         ...payload,

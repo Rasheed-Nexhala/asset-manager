@@ -6,6 +6,7 @@ import requestsReducer from './slices/requestsSlice';
 import steelMasterReducer from './slices/steelMasterSlice';
 import maintenanceReducer from './slices/maintenanceSlice';
 import activityLogReducer from './slices/activityLogSlice';
+import purchaseOrderReducer from './slices/purchaseOrderSlice';
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     steelMaster: steelMasterReducer,
     maintenance: maintenanceReducer,
     activityLog: activityLogReducer,
+    purchaseOrders: purchaseOrderReducer,
   },
   //Todo: Fix serializableCheck
   middleware: (getDefaultMiddleware) =>
@@ -74,6 +76,16 @@ export const store = configureStore({
           'activityLog/fetchLogs/fulfilled',
           'activityLog/loadMore/fulfilled',
           'activityLog/fetchMyActivity/fulfilled',
+          'activityLog/setFilters',
+          'purchaseOrders/setPurchaseOrders',
+          'purchaseOrders/setSelectedPO',
+          'purchaseOrders/setVendors',
+          'purchaseOrders/addOrUpdatePO',
+          'purchaseOrders/createPO/fulfilled',
+          'purchaseOrders/approvePO/fulfilled',
+          'purchaseOrders/rejectPO/fulfilled',
+          'purchaseOrders/markPOOrdered/fulfilled',
+          'purchaseOrders/receivePO/fulfilled',
         ],
         ignoredPaths: [
           'auth.user',
@@ -91,6 +103,10 @@ export const store = configureStore({
           'activityLog.logs',
           'activityLog.myRecentActivity',
           'activityLog.lastDoc',
+          'activityLog.filters',
+          'purchaseOrders.purchaseOrders',
+          'purchaseOrders.selectedPO',
+          'purchaseOrders.vendors',
         ],
       },
     }),

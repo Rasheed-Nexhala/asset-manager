@@ -1,7 +1,6 @@
 export { AuthFlowScreen } from './Authentication/AuthFlowScreen';
 export { LoginScreen } from './Authentication/LoginScreen';
 export { SignupScreen } from './Authentication/SignupScreen';
-export { SignedInScreen } from './Users/SignedInScreen';
 export { LoadingScreen } from './LoadingScreen';
 export { ProfileScreen } from './Users/ProfileScreen';
 export { UsersScreen } from './Users/UsersScreen';

@@ -11,13 +11,13 @@ export const selectActivityLogState = (state: RootState) =>
 export const selectActivityLogs = (state: RootState) =>
   state.activityLog.logs;
 
-/** My recent activity (raw, may not be sorted) */
+/** My recent activity (raw, may not be sorted) - with safe fallback for circular dependency edge cases */
 export const selectMyRecentActivity = (state: RootState) =>
-  state.activityLog.myRecentActivity;
+  state.activityLog?.myRecentActivity ?? [];
 
 /** My recent activity sorted by timestamp descending (newest first) */
 export const selectMyRecentActivitySorted = createSelector(
-  [selectMyRecentActivity],
+  [(state: RootState) => state.activityLog?.myRecentActivity ?? []],
   (logs) =>
     [...logs].sort(
       (a, b) =>
