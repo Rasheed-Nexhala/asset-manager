@@ -26,7 +26,10 @@ import {
   selectPurchaseOrderLoading,
   selectPurchaseOrderFilters,
 } from '../../store/selectors/purchaseOrderSelectors';
-import { selectIsAdmin } from '../../store/selectors/authSelectors';
+import {
+  selectIsStoreIncharge,
+  selectIsAdmin,
+} from '../../store/selectors/authSelectors';
 import type { PurchaseOrder } from '../../types/purchaseOrder';
 import type { PurchaseOrderStackParamList } from '../../navigation/PurchaseOrderStackParamList';
 
@@ -39,42 +42,56 @@ export const PurchaseOrderListScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const dispatch = useAppDispatch();
   const [refreshing, setRefreshing] = useState(false);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+  const [retryTrigger, setRetryTrigger] = useState(0);
 
   const orders = useAppSelector(selectFilteredPurchaseOrders);
   const isLoading = useAppSelector(selectPurchaseOrderLoading);
   const filters = useAppSelector(selectPurchaseOrderFilters);
+  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const isAdmin = useAppSelector(selectIsAdmin);
 
   useEffect(() => {
     dispatch(setLoading(true));
+    setSubscriptionError(null);
     const unsubscribe = subscribeToPurchaseOrders(
-      (poList) => {
-        dispatch(setPurchaseOrders(poList));
+      (poList, error) => {
+        if (error) {
+          setSubscriptionError(error.message ?? 'Failed to load purchase orders');
+          dispatch(setPurchaseOrders([]));
+        } else {
+          setSubscriptionError(null);
+          dispatch(setPurchaseOrders(poList));
+        }
       },
       filters.status !== 'all' ? filters.status : undefined
     );
     return unsubscribe;
-  }, [dispatch, filters.status]);
+  }, [dispatch, filters.status, retryTrigger]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
+    setRetryTrigger((t) => t + 1);
     setTimeout(() => setRefreshing(false), 800);
   }, []);
 
   const handlePOPress = useCallback(
     (po: PurchaseOrder) => {
-      if (po.status === 'pending_approval' && isAdmin) {
-        navigation.navigate('ApprovePO', { poId: po.id });
-      } else if (
-        (po.status === 'approved' || po.status === 'ordered') &&
-        !['received', 'rejected'].includes(po.status)
-      ) {
+      if (po.status === 'pending_approval') {
+        if (isAdmin) {
+          navigation.navigate('ApprovePO', { poId: po.id });
+        } else {
+          navigation.navigate('CreatePO', { poId: po.id });
+        }
+      } else if (po.status === 'approved' || po.status === 'ordered') {
         navigation.navigate('ReceivePO', { poId: po.id });
+      } else if (isStoreIncharge && (po.status === 'received' || po.status === 'rejected')) {
+        navigation.navigate('ApprovePO', { poId: po.id });
       } else {
         navigation.navigate('CreatePO', { poId: po.id });
       }
     },
-    [navigation, isAdmin]
+    [navigation, isStoreIncharge, isAdmin]
   );
 
   const renderFilterChip = useCallback(
@@ -152,6 +169,20 @@ export const PurchaseOrderListScreen: React.FC = () => {
         }}
       />
 
+      {subscriptionError && (
+        <View className="bg-[#DC2626]/15 px-4 py-3 border-b border-[#DC2626]/30 flex-row items-center justify-between">
+          <Text className="text-[14px] text-[#DC2626] flex-1">
+            {subscriptionError}
+          </Text>
+          <TouchableOpacity
+            onPress={() => setRetryTrigger((t) => t + 1)}
+            className="ml-2 px-3 py-1.5 bg-[#DC2626] rounded-lg"
+          >
+            <Text className="text-[13px] font-medium text-white">Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View className="bg-white border-b border-[#E2E8F0] px-4 py-3">
         <ScrollView
           horizontal
@@ -177,16 +208,24 @@ export const PurchaseOrderListScreen: React.FC = () => {
 
       {orders.length === 0 ? (
         <View className="flex-1 items-center justify-center px-4">
-          <Ionicons name="receipt-outline" size={80} color="#64748B" />
+          <Ionicons
+            name={subscriptionError ? 'cloud-offline-outline' : 'receipt-outline'}
+            size={80}
+            color="#64748B"
+          />
           <Text className="text-[22px] font-semibold text-[#0F172A] text-center mb-2 mt-4">
-            No Purchase Orders
+            {subscriptionError
+              ? 'Could not load purchase orders'
+              : 'No Purchase Orders'}
           </Text>
           <Text className="text-[15px] text-[#64748B] text-center mb-6">
-            {filters.status !== 'all'
-              ? 'Try adjusting your filters to see more orders.'
-              : 'Create your first purchase order to get started.'}
+            {subscriptionError
+              ? 'Check your connection and tap Retry above.'
+              : filters.status !== 'all'
+                ? 'Try adjusting your filters to see more orders.'
+                : 'Create your first purchase order to get started.'}
           </Text>
-          {filters.status === 'all' && (
+          {(filters.status === 'all' || subscriptionError) && (
             <TouchableOpacity
               onPress={() => navigation.navigate('CreatePO', {})}
               className="bg-[#1E40AF] rounded-[10px] h-[50px] px-6 items-center justify-center"

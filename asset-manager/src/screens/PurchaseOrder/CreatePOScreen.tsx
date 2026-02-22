@@ -19,11 +19,12 @@ import {
   POItemCard,
   POItemSelectorModal,
 } from '../../components/PurchaseOrder';
-import { createPO } from '../../store/thunks/purchaseOrderThunks';
+import { createPO, updatePO } from '../../store/thunks/purchaseOrderThunks';
 import {
   subscribeToVendors,
   createVendor,
 } from '../../services/firebase/vendorService';
+import { getPOById } from '../../services/firebase/purchaseOrderService';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { setVendors } from '../../store/slices/purchaseOrderSlice';
@@ -31,8 +32,15 @@ import {
   selectUserId,
   selectUserDisplayName,
 } from '../../store/selectors/authSelectors';
-import { selectVendors } from '../../store/selectors/purchaseOrderSelectors';
-import type { CreatePurchaseOrderData, PurchaseOrderItem } from '../../types/purchaseOrder';
+import {
+  selectVendors,
+  selectPOById,
+} from '../../store/selectors/purchaseOrderSelectors';
+import type {
+  CreatePurchaseOrderData,
+  PurchaseOrder,
+  PurchaseOrderItem,
+} from '../../types/purchaseOrder';
 import type { Item } from '../../types/inventory';
 import type { Vendor } from '../../types/vendor';
 import type { PurchaseOrderStackParamList } from '../../navigation/PurchaseOrderStackParamList';
@@ -53,6 +61,9 @@ export const CreatePOScreen: React.FC = () => {
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
   const vendors = useAppSelector(selectVendors);
+  const poFromStore = useAppSelector((state) =>
+    poId ? selectPOById(poId)(state) : null
+  );
 
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
   const [vendorName, setVendorName] = useState('');
@@ -68,6 +79,12 @@ export const CreatePOScreen: React.FC = () => {
   const [itemSelectorVisible, setItemSelectorVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDraft, setIsDraft] = useState(false);
+  const [isLoadingPO, setIsLoadingPO] = useState(false);
+  const [loadPOError, setLoadPOError] = useState<string | null>(null);
+  const [loadPORetryTrigger, setLoadPORetryTrigger] = useState(0);
+  const [editingPOStatus, setEditingPOStatus] = useState<
+    'draft' | 'rejected' | null
+  >(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -90,6 +107,50 @@ export const CreatePOScreen: React.FC = () => {
       }
     }
   }, [selectedVendorId, vendors]);
+
+  useEffect(() => {
+    if (!poId) {
+      setEditingPOStatus(null);
+      return;
+    }
+
+    const loadPO = (po: PurchaseOrder) => {
+      setSelectedVendorId(po.vendorId);
+      setVendorName(po.vendorName);
+      setVendorContact(po.vendorContact);
+      setVendorEmail(po.vendorEmail ?? '');
+      setVendorAddress(po.vendorAddress ?? '');
+      setItems(po.items);
+      setJustification(po.justification);
+      setExpectedDeliveryDate(
+        po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate) : null
+      );
+      setEditingPOStatus(po.status === 'draft' ? 'draft' : 'rejected');
+    };
+
+    if (poFromStore) {
+      loadPO(poFromStore);
+      return;
+    }
+
+    setIsLoadingPO(true);
+    setLoadPOError(null);
+    getPOById(poId)
+      .then((po) => {
+        if (po) {
+          loadPO(po);
+          setLoadPOError(null);
+        } else {
+          setLoadPOError('Purchase order not found');
+        }
+      })
+      .catch((err: unknown) => {
+        setLoadPOError(
+          err instanceof Error ? err.message : 'Failed to load purchase order'
+        );
+      })
+      .finally(() => setIsLoadingPO(false));
+  }, [poId, poFromStore?.id, loadPORetryTrigger]);
 
   const subtotal = items.reduce((s, i) => s + i.amount, 0);
   const gstAmount = Math.round((subtotal * GST_PERCENTAGE) / 100);
@@ -186,6 +247,8 @@ export const CreatePOScreen: React.FC = () => {
       setIsSubmitting(true);
       setIsDraft(asDraft);
 
+      let vendorCreatedThisAttempt = false;
+
       try {
         if (!vendorId) {
           vendorId = await createVendor({
@@ -196,6 +259,7 @@ export const CreatePOScreen: React.FC = () => {
             address: vendorAddress.trim() || undefined,
             category: 'other',
           });
+          vendorCreatedThisAttempt = true;
         }
 
         const data: CreatePurchaseOrderData = {
@@ -218,7 +282,15 @@ export const CreatePOScreen: React.FC = () => {
             : null,
         };
 
-        await dispatch(createPO({ data, userId, userName, isDraft: asDraft })).unwrap();
+        if (poId && editingPOStatus === 'draft') {
+          await dispatch(
+            updatePO({ poId, data, isDraft: asDraft })
+          ).unwrap();
+        } else {
+          await dispatch(
+            createPO({ data, userId, userName, isDraft: asDraft })
+          ).unwrap();
+        }
         Alert.alert(
           'Success',
           asDraft ? 'Draft saved.' : 'Purchase order submitted for approval.',
@@ -226,7 +298,16 @@ export const CreatePOScreen: React.FC = () => {
         );
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Failed to save';
-        Alert.alert('Error', msg);
+        if (vendorCreatedThisAttempt) {
+          setSelectedVendorId(vendorId);
+          Alert.alert(
+            'Vendor Saved',
+            'The vendor was saved, but the purchase order could not be created. Please try again. The vendor has been pre-selected.',
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert('Error', msg);
+        }
       } finally {
         setIsSubmitting(false);
       }
@@ -243,12 +324,64 @@ export const CreatePOScreen: React.FC = () => {
       items,
       justification,
       expectedDeliveryDate,
+      poId,
+      editingPOStatus,
       dispatch,
       navigation,
     ]
   );
 
   const handleBack = useCallback(() => navigation.goBack(), [navigation]);
+
+  if (poId && (isLoadingPO || loadPOError)) {
+    return (
+      <ScreenLayout edges={['top']}>
+        <ScreenHeader
+          title="Edit Purchase Order"
+          showBack
+          onBackPress={handleBack}
+        />
+        <View className="flex-1 items-center justify-center px-4">
+          {isLoadingPO ? (
+            <>
+              <ActivityIndicator size="large" color="#1E40AF" />
+              <Text className="text-[15px] text-[#64748B] mt-4">
+                Loading purchase order...
+              </Text>
+            </>
+          ) : (
+            <>
+              <Ionicons name="alert-circle-outline" size={64} color="#DC2626" />
+              <Text className="text-[17px] font-semibold text-[#0F172A] text-center mt-4 mb-2">
+                Could not load purchase order
+              </Text>
+              <Text className="text-[15px] text-[#64748B] text-center mb-6">
+                {loadPOError}
+              </Text>
+              <View className="flex-row gap-3">
+                <TouchableOpacity
+                  onPress={handleBack}
+                  className="px-6 py-3 border border-[#E2E8F0] rounded-[10px]"
+                >
+                  <Text className="text-[15px] font-medium text-[#64748B]">
+                    Go Back
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setLoadPORetryTrigger((t) => t + 1)}
+                  className="px-6 py-3 bg-[#1E40AF] rounded-[10px]"
+                >
+                  <Text className="text-[15px] font-medium text-white">
+                    Retry
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
+      </ScreenLayout>
+    );
+  }
 
   return (
     <ScreenLayout edges={['top']}>

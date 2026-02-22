@@ -179,7 +179,7 @@ export const incrementVendorPoCount = async (
     });
   } catch (error) {
     console.error('Error incrementing vendor PO count:', error);
-    throw error;
+    // Do not throw - vendor may have been deleted; PO is source of truth
   }
 };
 
@@ -200,7 +200,7 @@ export const updateVendorLastPoDate = async (
     });
   } catch (error) {
     console.error('Error updating vendor lastPoDate:', error);
-    throw error;
+    // Do not throw - vendor may have been deleted; PO is source of truth
   }
 };
 

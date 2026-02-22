@@ -645,6 +645,197 @@ export const onMaintenanceUpdated = onDocumentUpdated(
 );
 
 /**
+ * Firestore Trigger: Log Purchase Order Creation
+ */
+export const onPurchaseOrderCreated = onDocumentCreated(
+  'purchaseOrders/{poId}',
+  async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) {
+      logger.warn('onPurchaseOrderCreated: No data associated with the event');
+      return;
+    }
+
+    const po = snapshot.data();
+    const poId = event.params.poId;
+    const itemsCount = Array.isArray(po.items) ? po.items.length : 0;
+
+    await createActivityLog({
+      userId: po.createdBy ?? 'system',
+      userName: po.createdByName ?? 'System',
+      userRole: (po.createdByRole as string) ?? 'Admin',
+      actionType: 'po_created',
+      actionCategory: 'purchase_orders',
+      targetType: 'purchase_order',
+      targetId: poId,
+      targetDisplay: po.poNumber ?? `PO-${poId}`,
+      summary: `Created PO: ${po.poNumber ?? poId}`,
+      details: `PO for ${po.vendorName ?? 'vendor'}, ${itemsCount} items, ₹${po.totalAmount ?? 0}`,
+      changes: [],
+    });
+  }
+);
+
+/**
+ * Firestore Trigger: Log Purchase Order Updates (status changes)
+ */
+export const onPurchaseOrderUpdated = onDocumentUpdated(
+  'purchaseOrders/{poId}',
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    if (!before || !after) {
+      return;
+    }
+
+    if (before.status === after.status) {
+      return;
+    }
+
+    const statusActionMap: Record<string, string> = {
+      approved: 'po_approved',
+      rejected: 'po_rejected',
+      ordered: 'po_ordered',
+      received: 'po_received',
+    };
+    const actionType = statusActionMap[after.status];
+    if (!actionType) {
+      return;
+    }
+
+    const poId = event.params.poId;
+    const targetDisplay = after.poNumber ?? poId;
+
+    let userId: string;
+    let userName: string;
+    let userRole: string;
+    let summary: string;
+
+    if (after.status === 'received') {
+      userId = after.receivedBy ?? 'system';
+      userName = after.receivedByName ?? 'System';
+      userRole = 'StoreIncharge';
+      summary = `Received PO: ${targetDisplay}`;
+    } else if (after.status === 'approved') {
+      userId = after.reviewedBy ?? after.createdBy ?? 'system';
+      userName = after.reviewedByName ?? after.createdByName ?? 'System';
+      userRole = 'Admin';
+      summary = `Approved PO: ${targetDisplay}`;
+    } else if (after.status === 'rejected') {
+      userId = after.reviewedBy ?? after.createdBy ?? 'system';
+      userName = after.reviewedByName ?? after.createdByName ?? 'System';
+      userRole = 'Admin';
+      summary = `Rejected PO: ${targetDisplay}`;
+    } else {
+      userId = after.createdBy ?? 'system';
+      userName = after.createdByName ?? 'System';
+      userRole = 'Admin';
+      summary = `Marked PO as ordered: ${targetDisplay}`;
+    }
+
+    await createActivityLog({
+      userId,
+      userName,
+      userRole,
+      actionType,
+      actionCategory: 'purchase_orders',
+      targetType: 'purchase_order',
+      targetId: poId,
+      targetDisplay,
+      summary,
+      details: after.rejectionReason ?? after.adminComments ?? '',
+      changes: [
+        {
+          field: 'status',
+          fieldLabel: 'Status',
+          oldValue: before.status,
+          newValue: after.status,
+        },
+      ],
+    });
+  }
+);
+
+/**
+ * Firestore Trigger: Log Vendor Creation
+ */
+export const onVendorCreated = onDocumentCreated(
+  'vendors/{vendorId}',
+  async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) {
+      logger.warn('onVendorCreated: No data associated with the event');
+      return;
+    }
+
+    const vendor = snapshot.data();
+    const vendorId = event.params.vendorId;
+
+    await createActivityLog({
+      userId: 'system',
+      userName: 'System',
+      userRole: 'Admin',
+      actionType: 'vendor_created',
+      actionCategory: 'vendors',
+      targetType: 'vendor',
+      targetId: vendorId,
+      targetDisplay: vendor.name ?? vendorId,
+      summary: `Created vendor: ${vendor.name ?? vendorId}`,
+      details: `${vendor.category ?? ''}, ${vendor.contactPerson ?? ''}`.trim() || 'New vendor added',
+      changes: [],
+    });
+  }
+);
+
+/**
+ * Firestore Trigger: Log Vendor Updates
+ * Only logs when user-editable fields change (excludes poCount, lastPoDate, updatedAt)
+ */
+export const onVendorUpdated = onDocumentUpdated(
+  'vendors/{vendorId}',
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    if (!before || !after) {
+      return;
+    }
+
+    const vendorId = event.params.vendorId;
+    const userEditableFields = ['name', 'contactPerson', 'phone', 'email', 'address', 'gstin', 'category', 'status'];
+    const changes: Array<{ field: string; fieldLabel: string; oldValue: unknown; newValue: unknown }> = [];
+
+    for (const field of userEditableFields) {
+      if (JSON.stringify(before[field]) !== JSON.stringify(after[field])) {
+        changes.push({
+          field,
+          fieldLabel: field.charAt(0).toUpperCase() + field.slice(1),
+          oldValue: before[field],
+          newValue: after[field],
+        });
+      }
+    }
+
+    if (changes.length === 0) {
+      return;
+    }
+
+    await createActivityLog({
+      userId: 'system',
+      userName: 'System',
+      userRole: 'Admin',
+      actionType: 'vendor_updated',
+      actionCategory: 'vendors',
+      targetType: 'vendor',
+      targetId: vendorId,
+      targetDisplay: after.name ?? vendorId,
+      summary: `Updated vendor: ${after.name ?? vendorId}`,
+      details: `Modified ${changes.length} field(s)`,
+      changes,
+    });
+  }
+);
+
+/**
  * Callable Function: Log Authentication Event
  * Called from client on login/logout/login_failed - does not block auth on failure
  * login_failed does not require auth (user failed to authenticate)
@@ -747,6 +938,94 @@ export const logPasswordChanged = onCall(async (request) => {
     changes: [],
     deviceInfo: request.data?.deviceInfo ?? undefined,
     appVersion: request.data?.appVersion ?? undefined,
+  });
+
+  return { success: true };
+});
+
+/**
+ * Callable Function: Log Quantity Adjustment
+ * Called from client after successful manual inventory adjustment
+ */
+export const logQuantityAdjusted = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError(
+      'unauthenticated',
+      'User must be authenticated to log quantity adjustment'
+    );
+  }
+
+  const data = request.data ?? {};
+  const {
+    itemId,
+    itemName,
+    itemSku,
+    locationId,
+    locationName,
+    type,
+    quantity,
+    reason,
+    notes,
+    oldQuantity,
+    newQuantity,
+    userName,
+    userRole,
+  } = data;
+
+  if (
+    !itemId ||
+    itemName == null ||
+    itemSku == null ||
+    !locationId ||
+    !locationName ||
+    !type ||
+    quantity == null ||
+    reason == null ||
+    notes == null ||
+    oldQuantity == null ||
+    newQuantity == null
+  ) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Missing required fields: itemId, itemName, itemSku, locationId, locationName, type, quantity, reason, notes, oldQuantity, newQuantity'
+    );
+  }
+
+  if (type !== 'add' && type !== 'remove') {
+    throw new HttpsError(
+      'invalid-argument',
+      'type must be "add" or "remove"'
+    );
+  }
+
+  const displayName =
+    request.auth.token.name ??
+    request.auth.token.email ??
+    'Unknown';
+
+  const sign = type === 'add' ? '+' : '-';
+  const summary = `Adjusted quantity: ${oldQuantity}→${newQuantity} (${sign}${quantity})`;
+  const details = `${reason}${notes ? `. ${notes}` : ''}`;
+
+  await createActivityLog({
+    userId: request.auth.uid,
+    userName: (userName as string) ?? displayName,
+    userRole: (userRole as string) ?? 'Unassigned',
+    actionType: 'quantity_adjusted',
+    actionCategory: 'inventory',
+    targetType: 'item',
+    targetId: itemId,
+    targetDisplay: `${itemName} (${itemSku})`,
+    summary,
+    details,
+    changes: [
+      {
+        field: 'quantity',
+        fieldLabel: 'Quantity',
+        oldValue: oldQuantity,
+        newValue: newQuantity,
+      },
+    ],
   });
 
   return { success: true };

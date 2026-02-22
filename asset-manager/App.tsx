@@ -9,12 +9,7 @@ import { useAuthStateSync } from './src/hooks/useAuthStateSync';
 import { useUserRoleSync } from './src/hooks/useUserRoleSync';
 import { useManagerValidationSync } from './src/hooks/useManagerValidationSync';
 import { useAppSelector } from './src/store/hooks';
-import { 
-  selectUserId, 
-  selectIsAuthenticated, 
-  selectIsAdmin, 
-  selectIsRoleLoaded 
-} from './src/store/selectors/authSelectors';
+import { selectUserId } from './src/store/selectors/authSelectors';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { WeightViewPreferenceProvider } from './src/hooks/useWeightViewPreference';
 

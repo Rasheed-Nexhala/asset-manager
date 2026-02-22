@@ -473,7 +473,7 @@ const MAX_TRANSACTION_RETRIES = 3;
 
 export const adjustQuantity = async (
   adjustmentData: AdjustmentData
-): Promise<void> => {
+): Promise<{ oldQuantity: number; newQuantity: number }> => {
   const user = auth.currentUser;
   if (!user) {
     throw new Error('User must be authenticated to adjust inventory');
@@ -490,7 +490,7 @@ export const adjustQuantity = async (
   let lastError: unknown;
   for (let attempt = 1; attempt <= MAX_TRANSACTION_RETRIES; attempt++) {
     try {
-      await runTransaction(db, async (transaction) => {
+      const result = await runTransaction(db, async (transaction) => {
       // Read inventory within transaction (atomic with writes)
       // Note: transaction.get() supports Query at runtime; type assertion needed for TS
       const inventorySnapshot = (await (
@@ -573,8 +573,9 @@ export const adjustQuantity = async (
       updatedTotals.updatedAt = serverTimestamp();
 
       transaction.update(itemRef, updatedTotals);
-    });
-      return;
+        return { oldQuantity: currentQuantity, newQuantity };
+      });
+      return result;
     } catch (error) {
       lastError = error;
       const isRetryable =

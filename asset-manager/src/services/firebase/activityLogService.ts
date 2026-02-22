@@ -13,7 +13,8 @@ import {
   QueryDocumentSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
-import { db } from '../../../config/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../../../config/firebase';
 import type {
   ActivityLog,
   ActivityLogFirestore,
@@ -378,5 +379,64 @@ export function subscribeToMyRecentActivity(
     onError(new Error(err.message ?? 'Failed to subscribe to recent activity'));
     // Return no-op unsubscribe
     return () => {};
+  }
+}
+
+/**
+ * Payload for logQuantityAdjusted callable
+ */
+export interface LogQuantityAdjustedPayload {
+  itemId: string;
+  itemName: string;
+  itemSku: string;
+  locationId: string;
+  locationName: string;
+  type: 'add' | 'remove';
+  quantity: number;
+  reason: string;
+  notes: string;
+  oldQuantity: number;
+  newQuantity: number;
+  userName?: string;
+  userRole?: string;
+}
+
+/**
+ * Log quantity adjustment via Cloud Function (callable)
+ * Uses try-catch to not block the main operation on logging failure
+ */
+export async function logQuantityAdjustedToCloud(
+  payload: LogQuantityAdjustedPayload
+): Promise<void> {
+  try {
+    const logQuantityAdjustedFn = httpsCallable<
+      LogQuantityAdjustedPayload,
+      { success: boolean }
+    >(functions, 'logQuantityAdjusted');
+    await logQuantityAdjustedFn(payload);
+  } catch (error: unknown) {
+    const code = (error as { code?: string })?.code ?? '';
+    const message = (error as { message?: string })?.message ?? String(error);
+    if (
+      code === 'functions/not-found' ||
+      code === 'functions/unavailable' ||
+      message.includes('not-found')
+    ) {
+      if (__DEV__) {
+        console.info(
+          'Activity log (logQuantityAdjusted) unavailable. Deploy Cloud Functions to enable quantity adjustment logging.'
+        );
+      }
+      return;
+    }
+    if (code === 'unauthenticated' || message.includes('unauthenticated')) {
+      if (__DEV__) {
+        console.info(
+          'Activity log (logQuantityAdjusted): request was unauthenticated; event not logged.'
+        );
+      }
+      return;
+    }
+    console.error('Failed to log quantity adjustment:', error);
   }
 }

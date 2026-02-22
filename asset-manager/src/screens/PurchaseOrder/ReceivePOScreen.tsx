@@ -48,6 +48,8 @@ export const ReceivePOScreen: React.FC = () => {
 
   const [po, setPo] = useState<PurchaseOrder | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryTrigger, setRetryTrigger] = useState(0);
   const [saving, setSaving] = useState(false);
   const [receivedQuantities, setReceivedQuantities] = useState<Record<string, number>>({});
   const [invoiceFile, setInvoiceFile] = useState<{ fileName: string; fileUrl: string } | null>(null);
@@ -61,6 +63,7 @@ export const ReceivePOScreen: React.FC = () => {
   }, [dispatch]);
 
   useEffect(() => {
+    setLoadError(null);
     getPOById(poId)
       .then((p) => {
         if (p) {
@@ -70,16 +73,31 @@ export const ReceivePOScreen: React.FC = () => {
             initial[i.itemId] = i.quantity;
           });
           setReceivedQuantities(initial);
+          setLoadError(null);
+        } else {
+          setLoadError('Purchase order not found');
         }
       })
+      .catch((err: unknown) => {
+        setPo(null);
+        setLoadError(
+          err instanceof Error ? err.message : 'Failed to load purchase order'
+        );
+      })
       .finally(() => setLoading(false));
-  }, [poId]);
+  }, [poId, retryTrigger]);
 
   const handleBack = useCallback(() => navigation.goBack(), [navigation]);
 
-  const handleQuantityChange = useCallback((itemId: string, qty: number) => {
-    setReceivedQuantities((prev) => ({ ...prev, [itemId]: Math.max(0, qty) }));
-  }, []);
+  const handleQuantityChange = useCallback(
+    (itemId: string, qty: number) => {
+      const item = po?.items.find((i) => i.itemId === itemId);
+      const maxQty = item?.quantity ?? 0;
+      const clamped = Math.min(maxQty, Math.max(0, qty));
+      setReceivedQuantities((prev) => ({ ...prev, [itemId]: clamped }));
+    },
+    [po?.items]
+  );
 
   const handleUploadInvoice = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -110,10 +128,22 @@ export const ReceivePOScreen: React.FC = () => {
     }
   }, [poId]);
 
+  const hasAtLeastOneReceived =
+    po?.items.some(
+      (item) => (receivedQuantities[item.itemId] ?? 0) > 0
+    ) ?? false;
+
   const handleConfirm = useCallback(async () => {
     if (!po || !userId || !userName) return;
     if (!invoiceFile) {
       Alert.alert('Error', 'Invoice/Bill attachment is required.');
+      return;
+    }
+    if (!hasAtLeastOneReceived) {
+      Alert.alert(
+        'Error',
+        'At least one item must have a received quantity greater than zero.'
+      );
       return;
     }
 
@@ -154,6 +184,7 @@ export const ReceivePOScreen: React.FC = () => {
     invoiceFile,
     receivedDate,
     receivedNotes,
+    hasAtLeastOneReceived,
     dispatch,
     navigation,
   ]);
@@ -176,11 +207,50 @@ export const ReceivePOScreen: React.FC = () => {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader title="Receive PO" showBack onBackPress={handleBack} />
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#1E40AF" />
-          <Text className="text-[15px] text-[#64748B] mt-4">
-            Loading purchase order...
-          </Text>
+        <View className="flex-1 items-center justify-center px-4">
+          {loading ? (
+            <>
+              <ActivityIndicator size="large" color="#1E40AF" />
+              <Text className="text-[15px] text-[#64748B] mt-4">
+                Loading purchase order...
+              </Text>
+            </>
+          ) : loadError ? (
+            <>
+              <Ionicons name="alert-circle-outline" size={64} color="#DC2626" />
+              <Text className="text-[17px] font-semibold text-[#0F172A] text-center mt-4 mb-2">
+                Could not load purchase order
+              </Text>
+              <Text className="text-[15px] text-[#64748B] text-center mb-6">
+                {loadError}
+              </Text>
+              <View className="flex-row gap-3">
+                <TouchableOpacity
+                  onPress={handleBack}
+                  className="px-6 py-3 border border-[#E2E8F0] rounded-[10px]"
+                >
+                  <Text className="text-[15px] font-medium text-[#64748B]">
+                    Go Back
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setRetryTrigger((t) => t + 1)}
+                  className="px-6 py-3 bg-[#1E40AF] rounded-[10px]"
+                >
+                  <Text className="text-[15px] font-medium text-white">
+                    Retry
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <>
+              <ActivityIndicator size="large" color="#1E40AF" />
+              <Text className="text-[15px] text-[#64748B] mt-4">
+                Loading purchase order...
+              </Text>
+            </>
+          )}
         </View>
       </ScreenLayout>
     );
@@ -331,9 +401,11 @@ export const ReceivePOScreen: React.FC = () => {
 
         <TouchableOpacity
           onPress={handleConfirm}
-          disabled={saving || !invoiceFile}
+          disabled={saving || !invoiceFile || !hasAtLeastOneReceived}
           className={`mt-6 rounded-[10px] h-[50px] items-center justify-center ${
-            saving || !invoiceFile ? 'bg-[#94A3B8]' : 'bg-[#1E40AF]'
+            saving || !invoiceFile || !hasAtLeastOneReceived
+              ? 'bg-[#94A3B8]'
+              : 'bg-[#1E40AF]'
           }`}
         >
           {saving ? (

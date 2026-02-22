@@ -25,6 +25,7 @@ import {
 import { selectAllSites } from '../../store/selectors/sitesSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
+import { fetchSites } from '../../store/slices/sitesSlice';
 import { setFilters } from '../../store/slices/requestsSlice';
 import type { Request } from '../../types/request';
 import type { RequestStackParamList } from '../../navigation/RequestStackParamList';
@@ -76,6 +77,13 @@ export const RequestQueueScreen: React.FC = () => {
   // leaves items empty, causing "Insufficient stock" even when stock exists.
   useEffect(() => {
     dispatch(fetchItems());
+  }, [dispatch]);
+
+  // Ensure sites are loaded for the site filter chips.
+  // Without this, going directly to Requests tab without visiting Sites first
+  // leaves sites empty, so the filter shows only "All" with no site options.
+  useEffect(() => {
+    dispatch(fetchSites());
   }, [dispatch]);
 
   useEffect(() => {

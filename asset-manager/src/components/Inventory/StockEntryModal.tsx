@@ -113,6 +113,8 @@ export const StockEntryModal: React.FC<StockEntryModalProps> = ({
 
     const adjData: AdjustmentData = {
       itemId: item.id,
+      itemName: item.name,
+      itemSku: item.sku,
       locationId: getLocationId('store'),
       locationType: 'store',
       locationName: 'Central Store',

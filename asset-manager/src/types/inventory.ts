@@ -185,6 +185,8 @@ export interface UpdateItemData {
  */
 export interface AdjustmentData {
   itemId: string;
+  itemName: string;                // For activity log display
+  itemSku: string;                 // For activity log display
   locationId: string;
   locationType: LocationType;
   locationName: string;

@@ -60,6 +60,48 @@ export const createPO = createAsyncThunk(
 );
 
 /**
+ * Update an existing draft purchase order
+ */
+export const updatePO = createAsyncThunk(
+  'purchaseOrders/updatePO',
+  async (
+    {
+      poId,
+      data,
+      isDraft,
+    }: {
+      poId: string;
+      data: CreatePurchaseOrderData;
+      isDraft?: boolean;
+    },
+    { dispatch, rejectWithValue }
+  ) => {
+    try {
+      dispatch(setLoading(true));
+      dispatch(clearError());
+
+      const updatedPO = await purchaseOrderService.updatePO(
+        poId,
+        data,
+        isDraft ?? false
+      );
+
+      if (updatedPO) {
+        dispatch(addOrUpdatePO(updatedPO));
+      }
+
+      dispatch(setLoading(false));
+      return updatedPO;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to update purchase order';
+      dispatch(setError(errorMessage));
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
  * Approve a PO (Admin only)
  */
 export const approvePO = createAsyncThunk(

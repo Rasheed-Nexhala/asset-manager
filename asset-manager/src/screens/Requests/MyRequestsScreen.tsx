@@ -26,6 +26,7 @@ import {
   selectIsSiteManager,
 } from '../../store/selectors/authSelectors';
 import { selectAllSites } from '../../store/selectors/sitesSelectors';
+import { fetchSites } from '../../store/slices/sitesSlice';
 import type { Request } from '../../types/request';
 import type { RequestStackParamList } from '../../navigation/RequestStackParamList';
 
@@ -62,6 +63,11 @@ export const MyRequestsScreen: React.FC = () => {
     if (!userId || sites.length === 0) return null;
     return sites.find((site) => site.managerId === userId) || null;
   }, [userId, sites]);
+
+  // Ensure sites are loaded for currentSite (used by Create Request button).
+  useEffect(() => {
+    dispatch(fetchSites());
+  }, [dispatch]);
 
   useEffect(() => {
     if (!userId) return;

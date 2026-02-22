@@ -8,6 +8,7 @@ import {
   adjustQuantity as adjustQuantityService,
   getInventoryByLocation,
 } from '../../services/firebase/inventoryService';
+import { logQuantityAdjustedToCloud } from '../../services/firebase/activityLogService';
 import type { RootState } from '../index';
 import {
   listCategories,
@@ -170,10 +171,31 @@ export const deleteItem = createAsyncThunk(
  */
 export const adjustQuantity = createAsyncThunk(
   'inventory/adjustQuantity',
-  async (adjustmentData: AdjustmentData, { rejectWithValue }) => {
+  async (adjustmentData: AdjustmentData, { getState, rejectWithValue }) => {
     try {
-      await adjustQuantityService(adjustmentData);
-      // Return the location ID and item ID for potential state updates
+      const { oldQuantity, newQuantity } = await adjustQuantityService(adjustmentData);
+
+      const state = getState() as RootState;
+      const { user, userRole } = state.auth;
+      const userName = user?.displayName ?? user?.email ?? 'Unknown';
+      const userRoleType = userRole?.role ?? 'Unassigned';
+
+      void logQuantityAdjustedToCloud({
+        itemId: adjustmentData.itemId,
+        itemName: adjustmentData.itemName,
+        itemSku: adjustmentData.itemSku,
+        locationId: adjustmentData.locationId,
+        locationName: adjustmentData.locationName,
+        type: adjustmentData.type,
+        quantity: adjustmentData.quantity,
+        reason: adjustmentData.reason,
+        notes: adjustmentData.notes,
+        oldQuantity,
+        newQuantity,
+        userName,
+        userRole: userRoleType,
+      });
+
       return {
         itemId: adjustmentData.itemId,
         locationId: adjustmentData.locationId,

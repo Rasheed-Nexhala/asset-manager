@@ -68,7 +68,8 @@ const generatePoNumber = async (): Promise<string> => {
     return result;
   } catch (error) {
     console.error('Error generating PO number:', error);
-    return `${prefix}${Date.now()}`;
+    const fallback = `${prefix}${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+    return fallback;
   }
 };
 
@@ -217,6 +218,64 @@ export const getPOById = async (poId: string): Promise<PurchaseOrder | null> => 
 };
 
 /**
+ * Update an existing draft purchase order
+ * Only POs with status 'draft' can be updated
+ */
+export const updatePO = async (
+  poId: string,
+  data: CreatePurchaseOrderData,
+  isDraft: boolean = false
+): Promise<PurchaseOrder | null> => {
+  try {
+    const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
+    const poSnap = await getDocFromServer(poRef);
+
+    if (!poSnap.exists()) {
+      throw new Error('Purchase order not found');
+    }
+
+    const poData = poSnap.data();
+    if (poData.status !== 'draft') {
+      throw new Error(
+        `Cannot update PO with status "${poData.status}". Only draft POs can be updated.`
+      );
+    }
+
+    const items = buildPOItems(data.items);
+    const { subtotal, gstAmount, totalAmount } = calculateTotals(items);
+
+    const expectedDeliveryTimestamp = data.expectedDeliveryDate
+      ? Timestamp.fromDate(new Date(data.expectedDeliveryDate))
+      : null;
+
+    await updateDoc(poRef, {
+      vendorId: data.vendorId,
+      vendorName: data.vendorName,
+      vendorContact: data.vendorContact,
+      vendorEmail: data.vendorEmail ?? null,
+      vendorAddress: data.vendorAddress ?? null,
+      items,
+      subtotal,
+      gstAmount,
+      totalAmount,
+      justification: data.justification.trim(),
+      expectedDeliveryDate: expectedDeliveryTimestamp,
+      status: isDraft ? 'draft' : 'pending_approval',
+      updatedAt: serverTimestamp(),
+    });
+
+    if (!isDraft) {
+      await incrementVendorPoCount(data.vendorId, Timestamp.now());
+    }
+
+    return getPOById(poId);
+  } catch (error) {
+    console.error('Error updating PO:', error);
+    throw error;
+  }
+};
+
+/**
  * Approve a PO (Admin only)
  */
 export const approvePO = async (
@@ -346,6 +405,10 @@ export const receivePO = async (
     );
   }
 
+  if (!Array.isArray(poData.items) || poData.items.length === 0) {
+    throw new Error('PO has no valid items');
+  }
+
   const receivedByQty = new Map(
     receiveData.receivedQuantities.map((r) => [r.itemId, r.receivedQuantity])
   );
@@ -357,6 +420,16 @@ export const receivePO = async (
         `Invalid received quantity for ${item.itemName}: ${qty}. Must be between 0 and ${item.quantity}`
       );
     }
+  }
+
+  const hasAtLeastOneReceived = poData.items.some(
+    (item: PurchaseOrderFirestore['items'][0]) =>
+      (receivedByQty.get(item.itemId) ?? 0) > 0
+  );
+  if (!hasAtLeastOneReceived) {
+    throw new Error(
+      'At least one item must have a received quantity greater than zero'
+    );
   }
 
   const storeLocationId = getLocationId('store');
@@ -443,10 +516,11 @@ export const receivePO = async (
 };
 
 /**
- * Subscribe to purchase orders with optional status filter
+ * Subscribe to purchase orders with optional status filter.
+ * On error, callback receives ([], error). On success, callback receives (orders).
  */
 export const subscribeToPurchaseOrders = (
-  callback: (orders: PurchaseOrder[]) => void,
+  callback: (orders: PurchaseOrder[], error?: Error) => void,
   statusFilter?: string
 ): (() => void) => {
   let q = query(
@@ -463,46 +537,50 @@ export const subscribeToPurchaseOrders = (
     (snapshot) => {
       const orders: PurchaseOrder[] = [];
       snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        const firestorePO: PurchaseOrderFirestore = {
-          id: docSnap.id,
-          poNumber: data.poNumber,
-          vendorId: data.vendorId,
-          vendorName: data.vendorName,
-          vendorContact: data.vendorContact,
-          vendorEmail: data.vendorEmail,
-          vendorAddress: data.vendorAddress,
-          items: data.items,
-          subtotal: data.subtotal,
-          gstPercentage: data.gstPercentage ?? GST_PERCENTAGE,
-          gstAmount: data.gstAmount,
-          totalAmount: data.totalAmount,
-          justification: data.justification,
-          expectedDeliveryDate: data.expectedDeliveryDate ?? null,
-          documents: data.documents ?? [],
-          pdfUrl: data.pdfUrl,
-          status: data.status,
-          createdBy: data.createdBy,
-          createdByName: data.createdByName,
-          createdAt: data.createdAt,
-          reviewedBy: data.reviewedBy ?? null,
-          reviewedByName: data.reviewedByName ?? null,
-          reviewedAt: data.reviewedAt ?? null,
-          adminComments: data.adminComments ?? null,
-          rejectionReason: data.rejectionReason ?? null,
-          receivedAt: data.receivedAt ?? null,
-          receivedBy: data.receivedBy ?? null,
-          receivedByName: data.receivedByName ?? null,
-          receivedNotes: data.receivedNotes ?? null,
-          updatedAt: data.updatedAt,
-        };
-        orders.push(firestorePOToPO(firestorePO));
+        try {
+          const data = docSnap.data();
+          const firestorePO: PurchaseOrderFirestore = {
+            id: docSnap.id,
+            poNumber: data.poNumber,
+            vendorId: data.vendorId,
+            vendorName: data.vendorName,
+            vendorContact: data.vendorContact,
+            vendorEmail: data.vendorEmail,
+            vendorAddress: data.vendorAddress,
+            items: data.items,
+            subtotal: data.subtotal,
+            gstPercentage: data.gstPercentage ?? GST_PERCENTAGE,
+            gstAmount: data.gstAmount,
+            totalAmount: data.totalAmount,
+            justification: data.justification,
+            expectedDeliveryDate: data.expectedDeliveryDate ?? null,
+            documents: data.documents ?? [],
+            pdfUrl: data.pdfUrl,
+            status: data.status,
+            createdBy: data.createdBy,
+            createdByName: data.createdByName,
+            createdAt: data.createdAt,
+            reviewedBy: data.reviewedBy ?? null,
+            reviewedByName: data.reviewedByName ?? null,
+            reviewedAt: data.reviewedAt ?? null,
+            adminComments: data.adminComments ?? null,
+            rejectionReason: data.rejectionReason ?? null,
+            receivedAt: data.receivedAt ?? null,
+            receivedBy: data.receivedBy ?? null,
+            receivedByName: data.receivedByName ?? null,
+            receivedNotes: data.receivedNotes ?? null,
+            updatedAt: data.updatedAt,
+          };
+          orders.push(firestorePOToPO(firestorePO));
+        } catch (err) {
+          console.warn('Skipping malformed PO document:', docSnap.id, err);
+        }
       });
       callback(orders);
     },
     (error) => {
       console.error('Error in purchase orders subscription:', error);
-      callback([]);
+      callback([], error);
     }
   );
 
