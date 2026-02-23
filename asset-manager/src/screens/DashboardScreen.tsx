@@ -1,27 +1,184 @@
-import React from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   ScrollView,
   TouchableOpacity,
   Text,
+  RefreshControl,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
+import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
-import { ScreenHeader, ScreenLayout, MyRecentActivityWidget } from '../components';
+import {
+  ScreenHeader,
+  ScreenLayout,
+  MyRecentActivityWidget,
+  DashboardGreeting,
+  QuickStatsRow,
+  LowStockAlertWidget,
+  PendingRequestsWidget,
+} from '../components';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
-import { selectIsAdmin } from '../store/selectors/authSelectors';
+import {
+  selectIsAdmin,
+  selectIsStoreIncharge,
+  selectIsSiteManager,
+  selectUserDisplayName,
+  selectUserId,
+  selectUserRoleType,
+  selectHasPermission,
+  selectUserPermissions,
+} from '../store/selectors/authSelectors';
+import { selectAllRequests, selectMyRequests, selectRequestsLoading, selectRequestsError } from '../store/selectors/requestSelectors';
+import { selectLowStockItems, selectItemsLoading } from '../store/selectors/inventorySelectors';
+import { selectMaintenanceError } from '../store/selectors/maintenanceSelectors';
+import { selectPurchaseOrders, selectPurchaseOrderLoading, selectPurchaseOrderError } from '../store/selectors/purchaseOrderSelectors';
+import { selectAllSites, selectSiteById } from '../store/selectors/sitesSelectors';
+import { selectAllItems, selectInventoryByLocation } from '../store/selectors/inventorySelectors';
+import { selectAssignedSiteIdForUser } from '../store/selectors/sitesSelectors';
 import { selectActivityLogError } from '../store/selectors/activityLogSelectors';
 import { clearError } from '../store/slices/activityLogSlice';
+import {
+  clearError as clearRequestsError,
+} from '../store/slices/requestsSlice';
+import {
+  clearError as clearPurchaseOrderError,
+} from '../store/slices/purchaseOrderSlice';
+import {
+  clearError as clearMaintenanceError,
+} from '../store/slices/maintenanceSlice';
+import { useDashboardSubscriptions } from '../hooks/useDashboardSubscriptions';
+import { getLocationId } from '../utils/locationUtils';
 import type { DashboardStackParamList } from '../navigation/DashboardStackParamList';
+import type { Request } from '../types/request';
 
-type NavigationProp = StackNavigationProp<DashboardStackParamList, 'DashboardHome'>;
+type NavigationProp = CompositeNavigationProp<
+  StackNavigationProp<DashboardStackParamList, 'DashboardHome'>,
+  StackNavigationProp<DashboardStackParamList>
+>;
+
+/** Convert Firestore Timestamp to ISO string for display */
+function timestampToIso(ts: unknown): string {
+  if (!ts) return new Date().toISOString();
+  const t = ts as { toMillis?: () => number; toDate?: () => Date };
+  if (typeof t.toMillis === 'function') return new Date(t.toMillis()).toISOString();
+  if (typeof t.toDate === 'function') return t.toDate().toISOString();
+  return typeof ts === 'string' ? ts : new Date().toISOString();
+}
+
+/** Map Request to PendingRequest for widget */
+function toPendingRequest(r: Request) {
+  return {
+    id: r.id,
+    requestNumber: r.requestNumber,
+    siteName: r.siteName ?? '—',
+    itemCount: r.items?.length ?? 0,
+    hasInsufficient: false,
+    priority: (r.priority === 'high' ? 'high' : r.priority === 'low' ? 'low' : 'normal') as 'high' | 'normal' | 'low',
+    createdAt: timestampToIso(r.createdAt),
+  };
+}
 
 export const DashboardScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const dispatch = useAppDispatch();
+  const isFocused = useIsFocused();
+  const [refreshing, setRefreshing] = useState(false);
+
   const isAdmin = useAppSelector(selectIsAdmin);
-  const error = useAppSelector(selectActivityLogError);
+  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const isSiteManager = useAppSelector(selectIsSiteManager);
+  const displayName = useAppSelector(selectUserDisplayName) ?? '';
+  const userId = useAppSelector(selectUserId);
+  const roleType = useAppSelector(selectUserRoleType);
+  const role = roleType ?? 'Unassigned';
+  const assignedSiteId = useAppSelector(selectAssignedSiteIdForUser(userId));
+  const assignedSite = useAppSelector(
+    assignedSiteId ? selectSiteById(assignedSiteId) : () => null
+  );
+  const siteName = assignedSite?.name ?? null;
+
+  const requests = useAppSelector(selectAllRequests);
+  const myRequests = useAppSelector(selectMyRequests);
+  const lowStockItems = useAppSelector(selectLowStockItems);
+  const purchaseOrders = useAppSelector(selectPurchaseOrders);
+  const sites = useAppSelector(selectAllSites);
+  const items = useAppSelector(selectAllItems);
+  const activityLogError = useAppSelector(selectActivityLogError);
+  const requestsLoading = useAppSelector(selectRequestsLoading);
+  const requestsError = useAppSelector(selectRequestsError);
+  const purchaseOrderLoading = useAppSelector(selectPurchaseOrderLoading);
+  const purchaseOrderError = useAppSelector(selectPurchaseOrderError);
+  const maintenanceError = useAppSelector(selectMaintenanceError);
+  const itemsLoading = useAppSelector(selectItemsLoading);
+
+  const permissions = useAppSelector(selectUserPermissions);
+  const canManageInventory = useAppSelector(selectHasPermission('canManageInventory'));
+  const canApproveOrders = useAppSelector(selectHasPermission('canApproveOrders'));
+
+  // StoreIncharge with empty permissions: default to both (role implies access)
+  const showInventory = canManageInventory || (isStoreIncharge && permissions.length === 0);
+  const showOrders = canApproveOrders || (isStoreIncharge && permissions.length === 0);
+
+  const siteInventory = useAppSelector(
+    assignedSiteId
+      ? selectInventoryByLocation(getLocationId('site', assignedSiteId))
+      : () => []
+  );
+
+  const { isInitialLoad, isRefreshing, triggerRefresh } = useDashboardSubscriptions({
+    userId,
+    role: roleType,
+    assignedSiteId,
+    isVisible: isFocused,
+  });
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        triggerRefresh();
+      }
+    });
+    return () => sub.remove();
+  }, [triggerRefresh]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    triggerRefresh();
+    await new Promise((r) => setTimeout(r, 500));
+    setRefreshing(false);
+  }, [triggerRefresh]);
+
+  const dashboardDataError =
+    requestsError || purchaseOrderError || maintenanceError;
+  const clearDashboardError = useCallback(() => {
+    if (requestsError) dispatch(clearRequestsError());
+    if (purchaseOrderError) dispatch(clearPurchaseOrderError());
+    if (maintenanceError) dispatch(clearMaintenanceError());
+  }, [dispatch, requestsError, purchaseOrderError, maintenanceError]);
+
+  const pendingRequests = isSiteManager ? myRequests : requests;
+  const pendingForWidget = pendingRequests
+    .filter((r) => r.status === 'pending')
+    .slice(0, 5)
+    .map(toPendingRequest);
+
+  const poAwaitingApproval = purchaseOrders.filter((o) => o.status === 'pending_approval');
+  const poApprovedReady = purchaseOrders.filter((o) => o.status === 'approved');
+  const poOrderedAwaiting = purchaseOrders.filter((o) => o.status === 'ordered');
+
+  const statsForStore = [
+    ...(showInventory ? [{ icon: '📦', value: items.length, label: 'Items' }] : []),
+    ...(showOrders ? [{ icon: '⏳', value: poAwaitingApproval.length, label: 'Pending POs' }] : []),
+    ...(showOrders ? [{ icon: '📥', value: pendingForWidget.length, label: 'Pending Requests' }] : []),
+  ];
+
+  const tabNav = navigation.getParent() as
+    | { navigate: (name: string, params?: object) => void }
+    | undefined;
 
   return (
     <ScreenLayout edges={['top']}>
@@ -42,9 +199,9 @@ export const DashboardScreen: React.FC = () => {
             : undefined
         }
       />
-      {error && (
+      {activityLogError && (
         <View className="bg-[#DC2626]/15 px-4 py-3 mx-4 mt-2 rounded-lg flex-row items-center justify-between">
-          <Text className="text-[13px] text-[#DC2626] flex-1">{error}</Text>
+          <Text className="text-[13px] text-[#DC2626] flex-1">{activityLogError}</Text>
           <TouchableOpacity
             onPress={() => dispatch(clearError())}
             className="ml-2 px-3 py-1"
@@ -55,30 +212,165 @@ export const DashboardScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       )}
-      <ScrollView className="flex-1 px-4 py-4" showsVerticalScrollIndicator={false}>
-        {/* My Recent Activity Widget (All Users) */}
-        <MyRecentActivityWidget
-          onViewAll={() => navigation.navigate('MyActivity')}
-        />
-
-        {/* Admin-only: Full Activity Log Access */}
-        {isAdmin && (
+      {dashboardDataError && (
+        <View className="bg-[#DC2626]/15 px-4 py-3 mx-4 mt-2 rounded-lg flex-row items-center justify-between">
+          <Text className="text-[13px] text-[#DC2626] flex-1">
+            Some data failed to load
+          </Text>
           <TouchableOpacity
-            className="bg-white rounded-[10px] p-4 mt-3 flex-row items-center justify-between border border-[#E2E8F0]"
-            onPress={() => navigation.navigate('ActivityLog')}
-            activeOpacity={0.7}
-            accessibilityLabel="View full activity log"
+            onPress={clearDashboardError}
+            className="ml-2 px-3 py-1"
+            accessibilityLabel="Dismiss error"
             accessibilityRole="button"
           >
-            <View className="flex-row items-center gap-2">
-              <Ionicons name="document-text-outline" size={24} color="#1E40AF" />
-              <Text className="text-[15px] font-semibold text-[#0F172A]">
-                Activity Log
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#64748B" />
+            <Ionicons name="close" size={20} color="#DC2626" />
           </TouchableOpacity>
-        )}
+        </View>
+      )}
+      <ScrollView
+        className="flex-1 px-4 py-4"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing || isRefreshing}
+            onRefresh={onRefresh}
+            tintColor="#1E40AF"
+          />
+        }
+      >
+        <View className="gap-6">
+          <DashboardGreeting
+            displayName={displayName}
+            role={role}
+            siteName={siteName ?? undefined}
+          />
+
+          {isAdmin && (
+            <>
+              <QuickStatsRow
+                stats={[
+                  { icon: '📦', value: items.length, label: 'Items' },
+                  { icon: '⏳', value: poAwaitingApproval.length, label: 'Pending POs' },
+                  { icon: '🏗️', value: sites.length, label: 'Sites' },
+                ]}
+                isLoading={isInitialLoad}
+              />
+              <MyRecentActivityWidget onViewAll={() => navigation.navigate('MyActivity')} />
+              {(lowStockItems.length > 0 || isInitialLoad || itemsLoading) && (
+                <LowStockAlertWidget
+                  items={lowStockItems.map((i) => ({
+                    id: i.id,
+                    name: i.name ?? i.id,
+                    currentQty: i.totalQuantity ?? 0,
+                    minQty: i.minStockLevel ?? 0,
+                  }))}
+                  onViewAll={() => tabNav?.navigate('Inventory', { screen: 'CentralStoreInventory' })}
+                  onCreatePO={() =>
+                    tabNav?.navigate('PurchaseOrders', { screen: 'CreatePO', params: {} })
+                  }
+                  loading={isInitialLoad || itemsLoading}
+                />
+              )}
+              {(pendingForWidget.length > 0 || isInitialLoad || requestsLoading) && (
+                <PendingRequestsWidget
+                  requests={pendingForWidget}
+                  onViewAll={() => tabNav?.navigate('Requests', { screen: 'RequestQueue' })}
+                  onViewRequest={(id) =>
+                    tabNav?.navigate('Requests', { screen: 'ProcessRequest', params: { requestId: id } })
+                  }
+                  onApprove={(id) =>
+                    tabNav?.navigate('Requests', { screen: 'ProcessRequest', params: { requestId: id } })
+                  }
+                  loading={isInitialLoad || requestsLoading}
+                />
+              )}
+            </>
+          )}
+
+          {isStoreIncharge && (
+            <>
+              {statsForStore.length > 0 && (
+                <QuickStatsRow stats={statsForStore} isLoading={isInitialLoad} />
+              )}
+              {showInventory && (lowStockItems.length > 0 || isInitialLoad || itemsLoading) && (
+                <LowStockAlertWidget
+                  items={lowStockItems.map((i) => ({
+                    id: i.id,
+                    name: i.name ?? i.id,
+                    currentQty: i.totalQuantity ?? 0,
+                    minQty: i.minStockLevel ?? 0,
+                  }))}
+                  onViewAll={() => tabNav?.navigate('Inventory', { screen: 'CentralStoreInventory' })}
+                  onCreatePO={() =>
+                    tabNav?.navigate('PurchaseOrders', { screen: 'CreatePO', params: {} })
+                  }
+                  loading={isInitialLoad || itemsLoading}
+                />
+              )}
+              {showOrders && (pendingForWidget.length > 0 || isInitialLoad || requestsLoading) && (
+                <PendingRequestsWidget
+                  requests={pendingForWidget}
+                  onViewAll={() => tabNav?.navigate('Requests', { screen: 'RequestQueue' })}
+                  onViewRequest={(id) =>
+                    tabNav?.navigate('Requests', { screen: 'ProcessRequest', params: { requestId: id } })
+                  }
+                  onApprove={(id) =>
+                    tabNav?.navigate('Requests', { screen: 'ProcessRequest', params: { requestId: id } })
+                  }
+                  loading={isInitialLoad || requestsLoading}
+                />
+              )}
+              <MyRecentActivityWidget onViewAll={() => navigation.navigate('MyActivity')} />
+              <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
+                <Text className="text-[17px] font-semibold text-[#0F172A] mb-2">
+                  Today&apos;s Summary
+                </Text>
+                <Text className="text-[15px] text-[#64748B]">
+                  Requests processed, items transferred, POs created — view Activity for details.
+                </Text>
+              </View>
+            </>
+          )}
+
+          {isSiteManager && (
+            <>
+              <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
+                <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">
+                  My Inventory Summary
+                </Text>
+                <View className="gap-2">
+                  <View className="flex-row justify-between">
+                    <Text className="text-[15px] text-[#64748B]">Total items</Text>
+                    <Text className="text-[15px] font-semibold text-[#0F172A]">
+                      {siteInventory.length}
+                    </Text>
+                  </View>
+                  <View className="flex-row justify-between">
+                    <Text className="text-[15px] text-[#64748B]">Total quantity</Text>
+                    <Text className="text-[15px] font-semibold text-[#0F172A]">
+                      {siteInventory.reduce((s, e) => s + e.quantity, 0)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              {(pendingForWidget.length > 0 || isInitialLoad || requestsLoading) && (
+                <PendingRequestsWidget
+                  requests={pendingForWidget}
+                  onViewAll={() => tabNav?.navigate('Requests', { screen: 'MyRequests' })}
+                  onViewRequest={(id) =>
+                    tabNav?.navigate('Requests', { screen: 'ProcessRequest', params: { requestId: id } })
+                  }
+                  loading={isInitialLoad || requestsLoading}
+                />
+              )}
+              <MyRecentActivityWidget onViewAll={() => navigation.navigate('MyActivity')} />
+            </>
+          )}
+
+          {!isAdmin && !isStoreIncharge && !isSiteManager && (
+            <MyRecentActivityWidget onViewAll={() => navigation.navigate('MyActivity')} />
+          )}
+        </View>
       </ScrollView>
     </ScreenLayout>
   );

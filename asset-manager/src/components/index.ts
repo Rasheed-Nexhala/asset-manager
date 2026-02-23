@@ -43,3 +43,20 @@ export {
   ActivityLogDetailModal,
   MyRecentActivityWidget,
 } from './ActivityLog';
+
+// Dashboard components
+export {
+  DashboardGreeting,
+  QuickStatsRow,
+  LowStockAlertWidget,
+  PendingRequestsWidget,
+} from './Dashboard';
+export type {
+  DashboardGreetingProps,
+  QuickStatsRowProps,
+  QuickStat,
+  LowStockAlertWidgetProps,
+  LowStockItem,
+  PendingRequestsWidgetProps,
+  PendingRequest,
+} from './Dashboard';

@@ -1,6 +1,8 @@
 import React, { useCallback } from 'react';
 import { View, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
+import type { DashboardStackParamList } from '../../navigation/DashboardStackParamList';
 import { ScreenHeader, ScreenLayout, UserProfile } from '../../components';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { signOutUser } from '../../store/slices/authSlice';
@@ -14,8 +16,10 @@ import {
   selectUserPermissions,
 } from '../../store/selectors/authSelectors';
 
+type ProfileNavigationProp = StackNavigationProp<DashboardStackParamList, 'Profile'>;
+
 export const ProfileScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<ProfileNavigationProp>();
   const dispatch = useAppDispatch();
   const isLoading = useAppSelector(selectAuthLoading);
   const displayName = useAppSelector(selectUserDisplayName);

@@ -67,3 +67,16 @@ export const selectFilteredInactiveSites = createSelector(
   [selectFilteredSites],
   (sites) => sites.filter((site) => site.status === 'inactive')
 );
+
+/**
+ * Get the assigned site ID for a Site Manager (site where managerId matches userId).
+ */
+export const selectAssignedSiteIdForUser = (userId: string | null) =>
+  createSelector(
+    [selectAllSites],
+    (sites) => {
+      if (!userId) return null;
+      const site = sites.find((s) => s.managerId === userId);
+      return site?.id ?? null;
+    }
+  );

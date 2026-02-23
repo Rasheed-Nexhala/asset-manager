@@ -12,6 +12,7 @@ import {
   unsubscribeFromMyRecentActivity,
 } from './activityLogThunks';
 import type { SignUpCredentials, SignInCredentials } from '../../types/auth';
+import type { AppDispatch, RootState } from '../index';
 
 export const signUpUser = createAsyncThunk(
   'auth/signUp',
@@ -49,7 +50,11 @@ export const signInUser = createAsyncThunk(
   }
 );
 
-export const signOutUser = createAsyncThunk(
+export const signOutUser = createAsyncThunk<
+  null,
+  void,
+  { state: RootState; dispatch: AppDispatch }
+>(
   'auth/signOut',
   async (_, { dispatch, rejectWithValue }) => {
     try {

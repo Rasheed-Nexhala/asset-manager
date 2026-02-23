@@ -450,7 +450,16 @@ export const onItemUpdated = onDocumentUpdated(
     const itemId = event.params.itemId;
     const changes: Array<{ field: string; fieldLabel: string; oldValue: unknown; newValue: unknown }> = [];
 
-    const fieldsToCompare = ['name', 'sku', 'description', 'categoryId', 'categoryName', 'type', 'status'];
+    const fieldsToCompare = [
+      'name',
+      'sku',
+      'description',
+      'categoryId',
+      'categoryName',
+      'type',
+      'status',
+      'totalQuantity',
+    ];
     for (const field of fieldsToCompare) {
       if (JSON.stringify(before[field]) !== JSON.stringify(after[field])) {
         changes.push({
@@ -692,6 +701,9 @@ export const onPurchaseOrderUpdated = onDocumentUpdated(
       return;
     }
 
+    const poId = event.params.poId;
+    const poNum = after.poNumber ?? poId;
+
     const statusActionMap: Record<string, string> = {
       approved: 'po_approved',
       rejected: 'po_rejected',
@@ -703,8 +715,7 @@ export const onPurchaseOrderUpdated = onDocumentUpdated(
       return;
     }
 
-    const poId = event.params.poId;
-    const targetDisplay = after.poNumber ?? poId;
+    const targetDisplay = poNum;
 
     let userId: string;
     let userName: string;
