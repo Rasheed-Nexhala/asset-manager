@@ -1,6 +1,7 @@
 export { POStatusBadge } from './POStatusBadge';
 export { POCard } from './POCard';
 export { POItemCard } from './POItemCard';
+export { PODocumentCard } from './PODocumentCard';
 export { VendorCard } from './VendorCard';
 export { VendorSelector } from './VendorSelector';
 export { VendorForm } from './VendorForm';

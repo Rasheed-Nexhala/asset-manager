@@ -15,6 +15,7 @@ interface POItemCardProps {
   editable?: boolean;
   onQuantityChange?: (delta: number) => void;
   onUnitPriceChange?: (price: number) => void;
+  onGstPercentageChange?: (percentage: number) => void;
 }
 
 const formatCurrency = (amount: number): string => {
@@ -27,7 +28,12 @@ export const POItemCard: React.FC<POItemCardProps> = ({
   editable = false,
   onQuantityChange,
   onUnitPriceChange,
+  onGstPercentageChange,
 }) => {
+  const gstPct = item.gstPercentage ?? 0;
+  const gstAmount =
+    item.gstAmount ?? Math.round((item.amount * gstPct) / 100);
+  const amountWithGst = item.amount + gstAmount;
   return (
     <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-3">
       {/* Top row: Item name + Remove */}
@@ -43,29 +49,31 @@ export const POItemCard: React.FC<POItemCardProps> = ({
         {editable && onRemove && (
           <TouchableOpacity
             onPress={onRemove}
-            className="w-12 h-12 items-center justify-center -mr-2 -mt-1"
+            className="w-12 h-12 items-center justify-center -mr-2 -mt-1 rounded-full"
             accessibilityLabel="Remove item"
             accessibilityRole="button"
+            activeOpacity={0.7}
           >
             <Ionicons name="trash-outline" size={22} color="#DC2626" />
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Stacked layout: Quantity, Unit Price, Amount — full width per section (CIAMS gap-4) */}
+      {/* Stacked layout: Quantity, Unit Price, GST, Amount — CIAMS gap-4 between fields, gap-1.5 label-to-input */}
       <View className="gap-4">
-        {/* Quantity — full-width stepper */}
-        <View>
-          <Text className="text-[13px] text-[#64748B] mb-1.5">Quantity</Text>
+        {/* Quantity — full-width stepper (CIAMS: minus=outline, plus=primary) */}
+        <View className="gap-1.5">
+          <Text className="text-[15px] text-[#0F172A]">Quantity</Text>
           {editable && onQuantityChange ? (
             <View className="flex-row items-center gap-3">
               <TouchableOpacity
                 onPress={() => onQuantityChange(-1)}
-                className="w-12 h-12 rounded-lg bg-[#E2E8F0] items-center justify-center"
+                className="w-12 h-12 border border-[#E2E8F0] rounded-full items-center justify-center bg-white"
                 accessibilityLabel="Decrease quantity"
                 accessibilityRole="button"
+                activeOpacity={0.7}
               >
-                <Ionicons name="remove" size={20} color="#0F172A" />
+                <Ionicons name="remove" size={22} color="#1E40AF" />
               </TouchableOpacity>
               <View className="flex-1 min-w-0 items-center justify-center h-12">
                 <Text className="text-[15px] font-medium text-[#0F172A]">
@@ -74,11 +82,12 @@ export const POItemCard: React.FC<POItemCardProps> = ({
               </View>
               <TouchableOpacity
                 onPress={() => onQuantityChange(1)}
-                className="w-12 h-12 rounded-lg bg-[#E2E8F0] items-center justify-center"
+                className="w-12 h-12 border-2 border-[#1E40AF] rounded-full items-center justify-center bg-[#1E40AF]"
                 accessibilityLabel="Increase quantity"
                 accessibilityRole="button"
+                activeOpacity={0.7}
               >
-                <Ionicons name="add" size={20} color="#0F172A" />
+                <Ionicons name="add" size={22} color="white" />
               </TouchableOpacity>
             </View>
           ) : (
@@ -89,8 +98,8 @@ export const POItemCard: React.FC<POItemCardProps> = ({
         </View>
 
         {/* Unit Price — full-width input */}
-        <View>
-          <Text className="text-[13px] text-[#64748B] mb-1.5">Unit Price (₹)</Text>
+        <View className="gap-1.5">
+          <Text className="text-[15px] text-[#0F172A]">Unit Price (₹)</Text>
           {editable && onUnitPriceChange ? (
             <TextInput
               value={item.unitPrice > 0 ? String(item.unitPrice) : ''}
@@ -104,7 +113,7 @@ export const POItemCard: React.FC<POItemCardProps> = ({
                 includeFontPadding: false,
               })}
               style={Platform.OS === 'android' ? { textAlignVertical: 'center' } : undefined}
-              className="border border-[#E2E8F0] rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A]"
+              className="border border-[#E2E8F0] rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] focus:border-[#1E40AF]"
             />
           ) : (
             <View className="h-12 justify-center">
@@ -115,12 +124,45 @@ export const POItemCard: React.FC<POItemCardProps> = ({
           )}
         </View>
 
-        {/* Amount — full-width display */}
-        <View>
-          <Text className="text-[13px] text-[#64748B] mb-1.5">Amount</Text>
+        {/* GST % — full-width input */}
+        <View className="gap-1.5">
+          <Text className="text-[15px] text-[#0F172A]">GST (%)</Text>
+          {editable && onGstPercentageChange ? (
+            <TextInput
+              value={gstPct > 0 ? String(gstPct) : ''}
+              onChangeText={(t) => {
+                const parsed = parseFloat(t.replace(/[^\d.]/g, '')) || 0;
+                onGstPercentageChange(Math.min(100, Math.max(0, parsed)));
+              }}
+              placeholder="0"
+              placeholderTextColor="#94A3B8"
+              keyboardType="decimal-pad"
+              {...(Platform.OS === 'android' && {
+                includeFontPadding: false,
+              })}
+              style={Platform.OS === 'android' ? { textAlignVertical: 'center' } : undefined}
+              className="border border-[#E2E8F0] rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] focus:border-[#1E40AF]"
+            />
+          ) : (
+            <View className="h-12 justify-center flex-row items-center">
+              <Text className="text-[15px] text-[#0F172A]">{gstPct}%</Text>
+              {item.gstAmount != null && item.gstAmount > 0 && (
+                <Text className="text-[13px] text-[#64748B] ml-2">
+                  ({formatCurrency(item.gstAmount)})
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Amount (incl. GST) — full-width display */}
+        <View className="gap-1.5">
+          <Text className="text-[15px] text-[#0F172A]">
+            Amount (incl. GST)
+          </Text>
           <View className="h-12 justify-center">
             <Text className="text-[15px] font-semibold text-[#0F172A]">
-              {formatCurrency(item.amount)}
+              {formatCurrency(amountWithGst)}
             </Text>
           </View>
         </View>

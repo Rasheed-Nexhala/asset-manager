@@ -2,6 +2,9 @@ import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from '../index';
 import type { Item, Category, InventoryEntry, ItemType, ItemStatus } from '../../types/inventory';
 
+/** Stable empty array reference - prevents unnecessary rerenders when location has no inventory */
+const EMPTY_INVENTORY: InventoryEntry[] = [];
+
 // Base selectors
 const selectInventoryState = (state: RootState) => state.inventory;
 
@@ -112,8 +115,11 @@ export const selectCategoryById = (categoryId: string) =>
 export const selectInventoryByLocation = (locationId: string) =>
   createSelector(
     [selectInventoryState],
-    (inventoryState) => inventoryState.inventoryByLocation[locationId] || []
+    (inventoryState) => inventoryState.inventoryByLocation[locationId] ?? EMPTY_INVENTORY
   );
+
+/** Stable selector that always returns empty inventory - use when no site is assigned */
+export const selectEmptyInventory = (_state: RootState) => EMPTY_INVENTORY;
 
 export const selectAllInventoryByLocation = createSelector(
   [selectInventoryState],

@@ -17,6 +17,7 @@ import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { FormField } from '../../components/FormField';
 import { InvoiceUploadField, POReceiptSummary } from '../../components/PurchaseOrder';
+import { printPurchaseOrder } from '../../utils/poPdfUtils';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
 import { uploadPOInvoice } from '../../services/firebase/storageService';
 import { receivePO } from '../../store/thunks/purchaseOrderThunks';
@@ -88,6 +89,18 @@ export const ReceivePOScreen: React.FC = () => {
   }, [poId, retryTrigger]);
 
   const handleBack = useCallback(() => navigation.goBack(), [navigation]);
+
+  const handlePrint = useCallback(async () => {
+    if (!po) return;
+    try {
+      await printPurchaseOrder(po);
+    } catch (err) {
+      Alert.alert(
+        'Error',
+        err instanceof Error ? err.message : 'Failed to print'
+      );
+    }
+  }, [po]);
 
   const handleQuantityChange = useCallback(
     (itemId: string, qty: number) => {
@@ -275,6 +288,12 @@ export const ReceivePOScreen: React.FC = () => {
         title={`Receive ${po.poNumber}`}
         showBack
         onBackPress={handleBack}
+        rightAction={{
+          icon: 'print-outline',
+          label: 'Print',
+          onPress: handlePrint,
+          accessibilityLabel: 'Print purchase order',
+        }}
       />
 
       <ScrollView

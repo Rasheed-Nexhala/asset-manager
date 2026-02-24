@@ -19,6 +19,10 @@ import {
   POItemCard,
   POItemSelectorModal,
 } from '../../components/PurchaseOrder';
+import {
+  printPurchaseOrder,
+  buildDraftPOForPrint,
+} from '../../utils/poPdfUtils';
 import { createPO, updatePO } from '../../store/thunks/purchaseOrderThunks';
 import {
   subscribeToVendors,
@@ -46,9 +50,12 @@ import type { Vendor } from '../../types/vendor';
 import type { PurchaseOrderStackParamList } from '../../navigation/PurchaseOrderStackParamList';
 
 type RouteParams = RouteProp<PurchaseOrderStackParamList, 'CreatePO'>;
-type NavigationProp = StackNavigationProp<PurchaseOrderStackParamList, 'CreatePO'>;
+type NavigationProp = StackNavigationProp<
+  PurchaseOrderStackParamList,
+  'CreatePO' | 'ApprovePO'
+>;
 
-const GST_PERCENTAGE = 18;
+const DEFAULT_GST_PERCENTAGE = 18;
 
 const formatCurrency = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 
@@ -82,9 +89,7 @@ export const CreatePOScreen: React.FC = () => {
   const [isLoadingPO, setIsLoadingPO] = useState(false);
   const [loadPOError, setLoadPOError] = useState<string | null>(null);
   const [loadPORetryTrigger, setLoadPORetryTrigger] = useState(0);
-  const [editingPOStatus, setEditingPOStatus] = useState<
-    'draft' | 'rejected' | null
-  >(null);
+  const [editingPOStatus, setEditingPOStatus] = useState<'draft' | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -115,6 +120,10 @@ export const CreatePOScreen: React.FC = () => {
     }
 
     const loadPO = (po: PurchaseOrder) => {
+      if (po.status !== 'draft') {
+        navigation.replace('ApprovePO', { poId: po.id });
+        return;
+      }
       setSelectedVendorId(po.vendorId);
       setVendorName(po.vendorName);
       setVendorContact(po.vendorContact);
@@ -125,7 +134,7 @@ export const CreatePOScreen: React.FC = () => {
       setExpectedDeliveryDate(
         po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate) : null
       );
-      setEditingPOStatus(po.status === 'draft' ? 'draft' : 'rejected');
+      setEditingPOStatus('draft');
     };
 
     if (poFromStore) {
@@ -150,10 +159,14 @@ export const CreatePOScreen: React.FC = () => {
         );
       })
       .finally(() => setIsLoadingPO(false));
-  }, [poId, poFromStore?.id, loadPORetryTrigger]);
+  }, [poId, poFromStore?.id, loadPORetryTrigger, navigation]);
 
   const subtotal = items.reduce((s, i) => s + i.amount, 0);
-  const gstAmount = Math.round((subtotal * GST_PERCENTAGE) / 100);
+  const gstAmount = items.reduce(
+    (sum, i) =>
+      sum + Math.round((i.amount * (i.gstPercentage ?? DEFAULT_GST_PERCENTAGE)) / 100),
+    0
+  );
   const totalAmount = subtotal + gstAmount;
 
   const validate = useCallback((): boolean => {
@@ -177,6 +190,7 @@ export const CreatePOScreen: React.FC = () => {
       quantity: 1,
       unitPrice: 0,
       amount: 0,
+      gstPercentage: DEFAULT_GST_PERCENTAGE,
       receivedQuantity: null,
     }));
     setItems((prev) => {
@@ -209,6 +223,14 @@ export const CreatePOScreen: React.FC = () => {
         p.itemId === itemId
           ? { ...p, unitPrice: price, amount: p.quantity * price }
           : p
+      )
+    );
+  }, []);
+
+  const handleGstPercentageChange = useCallback((itemId: string, percentage: number) => {
+    setItems((prev) =>
+      prev.map((p) =>
+        p.itemId === itemId ? { ...p, gstPercentage: percentage } : p
       )
     );
   }, []);
@@ -275,6 +297,7 @@ export const CreatePOScreen: React.FC = () => {
             isExistingItem: i.isExistingItem,
             quantity: i.quantity,
             unitPrice: i.unitPrice,
+            gstPercentage: i.gstPercentage ?? DEFAULT_GST_PERCENTAGE,
           })),
           justification: justification.trim(),
           expectedDeliveryDate: expectedDeliveryDate
@@ -282,20 +305,44 @@ export const CreatePOScreen: React.FC = () => {
             : null,
         };
 
+        let savedPoId: string;
+        let savedPO: PurchaseOrder | null = null;
+
         if (poId && editingPOStatus === 'draft') {
-          await dispatch(
+          const updated = await dispatch(
             updatePO({ poId, data, isDraft: asDraft })
           ).unwrap();
+          savedPoId = poId;
+          savedPO = updated ?? null;
         } else {
-          await dispatch(
+          savedPoId = await dispatch(
             createPO({ data, userId, userName, isDraft: asDraft })
           ).unwrap();
         }
-        Alert.alert(
-          'Success',
-          asDraft ? 'Draft saved.' : 'Purchase order submitted for approval.',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
-        );
+
+        const poForPrint = savedPO ?? (await getPOById(savedPoId));
+        const successMsg = asDraft
+          ? 'Draft saved.'
+          : 'Purchase order submitted for approval.';
+
+        Alert.alert('Success', successMsg, [
+          {
+            text: 'Print',
+            onPress: async () => {
+              try {
+                const toPrint = poForPrint ?? (await getPOById(savedPoId));
+                if (toPrint) await printPurchaseOrder(toPrint);
+              } catch (err) {
+                Alert.alert(
+                  'Error',
+                  err instanceof Error ? err.message : 'Failed to print'
+                );
+              }
+              navigation.goBack();
+            },
+          },
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Failed to save';
         if (vendorCreatedThisAttempt) {
@@ -332,6 +379,50 @@ export const CreatePOScreen: React.FC = () => {
   );
 
   const handleBack = useCallback(() => navigation.goBack(), [navigation]);
+
+  const handlePrintDraft = useCallback(async () => {
+    if (!vendorName.trim() || !vendorContact.trim()) {
+      Alert.alert('Error', 'Vendor name and contact are required to print.');
+      return;
+    }
+    if (items.length === 0) {
+      Alert.alert('Error', 'Add at least one item to print.');
+      return;
+    }
+    try {
+      const draftPO = buildDraftPOForPrint(
+        {
+          vendorName: vendorName.trim(),
+          vendorContact: vendorContact.trim(),
+          vendorEmail: vendorEmail.trim() || undefined,
+          vendorAddress: vendorAddress.trim() || undefined,
+          items,
+          justification: justification.trim(),
+          expectedDeliveryDate,
+          userName: userName ?? '—',
+        },
+        poId && editingPOStatus === 'draft' ? poFromStore?.poNumber ?? 'DRAFT' : 'DRAFT'
+      );
+      await printPurchaseOrder(draftPO);
+    } catch (err) {
+      Alert.alert(
+        'Error',
+        err instanceof Error ? err.message : 'Failed to print'
+      );
+    }
+  }, [
+    vendorName,
+    vendorContact,
+    vendorEmail,
+    vendorAddress,
+    items,
+    justification,
+    expectedDeliveryDate,
+    userName,
+    poId,
+    editingPOStatus,
+    poFromStore?.poNumber,
+  ]);
 
   if (poId && (isLoadingPO || loadPOError)) {
     return (
@@ -478,6 +569,7 @@ export const CreatePOScreen: React.FC = () => {
                   onRemove={() => handleRemoveItem(item.itemId)}
                   onQuantityChange={(d) => handleQuantityChange(item.itemId, d)}
                   onUnitPriceChange={(p) => handleUnitPriceChange(item.itemId, p)}
+                  onGstPercentageChange={(p) => handleGstPercentageChange(item.itemId, p)}
                 />
               </View>
             ))}
@@ -495,9 +587,7 @@ export const CreatePOScreen: React.FC = () => {
               </Text>
             </View>
             <View className="flex-row justify-between mb-2">
-              <Text className="text-[15px] text-[#64748B]">
-                GST ({GST_PERCENTAGE}%)
-              </Text>
+              <Text className="text-[15px] text-[#64748B]">Total GST</Text>
               <Text className="text-[15px] text-[#0F172A]">
                 {formatCurrency(gstAmount)}
               </Text>
@@ -557,6 +647,17 @@ export const CreatePOScreen: React.FC = () => {
               />
             )}
           </View>
+
+          {/* Print Preview */}
+          <TouchableOpacity
+            onPress={handlePrintDraft}
+            className="border-[1.5px] border-[#64748B] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
+          >
+            <Ionicons name="print-outline" size={20} color="#64748B" />
+            <Text className="text-[15px] font-semibold text-[#64748B]">
+              Print Preview
+            </Text>
+          </TouchableOpacity>
 
           {/* Buttons */}
           <View className="flex-row gap-3 mt-4">

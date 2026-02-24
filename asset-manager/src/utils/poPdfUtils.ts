@@ -1,0 +1,268 @@
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import type { PurchaseOrder, PurchaseOrderItem } from '../types/purchaseOrder';
+
+const DEFAULT_GST_PERCENTAGE = 18;
+
+const formatDate = (iso: string | null | undefined): string => {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-IN', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+const formatCurrency = (amount: number): string =>
+  `₹${amount.toLocaleString('en-IN')}`;
+
+const statusLabels: Record<string, string> = {
+  draft: 'Draft',
+  pending_approval: 'Pending Approval',
+  approved: 'Approved',
+  ordered: 'Ordered',
+  received: 'Received',
+  rejected: 'Rejected',
+};
+
+const statusBadgeClass: Record<string, string> = {
+  draft: 'background: rgba(100, 116, 139, 0.2); color: #64748B;',
+  pending_approval: 'background: rgba(217, 119, 6, 0.2); color: #D97706;',
+  approved: 'background: rgba(30, 64, 175, 0.2); color: #1E40AF;',
+  ordered: 'background: rgba(22, 163, 74, 0.2); color: #16A34A;',
+  received: 'background: rgba(71, 85, 105, 0.2); color: #475569;',
+  rejected: 'background: rgba(220, 38, 38, 0.2); color: #DC2626;',
+};
+
+/**
+ * Generate HTML string for a Purchase Order PDF.
+ * Uses CIAMS design system colors and typography.
+ */
+export function generatePOHtml(po: PurchaseOrder): string {
+  const statusLabel = statusLabels[po.status] ?? po.status;
+  const statusStyle = statusBadgeClass[po.status] ?? statusBadgeClass.draft;
+
+  const itemRows = (po.items ?? []).map((item) => {
+    const gstPct = item.gstPercentage ?? DEFAULT_GST_PERCENTAGE;
+    const gstAmt =
+      item.gstAmount ?? Math.round((item.amount * gstPct) / 100);
+    const totalWithGst = item.amount + gstAmt;
+    return `
+      <tr>
+        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A;">${escapeHtml(item.itemName)}</td>
+        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 13px; color: #64748B;">${escapeHtml(item.itemSku)}</td>
+        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${item.quantity}</td>
+        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${formatCurrency(item.unitPrice)}</td>
+        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${gstPct}%</td>
+        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; font-weight: 600; color: #0F172A; text-align: right;">${formatCurrency(totalWithGst)}</td>
+      </tr>`;
+  }).join('');
+
+  const footerParts: string[] = [];
+  footerParts.push(`Created by ${escapeHtml(po.createdByName ?? '—')} on ${formatDate(po.createdAt)}`);
+  if (po.reviewedByName) {
+    footerParts.push(`Reviewed by ${escapeHtml(po.reviewedByName)} on ${formatDate(po.reviewedAt)}`);
+  }
+  if (po.receivedByName) {
+    footerParts.push(`Received by ${escapeHtml(po.receivedByName)} on ${formatDate(po.receivedAt)}`);
+  }
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, Helvetica, sans-serif; color: #0F172A; padding: 24px; font-size: 15px; }
+    .header { border-bottom: 2px solid #1E40AF; padding-bottom: 16px; margin-bottom: 24px; }
+    .section { margin-bottom: 24px; }
+    .section-title { font-size: 17px; font-weight: 600; color: #0F172A; margin-bottom: 12px; }
+    .label { font-size: 13px; color: #64748B; }
+    .value { font-size: 15px; color: #0F172A; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #E2E8F0; }
+    th { background: #F8FAFC; font-size: 13px; color: #64748B; font-weight: 600; padding: 8px 12px; text-align: left; }
+    .status-badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 500; margin-left: 8px; }
+    .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #E2E8F0; font-size: 13px; color: #64748B; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1 style="font-size: 22px; font-weight: 600; margin: 0; color: #0F172A;">PURCHASE ORDER</h1>
+    <p style="font-size: 15px; margin: 8px 0 0; color: #0F172A;">
+      ${escapeHtml(po.poNumber)}
+      <span class="status-badge" style="${statusStyle}">${escapeHtml(statusLabel)}</span>
+    </p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">VENDOR</div>
+    <p style="margin: 0 0 4px; font-size: 15px; color: #0F172A;">${escapeHtml(po.vendorName ?? '—')}</p>
+    <p style="margin: 0 0 4px; font-size: 13px; color: #64748B;">📞 ${escapeHtml(po.vendorContact ?? '—')}</p>
+    ${po.vendorEmail ? `<p style="margin: 0 0 4px; font-size: 13px; color: #64748B;">${escapeHtml(po.vendorEmail)}</p>` : ''}
+    ${po.vendorAddress ? `<p style="margin: 0; font-size: 13px; color: #64748B;">${escapeHtml(po.vendorAddress)}</p>` : ''}
+  </div>
+
+  <div class="section">
+    <div class="section-title">ITEMS</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>SKU</th>
+          <th style="text-align: right;">Qty</th>
+          <th style="text-align: right;">Unit Price</th>
+          <th style="text-align: right;">GST %</th>
+          <th style="text-align: right;">Amount (incl. GST)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemRows}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">SUMMARY</div>
+    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+      <span class="label">Subtotal</span>
+      <span class="value">${formatCurrency(po.subtotal ?? 0)}</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+      <span class="label">Total GST</span>
+      <span class="value">${formatCurrency(po.gstAmount ?? 0)}</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 1px solid #E2E8F0;">
+      <span class="section-title" style="margin: 0;">Total</span>
+      <span style="font-size: 17px; font-weight: 600; color: #0F172A;">${formatCurrency(po.totalAmount ?? 0)}</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">JUSTIFICATION</div>
+    <p style="margin: 0; font-size: 15px; color: #0F172A;">${escapeHtml(po.justification || '—')}</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">EXPECTED DELIVERY</div>
+    <p style="margin: 0; font-size: 15px; color: #0F172A;">${formatDate(po.expectedDeliveryDate)}</p>
+  </div>
+
+  <div class="footer">
+    ${footerParts.map((p) => `<p style="margin: 0 0 4px;">${p}</p>`).join('')}
+  </div>
+</body>
+</html>`;
+}
+
+function escapeHtml(text: string): string {
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;',
+  };
+  return text.replace(/[&<>"']/g, (c) => map[c] ?? c);
+}
+
+/**
+ * Build a PurchaseOrder-like object from form data for printing draft/preview.
+ */
+export function buildDraftPOForPrint(
+  formData: {
+    vendorName: string;
+    vendorContact: string;
+    vendorEmail?: string;
+    vendorAddress?: string;
+    items: PurchaseOrderItem[];
+    justification: string;
+    expectedDeliveryDate: Date | null;
+    userName: string;
+  },
+  poNumber: string = 'DRAFT'
+): PurchaseOrder {
+  const items = formData.items.map((i) => {
+    const amount = i.amount ?? i.quantity * i.unitPrice;
+    const gstPct = i.gstPercentage ?? DEFAULT_GST_PERCENTAGE;
+    const gstAmt = i.gstAmount ?? Math.round((amount * gstPct) / 100);
+    return { ...i, amount, gstAmount: gstAmt };
+  });
+  const subtotal = items.reduce((s, i) => s + i.amount, 0);
+  const gstAmount = items.reduce((s, i) => s + (i.gstAmount ?? 0), 0);
+  const totalAmount = subtotal + gstAmount;
+  const now = new Date().toISOString();
+
+  return {
+    id: '',
+    poNumber,
+    vendorId: '',
+    vendorName: formData.vendorName,
+    vendorContact: formData.vendorContact,
+    vendorEmail: formData.vendorEmail,
+    vendorAddress: formData.vendorAddress,
+    items,
+    subtotal,
+    gstPercentage: subtotal > 0 ? (gstAmount / subtotal) * 100 : 0,
+    gstAmount,
+    totalAmount,
+    justification: formData.justification,
+    expectedDeliveryDate: formData.expectedDeliveryDate
+      ? formData.expectedDeliveryDate.toISOString()
+      : null,
+    documents: [],
+    status: 'draft',
+    createdBy: '',
+    createdByName: formData.userName,
+    createdAt: now,
+    reviewedBy: null,
+    reviewedByName: null,
+    reviewedAt: null,
+    adminComments: null,
+    rejectionReason: null,
+    receivedAt: null,
+    receivedBy: null,
+    receivedByName: null,
+    receivedNotes: null,
+    updatedAt: now,
+  };
+}
+
+/**
+ * Generate PDF from PO HTML and share via native share dialog.
+ * User can print or save to files.
+ */
+export async function printPurchaseOrder(po: PurchaseOrder): Promise<void> {
+  try {
+    const html = generatePOHtml(po);
+    const { uri } = await Print.printToFileAsync({
+      html,
+      width: 612,
+      height: 792,
+    });
+
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `Print ${po.poNumber}`,
+        UTI: '.pdf',
+      });
+    } else {
+      throw new Error('Sharing is not available on this device');
+    }
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error printing purchase order:', err);
+
+    if (
+      err.message?.includes('expo-print') ||
+      err.message?.includes('expo-sharing') ||
+      err.message?.includes('Cannot find module')
+    ) {
+      throw new Error(
+        'PDF printing requires expo-print and expo-sharing. Install with: npx expo install expo-print expo-sharing'
+      );
+    }
+
+    throw new Error(err.message ?? 'Failed to print purchase order');
+  }
+}

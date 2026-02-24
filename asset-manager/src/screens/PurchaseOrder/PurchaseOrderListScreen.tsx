@@ -26,10 +26,6 @@ import {
   selectPurchaseOrderLoading,
   selectPurchaseOrderFilters,
 } from '../../store/selectors/purchaseOrderSelectors';
-import {
-  selectIsStoreIncharge,
-  selectIsAdmin,
-} from '../../store/selectors/authSelectors';
 import type { PurchaseOrder } from '../../types/purchaseOrder';
 import type { PurchaseOrderStackParamList } from '../../navigation/PurchaseOrderStackParamList';
 
@@ -48,8 +44,6 @@ export const PurchaseOrderListScreen: React.FC = () => {
   const orders = useAppSelector(selectFilteredPurchaseOrders);
   const isLoading = useAppSelector(selectPurchaseOrderLoading);
   const filters = useAppSelector(selectPurchaseOrderFilters);
-  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
-  const isAdmin = useAppSelector(selectIsAdmin);
 
   useEffect(() => {
     dispatch(setLoading(true));
@@ -77,21 +71,17 @@ export const PurchaseOrderListScreen: React.FC = () => {
 
   const handlePOPress = useCallback(
     (po: PurchaseOrder) => {
-      if (po.status === 'pending_approval') {
-        if (isAdmin) {
-          navigation.navigate('ApprovePO', { poId: po.id });
-        } else {
-          navigation.navigate('CreatePO', { poId: po.id });
-        }
+      if (po.status === 'draft') {
+        navigation.navigate('CreatePO', { poId: po.id });
+      } else if (po.status === 'pending_approval') {
+        navigation.navigate('ApprovePO', { poId: po.id });
       } else if (po.status === 'approved' || po.status === 'ordered') {
         navigation.navigate('ReceivePO', { poId: po.id });
-      } else if (isStoreIncharge && (po.status === 'received' || po.status === 'rejected')) {
-        navigation.navigate('ApprovePO', { poId: po.id });
       } else {
-        navigation.navigate('CreatePO', { poId: po.id });
+        navigation.navigate('ApprovePO', { poId: po.id });
       }
     },
-    [navigation, isStoreIncharge, isAdmin]
+    [navigation]
   );
 
   const renderFilterChip = useCallback(

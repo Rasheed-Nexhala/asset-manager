@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   ScrollView,
@@ -22,6 +22,7 @@ import {
   PendingRequestsWidget,
 } from '../components';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
+import type { RootState } from '../store';
 import {
   selectIsAdmin,
   selectIsStoreIncharge,
@@ -37,7 +38,7 @@ import { selectLowStockItems, selectItemsLoading } from '../store/selectors/inve
 import { selectMaintenanceError } from '../store/selectors/maintenanceSelectors';
 import { selectPurchaseOrders, selectPurchaseOrderLoading, selectPurchaseOrderError } from '../store/selectors/purchaseOrderSelectors';
 import { selectAllSites, selectSiteById } from '../store/selectors/sitesSelectors';
-import { selectAllItems, selectInventoryByLocation } from '../store/selectors/inventorySelectors';
+import { selectAllItems, selectInventoryByLocation, selectEmptyInventory } from '../store/selectors/inventorySelectors';
 import { selectAssignedSiteIdForUser } from '../store/selectors/sitesSelectors';
 import { selectActivityLogError } from '../store/selectors/activityLogSelectors';
 import { clearError } from '../store/slices/activityLogSlice';
@@ -54,6 +55,9 @@ import { useDashboardSubscriptions } from '../hooks/useDashboardSubscriptions';
 import { getLocationId } from '../utils/locationUtils';
 import type { DashboardStackParamList } from '../navigation/DashboardStackParamList';
 import type { Request } from '../types/request';
+
+/** Fallback when authSelectors fails to load (e.g. circular deps, hot reload) */
+const selectIsStoreInchargeSafe = selectIsStoreIncharge ?? ((_state: RootState) => false);
 
 type NavigationProp = CompositeNavigationProp<
   StackNavigationProp<DashboardStackParamList, 'DashboardHome'>,
@@ -89,16 +93,18 @@ export const DashboardScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   const isAdmin = useAppSelector(selectIsAdmin);
-  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const isStoreIncharge = useAppSelector(selectIsStoreInchargeSafe);
   const isSiteManager = useAppSelector(selectIsSiteManager);
   const displayName = useAppSelector(selectUserDisplayName) ?? '';
   const userId = useAppSelector(selectUserId);
   const roleType = useAppSelector(selectUserRoleType);
   const role = roleType ?? 'Unassigned';
   const assignedSiteId = useAppSelector(selectAssignedSiteIdForUser(userId));
-  const assignedSite = useAppSelector(
-    assignedSiteId ? selectSiteById(assignedSiteId) : () => null
+  const assignedSiteSelector = useMemo(
+    () => (assignedSiteId ? selectSiteById(assignedSiteId) : (_state: RootState) => null),
+    [assignedSiteId]
   );
+  const assignedSite = useAppSelector(assignedSiteSelector);
   const siteName = assignedSite?.name ?? null;
 
   const requests = useAppSelector(selectAllRequests);
@@ -123,11 +129,14 @@ export const DashboardScreen: React.FC = () => {
   const showInventory = canManageInventory || (isStoreIncharge && permissions.length === 0);
   const showOrders = canApproveOrders || (isStoreIncharge && permissions.length === 0);
 
-  const siteInventory = useAppSelector(
-    assignedSiteId
-      ? selectInventoryByLocation(getLocationId('site', assignedSiteId))
-      : () => []
+  const siteInventorySelector = useMemo(
+    () =>
+      assignedSiteId
+        ? selectInventoryByLocation(getLocationId('site', assignedSiteId))
+        : selectEmptyInventory,
+    [assignedSiteId]
   );
+  const siteInventory = useAppSelector(siteInventorySelector);
 
   const { isInitialLoad, isRefreshing, triggerRefresh } = useDashboardSubscriptions({
     userId,

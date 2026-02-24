@@ -35,7 +35,32 @@ const PO_COUNTERS_COLLECTION = 'poCounters';
 const INVENTORY_COLLECTION = 'inventory';
 const ITEMS_COLLECTION = 'items';
 
-const GST_PERCENTAGE = 18;
+const DEFAULT_GST_PERCENTAGE = 18;
+
+/**
+ * Normalize items when reading from Firestore (backward compat for old POs without per-item GST)
+ */
+const normalizePOItemsForRead = (
+  rawItems: Array<Record<string, unknown>>
+): PurchaseOrderFirestore['items'] =>
+  (rawItems ?? []).map((item) => {
+    const amount = (item.amount as number) ?? 0;
+    const gstPct = (item.gstPercentage as number | undefined) ?? DEFAULT_GST_PERCENTAGE;
+    const gstAmount =
+      (item.gstAmount as number | undefined) ?? Math.round((amount * gstPct) / 100);
+    return {
+      itemId: item.itemId as string,
+      itemName: item.itemName as string,
+      itemSku: item.itemSku as string,
+      isExistingItem: (item.isExistingItem as boolean) ?? false,
+      quantity: (item.quantity as number) ?? 0,
+      unitPrice: (item.unitPrice as number) ?? 0,
+      amount,
+      gstPercentage: gstPct,
+      gstAmount,
+      receivedQuantity: (item.receivedQuantity as number | null) ?? null,
+    };
+  });
 
 /**
  * Generate unique PO number using a counter document.
@@ -74,30 +99,41 @@ const generatePoNumber = async (): Promise<string> => {
 };
 
 /**
- * Build PO items with amounts from CreatePurchaseOrderData
+ * Build PO items with amounts and per-item GST from CreatePurchaseOrderData
  */
 const buildPOItems = (
   items: CreatePurchaseOrderData['items']
 ): PurchaseOrderFirestore['items'] =>
-  items.map((item) => ({
-    itemId: item.itemId,
-    itemName: item.itemName,
-    itemSku: item.itemSku,
-    isExistingItem: item.isExistingItem,
-    quantity: item.quantity,
-    unitPrice: item.unitPrice,
-    amount: item.quantity * item.unitPrice,
-    receivedQuantity: null,
-  }));
+  items.map((item) => {
+    const amount = item.quantity * item.unitPrice;
+    const gstPct = item.gstPercentage ?? DEFAULT_GST_PERCENTAGE;
+    const gstAmount = Math.round((amount * gstPct) / 100);
+    return {
+      itemId: item.itemId,
+      itemName: item.itemName,
+      itemSku: item.itemSku,
+      isExistingItem: item.isExistingItem,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      amount,
+      gstPercentage: gstPct,
+      gstAmount,
+      receivedQuantity: null,
+    };
+  });
 
 /**
- * Calculate subtotal, GST, total from items
+ * Calculate subtotal, GST, total from items (per-item GST)
  */
 const calculateTotals = (items: PurchaseOrderFirestore['items']) => {
   const subtotal = items.reduce((sum, i) => sum + i.amount, 0);
-  const gstAmount = Math.round((subtotal * GST_PERCENTAGE) / 100);
+  const gstAmount = items.reduce(
+    (sum, i) => sum + (i.gstAmount ?? Math.round((i.amount * (i.gstPercentage ?? DEFAULT_GST_PERCENTAGE)) / 100)),
+    0
+  );
   const totalAmount = subtotal + gstAmount;
-  return { subtotal, gstAmount, totalAmount };
+  const gstPercentage = subtotal > 0 ? (gstAmount / subtotal) * 100 : 0;
+  return { subtotal, gstAmount, totalAmount, gstPercentage };
 };
 
 /**
@@ -112,7 +148,7 @@ export const createPO = async (
   try {
     const poNumber = await generatePoNumber();
     const items = buildPOItems(data.items);
-    const { subtotal, gstAmount, totalAmount } = calculateTotals(items);
+    const { subtotal, gstAmount, totalAmount, gstPercentage } = calculateTotals(items);
 
     const expectedDeliveryTimestamp = data.expectedDeliveryDate
       ? Timestamp.fromDate(new Date(data.expectedDeliveryDate))
@@ -127,7 +163,7 @@ export const createPO = async (
       vendorAddress: data.vendorAddress ?? null,
       items,
       subtotal,
-      gstPercentage: GST_PERCENTAGE,
+      gstPercentage,
       gstAmount,
       totalAmount,
       justification: data.justification.trim(),
@@ -177,6 +213,7 @@ export const getPOById = async (poId: string): Promise<PurchaseOrder | null> => 
     }
 
     const data = poDoc.data();
+    const items = normalizePOItemsForRead(data.items ?? []);
     const firestorePO: PurchaseOrderFirestore = {
       id: poDoc.id,
       poNumber: data.poNumber,
@@ -185,9 +222,9 @@ export const getPOById = async (poId: string): Promise<PurchaseOrder | null> => 
       vendorContact: data.vendorContact,
       vendorEmail: data.vendorEmail,
       vendorAddress: data.vendorAddress,
-      items: data.items,
+      items,
       subtotal: data.subtotal,
-      gstPercentage: data.gstPercentage ?? GST_PERCENTAGE,
+      gstPercentage: data.gstPercentage ?? DEFAULT_GST_PERCENTAGE,
       gstAmount: data.gstAmount,
       totalAmount: data.totalAmount,
       justification: data.justification,
@@ -242,7 +279,7 @@ export const updatePO = async (
     }
 
     const items = buildPOItems(data.items);
-    const { subtotal, gstAmount, totalAmount } = calculateTotals(items);
+    const { subtotal, gstAmount, totalAmount, gstPercentage } = calculateTotals(items);
 
     const expectedDeliveryTimestamp = data.expectedDeliveryDate
       ? Timestamp.fromDate(new Date(data.expectedDeliveryDate))
@@ -256,6 +293,7 @@ export const updatePO = async (
       vendorAddress: data.vendorAddress ?? null,
       items,
       subtotal,
+      gstPercentage,
       gstAmount,
       totalAmount,
       justification: data.justification.trim(),
@@ -539,6 +577,7 @@ export const subscribeToPurchaseOrders = (
       snapshot.forEach((docSnap) => {
         try {
           const data = docSnap.data();
+          const items = normalizePOItemsForRead(data.items ?? []);
           const firestorePO: PurchaseOrderFirestore = {
             id: docSnap.id,
             poNumber: data.poNumber,
@@ -547,9 +586,9 @@ export const subscribeToPurchaseOrders = (
             vendorContact: data.vendorContact,
             vendorEmail: data.vendorEmail,
             vendorAddress: data.vendorAddress,
-            items: data.items,
+            items,
             subtotal: data.subtotal,
-            gstPercentage: data.gstPercentage ?? GST_PERCENTAGE,
+            gstPercentage: data.gstPercentage ?? DEFAULT_GST_PERCENTAGE,
             gstAmount: data.gstAmount,
             totalAmount: data.totalAmount,
             justification: data.justification,

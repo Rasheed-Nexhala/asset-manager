@@ -17,6 +17,8 @@ export type PurchaseOrderStatus =
 
 /**
  * Individual item in a purchase order
+ * gstPercentage: optional for backward compat (default 18 when reading old POs)
+ * gstAmount: optional for backward compat (computed from amount * gstPercentage when missing)
  */
 export interface PurchaseOrderItem {
   itemId: string;
@@ -26,6 +28,8 @@ export interface PurchaseOrderItem {
   quantity: number;
   unitPrice: number;
   amount: number;
+  gstPercentage?: number;
+  gstAmount?: number;
   receivedQuantity: number | null;
 }
 
@@ -165,6 +169,7 @@ export interface CreatePurchaseOrderData {
     isExistingItem: boolean;
     quantity: number;
     unitPrice: number;
+    gstPercentage: number;
   }>;
   justification: string;
   expectedDeliveryDate: string | null;

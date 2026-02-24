@@ -13,6 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { FormField } from '../../components/FormField';
+import { PODocumentCard } from '../../components/PurchaseOrder';
+import { printPurchaseOrder } from '../../utils/poPdfUtils';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
 import {
   approvePO,
@@ -84,6 +86,18 @@ export const ApprovePOScreen: React.FC = () => {
 
   const handleBack = useCallback(() => navigation.goBack(), [navigation]);
 
+  const handlePrint = useCallback(async () => {
+    if (!po) return;
+    try {
+      await printPurchaseOrder(po);
+    } catch (err) {
+      Alert.alert(
+        'Error',
+        err instanceof Error ? err.message : 'Failed to print'
+      );
+    }
+  }, [po]);
+
   const handleApprove = useCallback(async () => {
     if (!userId || !userName) return;
     setSaving(true);
@@ -137,6 +151,22 @@ export const ApprovePOScreen: React.FC = () => {
       setSaving(false);
     }
   }, [poId, userId, userName, rejectionReason, adminComments, dispatch, navigation]);
+
+  const handleMarkOrdered = useCallback(async () => {
+    setSaving(true);
+    try {
+      await dispatch(markPOOrdered({ poId })).unwrap();
+      Alert.alert('Success', 'Purchase order marked as ordered.', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : 'Failed to mark as ordered';
+      Alert.alert('Error', msg);
+    } finally {
+      setSaving(false);
+    }
+  }, [poId, dispatch, navigation]);
 
   if (loading || !po) {
     return (
@@ -194,7 +224,17 @@ export const ApprovePOScreen: React.FC = () => {
   if (po.status === 'ordered') {
     return (
       <ScreenLayout edges={['top']}>
-        <ScreenHeader title="Review PO" showBack onBackPress={handleBack} />
+        <ScreenHeader
+          title="Review PO"
+          showBack
+          onBackPress={handleBack}
+          rightAction={{
+            icon: 'print-outline',
+            label: 'Print',
+            onPress: handlePrint,
+            accessibilityLabel: 'Print purchase order',
+          }}
+        />
         <View className="flex-1 items-center justify-center px-4">
           <Text className="text-[15px] text-[#64748B] text-center">
             This PO has been marked as ordered. You can receive it from the list.
@@ -206,22 +246,6 @@ export const ApprovePOScreen: React.FC = () => {
 
   const canMarkOrdered =
     po.status === 'approved' && (isAdmin || isStoreIncharge);
-
-  const handleMarkOrdered = useCallback(async () => {
-    setSaving(true);
-    try {
-      await dispatch(markPOOrdered({ poId })).unwrap();
-      Alert.alert('Success', 'Purchase order marked as ordered.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : 'Failed to mark as ordered';
-      Alert.alert('Error', msg);
-    } finally {
-      setSaving(false);
-    }
-  }, [poId, dispatch, navigation]);
 
   const isReadOnly =
     po.status === 'received' || po.status === 'rejected';
@@ -243,6 +267,12 @@ export const ApprovePOScreen: React.FC = () => {
         title={isAdmin ? `Review ${po.poNumber}` : po.poNumber}
         showBack
         onBackPress={handleBack}
+        rightAction={{
+          icon: 'print-outline',
+          label: 'Print',
+          onPress: handlePrint,
+          accessibilityLabel: 'Print purchase order',
+        }}
       />
 
       <ScrollView
@@ -309,9 +339,21 @@ export const ApprovePOScreen: React.FC = () => {
                 </Text>
               </View>
               <View className="flex-1 min-w-0">
-                <Text className="text-[13px] text-[#64748B] mb-0.5">Amount</Text>
+                <Text className="text-[13px] text-[#64748B] mb-0.5">GST %</Text>
+                <Text className="text-[15px] text-[#0F172A]">
+                  {item.gstPercentage ?? 18}%
+                </Text>
+              </View>
+              <View className="flex-1 min-w-0">
+                <Text className="text-[13px] text-[#64748B] mb-0.5">Total</Text>
                 <Text className="text-[15px] font-semibold text-[#0F172A]">
-                  {formatCurrency(item.amount)}
+                  {formatCurrency(
+                    item.amount +
+                      (item.gstAmount ??
+                        Math.round(
+                          (item.amount * (item.gstPercentage ?? 18)) / 100
+                        ))
+                  )}
                 </Text>
               </View>
             </View>
@@ -319,9 +361,24 @@ export const ApprovePOScreen: React.FC = () => {
         </View>
 
         <View className="mb-4">
-          <Text className="text-[15px] font-semibold text-[#0F172A]">
-            Total: {formatCurrency(po.totalAmount)}
-          </Text>
+          <View className="flex-row justify-between mb-1">
+            <Text className="text-[15px] text-[#64748B]">Subtotal</Text>
+            <Text className="text-[15px] text-[#0F172A]">
+              {formatCurrency(po.subtotal)}
+            </Text>
+          </View>
+          <View className="flex-row justify-between mb-1">
+            <Text className="text-[15px] text-[#64748B]">Total GST</Text>
+            <Text className="text-[15px] text-[#0F172A]">
+              {formatCurrency(po.gstAmount)}
+            </Text>
+          </View>
+          <View className="flex-row justify-between pt-2 border-t border-[#E2E8F0]">
+            <Text className="text-[15px] font-semibold text-[#0F172A]">Total</Text>
+            <Text className="text-[15px] font-semibold text-[#0F172A]">
+              {formatCurrency(po.totalAmount)}
+            </Text>
+          </View>
         </View>
 
         <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-4">
@@ -354,6 +411,27 @@ export const ApprovePOScreen: React.FC = () => {
             )}
           </View>
         )}
+
+        {po.status === 'received' &&
+          Array.isArray(po.documents) &&
+          po.documents.length > 0 && (
+            <View className="mb-4">
+              <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">
+                ATTACHED DOCUMENTS
+              </Text>
+              <Text className="text-[13px] text-[#64748B] mb-2">
+                Invoice and bills attached at receipt
+              </Text>
+              {po.documents.map((doc, index) => (
+                <PODocumentCard
+                  key={`${doc.fileName}-${index}`}
+                  fileName={doc.fileName}
+                  fileUrl={doc.fileUrl}
+                  type={doc.type}
+                />
+              ))}
+            </View>
+          )}
 
         {showApproveReject && (
           <>
