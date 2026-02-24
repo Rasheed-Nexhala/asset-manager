@@ -10,7 +10,7 @@ describe('DashboardGreeting', () => {
         role="Admin"
       />
     );
-    expect(screen.getByText(/Hello, Admin/)).toBeTruthy();
+    expect(screen.getByText(/Hello, John Doe/)).toBeTruthy();
   });
 
   it('renders correctly for Site Manager with site name', () => {
