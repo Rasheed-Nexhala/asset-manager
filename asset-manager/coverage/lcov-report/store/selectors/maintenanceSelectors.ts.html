@@ -3,15 +3,15 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for utils/skuGenerationUtils.ts</title>
+    <title>Code coverage report for store/selectors/maintenanceSelectors.ts</title>
     <meta charset="utf-8" />
-    <link rel="stylesheet" href="../prettify.css" />
-    <link rel="stylesheet" href="../base.css" />
-    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style type='text/css'>
         .coverage-summary .sorter {
-            background-image: url(../sort-arrow-sprite.png);
+            background-image: url(../../sort-arrow-sprite.png);
         }
     </style>
 </head>
@@ -19,34 +19,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../index.html">All files</a> / <a href="index.html">utils</a> skuGenerationUtils.ts</h1>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">store/selectors</a> maintenanceSelectors.ts</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">97.22% </span>
+                <span class="strong">98.03% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>35/36</span>
-            </div>
-        
-            
-            <div class='fl pad1y space-right2'>
-                <span class="strong">91.66% </span>
-                <span class="quiet">Branches</span>
-                <span class='fraction'>22/24</span>
+                <span class='fraction'>50/51</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>4/4</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">96.66% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>6/6</span>
+                <span class='fraction'>29/30</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>32/32</span>
+                <span class='fraction'>41/41</span>
             </div>
         
             
@@ -151,10 +151,25 @@
 <a name='L86'></a><a href='#L86'>86</a>
 <a name='L87'></a><a href='#L87'>87</a>
 <a name='L88'></a><a href='#L88'>88</a>
-<a name='L89'></a><a href='#L89'>89</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -162,171 +177,210 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">22x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">15x</span>
-<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
- * SKU Generation Utilities
- * Auto-generate SKUs from HSN codes for steel items with incrementing suffixes
- */
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { createSelector } from '@reduxjs/toolkit';
+import { RootState } from '../index';
+import { Maintenance, MaintenanceStatus } from '../../types/maintenance';
 &nbsp;
-import { getSkusWithPrefix } from '../services/firebase/inventoryService';
+// Base selector
+export const selectMaintenanceState = <span class="fstat-no" title="function not covered" >(s</span>tate: RootState) =&gt; <span class="cstat-no" title="statement not covered" >state.maintenance;</span>
 &nbsp;
-/** Format for HSN-based SKU: HSN-XXX (e.g., 721699-001) */
-const SKU_SUFFIX_LENGTH = 3;
+// All maintenance records
+export const selectMaintenanceRecords = (state: RootState) =&gt;
+  state.maintenance.maintenanceRecords;
 &nbsp;
-/**
- * Sanitize HSN code for use as SKU prefix
- * Removes non-alphanumeric chars, keeps digits and hyphens
- */
-function sanitizeHsnForPrefix(hsnCode: string): string {
-  if (!hsnCode || typeof hsnCode !== 'string') return '';
-  return hsnCode.trim().replace(/[^a-zA-Z0-9-]/g, '');
-}
+// Selected maintenance record
+export const selectSelectedMaintenance = (state: RootState) =&gt;
+  state.maintenance.selectedMaintenance;
 &nbsp;
-/**
- * Get the next available SKU suffix for a given HSN prefix
- * Queries existing SKUs starting with prefix and finds highest number
- *
- * @param hsnPrefix - Prefix like "721699" (will become "721699-")
- * @returns Next suffix number (1, 2, 3, ...)
- */
-export async function getNextSkuSuffix(hsnPrefix: string): Promise&lt;number&gt; {
-  const sanitized = sanitizeHsnForPrefix(hsnPrefix);
-  if (!sanitized) return 1;
+// Loading state
+export const selectMaintenanceLoading = (state: RootState) =&gt;
+  state.maintenance.loading;
 &nbsp;
-  const prefix = `${sanitized}-`;
-  const existingSkus = await getSkusWithPrefix(prefix);
+// Error state
+export const selectMaintenanceError = (state: RootState) =&gt;
+  state.maintenance.error;
 &nbsp;
-  if (existingSkus.length === 0) return 1;
+// Filters
+export const selectMaintenanceFilters = (state: RootState) =&gt;
+  state.maintenance.filters;
 &nbsp;
-  const suffixes = existingSkus
-    .map((sku) =&gt; {
-      const parts = sku.split('-');
-      const lastPart = parts[parts.length - 1];
-      const num = parseInt(lastPart, 10);
-      return isNaN(num) ? <span class="branch-0 cbranch-no" title="branch not covered" >0 </span>: num;
-    })
-    .filter((n) =&gt; n &gt; 0);
+// Active maintenance records (pending, partial_return)
+export const selectActiveMaintenanceRecords = createSelector(
+  [selectMaintenanceRecords],
+  (records) =&gt;
+    records.filter((record) =&gt;
+      ['pending', 'partial_return'].includes(record.status)
+    )
+);
 &nbsp;
-  <span class="missing-if-branch" title="if path not taken" >I</span>if (suffixes.length === 0) <span class="cstat-no" title="statement not covered" >return 1;</span>
-  return Math.max(...suffixes) + 1;
-}
+// Written off records
+export const selectWrittenOffRecords = createSelector(
+  [selectMaintenanceRecords],
+  (records) =&gt; records.filter((record) =&gt; record.status === 'written_off')
+);
 &nbsp;
-/**
- * Generate SKU from steel master HSN code with auto-incrementing suffix
- * Example: HSN "721699" -&gt; "721699-001", next call -&gt; "721699-002"
- *
- * @param hsnCode - HSN/SAC code from steel master (e.g., "72169990" or "721699/80")
- * @returns Generated SKU (e.g., "721699-001")
- */
-export async function generateSkuFromHsn(hsnCode: string): Promise&lt;string&gt; {
-  const sanitized = sanitizeHsnForPrefix(hsnCode);
-  if (!sanitized) {
-    throw new Error('HSN code is required for SKU generation');
+// Returned records
+export const selectReturnedRecords = createSelector(
+  [selectMaintenanceRecords],
+  (records) =&gt; records.filter((record) =&gt; record.status === 'returned')
+);
+&nbsp;
+// History records (returned + written_off)
+export const selectMaintenanceHistory = createSelector(
+  [selectMaintenanceRecords],
+  (records) =&gt;
+    records.filter((record) =&gt;
+      ['returned', 'written_off'].includes(record.status)
+    )
+);
+&nbsp;
+// Factory selector: Get maintenance records by item ID
+export const selectMaintenanceByItemId = (itemId: string) =&gt;
+  createSelector([selectMaintenanceRecords], (records) =&gt;
+    records.filter((record) =&gt; record.itemId === itemId)
+  );
+&nbsp;
+// Filtered records based on current filter
+export const selectFilteredMaintenanceRecords = createSelector(
+  [selectMaintenanceRecords, selectMaintenanceFilters],
+  (records, filters) =&gt; {
+    if (filters.status === 'all') {
+      return records;
+    }
+    return records.filter((record) =&gt; record.status === filters.status);
   }
+);
 &nbsp;
-  const suffix = await getNextSkuSuffix(sanitized);
-  const suffixStr = suffix.toString().padStart(SKU_SUFFIX_LENGTH, '0');
-  return `${sanitized}-${suffixStr}`;
-}
+// Statistics
+export const selectMaintenanceStats = createSelector(
+  [selectMaintenanceRecords],
+  (records) =&gt; {
+    const active = records.filter((r) =&gt;
+      ['pending', 'partial_return'].includes(r.status)
+    );
+    const pending = records.filter((r) =&gt; r.status === 'pending');
+    const partialReturn = records.filter((r) =&gt; r.status === 'partial_return');
+    const writtenOff = records.filter((r) =&gt; r.status === 'written_off');
 &nbsp;
-/**
- * Validate and format SKU
- *
- * @param sku - SKU string to validate
- * @returns Validation result with optional error message
- */
-export function validateSku(sku: string): { valid: boolean; error?: string } {
-  if (!sku || typeof sku !== 'string') {
-    return { valid: false, error: 'SKU is required' };
+    return {
+      total: records.length,
+      active: active.length,
+      pending: pending.length,
+      partialReturn: partialReturn.length,
+      writtenOff: writtenOff.length,
+    };
   }
-  const trimmed = sku.trim();
-  if (!trimmed) {
-    return { valid: false, error: 'SKU cannot be empty' };
-  }
-  if (trimmed.length &gt; 50) {
-    return { valid: false, error: 'SKU is too long' };
-  }
-  if (/[^\w\-]/.test(trimmed)) {
-    return { valid: false, error: 'SKU can only contain letters, numbers, hyphens, and underscores' };
-  }
-  return { valid: true };
-}
+);
+&nbsp;
+// Maintenance records by status (factory selector)
+export const selectMaintenanceByStatus = (status: MaintenanceStatus) =&gt;
+  createSelector([selectMaintenanceRecords], (records) =&gt;
+    records.filter((record) =&gt; record.status === status)
+  );
+&nbsp;
+// Maintenance by ID (factory selector)
+export const selectMaintenanceById = (maintenanceId: string) =&gt;
+  createSelector([selectMaintenanceRecords], (records) =&gt;
+    records.find((record) =&gt; record.id === maintenanceId) || null
+  );
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -336,14 +390,14 @@ export function validateSku(sku: string): { valid: boolean; error?: string } {
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
                 at 2026-02-24T17:58:18.830Z
             </div>
-        <script src="../prettify.js"></script>
+        <script src="../../prettify.js"></script>
         <script>
             window.onload = function () {
                 prettyPrint();
             };
         </script>
-        <script src="../sorter.js"></script>
-        <script src="../block-navigation.js"></script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
     </body>
 </html>
     

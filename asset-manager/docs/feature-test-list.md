@@ -140,8 +140,10 @@ This document maps ALL features, functions, components, screens, Redux slices, h
 ## Summary Checklist
 
 - [x] Level 1: All utility tests passing (authValidation, weightConversionUtils, skuGenerationUtils, dateSerialization, locationUtils, requestUtils, csvExport, poPdfUtils)
-- [ ] Level 2: Redux slice tests (authSlice done; inventorySlice, requestsSlice, etc. pending)
-- [ ] Level 3: Selector tests (optional but valuable)
+- [x] Level 2: Redux slice tests (all 8 slices)
+- [x] Level 3: Selector tests (authSelectors, requestSelectors, inventorySelectors, purchaseOrderSelectors, sitesSelectors, steelMasterSelectors, maintenanceSelectors, activityLogSelectors)
+- [ ] Level 4: Hooks (useWeightViewPreference, useInventoryError done; useAuth, useAuthStateSync, etc. pending)
+- [x] Level 5: Component tests (DashboardGreeting, RequestCard, FormField)
 - [ ] Level 4: Key hooks tested
 - [ ] Level 5: Core UI components tested
 - [ ] Level 6: Form components tested
