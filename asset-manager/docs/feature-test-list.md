@@ -143,10 +143,9 @@ This document maps ALL features, functions, components, screens, Redux slices, h
 - [x] Level 2: Redux slice tests (all 8 slices)
 - [x] Level 3: Selector tests (authSelectors, requestSelectors, inventorySelectors, purchaseOrderSelectors, sitesSelectors, steelMasterSelectors, maintenanceSelectors, activityLogSelectors)
 - [ ] Level 4: Hooks (useWeightViewPreference, useInventoryError done; useAuth, useAuthStateSync, etc. pending)
-- [x] Level 5: Component tests (DashboardGreeting, RequestCard, FormField)
+- [x] Level 5: Component tests (DashboardGreeting, RequestCard, FormField, RequestStatusBadge, StockStatusBadge, AuthLogo, PrioritySelector, SiteCard, POCard, ItemCard)
 - [ ] Level 4: Key hooks tested
-- [ ] Level 5: Core UI components tested
-- [ ] Level 6: Form components tested
+- [ ] Level 6: Form components (VendorForm, UpdatePasswordForm, SteelMasterForm done; SiteForm, ItemSelectorModal pending)
 - [ ] Level 7: Main screens tested
 - [ ] Level 8: Critical workflows covered
 
