@@ -57,6 +57,7 @@ export const AddSiteScreen: React.FC = () => {
         <View
           className="p-3 mx-4 mt-3 rounded-lg bg-[#DC2626]/10 border-[1.5px] border-[#DC2626]"
           accessibilityRole="alert"
+          accessibilityLabel={error}
           accessibilityLiveRegion="polite"
         >
           <View className="flex-row items-start gap-2">

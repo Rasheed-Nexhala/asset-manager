@@ -19,7 +19,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
   return (
     <ScreenLayout edges={['top', 'bottom']}>
       <View className="flex-1 items-center justify-center px-4">
-        <ActivityIndicator size="large" color="#1E40AF" />
+        <ActivityIndicator size="large" color="#1E40AF" testID="loading-indicator" />
         <Text className="text-[15px] text-[#64748B] mt-4">{message}</Text>
       </View>
     </ScreenLayout>

@@ -1,7 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { View, ActivityIndicator, Text } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { ScreenHeader, ScreenLayout, Users } from '../../components';
+import { ScreenHeader } from '../../components/ScreenHeader';
+import { ScreenLayout } from '../../components/layout/ScreenLayout';
+import { Users } from '../../components/Users/Users';
 
 export const UsersScreen: React.FC = () => {
   const navigation = useNavigation();

@@ -120,6 +120,29 @@ This document maps ALL features, functions, components, screens, Redux slices, h
 | `CentralStoreInventoryScreen.tsx` | `CentralStoreInventoryScreen.test.tsx` | navigation, inventoryService, categoryService, inventoryThunks | List, search, filters, loading, error, item navigation |
 | `PurchaseOrderListScreen.tsx` | `PurchaseOrderListScreen.test.tsx` | navigation, purchaseOrderService | List, status filters, loading, empty state, subscription error |
 | `ActivityLogScreen.tsx` | `ActivityLogScreen.test.tsx` | activityLogThunks | Header, Export, loading/empty states, filters, clear filters, error, log list, filter modal, loading more |
+| `ReceivePOScreen.tsx` | `ReceivePOScreen.test.tsx` | getPOById, receivePO, ImagePicker | Loading, error, form, submit |
+| `CreatePOScreen.tsx` | `CreatePOScreen.test.tsx` | vendorService, purchaseOrderThunks | Create form, validation, submit |
+| `RejectRequestScreen.tsx` | `RejectRequestScreen.test.tsx` | requestService, rejectRequest | Loading, form, validation, submit |
+| `ProcessRequestScreen.tsx` | `ProcessRequestScreen.test.tsx` | requestService, approveRequest | Loading, request items, approve |
+| `EditRequestScreen.tsx` | `EditRequestScreen.test.tsx` | requestService, editRequest | Draft edit, save, submit |
+| `ConfirmTransferScreen.tsx` | `ConfirmTransferScreen.test.tsx` | requestService, transferRequest | Loading, form, validation, submit |
+| `MaintenanceDashboardScreen.tsx` | `MaintenanceDashboardScreen.test.tsx` | subscribeToMaintenance | Tabs, list, add, card press |
+| `MaintenanceDetailScreen.tsx` | `MaintenanceDetailScreen.test.tsx` | subscribeToMaintenanceById | Details, Return, Write-off nav |
+| `VendorManagementScreen.tsx` | `VendorManagementScreen.test.tsx` | subscribeToVendors | List, search, add, edit nav |
+| `AddVendorScreen.tsx` | `AddVendorScreen.test.tsx` | getVendorById, createVendor | Create/edit form, validation |
+| `SteelMasterScreen.tsx` | `SteelMasterScreen.test.tsx` | steelMasterThunks | List, add/edit form |
+| `AddEditItemScreen.tsx` | `AddEditItemScreen.test.tsx` | inventoryThunks | Create/edit form, validation |
+| `ItemDetailScreen.tsx` | `ItemDetailScreen.test.tsx` | inventoryThunks | Details, edit, add stock |
+| `CategoryManagementScreen.tsx` | `CategoryManagementScreen.test.tsx` | subscribeCategories | List, search, add/edit |
+| `OtherSiteInventoryScreen.tsx` | `OtherSiteInventoryScreen.test.tsx` | getSite, fetchInventoryByLocation | Loading, site info, inventory |
+| `MySiteInventoryScreen.tsx` | `MySiteInventoryScreen.test.tsx` | subscribeToSites | User site inventory, search, other sites |
+| `AddSiteScreen.tsx` | `AddSiteScreen.test.tsx` | createSite | Form, validation, submit |
+| `EditSiteScreen.tsx` | `EditSiteScreen.test.tsx` | getSite, updateSite | Loading, form, submit |
+| `UsersScreen.tsx` | `UsersScreen.test.tsx` | subscribeToAllUsers | Loading, user list |
+| `UpdatePasswordScreen.tsx` | `UpdatePasswordScreen.test.tsx` | UpdatePasswordForm | Form, success, goBack |
+| `MyActivityScreen.tsx` | `MyActivityScreen.test.tsx` | subscribeToMyRecentActivityRealtime | Loading, list, detail modal |
+| `AuthFlowScreen.tsx` | `AuthFlowScreen.test.tsx` | authThunks | Login/Signup toggle |
+| `LoadingScreen.tsx` | `LoadingScreen.test.tsx` | — | Message, ActivityIndicator |
 
 ---
 

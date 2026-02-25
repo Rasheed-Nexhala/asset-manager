@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { SiteManagementScreen } from '../SiteManagementScreen';
@@ -29,10 +29,23 @@ jest.mock('react-native-safe-area-context', () => ({
 
 const mockUnsubscribe = jest.fn();
 let mockSitesToReturn: Site[] | null = null;
+const defer = (fn: () => void) => {
+  if (typeof queueMicrotask === 'function') {
+    queueMicrotask(fn);
+  } else {
+    setTimeout(fn, 0);
+  }
+};
 jest.mock('../../../services/firebase/siteService', () => ({
   subscribeToSites: jest.fn((callback: (sites: Site[]) => void) => {
     if (mockSitesToReturn !== null) {
-      callback(mockSitesToReturn);
+      const sites = mockSitesToReturn;
+      defer(() => {
+        const { act } = require('@testing-library/react-native');
+        act(() => {
+          callback(sites);
+        });
+      });
     }
     return mockUnsubscribe;
   }),
@@ -51,6 +64,7 @@ jest.mock('../../../store/thunks/sitesThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
     fetchSites: createAsyncThunk('sites/fetchSites', async (_, { rejectWithValue }) => {
+      await Promise.resolve(); // Defer to next microtask so resolution happens inside act
       if (mockFetchSitesResult === 'reject') {
         return rejectWithValue('Failed to load sites');
       }
@@ -141,6 +155,18 @@ function renderWithStore(ui: React.ReactElement, preloadedState: Partial<RootSta
   };
 }
 
+/** Renders and flushes async updates (fetchSites, subscribeToSites) inside act to avoid act warnings. */
+async function renderWithStoreAndFlush(
+  ui: React.ReactElement,
+  preloadedState: Partial<RootState> = {}
+) {
+  const result = renderWithStore(ui, preloadedState);
+  await act(async () => {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  });
+  return result;
+}
+
 const mockActiveSite: Site = {
   id: 'site-1',
   name: 'Site A',
@@ -181,143 +207,128 @@ describe('SiteManagementScreen', () => {
   });
 
   it('renders Site Management header', async () => {
-    renderWithStore(<SiteManagementScreen />, {
+    await renderWithStoreAndFlush(<SiteManagementScreen />, {
       sites: defaultSitesState,
     });
 
-    await waitFor(() => {
-      expect(screen.getByText('Site Management')).toBeTruthy();
-    });
+    expect(screen.getByText('Site Management')).toBeTruthy();
   });
 
   it('renders Add new site button in header', async () => {
-    renderWithStore(<SiteManagementScreen />, {
+    await renderWithStoreAndFlush(<SiteManagementScreen />, {
       sites: defaultSitesState,
     });
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Add new site' })).toBeTruthy();
-    });
+    expect(screen.getAllByRole('button', { name: 'Add new site' }).length).toBeGreaterThan(0);
   });
 
   it('navigates to AddSite when Add button pressed', async () => {
-    renderWithStore(<SiteManagementScreen />, {
+    await renderWithStoreAndFlush(<SiteManagementScreen />, {
       sites: defaultSitesState,
     });
 
-    await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: 'Add new site' }).length).toBeGreaterThan(0);
-    });
     fireEvent.press(screen.getAllByRole('button', { name: 'Add new site' })[0]);
     expect(mockNavigate).toHaveBeenCalledWith('AddSite');
   });
 
   it('shows empty state when no sites', async () => {
-    renderWithStore(<SiteManagementScreen />, {
+    await renderWithStoreAndFlush(<SiteManagementScreen />, {
       sites: defaultSitesState,
     });
 
-    await waitFor(() => {
-      expect(screen.getByText('No Sites Found')).toBeTruthy();
-    });
+    expect(screen.getByText('No Sites Found')).toBeTruthy();
     expect(screen.getByText('Get started by creating your first site.')).toBeTruthy();
     expect(screen.getAllByRole('button', { name: 'Add new site' }).length).toBeGreaterThan(0);
   });
 
   it('shows search-adjusted message when no sites match search', async () => {
-    renderWithStore(<SiteManagementScreen />, {
+    await renderWithStoreAndFlush(<SiteManagementScreen />, {
       sites: {
         ...defaultSitesState,
         searchQuery: 'nonexistent',
       },
     });
 
-    await waitFor(() => {
-      expect(screen.getByText('No Sites Found')).toBeTruthy();
-    });
+    expect(screen.getByText('No Sites Found')).toBeTruthy();
     expect(screen.getByText('No sites match your search. Try a different search term.')).toBeTruthy();
   });
 
   it('renders search input', async () => {
-    renderWithStore(<SiteManagementScreen />, {
+    await renderWithStoreAndFlush(<SiteManagementScreen />, {
       sites: defaultSitesState,
     });
 
-    await waitFor(() => {
-      expect(screen.getByRole('search', { name: 'Search sites' })).toBeTruthy();
-    });
+    expect(screen.getByRole('search', { name: 'Search sites' })).toBeTruthy();
   });
 
   it('dispatches setSearchQuery when search input changes', async () => {
-    const { store } = renderWithStore(<SiteManagementScreen />, {
+    const { store } = await renderWithStoreAndFlush(<SiteManagementScreen />, {
       sites: defaultSitesState,
     });
 
-    await waitFor(() => {
-      expect(screen.getByRole('search', { name: 'Search sites' })).toBeTruthy();
-    });
     fireEvent.changeText(screen.getByRole('search', { name: 'Search sites' }), 'Site A');
     expect(store.getState().sites.searchQuery).toBe('Site A');
   });
 
-  it('renders site list when sites exist', () => {
+  it('renders site list when sites exist', async () => {
     mockSitesToReturn = null;
-    renderWithStore(<SiteManagementScreen />, {
-      sites: {
-        ...defaultSitesState,
-        sites: [mockActiveSite],
-      },
+    mockFetchSitesResult = [mockActiveSite];
+    await renderWithStoreAndFlush(<SiteManagementScreen />, {
+      sites: defaultSitesState,
     });
 
-    expect(screen.getByText('Site A')).toBeTruthy();
-    expect(screen.getByText('ACTIVE SITES (1)')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('Site A')).toBeTruthy();
+      expect(screen.getByText('ACTIVE SITES (1)')).toBeTruthy();
+    });
   });
 
-  it('renders active and inactive sections', () => {
+  it('renders active and inactive sections', async () => {
     mockSitesToReturn = null;
-    renderWithStore(<SiteManagementScreen />, {
-      sites: {
-        ...defaultSitesState,
-        sites: [mockActiveSite, mockInactiveSite],
-      },
+    mockFetchSitesResult = [mockActiveSite, mockInactiveSite];
+    await renderWithStoreAndFlush(<SiteManagementScreen />, {
+      sites: defaultSitesState,
     });
 
-    expect(screen.getByText('Site A')).toBeTruthy();
-    expect(screen.getByText('Site B')).toBeTruthy();
-    expect(screen.getByText('ACTIVE SITES (1)')).toBeTruthy();
-    expect(screen.getByText('INACTIVE SITES (1)')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('Site A')).toBeTruthy();
+      expect(screen.getByText('Site B')).toBeTruthy();
+      expect(screen.getByText('ACTIVE SITES (1)')).toBeTruthy();
+      expect(screen.getByText('INACTIVE SITES (1)')).toBeTruthy();
+    });
   });
 
-  it('navigates to EditSite when site card pressed', () => {
+  it('navigates to EditSite when site card pressed', async () => {
     mockSitesToReturn = null;
-    renderWithStore(<SiteManagementScreen />, {
-      sites: {
-        ...defaultSitesState,
-        sites: [mockActiveSite],
-      },
+    mockFetchSitesResult = [mockActiveSite];
+    await renderWithStoreAndFlush(<SiteManagementScreen />, {
+      sites: defaultSitesState,
     });
 
+    await waitFor(() => {
+      expect(screen.getByText('Site A')).toBeTruthy();
+    });
     fireEvent.press(screen.getByText('Site A'));
     expect(mockNavigate).toHaveBeenCalledWith('EditSite', { siteId: 'site-1' });
   });
 
   it('shows error state when fetchSites rejects', async () => {
     mockFetchSitesResult = 'reject';
-    renderWithStore(<SiteManagementScreen />, {
+    await renderWithStoreAndFlush(<SiteManagementScreen />, {
       sites: defaultSitesState,
     });
 
     await waitFor(() => {
       expect(screen.getByText('Error')).toBeTruthy();
+      expect(screen.getByText('Failed to load sites')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Retry loading sites' })).toBeTruthy();
     });
-    expect(screen.getByText('Failed to load sites')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Retry loading sites' })).toBeTruthy();
   });
 
   it('shows loading state when fetchSites is pending', async () => {
     mockFetchSitesResult = 'pending';
     mockSitesToReturn = null;
-    renderWithStore(<SiteManagementScreen />, {
+    await renderWithStoreAndFlush(<SiteManagementScreen />, {
       sites: defaultSitesState,
     });
 

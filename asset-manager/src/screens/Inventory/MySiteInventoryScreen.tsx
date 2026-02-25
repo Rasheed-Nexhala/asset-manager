@@ -198,6 +198,8 @@ export const MySiteInventoryScreen: React.FC = () => {
     <ScreenLayout edges={['top']}>
       <ScreenHeader
         title={`My Inventory`}
+        showBack
+        onBackPress={() => navigation.goBack()}
         rightAction={
           otherSites.length > 0
             ? {
