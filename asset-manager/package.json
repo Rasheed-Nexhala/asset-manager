@@ -52,6 +52,7 @@
   },
   "jest": {
     "preset": "jest-expo",
+    "setupFiles": ["<rootDir>/node_modules/react-native-gesture-handler/jestSetup.js"],
     "setupFilesAfterEnv": ["<rootDir>/jest.setup.js"],
     "testPathIgnorePatterns": ["/node_modules/", "renderWithProviders\\.tsx$"],
     "transformIgnorePatterns": [

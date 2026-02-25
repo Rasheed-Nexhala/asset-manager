@@ -250,21 +250,33 @@ export const ReturnFromMaintenanceScreen: React.FC = () => {
             )}
           </View>
 
-          {/* Repair Summary Field (Optional) */}
+          {/* Repair Summary Field (Required) */}
           <View className="gap-1.5">
-            <Text className="text-[15px] text-[#0F172A]">Repair Summary (Optional)</Text>
+            <Text className="text-[15px] text-[#0F172A]">
+              Repair Summary <Text className="text-[#DC2626]">*</Text>
+            </Text>
             <TextInput
-              className="border border-[#E2E8F0] rounded-lg px-4 py-3 bg-white text-[15px] text-[#0F172A]"
-              placeholder="Describe the repairs performed (optional)"
+              className={`rounded-lg px-4 py-3 bg-white text-[15px] text-[#0F172A] border ${
+                errors.repairSummary ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
+              }`}
+              placeholder="Describe the repairs performed (min 10 characters)"
               placeholderTextColor="#94A3B8"
               value={repairSummary}
-              onChangeText={setRepairSummary}
+              onChangeText={(text) => {
+                setRepairSummary(text);
+                if (errors.repairSummary) {
+                  setErrors((prev) => ({ ...prev, repairSummary: '' }));
+                }
+              }}
               multiline
               numberOfLines={4}
               textAlignVertical="top"
               style={{ minHeight: 100 }}
               accessibilityLabel="Repair summary"
             />
+            {errors.repairSummary && (
+              <Text className="text-[13px] text-[#DC2626] mt-1">{errors.repairSummary}</Text>
+            )}
           </View>
 
           {/* Repair Cost Field (Optional) */}

@@ -133,7 +133,9 @@ This document maps ALL features, functions, components, screens, Redux slices, h
 | PO Approval flow | `ApprovePOScreen.test.tsx` | getPOById, purchaseOrderThunks, Alert | Loading, error, PO details, approve, reject form, reject confirm, validation, mark ordered, read-only rejected |
 | Return Items flow | `ReturnItemsScreen.test.tsx` | requestService.getRequestById, requestThunks.returnItems | Loading, error status, consumables only, items list, select/quantity/condition, submit, validation, all returned |
 | Add to Maintenance → Return/Write-off | `AddToMaintenanceScreen.test.tsx` | maintenanceThunks, ImagePicker | Form render, item select, issue type, description validation, submit success |
-| Login → Dashboard (integration) | — | — | Mock Firebase auth success, render App or auth flow, assert navigation to Dashboard |
+| Return from Maintenance | `ReturnFromMaintenanceScreen.test.tsx` | maintenanceThunks, Alert | Loading, form render, quantity +/- , repair summary validation, submit success |
+| Write Off Item | `WriteOffScreen.test.tsx` | maintenanceThunks, WriteOffReasonSelector, Alert | Loading, form render, quantity +/- , reason/explanation validation, confirmation flow, submit success |
+| Login → Dashboard (integration) | `LoginToDashboard.test.tsx` | Redux preloadedState | Auth/Main/Loading screens based on isAuthenticated and isRoleLoading |
 
 ---
 
@@ -147,7 +149,7 @@ This document maps ALL features, functions, components, screens, Redux slices, h
 - [x] Level 4: Key hooks tested
 - [x] Level 6: Form components (VendorForm, UpdatePasswordForm, SteelMasterForm, SiteForm, ItemSelectorModal)
 - [x] Level 7: Main screens tested (LoginScreen, SignupScreen, ProfileScreen, DashboardScreen, MyRequestsScreen, RequestQueueScreen, SiteManagementScreen, CentralStoreInventoryScreen, PurchaseOrderListScreen, ActivityLogScreen)
-- [ ] Level 8: Critical workflows covered
+- [x] Level 8: Critical workflows covered (Create Request, PO Approval, Return Items, Add to Maintenance, Return from Maintenance, Write Off, Login → Dashboard)
 
 ---
 
