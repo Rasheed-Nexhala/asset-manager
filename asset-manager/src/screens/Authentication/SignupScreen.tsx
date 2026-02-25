@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { ScreenLayout } from '../../components';
+import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { Ionicons } from '@expo/vector-icons';
 import { FormField } from '../../components/FormField';
 import { AuthLogo } from '../../components/AuthLogo';
@@ -36,10 +36,6 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onGoToLogin }) => {
   const [errors, setErrors] = useState<AuthFormErrors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  useEffect(() => {
-    if (authError) dispatch(clearError());
-  }, [values.email, values.password, values.name, confirmPassword, authError, dispatch]);
 
   const updateField = useCallback((field: keyof AuthFormValues, text: string) => {
     setValues((prev) => ({ ...prev, [field]: text }));

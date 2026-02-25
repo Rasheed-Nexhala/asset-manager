@@ -12,15 +12,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { ScreenLayout } from '../components/layout/ScreenLayout';
+import { MyRecentActivityWidget } from '../components/ActivityLog';
 import {
-  ScreenHeader,
-  ScreenLayout,
-  MyRecentActivityWidget,
   DashboardGreeting,
   QuickStatsRow,
   LowStockAlertWidget,
   PendingRequestsWidget,
-} from '../components';
+} from '../components/Dashboard';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import type { RootState } from '../store';
 import {

@@ -111,15 +111,15 @@ This document maps ALL features, functions, components, screens, Redux slices, h
 | Screen | Test File | Key Mocks | What to Test |
 |--------|-----------|-----------|--------------|
 | `LoginScreen.tsx` | `LoginScreen.test.tsx` | authThunks, expo/vector-icons | Email/password validation, loading state, auth error display, onGoToSignup |
-| `SignupScreen.tsx` | `SignupScreen.test.tsx` | authThunks | Validation, password match, submit |
+| `SignupScreen.tsx` | `SignupScreen.test.tsx` | authThunks, expo/vector-icons | Validation, password match, submit, auth error display, onGoToLogin |
 | `ProfileScreen.tsx` | `ProfileScreen.test.tsx` | navigation | User info display, sign out |
 | `DashboardScreen.tsx` | `DashboardScreen.test.tsx` | useDashboardSubscriptions, navigation | Role-based widgets, pull-to-refresh |
 | `MyRequestsScreen.tsx` | `MyRequestsScreen.test.tsx` | navigation | List render, tabs, create button |
-| `RequestQueueScreen.tsx` | `RequestQueueScreen.test.tsx` | navigation | Priority sections, filters |
-| `SiteManagementScreen.tsx` | `SiteManagementScreen.test.tsx` | navigation | List, search, add button |
-| `CentralStoreInventoryScreen.tsx` | `CentralStoreInventoryScreen.test.tsx` | navigation | List, search, filters |
-| `PurchaseOrderListScreen.tsx` | `PurchaseOrderListScreen.test.tsx` | navigation | List, status filters |
-| `ActivityLogScreen.tsx` | `ActivityLogScreen.test.tsx` | navigation | Filters, export, pagination |
+| `RequestQueueScreen.tsx` | `RequestQueueScreen.test.tsx` | navigation, requestService | Priority sections, filters, loading, empty state, navigation |
+| `SiteManagementScreen.tsx` | `SiteManagementScreen.test.tsx` | navigation, siteService, sitesThunks | List, search, add button, loading, error, edit navigation |
+| `CentralStoreInventoryScreen.tsx` | `CentralStoreInventoryScreen.test.tsx` | navigation, inventoryService, categoryService, inventoryThunks | List, search, filters, loading, error, item navigation |
+| `PurchaseOrderListScreen.tsx` | `PurchaseOrderListScreen.test.tsx` | navigation, purchaseOrderService | List, status filters, loading, empty state, subscription error |
+| `ActivityLogScreen.tsx` | `ActivityLogScreen.test.tsx` | activityLogThunks | Header, Export, loading/empty states, filters, clear filters, error, log list, filter modal, loading more |
 
 ---
 
@@ -127,13 +127,13 @@ This document maps ALL features, functions, components, screens, Redux slices, h
 
 **Multi-step flows, modals, async behavior.**
 
-| Flow | Test Approach |
-|------|---------------|
-| Create Request → Item Selector → Submit | Render CreateRequestScreen, fill form, open modal, select items, submit, assert navigation/dispatch |
-| PO Approval flow | Mock PO data, render ApprovePOScreen, approve/reject, assert state |
-| Return Items flow | Mock request with items, render ReturnItemsScreen, select items, set quantities, submit |
-| Add to Maintenance → Return/Write-off | Mock maintenance record, test status transitions |
-| Login → Dashboard (integration) | Mock Firebase auth success, render App or auth flow, assert navigation to Dashboard |
+| Flow | Test File | Key Mocks | What to Test |
+|------|-----------|-----------|--------------|
+| Create Request → Item Selector → Submit | `CreateRequestScreen.test.tsx` | requestThunks, Alert, navigation | Site name, empty items, open modal, select items, validation, submit success, save draft, error alert, disabled while submitting |
+| PO Approval flow | `ApprovePOScreen.test.tsx` | getPOById, purchaseOrderThunks, Alert | Loading, error, PO details, approve, reject form, reject confirm, validation, mark ordered, read-only rejected |
+| Return Items flow | `ReturnItemsScreen.test.tsx` | requestService.getRequestById, requestThunks.returnItems | Loading, error status, consumables only, items list, select/quantity/condition, submit, validation, all returned |
+| Add to Maintenance → Return/Write-off | `AddToMaintenanceScreen.test.tsx` | maintenanceThunks, ImagePicker | Form render, item select, issue type, description validation, submit success |
+| Login → Dashboard (integration) | — | — | Mock Firebase auth success, render App or auth flow, assert navigation to Dashboard |
 
 ---
 
@@ -142,11 +142,11 @@ This document maps ALL features, functions, components, screens, Redux slices, h
 - [x] Level 1: All utility tests passing (authValidation, weightConversionUtils, skuGenerationUtils, dateSerialization, locationUtils, requestUtils, csvExport, poPdfUtils)
 - [x] Level 2: Redux slice tests (all 8 slices)
 - [x] Level 3: Selector tests (authSelectors, requestSelectors, inventorySelectors, purchaseOrderSelectors, sitesSelectors, steelMasterSelectors, maintenanceSelectors, activityLogSelectors)
-- [ ] Level 4: Hooks (useWeightViewPreference, useInventoryError done; useAuth, useAuthStateSync, etc. pending)
+- [x] Level 4: Hooks (useWeightViewPreference, useInventoryError, useAuth, useAuthStateSync, useUserRoleSync, useManagerValidationSync, useDashboardSubscriptions)
 - [x] Level 5: Component tests (DashboardGreeting, RequestCard, FormField, RequestStatusBadge, StockStatusBadge, AuthLogo, PrioritySelector, SiteCard, POCard, ItemCard)
-- [ ] Level 4: Key hooks tested
-- [ ] Level 6: Form components (VendorForm, UpdatePasswordForm, SteelMasterForm done; SiteForm, ItemSelectorModal pending)
-- [ ] Level 7: Main screens tested
+- [x] Level 4: Key hooks tested
+- [x] Level 6: Form components (VendorForm, UpdatePasswordForm, SteelMasterForm, SiteForm, ItemSelectorModal)
+- [x] Level 7: Main screens tested (LoginScreen, SignupScreen, ProfileScreen, DashboardScreen, MyRequestsScreen, RequestQueueScreen, SiteManagementScreen, CentralStoreInventoryScreen, PurchaseOrderListScreen, ActivityLogScreen)
 - [ ] Level 8: Critical workflows covered
 
 ---

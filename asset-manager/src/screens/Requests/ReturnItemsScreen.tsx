@@ -16,7 +16,7 @@ import { FormField } from '../../components/FormField';
 import { WeightDisplay } from '../../components/Inventory/WeightDisplay';
 import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
 import { ViewModeToggle } from '../../components/Inventory/ViewModeToggle';
-import { QuickMoveToMaintenanceButton } from '../../components';
+import QuickMoveToMaintenanceButton from '../../components/Maintenance/QuickMoveToMaintenanceButton';
 import { isWeightBasedItem } from '../../utils/weightConversionUtils';
 import { returnItems } from '../../store/thunks/requestThunks';
 import { requestService } from '../../services/firebase/requestService';

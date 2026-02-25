@@ -8,7 +8,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ScreenLayout, ScreenHeader } from '../../components';
+import { ScreenLayout } from '../../components/layout/ScreenLayout';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import {
   ActivityLogCard,
   ActivityLogFilterModal,

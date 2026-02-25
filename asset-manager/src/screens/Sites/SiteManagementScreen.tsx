@@ -11,7 +11,9 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { ScreenHeader, ScreenLayout, SiteCard } from '../../components';
+import { ScreenHeader } from '../../components/ScreenHeader';
+import { ScreenLayout } from '../../components/layout/ScreenLayout';
+import { SiteCard } from '../../components/Sites/SiteCard';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchSites, setSearchQuery, setSites } from '../../store/slices/sitesSlice';
 import {

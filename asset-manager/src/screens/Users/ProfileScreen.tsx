@@ -3,7 +3,9 @@ import { View, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { DashboardStackParamList } from '../../navigation/DashboardStackParamList';
-import { ScreenHeader, ScreenLayout, UserProfile } from '../../components';
+import { ScreenHeader } from '../../components/ScreenHeader';
+import { ScreenLayout } from '../../components/layout/ScreenLayout';
+import { UserProfile } from '../../components/UserProfile/UserProfile';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { signOutUser } from '../../store/slices/authSlice';
 import {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import {
   WeightViewPreferenceProvider,
   useWeightViewPreference,
@@ -56,7 +56,10 @@ describe('useWeightViewPreference', () => {
         <TestConsumer />
       </WeightViewPreferenceProvider>
     );
-    await screen.findByTestId('view-mode');
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
     expect(screen.getByText('pieces')).toBeTruthy();
   });
 
@@ -67,7 +70,10 @@ describe('useWeightViewPreference', () => {
         <TestConsumer />
       </WeightViewPreferenceProvider>
     );
-    await screen.findByTestId('view-mode');
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
     expect(screen.getByText('kg')).toBeTruthy();
   });
 
@@ -78,7 +84,10 @@ describe('useWeightViewPreference', () => {
         <TestConsumer />
       </WeightViewPreferenceProvider>
     );
-    await screen.findByTestId('toggle');
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
     fireEvent.press(screen.getByTestId('toggle'));
     expect(screen.getByText('kg')).toBeTruthy();
     expect(AsyncStorage.setItem).toHaveBeenCalledWith('@ciams_weight_view_preference', 'kg');
@@ -91,7 +100,10 @@ describe('useWeightViewPreference', () => {
         <TestConsumer />
       </WeightViewPreferenceProvider>
     );
-    await screen.findByTestId('set-kg');
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
     fireEvent.press(screen.getByTestId('set-kg'));
     expect(screen.getByText('kg')).toBeTruthy();
     expect(AsyncStorage.setItem).toHaveBeenCalledWith('@ciams_weight_view_preference', 'kg');

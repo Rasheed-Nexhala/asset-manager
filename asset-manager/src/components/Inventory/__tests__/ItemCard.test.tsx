@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import { WeightViewPreferenceProvider } from '../../../hooks/useWeightViewPreference';
 import { ItemCard } from '../ItemCard';
 
@@ -37,53 +37,58 @@ const lowStockItem = {
   inMaintenanceQuantity: 0,
 } as import('../../../types/inventory').Item;
 
-function renderItemCard(props: React.ComponentProps<typeof ItemCard>) {
-  return render(
+async function renderItemCard(props: React.ComponentProps<typeof ItemCard>) {
+  const result = render(
     <WeightViewPreferenceProvider>
       <ItemCard {...props} />
     </WeightViewPreferenceProvider>
   );
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  return result;
 }
 
 describe('ItemCard', () => {
-  it('renders item name and SKU', () => {
-    renderItemCard({ item: mockItem, onPress: jest.fn() });
+  it('renders item name and SKU', async () => {
+    await renderItemCard({ item: mockItem, onPress: jest.fn() });
 
     expect(screen.getByText('Steel Bar')).toBeTruthy();
     expect(screen.getByText(/SKU: SKU-001/)).toBeTruthy();
   });
 
-  it('renders Non-Consumable badge for non_consumable type', () => {
-    renderItemCard({ item: mockItem, onPress: jest.fn() });
+  it('renders Non-Consumable badge for non_consumable type', async () => {
+    await renderItemCard({ item: mockItem, onPress: jest.fn() });
     expect(screen.getByText('Non-Consumable')).toBeTruthy();
   });
 
-  it('renders Consumable badge for consumable type', () => {
+  it('renders Consumable badge for consumable type', async () => {
     const consumableItem = { ...mockItem, type: 'consumable' as const };
-    renderItemCard({ item: consumableItem, onPress: jest.fn() });
+    await renderItemCard({ item: consumableItem, onPress: jest.fn() });
     expect(screen.getByText('Consumable')).toBeTruthy();
   });
 
-  it('shows Low Stock badge when quantity at or below minStockLevel', () => {
-    renderItemCard({ item: lowStockItem, onPress: jest.fn() });
+  it('shows Low Stock badge when quantity at or below minStockLevel', async () => {
+    await renderItemCard({ item: lowStockItem, onPress: jest.fn() });
     expect(screen.getByText('Low Stock')).toBeTruthy();
   });
 
-  it('does not show Low Stock badge when quantity above minStockLevel', () => {
-    renderItemCard({ item: mockItem, onPress: jest.fn() });
+  it('does not show Low Stock badge when quantity above minStockLevel', async () => {
+    await renderItemCard({ item: mockItem, onPress: jest.fn() });
     expect(screen.queryByText('Low Stock')).toBeNull();
   });
 
-  it('calls onPress when pressed', () => {
+  it('calls onPress when pressed', async () => {
     const onPress = jest.fn();
-    renderItemCard({ item: mockItem, onPress });
+    await renderItemCard({ item: mockItem, onPress });
 
     fireEvent.press(screen.getByRole('button', { name: /Item: Steel Bar/i }));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it('renders stock quantities', () => {
-    renderItemCard({ item: mockItem, onPress: jest.fn() });
+  it('renders stock quantities', async () => {
+    await renderItemCard({ item: mockItem, onPress: jest.fn() });
     expect(screen.getByText('Total')).toBeTruthy();
     expect(screen.getByText('Central Store')).toBeTruthy();
     expect(screen.getByText('At Sites')).toBeTruthy();

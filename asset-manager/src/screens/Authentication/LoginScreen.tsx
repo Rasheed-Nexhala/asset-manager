@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ScreenLayout } from '../../components';
+import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { FormField } from '../../components/FormField';
 import { AuthLogo } from '../../components/AuthLogo';
 import type { AuthFormValues, AuthFormErrors } from '../../types/auth';
