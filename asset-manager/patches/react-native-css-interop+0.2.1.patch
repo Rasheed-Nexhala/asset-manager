@@ -1,0 +1,14 @@
+diff --git a/node_modules/react-native-css-interop/babel.js b/node_modules/react-native-css-interop/babel.js
+--- a/node_modules/react-native-css-interop/babel.js
++++ b/node_modules/react-native-css-interop/babel.js
+@@ -9,8 +9,8 @@
+           importSource: "react-native-css-interop",
+         },
+       ],
+-      // Use this plugin in reanimated 4 and later
+-      "react-native-worklets/plugin",
++      // Use reanimated/plugin for Reanimated 3.x; use worklets/plugin for Reanimated 4+
++      "react-native-reanimated/plugin",
+     ],
+   };
+ };
