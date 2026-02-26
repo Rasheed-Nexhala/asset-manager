@@ -14,10 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.asset-manager"
+      "bundleIdentifier": "com.ibf.assetmanager"
     },
     "android": {
-      "package": "com.assetmanager",
+      "package": "com.ibf.assetmanager",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -29,6 +29,11 @@
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "1b6e5a32-1289-48e1-a3a8-bab8fff5d5fd"
+      }
     }
   }
 }
