@@ -200,6 +200,7 @@ describe('MyRequestsScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
       requests: {
@@ -224,6 +225,7 @@ describe('MyRequestsScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
       requests: {
@@ -251,6 +253,7 @@ describe('MyRequestsScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
       sites: {
@@ -284,6 +287,7 @@ describe('MyRequestsScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
       sites: {
@@ -316,6 +320,7 @@ describe('MyRequestsScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
       sites: {
@@ -351,6 +356,7 @@ describe('MyRequestsScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
       requests: {
@@ -378,6 +384,7 @@ describe('MyRequestsScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
       requests: {
@@ -402,6 +409,7 @@ describe('MyRequestsScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
       requests: {

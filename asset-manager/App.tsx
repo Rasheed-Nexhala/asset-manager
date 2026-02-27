@@ -1,6 +1,8 @@
 import './global.css';
 import './config/firebase';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from 'react';
 import { LogBox } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
@@ -9,9 +11,12 @@ import { useAuthStateSync } from './src/hooks/useAuthStateSync';
 import { useUserRoleSync } from './src/hooks/useUserRoleSync';
 import { useManagerValidationSync } from './src/hooks/useManagerValidationSync';
 import { useAppSelector } from './src/store/hooks';
-import { selectUserId } from './src/store/selectors/authSelectors';
+import { selectUserId, selectAuthInitialized } from './src/store/selectors/authSelectors';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { WeightViewPreferenceProvider } from './src/hooks/useWeightViewPreference';
+
+// Keep splash screen visible until auth state is resolved
+SplashScreen.preventAutoHideAsync();
 
 // Suppress SafeAreaView deprecation warning
 // We're already using react-native-safe-area-context correctly
@@ -22,8 +27,15 @@ LogBox.ignoreLogs([
 function AppContent() {
   useAuthStateSync();
   const userId = useAppSelector(selectUserId);
+  const authInitialized = useAppSelector(selectAuthInitialized);
   useUserRoleSync(userId);
   useManagerValidationSync();
+
+  useEffect(() => {
+    if (authInitialized) {
+      SplashScreen.hideAsync();
+    }
+  }, [authInitialized]);
 
   return (
     <>

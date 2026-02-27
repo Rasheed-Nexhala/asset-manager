@@ -162,7 +162,10 @@ describe('useAuthStateSync', () => {
       auth: {
         user: { uid: 'old', email: 'old@test.com' } as unknown as import('firebase/auth').User,
         userRole: null,
+        isAuthenticated: true,
         isLoading: false,
+        isRoleLoading: false,
+        authInitialized: true,
         error: null,
       },
     });

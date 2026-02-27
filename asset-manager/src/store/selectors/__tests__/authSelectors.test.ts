@@ -18,6 +18,7 @@ const createMockState = (auth: Partial<RootState['auth']>): RootState =>
       isAuthenticated: false,
       isLoading: false,
       isRoleLoading: false,
+      authInitialized: false,
       error: null,
       ...auth,
     },

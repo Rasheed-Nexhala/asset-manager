@@ -233,6 +233,7 @@ describe('LoginToDashboard Integration', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });
@@ -252,6 +253,7 @@ describe('LoginToDashboard Integration', () => {
         isAuthenticated: false,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });
@@ -270,6 +272,7 @@ describe('LoginToDashboard Integration', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: true,
+        authInitialized: false,
         error: null,
       },
     });

@@ -29,6 +29,11 @@ export const selectIsRoleLoaded = createSelector(
   (auth) => auth.isAuthenticated ? auth.userRole !== null : true
 );
 
+export const selectAuthInitialized = createSelector(
+  [selectAuthState],
+  (auth) => auth.authInitialized
+);
+
 export const selectAuthError = createSelector(
   [selectAuthState],
   (auth) => auth.error

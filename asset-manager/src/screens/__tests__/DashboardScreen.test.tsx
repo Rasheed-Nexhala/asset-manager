@@ -162,6 +162,7 @@ describe('DashboardScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });
@@ -177,6 +178,7 @@ describe('DashboardScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });
@@ -193,6 +195,7 @@ describe('DashboardScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });
@@ -210,6 +213,7 @@ describe('DashboardScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
       sites: {
@@ -232,6 +236,7 @@ describe('DashboardScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });
@@ -247,6 +252,7 @@ describe('DashboardScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
       activityLog: {
@@ -271,6 +277,7 @@ describe('DashboardScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
       requests: {
@@ -294,6 +301,7 @@ describe('DashboardScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });

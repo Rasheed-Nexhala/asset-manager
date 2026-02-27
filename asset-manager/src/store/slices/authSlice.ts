@@ -10,6 +10,7 @@ const initialState: AuthState = {
   isAuthenticated: false,
   isLoading: false,
   isRoleLoading: false,
+  authInitialized: false,
   error: null,
 };
 
@@ -20,6 +21,7 @@ const authSlice = createSlice({
     setUser: (state, action: PayloadAction<User | null>) => {
       state.user = action.payload;
       state.isAuthenticated = action.payload !== null;
+      state.authInitialized = true;
       state.error = null;
       // Clear userRole when user logs out
       if (action.payload === null) {

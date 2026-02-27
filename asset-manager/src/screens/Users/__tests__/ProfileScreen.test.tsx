@@ -148,6 +148,7 @@ describe('ProfileScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });
@@ -168,6 +169,7 @@ describe('ProfileScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });
@@ -183,6 +185,7 @@ describe('ProfileScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });
@@ -198,6 +201,7 @@ describe('ProfileScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });
@@ -214,6 +218,7 @@ describe('ProfileScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });
@@ -237,6 +242,7 @@ describe('ProfileScreen', () => {
         isAuthenticated: true,
         isLoading: true,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });
@@ -252,6 +258,7 @@ describe('ProfileScreen', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });

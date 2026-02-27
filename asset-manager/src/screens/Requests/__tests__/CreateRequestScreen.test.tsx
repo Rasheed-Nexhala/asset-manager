@@ -212,6 +212,7 @@ const defaultPreloadedState: Partial<RootState> = {
     userRole: null,
     isLoading: false,
     isRoleLoading: false,
+    authInitialized: false,
     error: null,
     isAuthenticated: true,
   },

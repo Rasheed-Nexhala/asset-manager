@@ -10,7 +10,7 @@ import type { RootState } from '../../index';
 
 const createMockState = (steelMaster: Partial<RootState['steelMaster']>): RootState =>
   ({
-    auth: { user: null, userRole: null, isAuthenticated: false, isLoading: false, isRoleLoading: false, error: null },
+    auth: { user: null, userRole: null, isAuthenticated: false, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
     sites: { sites: [], isLoading: false, error: null, searchQuery: '', validationLoading: false, lastValidationAt: null },
     inventory: { items: [], categories: [], inventoryByLocation: {}, lowStockItemIds: [], loading: false, error: null, errorTimestamp: null, filters: null },
     requests: { requests: [], myRequests: [], selectedRequest: null, loading: false, error: null, errorTimestamp: null, filters: { status: 'all', priority: 'all', siteId: 'all' } },

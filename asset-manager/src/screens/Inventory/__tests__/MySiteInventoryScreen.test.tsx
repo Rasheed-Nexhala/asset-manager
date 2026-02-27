@@ -254,6 +254,7 @@ const defaultAuthState = {
   isAuthenticated: true,
   isLoading: false,
   isRoleLoading: false,
+  authInitialized: false,
   error: null,
 };
 

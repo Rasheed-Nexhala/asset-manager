@@ -221,7 +221,7 @@ describe('CentralStoreInventoryScreen', () => {
 
   it('renders Central Store header', async () => {
     renderWithStore(<CentralStoreInventoryScreen />, {
-      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, error: null },
+      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
       inventory: defaultInventoryState,
     });
 
@@ -232,7 +232,7 @@ describe('CentralStoreInventoryScreen', () => {
 
   it('renders Add new item button for admin', async () => {
     renderWithStore(<CentralStoreInventoryScreen />, {
-      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, error: null },
+      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
       inventory: defaultInventoryState,
     });
 
@@ -243,7 +243,7 @@ describe('CentralStoreInventoryScreen', () => {
 
   it('navigates to AddEditItem when Add button pressed', async () => {
     renderWithStore(<CentralStoreInventoryScreen />, {
-      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, error: null },
+      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
       inventory: defaultInventoryState,
     });
 
@@ -256,7 +256,7 @@ describe('CentralStoreInventoryScreen', () => {
 
   it('navigates to SteelMaster when Steel Master button pressed', async () => {
     renderWithStore(<CentralStoreInventoryScreen />, {
-      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, error: null },
+      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
       inventory: defaultInventoryState,
     });
 
@@ -269,7 +269,7 @@ describe('CentralStoreInventoryScreen', () => {
 
   it('renders search input', async () => {
     renderWithStore(<CentralStoreInventoryScreen />, {
-      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, error: null },
+      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
       inventory: defaultInventoryState,
     });
 
@@ -280,7 +280,7 @@ describe('CentralStoreInventoryScreen', () => {
 
   it('shows empty state when no items', async () => {
     renderWithStore(<CentralStoreInventoryScreen />, {
-      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, error: null },
+      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
       inventory: defaultInventoryState,
     });
 
@@ -292,7 +292,7 @@ describe('CentralStoreInventoryScreen', () => {
 
   it('shows Add First Item button when empty', async () => {
     renderWithStore(<CentralStoreInventoryScreen />, {
-      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, error: null },
+      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
       inventory: defaultInventoryState,
     });
 
@@ -308,7 +308,7 @@ describe('CentralStoreInventoryScreen', () => {
     mockFetchCategoriesResult = 'pending';
 
     renderWithStore(<CentralStoreInventoryScreen />, {
-      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, error: null },
+      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
       inventory: defaultInventoryState,
     });
 
@@ -325,7 +325,7 @@ describe('CentralStoreInventoryScreen', () => {
     mockFetchCategoriesResult = 'pending';
 
     renderWithStore(<CentralStoreInventoryScreen />, {
-      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, error: null },
+      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
       inventory: defaultInventoryState,
     });
 
@@ -341,7 +341,7 @@ describe('CentralStoreInventoryScreen', () => {
     mockFetchCategoriesResult = 'pending';
 
     renderWithStore(<CentralStoreInventoryScreen />, {
-      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, error: null },
+      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
       inventory: defaultInventoryState,
     });
 
@@ -355,7 +355,7 @@ describe('CentralStoreInventoryScreen', () => {
     mockFetchCategoriesResult = 'pending';
 
     renderWithStore(<CentralStoreInventoryScreen />, {
-      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, error: null },
+      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
       inventory: defaultInventoryState,
     });
 
@@ -368,7 +368,7 @@ describe('CentralStoreInventoryScreen', () => {
 
   it('toggles filters when filter button pressed', async () => {
     renderWithStore(<CentralStoreInventoryScreen />, {
-      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, error: null },
+      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
       inventory: defaultInventoryState,
     });
 
@@ -383,7 +383,7 @@ describe('CentralStoreInventoryScreen', () => {
 
   it('renders Maintenance button for admin', async () => {
     renderWithStore(<CentralStoreInventoryScreen />, {
-      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, error: null },
+      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
       inventory: defaultInventoryState,
     });
 

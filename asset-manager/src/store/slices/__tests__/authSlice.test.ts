@@ -24,6 +24,7 @@ describe('authSlice', () => {
     isAuthenticated: false,
     isLoading: false,
     isRoleLoading: false,
+    authInitialized: false,
     error: null,
   };
 

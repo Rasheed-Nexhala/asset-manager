@@ -187,6 +187,7 @@ const defaultPreloadedState: Partial<RootState> = {
     userRole: { role: 'StoreIncharge', isActive: true, permissions: [] },
     isLoading: false,
     isRoleLoading: false,
+    authInitialized: false,
     error: null,
     isAuthenticated: true,
   },

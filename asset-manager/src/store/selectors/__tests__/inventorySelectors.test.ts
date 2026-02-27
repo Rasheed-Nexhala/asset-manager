@@ -30,6 +30,7 @@ const baseAuth = {
   isAuthenticated: false,
   isLoading: false,
   isRoleLoading: false,
+  authInitialized: false,
   error: null,
 };
 const baseSites = {

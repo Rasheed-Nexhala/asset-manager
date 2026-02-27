@@ -154,6 +154,7 @@ describe('useManagerValidationSync', () => {
         isAuthenticated: false,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });
@@ -172,6 +173,7 @@ describe('useManagerValidationSync', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });
@@ -190,6 +192,7 @@ describe('useManagerValidationSync', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });
@@ -207,6 +210,7 @@ describe('useManagerValidationSync', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });
@@ -227,6 +231,7 @@ describe('useManagerValidationSync', () => {
         isAuthenticated: true,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });

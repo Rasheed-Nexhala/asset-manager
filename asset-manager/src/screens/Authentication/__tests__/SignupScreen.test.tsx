@@ -182,6 +182,7 @@ describe('SignupScreen', () => {
         isAuthenticated: false,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: 'Email already in use',
       },
     });
@@ -197,6 +198,7 @@ describe('SignupScreen', () => {
         isAuthenticated: false,
         isLoading: true,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });

@@ -161,6 +161,7 @@ describe('LoginScreen', () => {
         isAuthenticated: false,
         isLoading: false,
         isRoleLoading: false,
+        authInitialized: false,
         error: 'Invalid email or password',
       },
     });
@@ -176,6 +177,7 @@ describe('LoginScreen', () => {
         isAuthenticated: false,
         isLoading: true,
         isRoleLoading: false,
+        authInitialized: false,
         error: null,
       },
     });

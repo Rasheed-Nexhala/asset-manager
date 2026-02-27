@@ -14,7 +14,7 @@ import type { RootState } from '../../index';
 
 const createMockState = (sites: Partial<RootState['sites']>): RootState =>
   ({
-    auth: { user: null, userRole: null, isAuthenticated: false, isLoading: false, isRoleLoading: false, error: null },
+    auth: { user: null, userRole: null, isAuthenticated: false, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
     sites: {
       sites: [],
       isLoading: false,

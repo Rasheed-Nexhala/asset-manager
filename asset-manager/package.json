@@ -1,6 +1,6 @@
 {
   "name": "asset-manager",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
@@ -27,6 +27,7 @@
     "expo-image-picker": "~17.0.10",
     "expo-print": "^15.0.8",
     "expo-sharing": "~14.0.8",
+    "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
     "firebase": "^12.9.0",
     "nativewind": "^4.2.1",
@@ -54,9 +55,16 @@
   },
   "jest": {
     "preset": "jest-expo",
-    "setupFiles": ["<rootDir>/node_modules/react-native-gesture-handler/jestSetup.js"],
-    "setupFilesAfterEnv": ["<rootDir>/jest.setup.js"],
-    "testPathIgnorePatterns": ["/node_modules/", "renderWithProviders\\.tsx$"],
+    "setupFiles": [
+      "<rootDir>/node_modules/react-native-gesture-handler/jestSetup.js"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/jest.setup.js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "renderWithProviders\\.tsx$"
+    ],
     "transformIgnorePatterns": [
       "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|immer|@reduxjs|react-redux|react-native-safe-area-context)"
     ]

@@ -22,6 +22,7 @@ export interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   isRoleLoading: boolean;
+  authInitialized: boolean;
   error: string | null;
 }
 
