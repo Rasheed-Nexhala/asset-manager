@@ -14,10 +14,12 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ibf.assetmanager"
+      "bundleIdentifier": "com.ibf.assetmanager",
+      "buildNumber": "2"
     },
     "android": {
       "package": "com.ibf.assetmanager",
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
