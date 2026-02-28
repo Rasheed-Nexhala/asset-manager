@@ -129,7 +129,7 @@
 1. Enter valid email; enter "12345" (< 6 chars) as password → Tap **Login**.
 **Expected:** Inline validation error: "Password must be at least 6 characters".
 
-### TC-AUTH-008 — Successful signup
+### TC-AUTH-008 — Successful signup 
 **Pre:** Email not already registered.
 **Steps:**
 1. Tap **Sign Up** on Login screen.
@@ -1527,7 +1527,7 @@
 1. Enter quantity 9999999 → Save.
 **Expected:** Accepted (if within business limits) or error with max value message.
 
-### TC-EDGE-004 — Simultaneous PO approval by two Admins
+### TC-EDGE-004 — Simultaneous PO approval by two Admins [CHECK]
 **Pre:** Two Admins open same pending PO simultaneously.
 **Steps:**
 1. Admin A approves PO.
@@ -1540,12 +1540,12 @@
 1. Process request → try to approve full qty.
 **Expected:** Warning/error shown: "Insufficient stock"; StoreIncharge must approve partial qty or reject.
 
-### TC-EDGE-006 — Delete category used by items
+### TC-EDGE-006 — Delete category used by items [CHECK]
 **Pre:** Category "Power Tools" has items linked.
 **Steps:** Try to delete "Power Tools" category.
 **Expected:** Error: "Cannot delete category with existing items".
 
-### TC-EDGE-007 — SKU with spaces or special characters
+### TC-EDGE-007 — SKU with spaces or special characters [CHECK]
 **Pre:** Add Item screen.
 **Steps:**
 1. Enter SKU "DRL 001" (with space) → Save.
@@ -1563,24 +1563,24 @@
 1. Add item → enter quantity 0 → Submit.
 **Expected:** Validation error: "Quantity must be at least 1".
 
-### TC-EDGE-010 — Request submitted by SiteManager not assigned to any site
+### TC-EDGE-010 — Request submitted by SiteManager not assigned to any site [CHECK]
 **Pre:** SiteManager user without a site assignment.
 **Steps:**
 1. Try to create a request.
 **Expected:** Error or block: "No site assigned to your account. Contact Admin".
 
-### TC-EDGE-011 — Upload oversized image
+### TC-EDGE-011 — Upload oversized image [CHECK]
 **Pre:** Add Item screen; image > 5MB.
 **Steps:** Try to upload a 10MB image.
 **Expected:** Error: "Image too large; maximum size is X MB".
 
-### TC-EDGE-012 — Firebase offline: creating item
+### TC-EDGE-012 — Firebase offline: creating item [CHECK]
 **Pre:** Device has no internet; logged-in state may be cached.
 **Steps:**
 1. Turn off internet → try to create item.
 **Expected:** Clear error: "Unable to connect. Please check your internet connection."
 
-### TC-EDGE-013 — Rapid repeated taps on Submit button
+### TC-EDGE-013 — Rapid repeated taps on Submit button [CHECK]
 **Pre:** Create Request screen; form valid.
 **Steps:**
 1. Tap Submit button rapidly 5 times.
@@ -1597,12 +1597,12 @@
 **Steps:** Tap back button.
 **Expected:** Navigates to step 1 or prompts "Discard changes?"; no unintended submission.
 
-### TC-EDGE-016 — Activity log captures all required fields
+### TC-EDGE-016 — Activity log captures all required fields [CHECK]
 **Pre:** Admin performs any CRUD action.
 **Steps:** Check Activity Log entry.
 **Expected:** Each entry has: userId, userName, userRole, actionType, actionCategory, targetType, targetId, targetDisplay, summary, timestamp.
 
-### TC-EDGE-017 — Expired Firebase token mid-session
+### TC-EDGE-017 — Expired Firebase token mid-session [CHECK]
 **Pre:** User logged in; Firebase token expires.
 **Steps:**
 1. Perform an action requiring auth (create item).

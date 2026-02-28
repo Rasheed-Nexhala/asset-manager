@@ -9,7 +9,7 @@ import {
   AppStateStatus,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useIsFocused } from '@react-navigation/native';
+import { useNavigation, useIsFocused, useFocusEffect } from '@react-navigation/native';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { ScreenHeader } from '../components/ScreenHeader';
@@ -52,6 +52,7 @@ import {
   clearError as clearMaintenanceError,
 } from '../store/slices/maintenanceSlice';
 import { useDashboardSubscriptions } from '../hooks/useDashboardSubscriptions';
+import { getUnreadCount } from '../services/firebase/notificationService';
 import { getLocationId } from '../utils/locationUtils';
 import type { DashboardStackParamList } from '../navigation/DashboardStackParamList';
 import type { Request } from '../types/request';
@@ -91,6 +92,7 @@ export const DashboardScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const isFocused = useIsFocused();
   const [refreshing, setRefreshing] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const isAdmin = useAppSelector(selectIsAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreInchargeSafe);
@@ -154,6 +156,27 @@ export const DashboardScreen: React.FC = () => {
     return () => sub.remove();
   }, [triggerRefresh]);
 
+  useEffect(() => {
+    if (!userId) return;
+    getUnreadCount(userId).then(setUnreadCount);
+    const interval = setInterval(() => {
+      getUnreadCount(userId).then(setUnreadCount);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [userId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (userId) getUnreadCount(userId).then(setUnreadCount);
+    }, [userId])
+  );
+
+  const navToNotificationCenter = useCallback(() => {
+    const parent = navigation.getParent();
+    const mainStack = parent?.getParent();
+    (mainStack as { navigate?: (name: string) => void })?.navigate?.('NotificationCenter');
+  }, [navigation]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     triggerRefresh();
@@ -198,15 +221,23 @@ export const DashboardScreen: React.FC = () => {
           onPress: () => navigation.navigate('Profile'),
           accessibilityLabel: 'Profile',
         }}
-        rightAction={
-          isAdmin
-            ? {
-                icon: 'people-outline',
-                onPress: () => navigation.navigate('Users'),
-                accessibilityLabel: 'Users',
-              }
-            : undefined
-        }
+        rightActions={[
+          {
+            icon: 'notifications-outline',
+            onPress: navToNotificationCenter,
+            accessibilityLabel: 'Notifications',
+            badge: unreadCount > 0 ? unreadCount : undefined,
+          },
+          ...(isAdmin
+            ? [
+                {
+                  icon: 'people-outline' as const,
+                  onPress: () => navigation.navigate('Users'),
+                  accessibilityLabel: 'Users',
+                },
+              ]
+            : []),
+        ]}
       />
       {activityLogError && (
         <View className="bg-[#DC2626]/15 px-4 py-3 mx-4 mt-2 rounded-lg flex-row items-center justify-between">

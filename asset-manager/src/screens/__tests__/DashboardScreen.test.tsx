@@ -19,9 +19,17 @@ jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
     navigate: mockNavigate,
     goBack: jest.fn(),
-    getParent: () => ({ navigate: mockGetParentNavigate }),
+    getParent: () => ({ getParent: () => ({ navigate: mockGetParentNavigate }), navigate: mockGetParentNavigate }),
   }),
   useIsFocused: () => true,
+  useFocusEffect: (cb: () => void | (() => void)) => {
+    const cleanup = cb();
+    return () => { if (typeof cleanup === 'function') cleanup(); };
+  },
+}));
+
+jest.mock('../../services/firebase/notificationService', () => ({
+  getUnreadCount: jest.fn().mockResolvedValue(0),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({

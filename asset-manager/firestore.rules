@@ -68,6 +68,15 @@ service cloud.firestore {
       return isAuthenticated() && isUserActive() && isAdminOrStoreIncharge();
     }
     
+    /**
+     * Check if the update only touches token-related fields.
+     * Users can update their own expoPushTokens, notificationPrefs, tokensUpdatedAt, updatedAt.
+     */
+    function onlyUpdatingOwnTokenFields() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['expoPushTokens', 'notificationPrefs', 'tokensUpdatedAt', 'updatedAt']);
+    }
+    
     // ============================================
     // Existing Collections (preserve existing rules)
     // ============================================
@@ -75,15 +84,21 @@ service cloud.firestore {
     /**
      * Users collection
      * Users can read their own data; Admins can read all
-     * Only Admins can create/update/delete users
+     * Admins can create/delete users; Admins can update any field
+     * Users can update ONLY their own token-related fields (expoPushTokens, notificationPrefs, tokensUpdatedAt, updatedAt)
      */
     match /users/{userId} {
       // Allow reading individual user documents
       allow get: if isAuthenticated() && (isAdmin() || request.auth.uid == userId);
       // Allow listing/querying the entire users collection (only for Admins)
       allow list: if isAuthenticated() && isAdmin();
-      // Allow Admins to create, update, and delete users
-      allow create, update, delete: if isAuthenticated() && isUserActive() && isAdmin();
+      // Allow Admins to create and delete users
+      allow create, delete: if isAuthenticated() && isUserActive() && isAdmin();
+      // Allow update: Admins can update any field; users can update only their own token-related fields
+      allow update: if isAuthenticated() && (
+        (isUserActive() && isAdmin()) ||
+        (request.auth.uid == userId && onlyUpdatingOwnTokenFields())
+      );
     }
     
     /**
@@ -347,6 +362,16 @@ service cloud.firestore {
       
       // Delete: Admin only (soft delete preferred)
       allow delete: if isAuthenticated() && isUserActive() && isAdmin();
+    }
+
+    /**
+     * Notifications subcollection
+     * Path: notifications/{userId}/items/{itemId}
+     * Users can read and update their own notification items; create/delete are server-only
+     */
+    match /notifications/{userId}/items/{itemId} {
+      allow read, update: if isAuthenticated() && request.auth.uid == userId;
+      allow create, delete: if false;
     }
   }
 }
