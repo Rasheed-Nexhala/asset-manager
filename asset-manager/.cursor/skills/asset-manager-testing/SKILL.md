@@ -63,9 +63,7 @@ jest.mock('../../hooks/useDashboardSubscriptions', () => ({
 
 ### Expo Vector Icons
 
-```typescript
-jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
-```
+`@expo/vector-icons` is mocked globally via `moduleNameMapper` in `package.json` (see `jest/mocks/@expo-vector-icons.js`). **Do not add** `jest.mock('@expo/vector-icons', ...)` in individual test files.
 
 ## Key Components to Test
 

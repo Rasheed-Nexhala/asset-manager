@@ -94,8 +94,6 @@ jest.mock('@react-navigation/native', () => ({
   useRoute: () => ({ params: { siteId: 's1' } }),
 }));
 
-jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
-
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
   SafeAreaView: ({ children }: { children: React.ReactNode }) => children,

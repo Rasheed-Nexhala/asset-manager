@@ -16,8 +16,6 @@ import type { RootState } from '../../../store';
 import type { ActivityLog } from '../../../types/activityLog';
 import * as activityLogThunks from '../../../store/thunks/activityLogThunks';
 
-jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
-
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn().mockResolvedValue(null),
   setItem: jest.fn(),

@@ -14,8 +14,6 @@ import activityLogReducer from '../../../store/slices/activityLogSlice';
 import purchaseOrderReducer from '../../../store/slices/purchaseOrderSlice';
 import type { Item } from '../../../types/inventory';
 
-jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
-
 jest.mock('../../../store/thunks/authThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {

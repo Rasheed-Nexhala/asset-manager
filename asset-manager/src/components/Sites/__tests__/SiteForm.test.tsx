@@ -2,7 +2,6 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { SiteForm } from '../SiteForm';
 
-jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
 jest.mock('../SiteManagerSelector', () => ({
   SiteManagerSelector: () => null,
 }));

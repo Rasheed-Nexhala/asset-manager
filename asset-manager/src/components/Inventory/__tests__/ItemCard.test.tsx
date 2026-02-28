@@ -3,7 +3,6 @@ import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import { WeightViewPreferenceProvider } from '../../../hooks/useWeightViewPreference';
 import { ItemCard } from '../ItemCard';
 
-jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn().mockResolvedValue(null),
   setItem: jest.fn(),

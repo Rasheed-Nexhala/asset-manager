@@ -55,6 +55,9 @@
   },
   "jest": {
     "preset": "jest-expo",
+    "moduleNameMapper": {
+      "^@expo/vector-icons$": "<rootDir>/jest/mocks/@expo-vector-icons.js"
+    },
     "setupFiles": [
       "<rootDir>/node_modules/react-native-gesture-handler/jestSetup.js"
     ],

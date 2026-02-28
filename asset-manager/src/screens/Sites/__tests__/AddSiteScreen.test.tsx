@@ -92,8 +92,6 @@ jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: jest.fn(), goBack: mockGoBack }),
 }));
 
-jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
-
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
   SafeAreaView: ({ children }: { children: React.ReactNode }) => children,

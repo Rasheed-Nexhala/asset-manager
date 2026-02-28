@@ -2,8 +2,6 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { SteelMasterForm } from '../SteelMasterForm';
 
-jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
-
 const mockOnSubmit = jest.fn();
 const mockOnCancel = jest.fn();
 

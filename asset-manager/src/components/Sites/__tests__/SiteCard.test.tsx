@@ -2,8 +2,6 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { SiteCard } from '../SiteCard';
 
-jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
-
 const mockSite = {
   id: 'site1',
   name: 'Construction Site Alpha',

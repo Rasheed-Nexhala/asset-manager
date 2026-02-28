@@ -14,8 +14,6 @@ import purchaseOrderReducer from '../../../store/slices/purchaseOrderSlice';
 import type { RootState } from '../../../store';
 import type { ActivityLog } from '../../../types/activityLog';
 
-jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
-
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
   SafeAreaView: ({ children }: { children: React.ReactNode }) => children,

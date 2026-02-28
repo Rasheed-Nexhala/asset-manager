@@ -2,8 +2,6 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { RequestCard } from '../RequestCard';
 
-jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
-
 const mockRequest = {
   id: 'req1',
   requestNumber: 'R-001',

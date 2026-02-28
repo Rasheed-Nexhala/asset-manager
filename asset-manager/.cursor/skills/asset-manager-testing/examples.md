@@ -61,8 +61,6 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { RequestCard } from '../RequestCard';
 
-jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
-
 const mockRequest = {
   id: 'req-001',
   requestNumber: 'REQ-001',
@@ -110,7 +108,6 @@ jest.mock('../../../store/thunks/authThunks', () => ({
   signUpUser: jest.fn(),
   signOutUser: jest.fn(),
 }));
-jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
 
 describe('LoginScreen', () => {
   it('shows email validation error when submitted empty', () => {

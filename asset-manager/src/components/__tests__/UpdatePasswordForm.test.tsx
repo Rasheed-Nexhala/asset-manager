@@ -5,7 +5,6 @@ import { UpdatePasswordForm } from '../UpdatePasswordForm';
 const mockReauthenticateAndUpdatePassword = jest.fn();
 const mockLogPasswordChanged = jest.fn();
 
-jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
 jest.mock('../../services/firebase/authService', () => ({
   reauthenticateAndUpdatePassword: (...args: unknown[]) =>
     mockReauthenticateAndUpdatePassword(...args),
