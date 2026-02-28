@@ -382,20 +382,21 @@ export const updateItem = async (
       }
     }
 
-    const updateData: Record<string, unknown> = {
+    // Build update payload — Firestore rejects undefined; omit undefined fields
+    const rawData: Record<string, unknown> = {
       ...updates,
       updatedAt: serverTimestamp(),
     };
-
-    // If categoryId is updated, ensure categoryName is also updated
     if (updates.categoryId && categoryName) {
-      updateData.categoryName = categoryName;
+      rawData.categoryName = categoryName;
     }
+    if (updates.updatedBy) rawData.updatedBy = updates.updatedBy;
+    if (updates.updatedByName) rawData.updatedByName = updates.updatedByName;
+    if (updates.updatedByRole) rawData.updatedByRole = updates.updatedByRole;
 
-    // Activity log audit fields (Cloud Function reads these)
-    if (updates.updatedBy) updateData.updatedBy = updates.updatedBy;
-    if (updates.updatedByName) updateData.updatedByName = updates.updatedByName;
-    if (updates.updatedByRole) updateData.updatedByRole = updates.updatedByRole;
+    const updateData = Object.fromEntries(
+      Object.entries(rawData).filter(([, v]) => v !== undefined)
+    ) as Record<string, unknown>;
 
     await updateDoc(doc(db, ITEMS_COLLECTION, id), updateData);
   } catch (error) {
