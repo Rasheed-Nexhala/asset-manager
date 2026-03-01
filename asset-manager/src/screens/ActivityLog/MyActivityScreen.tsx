@@ -19,7 +19,7 @@ import {
   selectMyRecentActivitySorted,
   selectMyActivityLoading,
 } from '../../store/selectors/activityLogSelectors';
-import { selectUserId } from '../../store/selectors/authSelectors';
+import { selectUserId, selectUserRoleType } from '../../store/selectors/authSelectors';
 import {
   subscribeToMyRecentActivityRealtime,
   unsubscribeFromMyRecentActivity,
@@ -31,8 +31,11 @@ export const MyActivityScreen: React.FC = () => {
   const navigation = useNavigation();
 
   const userId = useAppSelector(selectUserId);
+  const roleType = useAppSelector(selectUserRoleType);
   const recentActivity = useAppSelector(selectMyRecentActivitySorted);
   const loading = useAppSelector(selectMyActivityLoading);
+
+  const isUnassigned = roleType === 'Unassigned' || !roleType;
 
   const [refreshing, setRefreshing] = useState(false);
   const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
@@ -144,23 +147,26 @@ export const MyActivityScreen: React.FC = () => {
                 No recent activity
               </Text>
               <Text className="text-[15px] text-[#64748B] text-center mb-6">
-                Your activity will appear here when you create requests or perform
-                actions in the system
+                {isUnassigned
+                  ? 'You will be active once your role is assigned.'
+                  : 'Your activity will appear here when you create requests or perform actions in the system'}
               </Text>
-              <TouchableOpacity
-                className="bg-[#1E40AF] rounded-[10px] h-[50px] px-6 items-center justify-center"
-                onPress={() =>
-                  (navigation.getParent() as { navigate?: (name: string) => void })
-                    ?.navigate?.('Requests')
-                }
-                activeOpacity={0.7}
-                accessibilityLabel="Go to Requests"
-                accessibilityRole="button"
-              >
-                <Text className="text-[15px] font-semibold text-white">
-                  Create your first request
-                </Text>
-              </TouchableOpacity>
+              {!isUnassigned && (
+                <TouchableOpacity
+                  className="bg-[#1E40AF] rounded-[10px] h-[50px] px-6 items-center justify-center"
+                  onPress={() =>
+                    (navigation.getParent() as { navigate?: (name: string) => void })
+                      ?.navigate?.('Requests')
+                  }
+                  activeOpacity={0.7}
+                  accessibilityLabel="Go to Requests"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-[15px] font-semibold text-white">
+                    Create your first request
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           )
         }

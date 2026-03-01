@@ -30,6 +30,7 @@ import {
   selectUserDisplayName,
   selectUserId,
   selectUserRoleType,
+  selectIsActive,
   selectHasPermission,
   selectUserPermissions,
 } from '../store/selectors/authSelectors';
@@ -101,6 +102,7 @@ export const DashboardScreen: React.FC = () => {
   const userId = useAppSelector(selectUserId);
   const roleType = useAppSelector(selectUserRoleType);
   const role = roleType ?? 'Unassigned';
+  const isActive = useAppSelector(selectIsActive);
   const assignedSiteId = useAppSelector(selectAssignedSiteIdForUser(userId));
   const assignedSiteSelector = useMemo(
     () => (assignedSiteId ? selectSiteById(assignedSiteId) : (_state: RootState) => null),
@@ -295,6 +297,16 @@ export const DashboardScreen: React.FC = () => {
                 ]}
                 isLoading={isInitialLoad}
               />
+              <TouchableOpacity
+                className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] flex-row items-center justify-between"
+                onPress={() => navigation.navigate('ActivityLog')}
+                activeOpacity={0.7}
+                accessibilityLabel="View Activity Log"
+                accessibilityRole="button"
+              >
+                <Text className="text-[17px] font-semibold text-[#0F172A]">Activity Log</Text>
+                <Ionicons name="chevron-forward" size={20} color="#64748B" />
+              </TouchableOpacity>
               <MyRecentActivityWidget onViewAll={() => navigation.navigate('MyActivity')} />
               {(lowStockItems.length > 0 || isInitialLoad || itemsLoading) && (
                 <LowStockAlertWidget
@@ -408,7 +420,20 @@ export const DashboardScreen: React.FC = () => {
           )}
 
           {!isAdmin && !isStoreIncharge && !isSiteManager && (
-            <MyRecentActivityWidget onViewAll={() => navigation.navigate('MyActivity')} />
+            <>
+              {!isActive && roleType === 'Unassigned' && (
+                <View
+                  className="bg-[#D97706]/15 rounded-[10px] p-4 border border-[#D97706]/30 flex-row items-center"
+                  accessibilityLabel="Account pending activation"
+                >
+                  <Ionicons name="information-circle" size={24} color="#D97706" />
+                  <Text className="text-[15px] text-[#D97706] ml-3 flex-1">
+                    Your account will be activated once the Admin activates it and assigns you a role.
+                  </Text>
+                </View>
+              )}
+              <MyRecentActivityWidget onViewAll={() => navigation.navigate('MyActivity')} />
+            </>
           )}
         </View>
       </ScrollView>

@@ -17,10 +17,11 @@ service cloud.firestore {
     /**
      * Get user role from users collection
      * Returns the role string or null if user doesn't exist
+     * Uses exists() to avoid errors when document doesn't exist (e.g. new signup)
      */
     function getUserRole() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return userDoc != null ? userDoc.data.role : null;
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(userPath) ? get(userPath).data.role : null;
     }
     
     /**
@@ -55,10 +56,11 @@ service cloud.firestore {
     
     /**
      * Check if user is active (not disabled)
+     * Returns false if user document doesn't exist (e.g. new signup)
      */
     function isUserActive() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return userDoc != null && userDoc.data.isActive == true;
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(userPath) && get(userPath).data.isActive == true;
     }
     
     /**
@@ -66,6 +68,18 @@ service cloud.firestore {
      */
     function hasInventoryAccess() {
       return isAuthenticated() && isUserActive() && isAdminOrStoreIncharge();
+    }
+    
+    /**
+     * Check if user is creating their own document for the first time (self-registration on signup).
+     * Document must not exist yet, and payload must have safe defaults (Unassigned, isActive false).
+     */
+    function isSelfRegistration(userId) {
+      let userPath = /databases/$(database)/documents/users/$(userId);
+      return request.auth.uid == userId
+        && !exists(userPath)
+        && request.resource.data.role == 'Unassigned'
+        && request.resource.data.isActive == false;
     }
     
     /**
@@ -92,8 +106,13 @@ service cloud.firestore {
       allow get: if isAuthenticated() && (isAdmin() || request.auth.uid == userId);
       // Allow listing/querying the entire users collection (only for Admins)
       allow list: if isAuthenticated() && isAdmin();
-      // Allow Admins to create and delete users
-      allow create, delete: if isAuthenticated() && isUserActive() && isAdmin();
+      // Allow Admins to create users; allow self-registration on signup (create own doc with Unassigned role)
+      allow create: if isAuthenticated() && (
+        (isUserActive() && isAdmin()) ||
+        isSelfRegistration(userId)
+      );
+      // Only Admins can delete users
+      allow delete: if isAuthenticated() && isUserActive() && isAdmin();
       // Allow update: Admins can update any field; users can update only their own token-related fields
       allow update: if isAuthenticated() && (
         (isUserActive() && isAdmin()) ||
@@ -283,7 +302,8 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isUserActive() && isAdmin();
 
       // Users can read only their own logs (userId match)
-      allow read: if isAuthenticated() && isUserActive() &&
+      // Includes new signup users (Unassigned, isActive: false) for Dashboard My Recent Activity widget
+      allow read: if isAuthenticated() &&
         resource.data.userId == request.auth.uid;
 
       // No client writes allowed - only Cloud Functions create logs

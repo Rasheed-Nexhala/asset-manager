@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { FormField } from '../../components/FormField';
 import { AuthLogo } from '../../components/AuthLogo';
@@ -33,6 +32,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onGoToSignup }) => {
 
   const [values, setValues] = useState<AuthFormValues>(defaultValues);
   const [errors, setErrors] = useState<AuthFormErrors>({});
+
+  // Auto-dismiss auth error after a few seconds so it doesn't persist indefinitely
+  const AUTH_ERROR_DISMISS_MS = 4000;
+  useEffect(() => {
+    if (!authError) return;
+    const timer = setTimeout(() => dispatch(clearError()), AUTH_ERROR_DISMISS_MS);
+    return () => clearTimeout(timer);
+  }, [authError, dispatch]);
 
   const updateField = useCallback((field: keyof AuthFormValues, text: string) => {
     setValues((prev) => ({ ...prev, [field]: text }));
@@ -127,13 +134,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onGoToSignup }) => {
                 accessibilityRole="alert"
                 accessibilityLiveRegion="polite"
               >
-                <View className="flex-row items-start gap-2">
-                  <Ionicons name="warning" size={20} color="#D97706" />
-                  <Text className="text-[18px] mt-0.5 font-semibold text-[#D97706]">Warning</Text>
-                  <Text className="text-[14px] text-[#DC2626] flex-1 leading-5">
-                    {authError}
-                  </Text>
-                </View>
+                <Text className="text-[14px] text-[#DC2626] leading-5">{authError}</Text>
               </View>
             ) : null}
           </View>

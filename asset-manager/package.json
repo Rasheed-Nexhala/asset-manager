@@ -12,6 +12,7 @@
     "postinstall": "patch-package && node scripts/patch-expo-dev-menu.js"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/datetimepicker": "^8.6.0",
     "@react-navigation/bottom-tabs": "^7.12.0",
