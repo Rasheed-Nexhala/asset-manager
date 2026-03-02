@@ -262,6 +262,31 @@ describe('useDashboardSubscriptions', () => {
     jest.useRealTimers();
   });
 
+  it('triggerRefresh re-subscribes to fetch fresh data', () => {
+    const { requestService } = require('../../services/firebase/requestService');
+    const wrapper = createWrapper();
+    const { result } = renderHook(
+      () =>
+        useDashboardSubscriptions({
+          userId: 'user-1',
+          role: 'Admin',
+          assignedSiteId: null,
+          isVisible: true,
+        }),
+      { wrapper }
+    );
+
+    expect(requestService.subscribeToRequests).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      result.current.triggerRefresh();
+    });
+
+    // Effect re-runs: cleanup unsubscribes, then new subscriptions
+    expect(mockUnsubRequests).toHaveBeenCalledTimes(1);
+    expect(requestService.subscribeToRequests).toHaveBeenCalledTimes(2);
+  });
+
   it('calls all unsubscribes on unmount for Admin', () => {
     const wrapper = createWrapper();
     const { unmount } = renderHook(

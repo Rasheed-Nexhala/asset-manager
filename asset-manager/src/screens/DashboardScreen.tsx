@@ -313,7 +313,7 @@ export const DashboardScreen: React.FC = () => {
                   items={lowStockItems.map((i) => ({
                     id: i.id,
                     name: i.name ?? i.id,
-                    currentQty: i.totalQuantity ?? 0,
+                    currentQty: i.centralStoreQuantity ?? i.totalQuantity ?? 0,
                     minQty: i.minStockLevel ?? 0,
                   }))}
                   onViewAll={() => tabNav?.navigate('Inventory', { screen: 'CentralStoreInventory' })}
@@ -349,7 +349,7 @@ export const DashboardScreen: React.FC = () => {
                   items={lowStockItems.map((i) => ({
                     id: i.id,
                     name: i.name ?? i.id,
-                    currentQty: i.totalQuantity ?? 0,
+                    currentQty: i.centralStoreQuantity ?? i.totalQuantity ?? 0,
                     minQty: i.minStockLevel ?? 0,
                   }))}
                   onViewAll={() => tabNav?.navigate('Inventory', { screen: 'CentralStoreInventory' })}
@@ -373,14 +373,6 @@ export const DashboardScreen: React.FC = () => {
                 />
               )}
               <MyRecentActivityWidget onViewAll={() => navigation.navigate('MyActivity')} />
-              <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
-                <Text className="text-[17px] font-semibold text-[#0F172A] mb-2">
-                  Today&apos;s Summary
-                </Text>
-                <Text className="text-[15px] text-[#64748B]">
-                  Requests processed, items transferred, POs created — view Activity for details.
-                </Text>
-              </View>
             </>
           )}
 

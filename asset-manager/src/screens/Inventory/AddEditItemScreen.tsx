@@ -253,7 +253,9 @@ export const AddEditItemScreen: React.FC = () => {
           }, 1000);
         }
       } catch (err: any) {
-        const errorMessage = err?.message || 'Failed to save item';
+        // unwrap() rejects with the payload directly when using rejectWithValue(string)
+        const errorMessage =
+          (typeof err === 'string' ? err : err?.message) || 'Failed to save item';
         setError(errorMessage);
 
         // Show Alert for duplicate SKU - definitive UX feedback for both create and edit

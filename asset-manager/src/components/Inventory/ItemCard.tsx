@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { isLowStock } from '../../utils/inventoryUtils';
 import { WeightDisplay } from './WeightDisplay';
 import { ViewModeToggle } from './ViewModeToggle';
 import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
@@ -14,8 +15,7 @@ export interface ItemCardProps {
 
 export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
   const { viewMode, toggleViewMode } = useWeightViewPreference();
-  const isLowStock =
-    (item.totalQuantity ?? 0) <= (item.minStockLevel ?? 0);
+  const showLowStockBadge = isLowStock(item);
   const itemTypeLabel = item.type === 'consumable' ? 'Consumable' : 'Non-Consumable';
   const isConsumable = item.type === 'consumable';
   const isSteelItem = isWeightViewSupported(item);
@@ -73,7 +73,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
           </View>
 
           {/* Low Stock Badge */}
-          {isLowStock && (
+          {showLowStockBadge && (
             <View className="px-2 py-1 rounded-full bg-[#D97706]/15">
               <Text className="text-[12px] font-medium text-[#D97706]">
                 Low Stock

@@ -171,6 +171,9 @@ service cloud.firestore {
      * - Write: Admin and Store Incharge; Site Managers can update denormalized stock totals when returning items
      * - Create: Enforces SKU uniqueness via document ID (items/{sku}); prevents race duplicates
      * 
+     * Add Stock (manual): Restricted to Admin only at application layer (ItemDetailScreen + adjustQuantity thunk).
+     * Store Incharge can still receive POs, transfer, and manage maintenance via their dedicated flows.
+     * 
      * Note: Site Managers need update access to adjust centralStoreQuantity/atSitesQuantity when
      * returning items from their site to central store.
      */
@@ -196,6 +199,9 @@ service cloud.firestore {
      * - Create: Admin, Store Incharge, and Site Managers (when creating store entry for returned items)
      * - Update: Admin, Store Incharge, and Site Managers (when returning items to store or from site)
      * - Delete: Admin and Store Incharge only
+     * 
+     * Add Stock (manual): Restricted to Admin only at application layer (ItemDetailScreen + adjustQuantity thunk).
+     * Store Incharge can still receive POs, transfer, and manage maintenance via their dedicated flows.
      * 
      * Note: Site Managers need full read/list access to query inventory documents when returning items.
      * The queries filter by itemId and locationId to find the correct inventory documents to update.

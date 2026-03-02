@@ -1,6 +1,6 @@
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
@@ -9,23 +9,98 @@ import { StockStatusBadge, type StockStatus } from '../../components/Inventory/S
 import { StockEntryModal } from '../../components/Inventory/StockEntryModal';
 import { WeightDisplay } from '../../components/Inventory/WeightDisplay';
 import { ViewModeToggle } from '../../components/Inventory/ViewModeToggle';
-import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
+import { useWeightViewPreference, type WeightViewMode } from '../../hooks/useWeightViewPreference';
 import { isWeightViewSupported } from '../../utils/weightConversionUtils';
+import { isLowStock } from '../../utils/inventoryUtils';
 import type { InventoryStackParamList } from '../../navigation/InventoryStackNavigator';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import {
-  fetchItemById,
-  adjustQuantity,
-  fetchInventoryByLocation,
-} from '../../store/thunks/inventoryThunks';
+import { fetchItemById, adjustQuantity } from '../../store/thunks/inventoryThunks';
 import { selectItemById, selectItemsLoading, selectItemsError } from '../../store/selectors/inventorySelectors';
-import { getLocationId } from '../../utils/locationUtils';
-import type { Item, AdjustmentData } from '../../types/inventory';
+import { selectIsAdmin } from '../../store/selectors/authSelectors';
+import { updateItemInState } from '../../store/slices/inventorySlice';
+import { subscribeItemById, subscribeInventoryByItemId } from '../../services/firebase/inventoryService';
+import type { Item, AdjustmentData, InventoryEntry } from '../../types/inventory';
 
 type NavigationProp = StackNavigationProp<InventoryStackParamList, 'ItemDetail'>;
 
 interface RouteParams {
   itemId: string;
+}
+
+type LocationType = 'store' | 'site' | 'maintenance';
+
+/** Sort order for location types: store first, then sites, then maintenance */
+const LOCATION_ORDER: Record<LocationType, number> = {
+  store: 0,
+  site: 1,
+  maintenance: 2,
+};
+
+interface StockDistributionBreakdownProps {
+  entries: InventoryEntry[];
+  item: Item;
+  viewMode: WeightViewMode;
+}
+
+/**
+ * Displays per-location stock breakdown: Central Store, each site, Maintenance.
+ * Shows location name and quantity for each.
+ */
+function StockDistributionBreakdown({
+  entries,
+  item,
+  viewMode,
+}: StockDistributionBreakdownProps) {
+  const sortedEntries = useMemo(() => {
+    return [...entries].sort((a, b) => {
+      const orderA = LOCATION_ORDER[a.locationType as LocationType] ?? 2;
+      const orderB = LOCATION_ORDER[b.locationType as LocationType] ?? 2;
+      if (orderA !== orderB) return orderA - orderB;
+      return (a.locationName ?? '').localeCompare(b.locationName ?? '');
+    });
+  }, [entries]);
+
+  if (sortedEntries.length === 0) return null;
+
+  const getLocationIcon = (locationType: string): 'business-outline' | 'build-outline' | 'construct-outline' => {
+    if (locationType === 'store') return 'business-outline';
+    if (locationType === 'maintenance') return 'build-outline';
+    return 'construct-outline';
+  };
+
+  return (
+    <View className="mt-3 bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
+      <Text className="text-[15px] font-semibold text-[#0F172A] mb-3">
+        By Location
+      </Text>
+      <View className="gap-3">
+        {sortedEntries.map((entry) => (
+          <View
+            key={entry.id}
+            className="flex-row items-center justify-between py-2 border-b border-[#E2E8F0] last:border-b-0"
+          >
+            <View className="flex-row items-center gap-2 flex-1">
+              <Ionicons
+                name={getLocationIcon(entry.locationType)}
+                size={20}
+                color="#64748B"
+              />
+              <Text className="text-[15px] text-[#0F172A]" numberOfLines={1}>
+                {entry.locationName || entry.locationId || 'Unknown'}
+              </Text>
+            </View>
+            <WeightDisplay
+              quantity={entry.quantity}
+              weightPerMeter={item.weightPerMeter}
+              lengthPerPiece={entry.lengthPerPiece ?? item.lengthPerPiece}
+              viewMode={viewMode}
+              unit={item.unit}
+            />
+          </View>
+        ))}
+      </View>
+    </View>
+  );
 }
 
 /**
@@ -48,9 +123,11 @@ export const ItemDetailScreen: React.FC = () => {
   const item = useAppSelector((state) => selectItemById(itemId)(state));
   const isLoading = useAppSelector(selectItemsLoading);
   const error = useAppSelector(selectItemsError);
+  const isAdmin = useAppSelector(selectIsAdmin);
   const { viewMode, toggleViewMode } = useWeightViewPreference();
   const [showStockModal, setShowStockModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [inventoryByLocation, setInventoryByLocation] = useState<InventoryEntry[]>([]);
   const isSteelItem = item ? isWeightViewSupported(item) : false;
 
   // Fetch item if not in store
@@ -60,11 +137,35 @@ export const ItemDetailScreen: React.FC = () => {
     }
   }, [dispatch, itemId, item, isLoading]);
 
+  // Real-time subscription: update item when Firestore changes (add stock, transfer, maintenance, etc.)
+  useFocusEffect(
+    useCallback(() => {
+      if (!itemId) return;
+      const unsubscribe = subscribeItemById(itemId, (updatedItem) => {
+        if (updatedItem) {
+          dispatch(updateItemInState(updatedItem));
+        }
+      });
+      return () => unsubscribe();
+    }, [itemId, dispatch])
+  );
+
+  // Real-time subscription: per-location inventory for stock distribution breakdown
+  useFocusEffect(
+    useCallback(() => {
+      if (!itemId) return;
+      const unsubscribe = subscribeInventoryByItemId(itemId, (entries) => {
+        setInventoryByLocation(entries);
+      });
+      return () => unsubscribe();
+    }, [itemId])
+  );
+
   // Determine stock status based on quantity vs min level
   const stockStatus: StockStatus = useMemo(() => {
     if (!item) return 'adequate';
     if (item.status === 'discontinued') return 'discontinued';
-    if (item.totalQuantity <= item.minStockLevel) return 'low_stock';
+    if (isLowStock(item)) return 'low_stock';
     return 'adequate';
   }, [item]);
 
@@ -94,8 +195,7 @@ export const ItemDetailScreen: React.FC = () => {
       setIsSubmitting(true);
       try {
         await dispatch(adjustQuantity(adjustmentData)).unwrap();
-        await dispatch(fetchInventoryByLocation(getLocationId('store')));
-        await dispatch(fetchItemById(itemId));
+        // Real-time subscription will update the item; no need to refetch
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Failed to add stock';
         throw new Error(msg);
@@ -103,7 +203,7 @@ export const ItemDetailScreen: React.FC = () => {
         setIsSubmitting(false);
       }
     },
-    [dispatch, itemId]
+    [dispatch]
   );
 
   // Loading state
@@ -327,6 +427,13 @@ export const ItemDetailScreen: React.FC = () => {
               </View>
             </View>
           </ScrollView>
+
+          {/* Per-location breakdown: Central Store, each site, Maintenance */}
+          <StockDistributionBreakdown
+            entries={inventoryByLocation}
+            item={item}
+            viewMode={viewMode}
+          />
         </View>
 
         {/* Stock Level & Status Card */}
@@ -397,14 +504,26 @@ export const ItemDetailScreen: React.FC = () => {
               <View className="h-2 bg-[#E2E8F0] rounded-full overflow-hidden">
                 <View
                   className={`h-full rounded-full ${
-                    item.totalQuantity <= item.minStockLevel
+                    isLowStock(item)
                       ? 'bg-[#DC2626]'
-                      : item.totalQuantity <= item.minStockLevel * 1.5
+                      : (item.centralStoreQuantity ?? item.totalQuantity ?? 0) <=
+                        ((item.minStockLevel ?? 0) * 1.5)
                       ? 'bg-[#D97706]'
                       : 'bg-[#16A34A]'
                   }`}
                   style={{
-                    width: `${Math.min((item.totalQuantity / (item.minStockLevel * 2)) * 100, 100)}%`,
+                    width: (() => {
+                      const qty =
+                        item.centralStoreQuantity ?? item.totalQuantity ?? 0;
+                      const min = item.minStockLevel ?? 0;
+                      const pct =
+                        min === 0
+                          ? qty > 0
+                            ? 100
+                            : 0
+                          : Math.min((qty / (min * 2)) * 100, 100);
+                      return `${pct}%`;
+                    })(),
                   }}
                 />
               </View>
@@ -414,16 +533,18 @@ export const ItemDetailScreen: React.FC = () => {
 
         {/* Action Buttons */}
         <View className="mb-6 mt-2 gap-3">
-          <TouchableOpacity
-            className="bg-[#16A34A] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
-            onPress={handleAddStock}
-            activeOpacity={0.7}
-            accessibilityLabel="Add stock"
-            accessibilityRole="button"
-          >
-            <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-            <Text className="text-[15px] font-semibold text-white">Add Stock</Text>
-          </TouchableOpacity>
+          {isAdmin && (
+            <TouchableOpacity
+              className="bg-[#16A34A] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
+              onPress={handleAddStock}
+              activeOpacity={0.7}
+              accessibilityLabel="Add stock"
+              accessibilityRole="button"
+            >
+              <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+              <Text className="text-[15px] font-semibold text-white">Add Stock</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             className="border-[1.5px] border-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
             onPress={handleEdit}

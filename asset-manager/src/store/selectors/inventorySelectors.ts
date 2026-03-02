@@ -1,6 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from '../index';
 import type { Item, Category, InventoryEntry, ItemType, ItemStatus } from '../../types/inventory';
+import { isLowStock } from '../../utils/inventoryUtils';
 
 /** Stable empty array reference - prevents unnecessary rerenders when location has no inventory */
 const EMPTY_INVENTORY: InventoryEntry[] = [];
@@ -84,14 +85,15 @@ export const selectLowStockItemIds = createSelector(
   (inventoryState) => inventoryState.lowStockItemIds
 );
 
+/** Derives low-stock items directly from items (single source of truth) */
 export const selectLowStockItems = createSelector(
-  [selectAllItems, selectLowStockItemIds],
-  (items, lowStockIds) => items.filter((item) => lowStockIds.includes(item.id))
+  [selectAllItems],
+  (items) => items.filter((item) => isLowStock(item))
 );
 
 export const selectLowStockCount = createSelector(
-  [selectLowStockItemIds],
-  (lowStockIds) => lowStockIds.length
+  [selectLowStockItems],
+  (lowStockItems) => lowStockItems.length
 );
 
 // Categories selectors
@@ -153,10 +155,7 @@ export const selectFilteredItems = createSelector(
 
     // Filter by low stock (must be applied last as it depends on totalQuantity)
     if (filters.lowStockOnly) {
-      filtered = filtered.filter(
-        (item) =>
-          (item.totalQuantity ?? 0) <= (item.minStockLevel ?? 0)
-      );
+      filtered = filtered.filter((item) => isLowStock(item));
     }
 
     return filtered;
@@ -164,9 +163,8 @@ export const selectFilteredItems = createSelector(
 );
 
 export const selectFilteredLowStockItems = createSelector(
-  [selectFilteredItems, selectLowStockItemIds],
-  (filteredItems, lowStockIds) =>
-    filteredItems.filter((item) => lowStockIds.includes(item.id))
+  [selectFilteredItems],
+  (filteredItems) => filteredItems.filter((item) => isLowStock(item))
 );
 
 // Base search query selector

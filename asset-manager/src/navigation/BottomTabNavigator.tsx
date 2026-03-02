@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,7 +13,7 @@ import {
   selectIsStoreIncharge,
   selectIsSiteManager,
 } from '../store/selectors/authSelectors';
-import { selectHighPriorityPendingCount } from '../store/selectors/requestSelectors';
+import { selectPendingRequestsCount } from '../store/selectors/requestSelectors';
 import { selectPendingApprovalCount } from '../store/selectors/purchaseOrderSelectors';
 
 const Tab = createBottomTabNavigator();
@@ -38,7 +38,7 @@ export const BottomTabNavigator: React.FC = () => {
   const isAdmin = useAppSelector(selectIsAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const isSiteManager = useAppSelector(selectIsSiteManager);
-  const highPriorityCount = useAppSelector(selectHighPriorityPendingCount);
+  const pendingRequestsCount = useAppSelector(selectPendingRequestsCount);
   const pendingApprovalCount = useAppSelector(selectPendingApprovalCount);
 
   // Purchase Orders tab is visible to Admin and StoreIncharge only
@@ -49,6 +49,21 @@ export const BottomTabNavigator: React.FC = () => {
 
   // Requests tab is visible to Admin, StoreIncharge, and SiteManager
   const showRequestsTab = isAdmin || isStoreIncharge || isSiteManager;
+
+  // Initial screen for Requests stack (role-based)
+  const requestsInitialScreen = isAdmin || isStoreIncharge ? 'RequestQueue' : 'MyRequests';
+
+  // When Requests tab is pressed, pop to initial screen so user always sees RequestQueue/MyRequests
+  const requestsTabListeners = useCallback(
+    ({ navigation }: { navigation: { navigate: (name: string, params?: object) => void } }) => ({
+      tabPress: () => {
+        navigation.navigate('Requests', {
+          screen: requestsInitialScreen,
+        });
+      },
+    }),
+    [requestsInitialScreen]
+  );
 
   return (
     <Tab.Navigator
@@ -104,8 +119,9 @@ export const BottomTabNavigator: React.FC = () => {
               <Ionicons name="file-tray-full-outline" size={size} color={color} />
             ),
             tabBarLabel: 'Requests',
-            tabBarBadge: highPriorityCount > 0 ? highPriorityCount : undefined,
+            tabBarBadge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
           }}
+          listeners={requestsTabListeners}
         />
       )}
       {showPurchaseOrdersTab && (

@@ -177,18 +177,28 @@ describe('inventorySelectors', () => {
     expect(selectAllCategories(state)).toEqual(categories);
   });
 
-  it('selectLowStockItems returns items in lowStockItemIds', () => {
-    const lowItem = mockItem('low1', { totalQuantity: 2, minStockLevel: 5 });
-    const okItem = mockItem('ok1', { totalQuantity: 10, minStockLevel: 5 });
+  it('selectLowStockItems returns items where centralStoreQuantity <= minStockLevel', () => {
+    const lowItem = mockItem('low1', {
+      centralStoreQuantity: 2,
+      totalQuantity: 10,
+      minStockLevel: 5,
+    });
+    const okItem = mockItem('ok1', {
+      centralStoreQuantity: 10,
+      totalQuantity: 10,
+      minStockLevel: 5,
+    });
     const state = createMockState({
       items: [lowItem, okItem],
-      lowStockItemIds: ['low1'],
     });
     expect(selectLowStockItems(state)).toEqual([lowItem]);
   });
 
-  it('selectLowStockCount returns count of low stock ids', () => {
-    const state = createMockState({ lowStockItemIds: ['a', 'b', 'c'] });
+  it('selectLowStockCount returns count of low stock items', () => {
+    const low1 = mockItem('a', { centralStoreQuantity: 1, minStockLevel: 5 });
+    const low2 = mockItem('b', { centralStoreQuantity: 2, minStockLevel: 5 });
+    const low3 = mockItem('c', { centralStoreQuantity: 3, minStockLevel: 5 });
+    const state = createMockState({ items: [low1, low2, low3] });
     expect(selectLowStockCount(state)).toBe(3);
   });
 

@@ -32,6 +32,7 @@ import type {
 } from '../../types/inventory';
 import { timestampToISO } from '../../types/inventory';
 import { getLocationId, getLocationTypeFromId } from '../../utils/locationUtils';
+import { isLowStock } from '../../utils/inventoryUtils';
 
 // Collection names
 const ITEMS_COLLECTION = 'items';
@@ -100,7 +101,7 @@ export const listItems = async (filters?: ItemFilters): Promise<Item[]> => {
         type: data.type,
         unit: data.unit,
         imageUrl: data.imageUrl,
-        minStockLevel: data.minStockLevel,
+        minStockLevel: data.minStockLevel ?? 0,
         status: data.status,
         totalQuantity: data.totalQuantity || 0,
         centralStoreQuantity: data.centralStoreQuantity || 0,
@@ -117,12 +118,9 @@ export const listItems = async (filters?: ItemFilters): Promise<Item[]> => {
       items.push(firestoreItemToItem(firestoreItem));
     });
 
-    // Apply low stock filter in memory (after fetching)
+    // Apply low stock filter in memory (central store quantity <= min)
     if (filters?.lowStockOnly) {
-      return items.filter(
-        (item) =>
-          (item.totalQuantity ?? 0) <= (item.minStockLevel ?? 0)
-      );
+      return items.filter((item) => isLowStock(item));
     }
 
     return items;
@@ -133,8 +131,37 @@ export const listItems = async (filters?: ItemFilters): Promise<Item[]> => {
 };
 
 /**
+ * Build FirestoreItem from Firestore document data (shared by getItemById and subscribeItemById)
+ */
+const docDataToItem = (id: string, data: Record<string, unknown>): Item =>
+  firestoreItemToItem({
+    id,
+    name: data.name,
+    sku: data.sku,
+    description: data.description,
+    categoryId: data.categoryId,
+    categoryName: data.categoryName,
+    type: data.type,
+    unit: data.unit,
+    imageUrl: data.imageUrl,
+    minStockLevel: data.minStockLevel ?? 0,
+    status: data.status,
+    totalQuantity: data.totalQuantity || 0,
+    centralStoreQuantity: data.centralStoreQuantity || 0,
+    atSitesQuantity: data.atSitesQuantity || 0,
+    inMaintenanceQuantity: data.inMaintenanceQuantity || 0,
+    weightPerMeter: data.weightPerMeter,
+    lengthPerPiece: data.lengthPerPiece,
+    steelMasterId: data.steelMasterId,
+    steelMasterName: data.steelMasterName,
+    isWeightBased: data.isWeightBased,
+    createdAt: data.createdAt,
+    updatedAt: data.updatedAt,
+  } as FirestoreItem);
+
+/**
  * Get a single item by ID
- * 
+ *
  * @param id - Item document ID
  * @returns Item if found, null otherwise
  */
@@ -147,36 +174,43 @@ export const getItemById = async (id: string): Promise<Item | null> => {
     }
 
     const data = itemDoc.data();
-    const firestoreItem: FirestoreItem = {
-      id: itemDoc.id,
-      name: data.name,
-      sku: data.sku,
-      description: data.description,
-      categoryId: data.categoryId,
-      categoryName: data.categoryName,
-      type: data.type,
-      unit: data.unit,
-      imageUrl: data.imageUrl,
-      minStockLevel: data.minStockLevel,
-      status: data.status,
-      totalQuantity: data.totalQuantity || 0,
-      centralStoreQuantity: data.centralStoreQuantity || 0,
-      atSitesQuantity: data.atSitesQuantity || 0,
-      inMaintenanceQuantity: data.inMaintenanceQuantity || 0,
-      weightPerMeter: data.weightPerMeter,
-      lengthPerPiece: data.lengthPerPiece,
-      steelMasterId: data.steelMasterId,
-      steelMasterName: data.steelMasterName,
-      isWeightBased: data.isWeightBased,
-      createdAt: data.createdAt,
-      updatedAt: data.updatedAt,
-    };
-
-    return firestoreItemToItem(firestoreItem);
+    return docDataToItem(itemDoc.id, data);
   } catch (error) {
     console.error('Error getting item by ID:', error);
     throw error;
   }
+};
+
+/**
+ * Subscribe to real-time updates for a single item by ID
+ *
+ * @param id - Item document ID
+ * @param callback - Called whenever the item changes (or with null if deleted)
+ * @returns Unsubscribe function
+ */
+export const subscribeItemById = (
+  id: string,
+  callback: (item: Item | null) => void
+): Unsubscribe => {
+  if (!id) {
+    callback(null);
+    return () => {};
+  }
+  return onSnapshot(
+    doc(db, ITEMS_COLLECTION, id),
+    (snap) => {
+      if (!snap.exists()) {
+        callback(null);
+        return;
+      }
+      const data = snap.data();
+      callback(docDataToItem(snap.id, data));
+    },
+    (error) => {
+      console.error('Error in item subscription:', error);
+      callback(null);
+    }
+  );
 };
 
 /**
@@ -480,6 +514,13 @@ export const adjustQuantity = async (
     throw new Error('User must be authenticated to adjust inventory');
   }
 
+  if (!adjustmentData.itemId?.trim()) {
+    throw new Error('Item ID is required to adjust quantity');
+  }
+  if (!adjustmentData.locationId?.trim()) {
+    throw new Error('Location ID is required to adjust quantity');
+  }
+
   const inventoryQuery = query(
     collection(db, INVENTORY_COLLECTION),
     where('itemId', '==', adjustmentData.itemId),
@@ -504,8 +545,12 @@ export const adjustQuantity = async (
         inventoryRef = doc(collection(db, INVENTORY_COLLECTION));
         currentQuantity = 0;
       } else {
-        inventoryRef = doc(db, INVENTORY_COLLECTION, inventorySnapshot.docs[0].id);
-        currentQuantity = inventorySnapshot.docs[0].data()?.quantity || 0;
+        const existingDoc = inventorySnapshot.docs[0];
+        if (!existingDoc?.ref) {
+          throw new Error('Invalid inventory snapshot: missing document reference');
+        }
+        inventoryRef = existingDoc.ref;
+        currentQuantity = existingDoc.data()?.quantity || 0;
       }
 
       // Read item within transaction
@@ -647,7 +692,7 @@ export const subscribeItems = (
           type: data.type,
           unit: data.unit,
           imageUrl: data.imageUrl,
-          minStockLevel: data.minStockLevel,
+          minStockLevel: data.minStockLevel ?? 0,
           status: data.status,
           totalQuantity: data.totalQuantity || 0,
           centralStoreQuantity: data.centralStoreQuantity || 0,
@@ -659,12 +704,9 @@ export const subscribeItems = (
         items.push(firestoreItemToItem(firestoreItem));
       });
 
-      // Apply low stock filter in memory
+      // Apply low stock filter in memory (central store quantity <= min)
       if (filters?.lowStockOnly) {
-        const filteredItems = items.filter(
-          (item) =>
-            (item.totalQuantity ?? 0) <= (item.minStockLevel ?? 0)
-        );
+        const filteredItems = items.filter((item) => isLowStock(item));
         callback(filteredItems);
       } else {
         callback(items);
@@ -788,5 +830,102 @@ export const getInventoryByLocation = async (
     console.error('Error getting inventory by location:', error);
     throw error;
   }
+};
+
+/**
+ * Get inventory for a specific item across all locations (central store, sites, maintenance).
+ * Used for stock distribution breakdown on Item Detail screen.
+ *
+ * @param itemId - Item document ID
+ * @returns Array of inventory entries for the item at each location
+ */
+export const getInventoryByItemId = async (
+  itemId: string
+): Promise<InventoryEntry[]> => {
+  try {
+    if (!itemId) return [];
+
+    const q = query(
+      collection(db, INVENTORY_COLLECTION),
+      where('itemId', '==', itemId),
+      orderBy('locationId', 'asc')
+    );
+
+    const snapshot = await getDocs(q);
+    const entries: InventoryEntry[] = [];
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const firestoreEntry: FirestoreInventoryEntry = {
+        id: docSnap.id,
+        itemId: data.itemId,
+        itemName: data.itemName,
+        itemSku: data.itemSku,
+        locationId: data.locationId,
+        locationType: data.locationType,
+        locationName: data.locationName,
+        quantity: data.quantity,
+        lengthPerPiece: data.lengthPerPiece,
+        updatedAt: data.updatedAt,
+      };
+      entries.push(firestoreInventoryEntryToInventoryEntry(firestoreEntry));
+    });
+
+    return entries;
+  } catch (error) {
+    console.error('Error getting inventory by item:', error);
+    throw error;
+  }
+};
+
+/**
+ * Subscribe to real-time updates for inventory of a specific item across all locations.
+ *
+ * @param itemId - Item document ID
+ * @param callback - Called whenever the item's inventory changes
+ * @returns Unsubscribe function
+ */
+export const subscribeInventoryByItemId = (
+  itemId: string,
+  callback: (entries: InventoryEntry[]) => void
+): Unsubscribe => {
+  if (!itemId) {
+    callback([]);
+    return () => {};
+  }
+
+  const q = query(
+    collection(db, INVENTORY_COLLECTION),
+    where('itemId', '==', itemId),
+    orderBy('locationId', 'asc')
+  );
+
+  return onSnapshot(
+    q,
+    (snapshot: QuerySnapshot) => {
+      const entries: InventoryEntry[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const firestoreEntry: FirestoreInventoryEntry = {
+          id: docSnap.id,
+          itemId: data.itemId,
+          itemName: data.itemName,
+          itemSku: data.itemSku,
+          locationId: data.locationId,
+          locationType: data.locationType,
+          locationName: data.locationName,
+          quantity: data.quantity,
+          lengthPerPiece: data.lengthPerPiece,
+          updatedAt: data.updatedAt,
+        };
+        entries.push(firestoreInventoryEntryToInventoryEntry(firestoreEntry));
+      });
+      callback(entries);
+    },
+    (error) => {
+      console.error('Error in inventory-by-item subscription:', error);
+      callback([]);
+    }
+  );
 };
 

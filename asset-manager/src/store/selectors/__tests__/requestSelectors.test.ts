@@ -5,6 +5,7 @@ import {
   selectRequestsFilters,
   selectRequestById,
   selectFilteredRequests,
+  selectFilteredRequestsSortedByDate,
   selectPendingRequestsCount,
   selectHighPriorityPendingCount,
 } from '../requestSelectors';
@@ -84,6 +85,23 @@ describe('requestSelectors', () => {
     const result = selectFilteredRequests(state);
     expect(result).toHaveLength(1);
     expect(result[0].status).toBe('pending');
+  });
+
+  it('selectFilteredRequestsSortedByDate returns filtered requests sorted by updatedAt descending', () => {
+    const reqs = [
+      { ...mockRequest('1', 'pending', 'high', 'site1'), updatedAt: { toMillis: () => 1000 }, createdAt: { toMillis: () => 500 } },
+      { ...mockRequest('2', 'pending', 'medium', 'site1'), updatedAt: { toMillis: () => 2000 }, createdAt: { toMillis: () => 1500 } },
+      { ...mockRequest('3', 'pending', 'low', 'site1'), updatedAt: { toMillis: () => 1500 }, createdAt: { toMillis: () => 1000 } },
+    ];
+    const state = createMockState({
+      requests: reqs as never[],
+      filters: { status: 'all', priority: 'all', siteId: 'all' },
+    });
+    const result = selectFilteredRequestsSortedByDate(state);
+    expect(result).toHaveLength(3);
+    expect(result[0].id).toBe('2');
+    expect(result[1].id).toBe('3');
+    expect(result[2].id).toBe('1');
   });
 
   it('selectPendingRequestsCount returns count of pending', () => {

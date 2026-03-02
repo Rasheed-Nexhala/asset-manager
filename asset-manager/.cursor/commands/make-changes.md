@@ -9,3 +9,5 @@
 3. **GeneralPurpose subagent:** Implement the chosen approach.
 
 **Constraints:** Follow existing patterns. No new dependencies unless required. Verify with build/test.
+
+##IMPORTANT: Once updates done tell me how can I test it in the app

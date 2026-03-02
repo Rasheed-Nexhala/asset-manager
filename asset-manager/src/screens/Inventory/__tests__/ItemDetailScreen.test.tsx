@@ -32,6 +32,12 @@ jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack }),
   useRoute: () => ({ params: mockRouteParams }),
   useIsFocused: () => true,
+  useFocusEffect: (cb: () => void | (() => void)) => {
+    const cleanup = cb();
+    return () => {
+      if (typeof cleanup === 'function') cleanup();
+    };
+  },
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -100,6 +106,12 @@ jest.mock('../../../store/thunks/maintenanceThunks', () => {
     addMaintenanceUpdateThunk: createAsyncThunk('maintenance/update', async () => null),
   };
 });
+jest.mock('../../../services/firebase/inventoryService', () => ({
+  subscribeItemById: jest.fn(() => () => {}),
+  subscribeInventoryByItemId: jest.fn(() => () => {}),
+  getItemById: jest.fn(),
+  listItems: jest.fn(),
+}));
 jest.mock('../../../store/thunks/activityLogThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
@@ -245,9 +257,14 @@ describe('ItemDetailScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('AddEditItem', { itemId: 'i1' });
   });
 
-  it('add stock opens StockEntryModal', () => {
+  it('add stock opens StockEntryModal when user is Admin', () => {
     mockRouteParams = { itemId: 'i1' };
+    const adminAuth = {
+        ...defaultPreloadedState.auth,
+        userRole: { role: 'Admin' as const, isActive: true, permissions: [] },
+      };
     renderWithStore(<ItemDetailScreen />, {
+      auth: adminAuth as Partial<RootState['auth']>,
       inventory: {
         items: [mockItem],
         categories: [],
@@ -264,6 +281,30 @@ describe('ItemDetailScreen', () => {
     fireEvent.press(addStockButtons[0]);
 
     expect(screen.getByLabelText('Amount input')).toBeTruthy();
+  });
+
+  it('Add Stock button is hidden when user is StoreIncharge', () => {
+    mockRouteParams = { itemId: 'i1' };
+    const storeInchargeAuth = {
+        ...defaultPreloadedState.auth,
+        userRole: { role: 'StoreIncharge' as const, isActive: true, permissions: [] },
+      };
+    renderWithStore(<ItemDetailScreen />, {
+      auth: storeInchargeAuth as Partial<RootState['auth']>,
+      inventory: {
+        items: [mockItem],
+        categories: [],
+        inventoryByLocation: {},
+        lowStockItemIds: [],
+        loading: false,
+        error: null,
+        errorTimestamp: null,
+        filters: null,
+      },
+    });
+
+    expect(screen.queryByRole('button', { name: 'Add stock' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Edit item' }).length).toBeGreaterThan(0);
   });
 
   it('back button calls goBack', () => {

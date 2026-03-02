@@ -42,6 +42,10 @@ const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack }),
+  useFocusEffect: (cb: () => void | (() => void)) => {
+    const cleanup = cb();
+    return () => { if (typeof cleanup === 'function') cleanup(); };
+  },
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -65,6 +69,7 @@ jest.mock('../../../services/firebase/siteService', () => ({
 
 let mockFetchSitesResult: Site[] | 'reject' | 'pending' = [];
 let mockFetchInventoryResult: { locationId: string; inventory: InventoryEntry[] } | 'reject' | 'pending' = { locationId: '', inventory: [] };
+const mockUnsubscribeInventory = jest.fn();
 
 jest.mock('../../../store/thunks/authThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
@@ -109,25 +114,31 @@ jest.mock('../../../store/thunks/inventoryThunks', () => {
     updateItem: createAsyncThunk('inventory/updateItem', async () => null),
     deleteItem: createAsyncThunk('inventory/deleteItem', async () => null),
     adjustQuantity: createAsyncThunk('inventory/adjustQuantity', async () => null),
-    fetchInventoryByLocation: createAsyncThunk(
-      'inventory/fetchInventoryByLocation',
-      async (locationId: string, { rejectWithValue }) => {
-        if (mockFetchInventoryResult === 'reject') {
-          return rejectWithValue('Failed to fetch inventory');
-        }
-        if (mockFetchInventoryResult === 'pending') {
-          await new Promise(() => {});
-        }
-        const result = mockFetchInventoryResult as { locationId: string; inventory: InventoryEntry[] };
-        return { locationId: result.locationId || locationId, inventory: result.inventory };
-      }
-    ),
+    fetchInventoryByLocation: createAsyncThunk('inventory/fetchInventoryByLocation', async () => ({ locationId: '', inventory: [] })),
     fetchCategories: createAsyncThunk('inventory/fetchCategories', async () => []),
     createCategory: createAsyncThunk('inventory/createCategory', async () => null),
     updateCategory: createAsyncThunk('inventory/updateCategory', async () => null),
     deleteCategory: createAsyncThunk('inventory/deleteCategory', async () => null),
   };
 });
+jest.mock('../../../services/firebase/inventoryService', () => ({
+  subscribeInventoryByLocation: jest.fn((_locationId: string, callback: (inventory: InventoryEntry[]) => void) => {
+    const result = mockFetchInventoryResult;
+    if (result !== 'reject' && result !== 'pending' && typeof result === 'object') {
+      callback(result.inventory || []);
+    } else {
+      callback([]);
+    }
+    return mockUnsubscribeInventory;
+  }),
+  getInventoryByLocation: jest.fn().mockImplementation(() => {
+    const result = mockFetchInventoryResult;
+    if (result !== 'reject' && result !== 'pending' && typeof result === 'object') {
+      return Promise.resolve(result.inventory || []);
+    }
+    return Promise.resolve([]);
+  }),
+}));
 jest.mock('../../../store/thunks/steelMasterThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
@@ -272,6 +283,7 @@ describe('MySiteInventoryScreen', () => {
     mockNavigate.mockClear();
     mockGoBack.mockClear();
     mockUnsubscribe.mockClear();
+    mockUnsubscribeInventory.mockClear();
     mockSitesToReturn = null;
     mockFetchSitesResult = [];
     mockFetchInventoryResult = { locationId: SITE_LOCATION_ID, inventory: [] };

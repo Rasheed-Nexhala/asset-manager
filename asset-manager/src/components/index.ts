@@ -4,6 +4,8 @@ export { ScreenHeader } from './ScreenHeader';
 export type { ScreenHeaderProps, ScreenHeaderRightAction } from './ScreenHeader';
 export { FormField } from './FormField';
 export type { FormFieldProps } from './FormField';
+export { KeyboardToolbar } from './KeyboardToolbar';
+export type { KeyboardToolbarProps } from './KeyboardToolbar';
 export { UserProfile } from './UserProfile/UserProfile';
 export type { UserProfileProps } from './UserProfile/UserProfile';
 export { UpdatePasswordForm } from './UpdatePasswordForm';

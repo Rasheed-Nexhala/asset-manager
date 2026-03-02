@@ -36,6 +36,7 @@ import { useInventoryError } from '../../hooks/useInventoryError';
 import { subscribeItems } from '../../services/firebase/inventoryService';
 import { subscribeCategories } from '../../services/firebase/categoryService';
 import { setItems, setCategories } from '../../store/slices/inventorySlice';
+import { isLowStock } from '../../utils/inventoryUtils';
 import type { Item, ItemType, Category } from '../../types/inventory';
 
 type StockFilter = 'all' | 'low_stock';
@@ -88,9 +89,7 @@ export const CentralStoreInventoryScreen: React.FC = () => {
       items = items.filter((item) => item.type === filters.type);
     }
     if (filters.stock === 'low_stock') {
-      items = items.filter(
-        (item) => item.totalQuantity <= item.minStockLevel
-      );
+      items = items.filter((item) => isLowStock(item));
     }
 
     return items;
@@ -98,9 +97,7 @@ export const CentralStoreInventoryScreen: React.FC = () => {
 
   // Calculate counts for filtered items
   const filteredLowStockCount = useMemo(() => {
-    return filteredItems.filter(
-      (item) => item.totalQuantity <= item.minStockLevel
-    ).length;
+    return filteredItems.filter((item) => isLowStock(item)).length;
   }, [filteredItems]);
 
   // Subscribe once on mount — filters are applied in memory via useMemo/selectors

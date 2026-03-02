@@ -229,7 +229,7 @@ describe('RequestQueueScreen', () => {
     expect(screen.getByText('Try adjusting your filters to see more requests.')).toBeTruthy();
   });
 
-  it('renders site and status filter chips', () => {
+  it('renders priority, site, and status filter chips', () => {
     renderWithStore(<RequestQueueScreen />, {
       requests: defaultRequestsState,
       sites: {
@@ -242,8 +242,13 @@ describe('RequestQueueScreen', () => {
       },
     });
 
+    expect(screen.getByText('Priority:')).toBeTruthy();
     expect(screen.getByText('Site:')).toBeTruthy();
     expect(screen.getByText('Status:')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Filter by all priorities' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Filter by high priority' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Filter by medium priority' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Filter by low priority' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Filter by all sites' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Filter by Site A' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Filter by all statuses' })).toBeTruthy();
@@ -263,6 +268,9 @@ describe('RequestQueueScreen', () => {
         lastValidationAt: null,
       },
     });
+
+    fireEvent.press(screen.getByRole('button', { name: 'Filter by high priority' }));
+    expect(store.getState().requests.filters.priority).toBe('high');
 
     fireEvent.press(screen.getByRole('button', { name: 'Filter by pending' }));
     expect(store.getState().requests.filters.status).toBe('pending');
@@ -291,7 +299,7 @@ describe('RequestQueueScreen', () => {
     });
 
     expect(screen.getByText('REQ-2025-0001')).toBeTruthy();
-    expect(screen.getByText('High Priority')).toBeTruthy();
+    expect(screen.getByText('Site A')).toBeTruthy();
   });
 
   it('navigates to ProcessRequest when request card pressed', () => {
@@ -317,7 +325,7 @@ describe('RequestQueueScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('ProcessRequest', { requestId: 'req-1' });
   });
 
-  it('renders priority sections', () => {
+  it('renders flat list of requests sorted by date (latest first)', () => {
     mockRequestsToReturn = null;
     const highReq = createMockRequest({ id: 'req-1', requestNumber: 'REQ-2025-0001', priority: 'high' });
     const mediumReq = createMockRequest({ id: 'req-2', requestNumber: 'REQ-2025-0002', priority: 'medium' });
@@ -337,8 +345,6 @@ describe('RequestQueueScreen', () => {
       },
     });
 
-    expect(screen.getByText('High Priority')).toBeTruthy();
-    expect(screen.getByText('Medium Priority')).toBeTruthy();
     expect(screen.getByText('REQ-2025-0001')).toBeTruthy();
     expect(screen.getByText('REQ-2025-0002')).toBeTruthy();
   });

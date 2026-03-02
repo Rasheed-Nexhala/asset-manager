@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { Item, Category, InventoryEntry, ItemFilters } from '../../types/inventory';
+import { isLowStock } from '../../utils/inventoryUtils';
 
 /** Safely extract error message from thunk rejection payload */
 const getErrorMessage = (payload: unknown): string => {
@@ -56,12 +57,9 @@ const inventorySlice = createSlice({
   reducers: {
     setItems: (state, action: PayloadAction<Item[]>) => {
       state.items = action.payload;
-      // Update low stock item IDs whenever items change
+      // Update low stock item IDs (central store quantity <= min)
       state.lowStockItemIds = action.payload
-        .filter(
-          (item) =>
-            (item.totalQuantity ?? 0) <= (item.minStockLevel ?? 0)
-        )
+        .filter((item) => isLowStock(item))
         .map((item) => item.id);
     },
     setCategories: (state, action: PayloadAction<Category[]>) => {
@@ -91,27 +89,24 @@ const inventorySlice = createSlice({
       state.errorTimestamp = null;
     },
     // Update a single item in the items array (useful for real-time updates)
+    // Adds the item if not present (e.g. when ItemDetailScreen subscribes before items are loaded)
     updateItemInState: (state, action: PayloadAction<Item>) => {
       const index = state.items.findIndex((item) => item.id === action.payload.id);
       if (index !== -1) {
         state.items[index] = action.payload;
-        // Update low stock item IDs
-        state.lowStockItemIds = state.items
-          .filter(
-            (item) =>
-              (item.totalQuantity ?? 0) <= (item.minStockLevel ?? 0)
-          )
-          .map((item) => item.id);
+      } else {
+        state.items.push(action.payload);
       }
+      // Update low stock item IDs (central store quantity <= min)
+      state.lowStockItemIds = state.items
+        .filter((item) => isLowStock(item))
+        .map((item) => item.id);
     },
     // Add a new item to the items array
     addItem: (state, action: PayloadAction<Item>) => {
       state.items.push(action.payload);
-      // Update low stock item IDs
-      if (
-        (action.payload.totalQuantity ?? 0) <=
-        (action.payload.minStockLevel ?? 0)
-      ) {
+      // Update low stock item IDs (central store quantity <= min)
+      if (isLowStock(action.payload)) {
         state.lowStockItemIds.push(action.payload.id);
       }
     },
@@ -141,12 +136,9 @@ const inventorySlice = createSlice({
       .addCase(fetchItems.fulfilled, (state, action) => {
         state.loading = false;
         state.items = action.payload;
-        // Update low stock item IDs
+        // Update low stock item IDs (central store quantity <= min)
         state.lowStockItemIds = action.payload
-          .filter(
-            (item) =>
-              (item.totalQuantity ?? 0) <= (item.minStockLevel ?? 0)
-          )
+          .filter((item) => isLowStock(item))
           .map((item) => item.id);
         state.error = null;
         state.errorTimestamp = null;
@@ -171,12 +163,9 @@ const inventorySlice = createSlice({
           } else {
             state.items.push(action.payload);
           }
-          // Update low stock item IDs
+          // Update low stock item IDs (central store quantity <= min)
           state.lowStockItemIds = state.items
-            .filter(
-              (item) =>
-                (item.totalQuantity ?? 0) <= (item.minStockLevel ?? 0)
-            )
+            .filter((item) => isLowStock(item))
             .map((item) => item.id);
         }
         state.error = null;

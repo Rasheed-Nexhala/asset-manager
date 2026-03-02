@@ -126,6 +126,14 @@
       ]
     },
     {
+      "collectionGroup": "inventory",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "itemId", "order": "ASCENDING" },
+        { "fieldPath": "locationId", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "steelMaster",
       "queryScope": "COLLECTION",
       "fields": [

@@ -146,6 +146,13 @@ export const updateItem = createAsyncThunk(
       }
       return updatedItem;
     } catch (error: any) {
+      // Handle duplicate SKU error (same as createItem)
+      if (
+        error?.message?.includes('SKU') &&
+        error?.message?.toLowerCase().includes('already exists')
+      ) {
+        return rejectWithValue(SKU_EXISTS_ERROR_MESSAGE);
+      }
       return rejectWithValue(error.message || 'Failed to update item');
     }
   }
@@ -166,13 +173,30 @@ export const deleteItem = createAsyncThunk(
   }
 );
 
+/** Error when non-Admin attempts to add stock to central store */
+const ADD_STOCK_ADMIN_ONLY_MESSAGE =
+  'Only Admin can add stock to central store. Store Incharge can receive POs, transfer, or manage maintenance.';
+
 /**
  * Adjust inventory quantity at a specific location
+ * Add stock to central store is restricted to Admin only (Store Incharge can receive POs, transfer, maintenance)
  */
 export const adjustQuantity = createAsyncThunk(
   'inventory/adjustQuantity',
   async (adjustmentData: AdjustmentData, { getState, rejectWithValue }) => {
     try {
+      // Add stock to central store: Admin only (enforced at UI + thunk layer)
+      if (
+        adjustmentData.type === 'add' &&
+        adjustmentData.locationType === 'store'
+      ) {
+        const state = getState() as RootState;
+        const userRole = state.auth.userRole?.role;
+        if (userRole !== 'Admin') {
+          return rejectWithValue(ADD_STOCK_ADMIN_ONLY_MESSAGE);
+        }
+      }
+
       const { oldQuantity, newQuantity } = await adjustQuantityService(adjustmentData);
 
       const state = getState() as RootState;

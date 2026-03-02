@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAppDispatch } from '../store/hooks';
 import { setRequests, setMyRequests } from '../store/slices/requestsSlice';
 import { setPurchaseOrders } from '../store/slices/purchaseOrderSlice';
@@ -30,6 +30,9 @@ export interface UseDashboardSubscriptionsResult {
 /**
  * Subscribes to Firestore data based on user role when Dashboard is visible.
  * Returns isInitialLoad (true until first data received or timeout) and triggerRefresh.
+ *
+ * Auto-update: triggerRefresh tears down and re-establishes subscriptions, forcing
+ * a fresh Firestore snapshot. Called on pull-to-refresh and when app returns to foreground.
  */
 export function useDashboardSubscriptions({
   userId,
@@ -40,8 +43,11 @@ export function useDashboardSubscriptions({
   const dispatch = useAppDispatch();
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const isFirstRun = useRef(true);
 
   const triggerRefresh = useCallback(() => {
+    setRefreshTrigger((t) => t + 1);
     setIsRefreshing(true);
     setTimeout(() => setIsRefreshing(false), 500);
   }, []);
@@ -51,7 +57,11 @@ export function useDashboardSubscriptions({
       return;
     }
 
-    setIsInitialLoad(true);
+    // Only show full loading on first run; refresh uses pull indicator only
+    if (isFirstRun.current) {
+      setIsInitialLoad(true);
+      isFirstRun.current = false;
+    }
     const timeout = setTimeout(() => setIsInitialLoad(false), 3000);
 
     const unsubscribes: Array<() => void> = [];
@@ -183,7 +193,7 @@ export function useDashboardSubscriptions({
       clearTimeout(timeout);
       unsubscribes.forEach((unsub) => unsub());
     };
-  }, [dispatch, userId, role, assignedSiteId, isVisible]);
+  }, [dispatch, userId, role, assignedSiteId, isVisible, refreshTrigger]);
 
   return { isInitialLoad, isRefreshing, triggerRefresh };
 }

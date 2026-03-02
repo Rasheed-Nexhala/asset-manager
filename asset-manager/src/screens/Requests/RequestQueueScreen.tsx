@@ -1,8 +1,8 @@
-import React, { useEffect, useCallback, useMemo, useState } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import {
   View,
   Text,
-  SectionList,
+  FlatList,
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
@@ -16,9 +16,9 @@ import { ScreenHeader } from '../../components/ScreenHeader';
 import { RequestCard } from '../../components/Requests/RequestCard';
 import { requestService } from '../../services/firebase/requestService';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { setRequests, setLoading } from '../../store/slices/requestsSlice';
+import { setRequests, setLoading, setFilters } from '../../store/slices/requestsSlice';
 import {
-  selectRequestsByPriority,
+  selectFilteredRequestsSortedByDate,
   selectRequestsLoading,
   selectRequestsFilters,
 } from '../../store/selectors/requestSelectors';
@@ -26,62 +26,28 @@ import { selectAllSites } from '../../store/selectors/sitesSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
 import { fetchSites } from '../../store/slices/sitesSlice';
-import { setFilters } from '../../store/slices/requestsSlice';
 import type { Request } from '../../types/request';
 import type { RequestStackParamList } from '../../navigation/RequestStackParamList';
 
 type NavigationProp = StackNavigationProp<RequestStackParamList, 'RequestQueue'>;
-
-interface SectionData {
-  title: string;
-  data: Request[];
-  key: string;
-}
 
 export const RequestQueueScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const dispatch = useAppDispatch();
   const [refreshing, setRefreshing] = useState(false);
 
-  const requestsByPriority = useAppSelector(selectRequestsByPriority);
+  const requests = useAppSelector(selectFilteredRequestsSortedByDate);
   const isLoading = useAppSelector(selectRequestsLoading);
   const filters = useAppSelector(selectRequestsFilters);
   const sites = useAppSelector(selectAllSites);
   const allItems = useAppSelector(selectAllItems);
 
-  const sections = useMemo<SectionData[]>(() => {
-    const result: SectionData[] = [];
-    const priorityOrder: Array<'high' | 'medium' | 'low'> = [
-      'high',
-      'medium',
-      'low',
-    ];
-    const titles = { high: 'High Priority', medium: 'Medium Priority', low: 'Low Priority' };
-
-    priorityOrder.forEach((p) => {
-      const requests = requestsByPriority[p] || [];
-      if (requests.length > 0) {
-        result.push({
-          title: titles[p],
-          data: requests,
-          key: p,
-        });
-      }
-    });
-
-    return result;
-  }, [requestsByPriority]);
-
   // Ensure inventory is loaded for availability display (isAllSufficient on RequestCard).
-  // Without this, going directly to Requests tab without visiting Inventory first
-  // leaves items empty, causing "Insufficient stock" even when stock exists.
   useEffect(() => {
     dispatch(fetchItems());
   }, [dispatch]);
 
   // Ensure sites are loaded for the site filter chips.
-  // Without this, going directly to Requests tab without visiting Sites first
-  // leaves sites empty, so the filter shows only "All" with no site options.
   useEffect(() => {
     dispatch(fetchSites());
   }, [dispatch]);
@@ -93,8 +59,8 @@ export const RequestQueueScreen: React.FC = () => {
         status: filters.status,
         siteId: filters.siteId,
       },
-      (requests) => {
-        dispatch(setRequests(requests));
+      (reqs) => {
+        dispatch(setRequests(reqs));
       }
     );
     return unsubscribe;
@@ -102,7 +68,6 @@ export const RequestQueueScreen: React.FC = () => {
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    // Subscription is real-time; data is kept current. Brief delay for UX.
     setTimeout(() => setRefreshing(false), 800);
   }, []);
 
@@ -113,13 +78,33 @@ export const RequestQueueScreen: React.FC = () => {
     [navigation]
   );
 
-  const renderSectionHeader = useCallback(
-    ({ section }: { section: SectionData }) => (
-      <View className="bg-[#F8FAFC] px-4 py-2">
-        <Text className="text-[15px] font-semibold text-[#0F172A]">
-          {section.title}
+  const renderFilterChip = useCallback(
+    (
+      label: string,
+      isActive: boolean,
+      onPress: () => void,
+      accessibilityLabel: string
+    ) => (
+      <TouchableOpacity
+        className={`px-4 py-2 rounded-full border min-h-[40px] justify-center ${
+          isActive
+            ? 'bg-[#1E40AF] border-[#1E40AF]'
+            : 'bg-white border-[#E2E8F0]'
+        }`}
+        onPress={onPress}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ selected: isActive }}
+      >
+        <Text
+          className={`text-[13px] font-medium ${
+            isActive ? 'text-white' : 'text-[#64748B]'
+          }`}
+        >
+          {label}
         </Text>
-      </View>
+      </TouchableOpacity>
     ),
     []
   );
@@ -145,40 +130,12 @@ export const RequestQueueScreen: React.FC = () => {
     [handleRequestPress, allItems]
   );
 
-  const renderFilterChip = useCallback(
-    (
-      label: string,
-      isActive: boolean,
-      onPress: () => void,
-      accessibilityLabel: string
-    ) => (
-      <TouchableOpacity
-        className={`px-4 py-2 rounded-full border ${
-          isActive
-            ? 'bg-[#1E40AF] border-[#1E40AF]'
-            : 'bg-white border-[#E2E8F0]'
-        }`}
-        onPress={onPress}
-        activeOpacity={0.7}
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-        accessibilityState={{ selected: isActive }}
-      >
-        <Text
-          className={`text-[13px] font-medium ${
-            isActive ? 'text-white' : 'text-[#64748B]'
-          }`}
-        >
-          {label}
-        </Text>
-      </TouchableOpacity>
-    ),
-    []
-  );
+  const hasActiveFilters =
+    filters.status !== 'all' ||
+    filters.siteId !== 'all' ||
+    filters.priority !== 'all';
 
-  const totalCount = sections.reduce((sum, s) => sum + s.data.length, 0);
-
-  if (isLoading && totalCount === 0) {
+  if (isLoading && requests.length === 0) {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader title="Request Queue" />
@@ -206,6 +163,39 @@ export const RequestQueueScreen: React.FC = () => {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: 8 }}
+        >
+          <View className="flex-row items-center gap-2">
+            <Text className="text-[13px] text-[#64748B]">Priority:</Text>
+            {renderFilterChip(
+              'All',
+              filters.priority === 'all',
+              () => dispatch(setFilters({ priority: 'all' })),
+              'Filter by all priorities'
+            )}
+            {renderFilterChip(
+              'High',
+              filters.priority === 'high',
+              () => dispatch(setFilters({ priority: 'high' })),
+              'Filter by high priority'
+            )}
+            {renderFilterChip(
+              'Medium',
+              filters.priority === 'medium',
+              () => dispatch(setFilters({ priority: 'medium' })),
+              'Filter by medium priority'
+            )}
+            {renderFilterChip(
+              'Low',
+              filters.priority === 'low',
+              () => dispatch(setFilters({ priority: 'low' })),
+              'Filter by low priority'
+            )}
+          </View>
+        </ScrollView>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8, marginTop: 8 }}
         >
           <View className="flex-row items-center gap-2">
             <Text className="text-[13px] text-[#64748B]">Site:</Text>
@@ -274,24 +264,23 @@ export const RequestQueueScreen: React.FC = () => {
         </ScrollView>
       </View>
 
-      {totalCount === 0 ? (
+      {requests.length === 0 ? (
         <View className="flex-1 items-center justify-center px-4">
           <Ionicons name="document-text-outline" size={80} color="#64748B" />
           <Text className="text-[22px] font-semibold text-[#0F172A] text-center mb-2 mt-4">
             No Requests Found
           </Text>
           <Text className="text-[15px] text-[#64748B] text-center">
-            {filters.status !== 'all' || filters.siteId !== 'all'
+            {hasActiveFilters
               ? 'Try adjusting your filters to see more requests.'
               : 'No requests in the queue yet.'}
           </Text>
         </View>
       ) : (
-        <SectionList
-          sections={sections}
+        <FlatList
+          data={requests}
           keyExtractor={(item) => item.id}
           renderItem={renderRequestCard}
-          renderSectionHeader={renderSectionHeader}
           contentContainerStyle={{ paddingVertical: 16, paddingBottom: 80 }}
           refreshControl={
             <RefreshControl
@@ -300,7 +289,6 @@ export const RequestQueueScreen: React.FC = () => {
               tintColor="#1E40AF"
             />
           }
-          stickySectionHeadersEnabled={false}
           showsVerticalScrollIndicator={false}
         />
       )}

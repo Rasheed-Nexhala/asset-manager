@@ -108,6 +108,35 @@ export const selectFilteredRequests = createSelector(
 );
 
 /**
+ * Get comparable timestamp in ms for sorting (createdAt or updatedAt)
+ */
+const getRequestSortTimestamp = (
+  r: { createdAt?: { toMillis?: () => number } | null; updatedAt?: { toMillis?: () => number } | null }
+): number => {
+  const t = r.updatedAt ?? r.createdAt;
+  if (!t || typeof (t as { toMillis?: () => number }).toMillis !== 'function') return 0;
+  return (t as { toMillis: () => number }).toMillis();
+};
+
+/**
+ * Get filtered requests sorted by date (latest first) for Request Queue
+ */
+export const selectFilteredRequestsSortedByDate = createSelector(
+  [selectFilteredRequests],
+  (requests) => {
+    const seen = new Set<string>();
+    const deduped = requests.filter((r) => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
+    return [...deduped].sort(
+      (a, b) => getRequestSortTimestamp(b) - getRequestSortTimestamp(a)
+    );
+  }
+);
+
+/**
  * Get pending requests count
  */
 export const selectPendingRequestsCount = createSelector(

@@ -124,11 +124,19 @@ jest.mock('../../../store/thunks/inventoryThunks', () => {
     ),
     createItem: createAsyncThunk(
       'inventory/createItem',
-      async () =>
-        new Promise<Item>((resolve, reject) => {
-          mockCreateItemResolve = resolve;
-          mockCreateItemReject = reject;
-        })
+      async (_, { rejectWithValue }) => {
+        try {
+          return await new Promise<Item>((resolve, reject) => {
+            mockCreateItemResolve = resolve;
+            mockCreateItemReject = reject;
+          });
+        } catch (reason) {
+          // Simulate real thunk: rejectWithValue puts payload in action for slice
+          const msg =
+            typeof reason === 'string' ? reason : (reason as Error)?.message ?? 'Unknown';
+          return rejectWithValue(msg);
+        }
+      }
     ),
     updateItem: createAsyncThunk(
       'inventory/updateItem',
@@ -403,5 +411,31 @@ describe('AddEditItemScreen', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Cancel form' }));
 
     expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  it('shows SKU already exists message when createItem rejects with duplicate SKU', async () => {
+    const skuExistsMessage = 'This SKU already exists. Please use a different SKU.';
+    mockRouteParams = {};
+    renderWithStore(<AddEditItemScreen />);
+
+    fillCreateFormValid();
+    fireEvent.press(screen.getByRole('button', { name: 'Submit new item' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Saving, please wait' })).toBeTruthy();
+    });
+
+    // Reject with string (simulates rejectWithValue from thunk - unwrap() throws payload directly)
+    mockCreateItemReject!(skuExistsMessage);
+
+    await waitFor(() => {
+      expect(screen.getByText(skuExistsMessage)).toBeTruthy();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Duplicate SKU',
+      skuExistsMessage,
+      [{ text: 'OK' }]
+    );
   });
 });

@@ -9,16 +9,17 @@ import {
   Modal,
   FlatList,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectUserId } from '../../store/selectors/authSelectors';
 import { selectAllSites, selectSitesLoading } from '../../store/selectors/sitesSelectors';
 import { selectAllItems, selectInventoryByLocation, selectItemsLoading } from '../../store/selectors/inventorySelectors';
-import { fetchInventoryByLocation } from '../../store/slices/inventorySlice';
+import { setInventoryForLocation } from '../../store/slices/inventorySlice';
 import { fetchSites, setSites } from '../../store/slices/sitesSlice';
 import { subscribeToSites } from '../../services/firebase/siteService';
+import { subscribeInventoryByLocation, getInventoryByLocation } from '../../services/firebase/inventoryService';
 import { ScreenLayout, ScreenHeader } from '../../components';
 import { InventoryListItem } from '../../components/Inventory';
 import { getLocationId } from '../../utils/locationUtils';
@@ -81,12 +82,32 @@ export const MySiteInventoryScreen: React.FC = () => {
     }
   }, [userId, sites, sitesLoading]);
   
-  // Fetch inventory when site is found
+  // Subscribe to real-time inventory updates when site is found
+  // Use currentSite.id to avoid re-subscribing when site object reference changes (e.g. from sites array updates)
+  const siteId = currentSite?.id ?? null;
   useEffect(() => {
-    if (currentSite) {
-      dispatch(fetchInventoryByLocation(getLocationId('site', currentSite.id)));
-    }
-  }, [currentSite, dispatch]);
+    if (!siteId) return;
+
+    const locationId = getLocationId('site', siteId);
+    const unsubscribe = subscribeInventoryByLocation(locationId, (inventory) => {
+      dispatch(setInventoryForLocation({ locationId, inventory }));
+    });
+
+    return () => unsubscribe();
+  }, [siteId, dispatch]);
+
+  // Refresh inventory when screen gains focus (e.g. switching back to tab)
+  // Ensures updates from transfers appear immediately when user returns
+  useFocusEffect(
+    useCallback(() => {
+      if (!siteId) return;
+
+      const locationId = getLocationId('site', siteId);
+      getInventoryByLocation(locationId).then((inventory) => {
+        dispatch(setInventoryForLocation({ locationId, inventory }));
+      });
+    }, [siteId, dispatch])
+  );
   
   // Get inventory for current site (standardized location ID format)
   // Memoize selector to avoid "new reference" warning - only recreate when siteLocationId changes

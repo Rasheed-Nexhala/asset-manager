@@ -3,7 +3,7 @@
  * Form for adding/editing steel master specifications
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,14 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { KeyboardToolbar } from '../KeyboardToolbar';
 import type { SteelMaster, CreateSteelMasterData, UpdateSteelMasterData } from '../../types/steelMaster';
+
+const STEEL_MASTER_TOOLBAR_NEXT = 'steelMasterToolbarNext';
+const STEEL_MASTER_TOOLBAR_DONE = 'steelMasterToolbarDone';
 
 export interface SteelMasterFormProps {
   visible: boolean;
@@ -40,6 +45,22 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
   const [defaultLength, setDefaultLength] = useState('');
   const [hsnCode, setHsnCode] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [focusedField, setFocusedField] = useState<'name' | 'defaultLength' | 'weightPerMeter' | 'hsnCode' | null>(null);
+
+  const defaultLengthRef = useRef<TextInput>(null);
+  const weightPerMeterRef = useRef<TextInput>(null);
+  const hsnCodeRef = useRef<TextInput>(null);
+
+  const handleToolbarNext = useCallback(() => {
+    if (focusedField === 'name') defaultLengthRef.current?.focus();
+    else if (focusedField === 'defaultLength') weightPerMeterRef.current?.focus();
+    else if (focusedField === 'weightPerMeter') hsnCodeRef.current?.focus();
+    else Keyboard.dismiss();
+  }, [focusedField]);
+
+  const handleToolbarDone = useCallback(() => {
+    Keyboard.dismiss();
+  }, []);
 
   useEffect(() => {
     if (visible) {
@@ -117,6 +138,16 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
       animationType="slide"
       onRequestClose={onCancel}
     >
+      <KeyboardToolbar
+        nativeID={STEEL_MASTER_TOOLBAR_NEXT}
+        onDone={handleToolbarDone}
+        onNext={handleToolbarNext}
+        showNext
+      />
+      <KeyboardToolbar
+        nativeID={STEEL_MASTER_TOOLBAR_DONE}
+        onDone={handleToolbarDone}
+      />
       <View className="flex-1 bg-black/50 justify-end">
         <View className="bg-white rounded-t-2xl max-h-[90%]">
           {/* Handle Bar */}
@@ -137,7 +168,7 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView className="p-4" showsVerticalScrollIndicator={false}>
+          <ScrollView className="p-4" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View className="gap-4">
               {/* Name */}
               <View className="gap-1.5">
@@ -153,6 +184,8 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
                     setName(t);
                     if (errors.name) setErrors((e) => ({ ...e, name: '' }));
                   }}
+                  onFocus={() => setFocusedField('name')}
+                  inputAccessoryViewID={STEEL_MASTER_TOOLBAR_NEXT}
                   editable={!loading}
                   accessibilityLabel="Steel master name input"
                 />
@@ -169,6 +202,7 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
                   Default Length (m) <Text className="text-[#DC2626]">*</Text>
                 </Text>
                 <TextInput
+                  ref={defaultLengthRef}
                   className={`border rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] ${
                     errors.defaultLength ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
                   }`}
@@ -180,6 +214,8 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
                     if (errors.defaultLength)
                       setErrors((e) => ({ ...e, defaultLength: '' }));
                   }}
+                  onFocus={() => setFocusedField('defaultLength')}
+                  inputAccessoryViewID={STEEL_MASTER_TOOLBAR_NEXT}
                   keyboardType="decimal-pad"
                   editable={!loading}
                   accessibilityLabel="Default length input"
@@ -197,6 +233,7 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
                   Weight per Meter (kg/m) <Text className="text-[#DC2626]">*</Text>
                 </Text>
                 <TextInput
+                  ref={weightPerMeterRef}
                   className={`border rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] ${
                     errors.weightPerMeter ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
                   }`}
@@ -208,6 +245,8 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
                     if (errors.weightPerMeter)
                       setErrors((e) => ({ ...e, weightPerMeter: '' }));
                   }}
+                  onFocus={() => setFocusedField('weightPerMeter')}
+                  inputAccessoryViewID={STEEL_MASTER_TOOLBAR_NEXT}
                   keyboardType="decimal-pad"
                   editable={!loading}
                   accessibilityLabel="Weight per meter input"
@@ -225,6 +264,7 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
                   SKU <Text className="text-[#DC2626]">*</Text>
                 </Text>
                 <TextInput
+                  ref={hsnCodeRef}
                   className={`border rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] ${
                     errors.hsnCode ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
                   }`}
@@ -235,6 +275,8 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
                     setHsnCode(t);
                     if (errors.hsnCode) setErrors((e) => ({ ...e, hsnCode: '' }));
                   }}
+                  onFocus={() => setFocusedField('hsnCode')}
+                  inputAccessoryViewID={STEEL_MASTER_TOOLBAR_DONE}
                   editable={!loading}
                   accessibilityLabel="SKU input"
                 />
