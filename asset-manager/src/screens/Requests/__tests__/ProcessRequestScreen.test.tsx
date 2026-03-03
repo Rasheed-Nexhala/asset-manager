@@ -26,8 +26,14 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 const mockGoBack = jest.fn();
+const mockReplace = jest.fn();
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: jest.fn(), goBack: mockGoBack, canGoBack: () => true }),
+  useNavigation: () => ({
+    navigate: jest.fn(),
+    goBack: mockGoBack,
+    replace: mockReplace,
+    canGoBack: () => true,
+  }),
   useRoute: () => ({ params: { requestId: 'req1' } }),
   useIsFocused: () => true,
 }));
@@ -346,9 +352,12 @@ describe('ProcessRequestScreen', () => {
     mockApproveRequestResolve!();
 
     await waitFor(() => {
-      expect(Alert.alert).toHaveBeenCalledWith('Success', 'Request approved successfully', expect.any(Array));
+      // No success modal; UI updates via subscription
+      expect(Alert.alert).not.toHaveBeenCalledWith('Success', expect.any(String));
     });
 
-    expect(mockGoBack).toHaveBeenCalled();
+    // User stays on ProcessRequest; Confirm Transfer button appears below
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockGoBack).not.toHaveBeenCalled();
   });
 });

@@ -193,9 +193,7 @@ export const ProcessRequestScreen: React.FC = () => {
         })
       ).unwrap();
 
-      Alert.alert('Success', 'Request approved successfully', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      // No modal: UI updates via subscription (Confirm Transfer button appears)
     } catch (error: unknown) {
       Alert.alert(
         'Error',

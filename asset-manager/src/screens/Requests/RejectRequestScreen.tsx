@@ -79,14 +79,6 @@ export const RejectRequestScreen: React.FC = () => {
       newErrors.reason = 'Rejection reason is required';
     }
 
-    if (reason === 'other' && !comments.trim()) {
-      newErrors.comments = 'Comments are required when selecting Other';
-    }
-
-    if (!comments.trim()) {
-      newErrors.comments = 'Comments are required';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -99,7 +91,7 @@ export const RejectRequestScreen: React.FC = () => {
     try {
       const rejectionData: RejectRequestData = {
         reason: reason as RejectRequestData['reason'],
-        comments: comments.trim(),
+        comments: comments.trim() || '',
       };
 
       await dispatch(
@@ -203,10 +195,10 @@ export const RejectRequestScreen: React.FC = () => {
             )}
           </View>
 
-          {/* Comments */}
+          {/* Comments - optional, no asterisk */}
           <FormField
-            label="Comments"
-            required
+            label="Comments (Optional)"
+            required={false}
             value={comments}
             onChangeText={(text) => {
               setComments(text);

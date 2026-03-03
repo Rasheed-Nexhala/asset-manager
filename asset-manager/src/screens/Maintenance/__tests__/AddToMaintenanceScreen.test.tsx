@@ -241,7 +241,7 @@ describe('AddToMaintenanceScreen — Add to Maintenance flow', () => {
     fireEvent.press(screen.getByText('Physical Damage'));
 
     fireEvent.changeText(
-      screen.getByPlaceholderText('Describe the issue in detail (min 10 characters)'),
+      screen.getByPlaceholderText('Describe the issue in detail (optional)'),
       'Motor has stopped working and needs repair'
     );
 
@@ -256,21 +256,23 @@ describe('AddToMaintenanceScreen — Add to Maintenance flow', () => {
     expect(mockGoBack).toHaveBeenCalled();
   });
 
-  it('does not submit when description is too short', () => {
+  it('submits successfully without description (description is optional)', async () => {
     renderWithStore(<AddToMaintenanceScreen />, defaultPreloadedState);
 
     fireEvent.press(screen.getByRole('button', { name: 'Item selector' }));
     fireEvent.press(screen.getByText('Steel Bar'));
     fireEvent.press(screen.getByText('Select Issue Type'));
     fireEvent.press(screen.getByText('Physical Damage'));
-    fireEvent.changeText(
-      screen.getByPlaceholderText('Describe the issue in detail (min 10 characters)'),
-      'Short'
-    );
+    // No description entered - field is optional
 
     fireEvent.press(screen.getByRole('button', { name: 'Add to maintenance' }));
 
-    expect(Alert.alert).not.toHaveBeenCalledWith('Success', expect.any(String), expect.any(Array));
-    expect(mockGoBack).not.toHaveBeenCalled();
+    mockAddToMaintenanceResolve!();
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith('Success', 'Item has been added to maintenance', expect.any(Array));
+    });
+
+    expect(mockGoBack).toHaveBeenCalled();
   });
 });

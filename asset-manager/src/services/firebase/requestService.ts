@@ -322,7 +322,7 @@ export const rejectRequest = async (
       processedByName,
       processedAt: serverTimestamp(),
       rejectionReason: rejectionData.reason,
-      rejectionComments: rejectionData.comments,
+      rejectionComments: rejectionData.comments || '',
       updatedAt: serverTimestamp(),
     });
   } catch (error) {

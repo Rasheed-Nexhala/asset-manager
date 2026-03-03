@@ -154,7 +154,7 @@ export interface EditRequestData {
  */
 export interface RejectRequestData {
   reason: 'insufficient_stock' | 'duplicate_request' | 'items_not_required' | 'other';
-  comments: string;
+  comments?: string;
 }
 
 /**

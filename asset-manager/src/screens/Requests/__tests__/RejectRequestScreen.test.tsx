@@ -238,6 +238,25 @@ describe('RejectRequestScreen', () => {
     expect(screen.getByText('Rejection reason is required')).toBeTruthy();
   });
 
+  it('submit with reason only (no comments) dispatches rejectRequest', async () => {
+    renderWithStore(<RejectRequestScreen />, defaultPreloadedState);
+
+    mockGetRequestByIdResolve!({ requestNumber: 'REQ-001' });
+
+    await waitFor(() => {
+      expect(screen.getByText('REQ-001')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByLabelText('Rejection reason: Insufficient Stock'));
+    fireEvent.press(screen.getByRole('button', { name: 'Confirm rejection' }));
+
+    mockRejectRequestResolve!();
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith('Success', 'Request rejected', expect.any(Array));
+    });
+  });
+
   it('select reason and add comments, submit dispatches rejectRequest', async () => {
     renderWithStore(<RejectRequestScreen />, defaultPreloadedState);
 

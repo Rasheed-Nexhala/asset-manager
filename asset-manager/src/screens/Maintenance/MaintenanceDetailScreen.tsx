@@ -345,7 +345,7 @@ export const MaintenanceDetailScreen: React.FC = () => {
             <View>
               <Text className="text-[13px] text-[#64748B] mb-1">Description</Text>
               <Text className="text-[15px] text-[#0F172A]">
-                {maintenance.issueDescription}
+                {maintenance.issueDescription?.trim() || 'No description'}
               </Text>
             </View>
 

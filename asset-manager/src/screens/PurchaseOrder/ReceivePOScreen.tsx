@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  TextInput,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -52,7 +51,6 @@ export const ReceivePOScreen: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryTrigger, setRetryTrigger] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [receivedQuantities, setReceivedQuantities] = useState<Record<string, number>>({});
   const [invoiceFile, setInvoiceFile] = useState<{ fileName: string; fileUrl: string } | null>(null);
   const [receivedDate, setReceivedDate] = useState(new Date());
   const [receivedNotes, setReceivedNotes] = useState('');
@@ -69,11 +67,6 @@ export const ReceivePOScreen: React.FC = () => {
       .then((p) => {
         if (p) {
           setPo(p);
-          const initial: Record<string, number> = {};
-          p.items.forEach((i) => {
-            initial[i.itemId] = i.quantity;
-          });
-          setReceivedQuantities(initial);
           setLoadError(null);
         } else {
           setLoadError('Purchase order not found');
@@ -101,16 +94,6 @@ export const ReceivePOScreen: React.FC = () => {
       );
     }
   }, [po]);
-
-  const handleQuantityChange = useCallback(
-    (itemId: string, qty: number) => {
-      const item = po?.items.find((i) => i.itemId === itemId);
-      const maxQty = item?.quantity ?? 0;
-      const clamped = Math.min(maxQty, Math.max(0, qty));
-      setReceivedQuantities((prev) => ({ ...prev, [itemId]: clamped }));
-    },
-    [po?.items]
-  );
 
   const handleUploadInvoice = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -141,22 +124,10 @@ export const ReceivePOScreen: React.FC = () => {
     }
   }, [poId]);
 
-  const hasAtLeastOneReceived =
-    po?.items.some(
-      (item) => (receivedQuantities[item.itemId] ?? 0) > 0
-    ) ?? false;
-
   const handleConfirm = useCallback(async () => {
     if (!po || !userId || !userName) return;
     if (!invoiceFile) {
       Alert.alert('Error', 'Invoice/Bill attachment is required.');
-      return;
-    }
-    if (!hasAtLeastOneReceived) {
-      Alert.alert(
-        'Error',
-        'At least one item must have a received quantity greater than zero.'
-      );
       return;
     }
 
@@ -166,9 +137,10 @@ export const ReceivePOScreen: React.FC = () => {
         receivePO({
           poId,
           receiveData: {
-            receivedQuantities: Object.entries(receivedQuantities).map(
-              ([itemId, qty]) => ({ itemId, receivedQuantity: qty })
-            ),
+            receivedQuantities: po.items.map((item) => ({
+              itemId: item.itemId,
+              receivedQuantity: item.quantity,
+            })),
             documents: [
               { type: 'invoice', fileName: invoiceFile.fileName, fileUrl: invoiceFile.fileUrl },
             ],
@@ -193,27 +165,24 @@ export const ReceivePOScreen: React.FC = () => {
     poId,
     userId,
     userName,
-    receivedQuantities,
     invoiceFile,
     receivedDate,
     receivedNotes,
-    hasAtLeastOneReceived,
     dispatch,
     navigation,
   ]);
 
   const inventoryUpdates = po
     ? po.items.map((item) => {
-        const received = receivedQuantities[item.itemId] ?? 0;
         const invItem = allItems.find((i) => i.id === item.itemId);
         const current = invItem?.centralStoreQuantity ?? 0;
         return {
           itemName: item.itemName,
           currentQty: current,
-          receivedQty: received,
-          newQty: current + received,
+          receivedQty: item.quantity,
+          newQty: current + item.quantity,
         };
-      }).filter((u) => u.receivedQty > 0)
+      })
     : [];
 
   if (loading || !po) {
@@ -310,60 +279,33 @@ export const ReceivePOScreen: React.FC = () => {
 
         <View className="mb-4">
           <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">
-            ITEMS RECEIVED
+            ITEMS TO RECEIVE (FULL QUANTITY)
           </Text>
-          {po.items.map((item) => {
-            const received = receivedQuantities[item.itemId] ?? item.quantity;
-            const fullQty = received >= item.quantity;
-            return (
-              <View
-                key={item.itemId}
-                className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-3"
-              >
-                <View className="flex-row items-center gap-2 mb-3">
-                  <View className="w-8 h-8 items-center justify-center">
-                    <Ionicons
-                      name={fullQty ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={22}
-                      color={fullQty ? '#16A34A' : '#64748B'}
-                    />
-                  </View>
-                  <View className="flex-1 min-w-0">
-                    <Text className="text-[15px] font-medium text-[#0F172A]">
-                      {item.itemName}
-                    </Text>
-                    <Text className="text-[13px] text-[#64748B] mt-0.5">
-                      Ordered: {item.quantity}
-                    </Text>
-                  </View>
-                </View>
-                <View className="gap-1.5">
-                  <Text className="text-[13px] text-[#64748B]">
-                    Received Qty
+          <Text className="text-[13px] text-[#64748B] mb-3">
+            All items must be received at full ordered quantity. Partial receiving is not allowed.
+          </Text>
+          {po.items.map((item) => (
+            <View
+              key={item.itemId}
+              className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-3"
+            >
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1 min-w-0">
+                  <Text className="text-[15px] font-medium text-[#0F172A]">
+                    {item.itemName}
                   </Text>
-                  <View className="flex-row items-center gap-3">
-                    <TextInput
-                      value={String(received)}
-                      onChangeText={(t) =>
-                        handleQuantityChange(
-                          item.itemId,
-                          parseInt(t.replace(/\D/g, ''), 10) || 0
-                        )
-                      }
-                      keyboardType="number-pad"
-                      className="border border-[#E2E8F0] rounded-lg h-12 w-24 px-4 bg-white text-[15px] text-[#0F172A]"
-                      placeholderTextColor="#94A3B8"
-                    />
-                    {fullQty && (
-                      <Text className="text-[13px] font-medium text-[#16A34A]">
-                        ✓ Full quantity
-                      </Text>
-                    )}
-                  </View>
+                  <Text className="text-[13px] text-[#64748B] mt-0.5">
+                    Quantity: {item.quantity}
+                  </Text>
+                </View>
+                <View className="items-end">
+                  <Text className="text-[15px] font-semibold text-[#0F172A]">
+                    × {item.quantity}
+                  </Text>
                 </View>
               </View>
-            );
-          })}
+            </View>
+          ))}
         </View>
 
         <View className="mb-4">
@@ -420,11 +362,9 @@ export const ReceivePOScreen: React.FC = () => {
 
         <TouchableOpacity
           onPress={handleConfirm}
-          disabled={saving || !invoiceFile || !hasAtLeastOneReceived}
+          disabled={saving || !invoiceFile}
           className={`mt-6 rounded-[10px] h-[50px] items-center justify-center ${
-            saving || !invoiceFile || !hasAtLeastOneReceived
-              ? 'bg-[#94A3B8]'
-              : 'bg-[#1E40AF]'
+            saving || !invoiceFile ? 'bg-[#94A3B8]' : 'bg-[#1E40AF]'
           }`}
         >
           {saving ? (

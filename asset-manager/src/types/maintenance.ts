@@ -133,7 +133,7 @@ export interface AddToMaintenanceData {
   itemSku: string;
   quantity: number;
   issueType: IssueType;
-  issueDescription: string;
+  issueDescription?: string;
   reportedBy?: string;
   reportedByName?: string;
   photos?: MaintenancePhoto[];

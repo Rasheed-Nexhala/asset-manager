@@ -91,10 +91,6 @@ export const AddToMaintenanceScreen: React.FC = () => {
       newErrors.issueType = 'Please select issue type';
     }
     
-    if (description.trim().length < 10) {
-      newErrors.description = 'Description must be at least 10 characters';
-    }
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -148,13 +144,7 @@ export const AddToMaintenanceScreen: React.FC = () => {
     }
   };
   
-  // Handle description change
-  const handleDescriptionChange = (text: string) => {
-    setDescription(text);
-    if (errors.description && text.trim().length >= 10) {
-      setErrors({ ...errors, description: undefined });
-    }
-  };
+  const handleDescriptionChange = (text: string) => setDescription(text);
 
   const handleImagePick = useCallback(async () => {
     if (photoUris.length >= MAX_PHOTOS) return;
@@ -202,7 +192,7 @@ export const AddToMaintenanceScreen: React.FC = () => {
       itemSku: selectedItem.sku,
       quantity,
       issueType,
-      issueDescription: description.trim(),
+      issueDescription: description.trim() || '',
       reportedBy: reportedBy.trim() || undefined,
       reportedByName: reportedBy.trim() || undefined,
       photos: [],
@@ -320,16 +310,12 @@ export const AddToMaintenanceScreen: React.FC = () => {
             />
           </View>
           
-          {/* Description Input */}
+          {/* Description Input (Optional) */}
           <View className="gap-1.5">
-            <Text className="text-[15px] text-[#0F172A]">
-              Description <Text className="text-[#DC2626]">*</Text>
-            </Text>
+            <Text className="text-[15px] text-[#0F172A]">Description</Text>
             <TextInput
-              className={`border rounded-lg px-4 py-3 bg-white text-[15px] text-[#0F172A] ${
-                errors.description ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
-              }`}
-              placeholder="Describe the issue in detail (min 10 characters)"
+              className="border border-[#E2E8F0] rounded-lg px-4 py-3 bg-white text-[15px] text-[#0F172A]"
+              placeholder="Describe the issue in detail (optional)"
               placeholderTextColor="#94A3B8"
               value={description}
               onChangeText={handleDescriptionChange}

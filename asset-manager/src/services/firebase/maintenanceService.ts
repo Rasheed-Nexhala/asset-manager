@@ -152,7 +152,7 @@ export async function addToMaintenance(
         itemSku: data.itemSku,
         quantity: data.quantity,
         issueType: data.issueType,
-        issueDescription: data.issueDescription,
+        issueDescription: data.issueDescription ?? '',
         reportedBy: data.reportedBy || '',
         reportedByName: data.reportedByName || '',
         photos: data.photos || [],
