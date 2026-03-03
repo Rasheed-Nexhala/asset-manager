@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { WeightDisplay } from './WeightDisplay';
 import { ViewModeToggle } from './ViewModeToggle';
 import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
 import { isWeightViewSupported } from '../../utils/weightConversionUtils';
+import type { WeightViewMode } from '../../hooks/useWeightViewPreference';
 import type { InventoryEntry, ItemType } from '../../types/inventory';
 
 export interface InventoryListItemProps {
@@ -51,7 +52,12 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
   lengthPerPiece,
   onPress,
 }) => {
-  const { viewMode, toggleViewMode } = useWeightViewPreference();
+  const { viewMode: globalViewMode } = useWeightViewPreference();
+  const [localViewMode, setLocalViewMode] = useState<WeightViewMode>(globalViewMode);
+
+  const toggleViewMode = useCallback(() => {
+    setLocalViewMode((prev) => (prev === 'pieces' ? 'kg' : 'pieces'));
+  }, []);
   const itemTypeLabel = type === 'consumable' ? 'Consumable' : 'Non-Consumable';
   const itemTypeColor = type === 'consumable' ? '#475569' : '#0D9488';
   const formattedDate = formatTimestamp(entry.updatedAt);
@@ -89,7 +95,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
                 quantity={entry.quantity}
                 weightPerMeter={weightPerMeter}
                 lengthPerPiece={effectiveLength}
-                viewMode={viewMode}
+                viewMode={localViewMode}
                 unit={unit}
               />
             </View>
@@ -103,7 +109,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
           {/* Right: Pcs/Kg toggle (steel only) + Item Type Badge */}
           <View className="items-end gap-1.5 flex-shrink-0">
             {isSteelItem && (
-              <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} compact />
+              <ViewModeToggle viewMode={localViewMode} onToggle={toggleViewMode} compact />
             )}
             <View
               className="px-2 py-1 rounded-full"

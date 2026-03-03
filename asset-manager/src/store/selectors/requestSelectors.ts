@@ -107,6 +107,38 @@ export const selectFilteredRequests = createSelector(
   }
 );
 
+/** Pass-through for search query (used as second arg to selectors) */
+const selectSearchQueryArg = (_state: RootState, searchQuery: string) => searchQuery;
+
+/**
+ * Filter requests by search query (request number, site, requester, purpose, item names/SKUs)
+ * Use: useAppSelector((state) => selectFilteredRequestsBySearchQuery(state, searchQuery))
+ */
+export const selectFilteredRequestsBySearchQuery = createSelector(
+  [selectFilteredRequests, selectSearchQueryArg],
+  (filteredRequests, searchQuery) => {
+    const trimmedQuery = searchQuery?.trim() || '';
+    if (!trimmedQuery) return filteredRequests;
+
+    const lowerQuery = trimmedQuery.toLowerCase();
+    return filteredRequests.filter((r) => {
+      const matchesRequestNumber = (r.requestNumber ?? '').toLowerCase().includes(lowerQuery);
+      const matchesSiteName = (r.siteName ?? '').toLowerCase().includes(lowerQuery);
+      const matchesRequestedBy = (r.requestedByName ?? '').toLowerCase().includes(lowerQuery);
+      const matchesPurpose = (r.purpose ?? '').toLowerCase().includes(lowerQuery);
+      const matchesItem = Array.isArray(r.items)
+        ? r.items.some(
+            (item) =>
+              (item.itemName ?? '').toLowerCase().includes(lowerQuery) ||
+              (item.itemSku ?? '').toLowerCase().includes(lowerQuery) ||
+              (item.categoryName ?? '').toLowerCase().includes(lowerQuery)
+          )
+        : false;
+      return matchesRequestNumber || matchesSiteName || matchesRequestedBy || matchesPurpose || matchesItem;
+    });
+  }
+);
+
 /**
  * Get comparable timestamp in ms for sorting (createdAt or updatedAt)
  */
@@ -123,6 +155,25 @@ const getRequestSortTimestamp = (
  */
 export const selectFilteredRequestsSortedByDate = createSelector(
   [selectFilteredRequests],
+  (requests) => {
+    const seen = new Set<string>();
+    const deduped = requests.filter((r) => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
+    return [...deduped].sort(
+      (a, b) => getRequestSortTimestamp(b) - getRequestSortTimestamp(a)
+    );
+  }
+);
+
+/**
+ * Get filtered + searched requests sorted by date (latest first).
+ * Use: useAppSelector((state) => selectFilteredAndSearchedRequestsSortedByDate(state, searchQuery))
+ */
+export const selectFilteredAndSearchedRequestsSortedByDate = createSelector(
+  [selectFilteredRequestsBySearchQuery],
   (requests) => {
     const seen = new Set<string>();
     const deduped = requests.filter((r) => {
@@ -176,3 +227,39 @@ export const selectMyRequestsByStatus = (status: string) =>
       (a, b) => getCreatedAtMs(b) - getCreatedAtMs(a)
     );
   });
+
+/** Pass-through for search in my requests selector */
+const selectMySearchQueryArg = (_state: RootState, searchQuery: string) => searchQuery;
+
+/**
+ * Filter my requests by status and search query, sorted by createdAt descending.
+ * Use: useAppSelector((state) => selectMyRequestsByStatusAndSearch(activeTab)(state, searchQuery))
+ */
+export const selectMyRequestsByStatusAndSearch = (status: string) =>
+  createSelector(
+    [selectMyRequests, selectMySearchQueryArg],
+    (requests, searchQuery) => {
+      let filtered = requests.filter((r) => status === 'all' || r.status === status);
+      const trimmedQuery = searchQuery?.trim() || '';
+      if (trimmedQuery) {
+        const lowerQuery = trimmedQuery.toLowerCase();
+        filtered = filtered.filter((r) => {
+          const matchesRequestNumber = (r.requestNumber ?? '').toLowerCase().includes(lowerQuery);
+          const matchesSiteName = (r.siteName ?? '').toLowerCase().includes(lowerQuery);
+          const matchesPurpose = (r.purpose ?? '').toLowerCase().includes(lowerQuery);
+          const matchesItem = Array.isArray(r.items)
+            ? r.items.some(
+                (item) =>
+                  (item.itemName ?? '').toLowerCase().includes(lowerQuery) ||
+                  (item.itemSku ?? '').toLowerCase().includes(lowerQuery) ||
+                  (item.categoryName ?? '').toLowerCase().includes(lowerQuery)
+              )
+            : false;
+          return matchesRequestNumber || matchesSiteName || matchesPurpose || matchesItem;
+        });
+      }
+      return [...filtered].sort(
+        (a, b) => getCreatedAtMs(b) - getCreatedAtMs(a)
+      );
+    }
+  );

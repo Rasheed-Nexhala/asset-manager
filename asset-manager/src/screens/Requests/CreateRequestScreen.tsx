@@ -137,6 +137,9 @@ export const CreateRequestScreen: React.FC = () => {
       setIsSubmittingRequest(true);
     }
 
+    const startedAt = Date.now();
+    const MIN_LOADER_MS = 500;
+
     try {
       const requestData: CreateRequestData = {
         siteId: site.id,
@@ -182,10 +185,19 @@ export const CreateRequestScreen: React.FC = () => {
         error instanceof Error ? error.message : 'Failed to create request'
       );
     } finally {
-      if (isDraft) {
-        setIsSavingDraft(false);
+      const clearLoading = () => {
+        if (isDraft) {
+          setIsSavingDraft(false);
+        } else {
+          setIsSubmittingRequest(false);
+        }
+      };
+      const elapsed = Date.now() - startedAt;
+      const remaining = Math.max(0, MIN_LOADER_MS - elapsed);
+      if (remaining > 0) {
+        setTimeout(clearLoading, remaining);
       } else {
-        setIsSubmittingRequest(false);
+        clearLoading();
       }
     }
   };
@@ -307,11 +319,16 @@ export const CreateRequestScreen: React.FC = () => {
             disabled={isBusy}
             className="flex-1 border-[1.5px] border-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Save as draft"
+            accessibilityLabel={isSavingDraft ? 'Saving draft' : 'Save as draft'}
+            accessibilityState={{ disabled: isBusy, busy: isSavingDraft }}
           >
-            <Text className="text-[15px] font-semibold text-[#1E40AF]">
-              Save Draft
-            </Text>
+            {isSavingDraft ? (
+              <ActivityIndicator size="small" color="#1E40AF" />
+            ) : (
+              <Text className="text-[15px] font-semibold text-[#1E40AF]">
+                Save Draft
+              </Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity

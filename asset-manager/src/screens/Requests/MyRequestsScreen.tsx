@@ -3,6 +3,7 @@ import {
   View,
   Text,
   FlatList,
+  TextInput,
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
@@ -18,7 +19,7 @@ import { requestService } from '../../services/firebase/requestService';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { setMyRequests, setLoading } from '../../store/slices/requestsSlice';
 import {
-  selectMyRequestsByStatus,
+  selectMyRequestsByStatusAndSearch,
   selectRequestsLoading,
 } from '../../store/selectors/requestSelectors';
 import {
@@ -48,14 +49,15 @@ export const MyRequestsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const dispatch = useAppDispatch();
   const [activeTab, setActiveTab] = useState<TabKey>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const userId = useAppSelector(selectUserId);
   const isSiteManager = useAppSelector(selectIsSiteManager);
   const sites = useAppSelector(selectAllSites);
-  const filteredRequests = useAppSelector(
-    selectMyRequestsByStatus(activeTab === 'all' ? 'all' : activeTab)
+  const filteredRequests = useAppSelector((state) =>
+    selectMyRequestsByStatusAndSearch(activeTab === 'all' ? 'all' : activeTab)(state, searchQuery)
   );
   const isLoading = useAppSelector(selectRequestsLoading);
 
@@ -97,6 +99,10 @@ export const MyRequestsScreen: React.FC = () => {
       refreshTimeoutRef.current = null;
       setRefreshing(false);
     }, 800);
+  }, []);
+
+  const handleSearchChange = useCallback((text: string) => {
+    setSearchQuery(text);
   }, []);
 
   const handleCreateRequest = useCallback(() => {
@@ -190,6 +196,32 @@ export const MyRequestsScreen: React.FC = () => {
         }
       />
 
+      {/* CIAMS Search Bar */}
+      <View className="bg-white border-b border-[#E2E8F0] px-4 py-3">
+        <View className="bg-[#F1F5F9] rounded-full h-12 px-4 flex-row items-center">
+          <Ionicons name="search" size={20} color="#94A3B8" />
+          <TextInput
+            className="flex-1 ml-3 text-[15px] text-[#0F172A]"
+            placeholder="Search by request number, site, purpose, or item..."
+            placeholderTextColor="#94A3B8"
+            value={searchQuery}
+            onChangeText={handleSearchChange}
+            accessibilityLabel="Search requests"
+            accessibilityRole="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => handleSearchChange('')}
+              className="w-8 h-8 items-center justify-center"
+              accessibilityLabel="Clear search"
+              accessibilityRole="button"
+            >
+              <Ionicons name="close-circle" size={20} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       {/* Tabs */}
       <View className="bg-white border-b border-[#E2E8F0] px-4 py-3">
         <ScrollView
@@ -208,9 +240,11 @@ export const MyRequestsScreen: React.FC = () => {
             No Requests Yet
           </Text>
           <Text className="text-[15px] text-[#64748B] text-center mb-6">
-            {activeTab !== 'all'
-              ? `No ${activeTab} requests.`
-              : 'Create your first request to get started.'}
+            {searchQuery.trim()
+              ? 'No requests match your search. Try different keywords.'
+              : activeTab !== 'all'
+                ? `No ${activeTab} requests.`
+                : 'Create your first request to get started.'}
           </Text>
           {isSiteManager && currentSite && activeTab === 'all' && (
             <TouchableOpacity

@@ -122,6 +122,14 @@ export const InventoryStackNavigator: React.FC = () => {
               gestureEnabled: true,
             }}
           />
+          <Stack.Screen
+            name="ItemDetail"
+            component={ItemDetailScreen}
+            options={{
+              presentation: 'card',
+              gestureEnabled: true,
+            }}
+          />
         </>
       )}
     </Stack.Navigator>

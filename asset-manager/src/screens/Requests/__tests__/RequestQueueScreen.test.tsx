@@ -196,6 +196,15 @@ describe('RequestQueueScreen', () => {
     expect(screen.getByText('Request Queue')).toBeTruthy();
   });
 
+  it('renders search bar with placeholder', () => {
+    renderWithStore(<RequestQueueScreen />, {
+      requests: defaultRequestsState,
+    });
+
+    expect(screen.getByPlaceholderText('Search by request number, site, requester, purpose, or item...')).toBeTruthy();
+    expect(screen.getByLabelText('Search requests')).toBeTruthy();
+  });
+
   it('shows loading state when loading and no requests', () => {
     mockRequestsToReturn = null;
     renderWithStore(<RequestQueueScreen />, {
@@ -226,10 +235,10 @@ describe('RequestQueueScreen', () => {
     });
 
     expect(screen.getByText('No Requests Found')).toBeTruthy();
-    expect(screen.getByText('Try adjusting your filters to see more requests.')).toBeTruthy();
+    expect(screen.getByText('Try adjusting your filters or search to see more requests.')).toBeTruthy();
   });
 
-  it('renders priority, site, and status filter chips', () => {
+  it('renders priority, site, and status filter chips when filters expanded', () => {
     renderWithStore(<RequestQueueScreen />, {
       requests: defaultRequestsState,
       sites: {
@@ -242,9 +251,12 @@ describe('RequestQueueScreen', () => {
       },
     });
 
-    expect(screen.getByText('Priority:')).toBeTruthy();
-    expect(screen.getByText('Site:')).toBeTruthy();
-    expect(screen.getByText('Status:')).toBeTruthy();
+    // Filters are collapsible — tap toggle to expand
+    fireEvent.press(screen.getByRole('button', { name: 'Toggle filters' }));
+
+    expect(screen.getByText('Priority')).toBeTruthy();
+    expect(screen.getByText('Site')).toBeTruthy();
+    expect(screen.getByText('Status')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Filter by all priorities' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Filter by high priority' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Filter by medium priority' })).toBeTruthy();
@@ -268,6 +280,9 @@ describe('RequestQueueScreen', () => {
         lastValidationAt: null,
       },
     });
+
+    // Expand filters first (collapsible like Inventory)
+    fireEvent.press(screen.getByRole('button', { name: 'Toggle filters' }));
 
     fireEvent.press(screen.getByRole('button', { name: 'Filter by high priority' }));
     expect(store.getState().requests.filters.priority).toBe('high');

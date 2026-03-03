@@ -155,6 +155,9 @@ export const EditRequestScreen: React.FC = () => {
       setIsSubmittingRequest(true);
     }
 
+    const startedAt = Date.now();
+    const MIN_LOADER_MS = 500;
+
     try {
       const updates: EditRequestData = {
         priority,
@@ -193,10 +196,19 @@ export const EditRequestScreen: React.FC = () => {
         error instanceof Error ? error.message : 'Failed to update request'
       );
     } finally {
-      if (isDraft) {
-        setIsSavingDraft(false);
+      const clearLoading = () => {
+        if (isDraft) {
+          setIsSavingDraft(false);
+        } else {
+          setIsSubmittingRequest(false);
+        }
+      };
+      const elapsed = Date.now() - startedAt;
+      const remaining = Math.max(0, MIN_LOADER_MS - elapsed);
+      if (remaining > 0) {
+        setTimeout(clearLoading, remaining);
       } else {
-        setIsSubmittingRequest(false);
+        clearLoading();
       }
     }
   };
@@ -314,8 +326,8 @@ export const EditRequestScreen: React.FC = () => {
               !hasItems ? 'opacity-50' : ''
             }`}
             accessibilityRole="button"
-            accessibilityLabel="Save as draft"
-            accessibilityState={{ disabled: isButtonDisabled }}
+            accessibilityLabel={isSavingDraft ? 'Saving draft' : 'Save as draft'}
+            accessibilityState={{ disabled: isButtonDisabled, busy: isSavingDraft }}
           >
             {isSavingDraft ? (
               <ActivityIndicator size="small" color="#1E40AF" />

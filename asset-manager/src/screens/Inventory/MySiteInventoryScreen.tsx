@@ -322,8 +322,7 @@ export const MySiteInventoryScreen: React.FC = () => {
                   weightPerMeter={item?.weightPerMeter}
                   lengthPerPiece={item?.lengthPerPiece ?? entry.lengthPerPiece}
                   onPress={() => {
-                    // Navigate to item detail screen (to be implemented)
-                    console.log('Item pressed:', entry.id);
+                    navigation.navigate('ItemDetail', { itemId: entry.itemId });
                   }}
                 />
               ))}

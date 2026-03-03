@@ -236,9 +236,14 @@ describe('ItemDetailScreen', () => {
     expect(screen.getByText('Central Store')).toBeTruthy();
   });
 
-  it('edit button navigates to AddEditItem with itemId', () => {
+  it('edit button navigates to AddEditItem with itemId when user can edit (Admin/StoreIncharge)', () => {
     mockRouteParams = { itemId: 'i1' };
+    const storeInchargeAuth = {
+      ...defaultPreloadedState.auth,
+      userRole: { role: 'StoreIncharge' as const, isActive: true, permissions: [] },
+    };
     renderWithStore(<ItemDetailScreen />, {
+      auth: storeInchargeAuth as Partial<RootState['auth']>,
       inventory: {
         items: [mockItem],
         categories: [],
@@ -309,7 +314,12 @@ describe('ItemDetailScreen', () => {
 
   it('back button calls goBack', () => {
     mockRouteParams = { itemId: 'i1' };
+    const storeInchargeAuth = {
+      ...defaultPreloadedState.auth,
+      userRole: { role: 'StoreIncharge' as const, isActive: true, permissions: [] },
+    };
     renderWithStore(<ItemDetailScreen />, {
+      auth: storeInchargeAuth as Partial<RootState['auth']>,
       inventory: {
         items: [mockItem],
         categories: [],
@@ -325,5 +335,31 @@ describe('ItemDetailScreen', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Go back' }));
 
     expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  it('Edit, Add Stock, and Stock Level section are hidden when user is Site Manager (view-only)', () => {
+    mockRouteParams = { itemId: 'i1' };
+    const siteManagerAuth = {
+      ...defaultPreloadedState.auth,
+      userRole: { role: 'SiteManager' as const, isActive: true, permissions: [] },
+    };
+    renderWithStore(<ItemDetailScreen />, {
+      auth: siteManagerAuth as Partial<RootState['auth']>,
+      inventory: {
+        items: [mockItem],
+        categories: [],
+        inventoryByLocation: {},
+        lowStockItemIds: [],
+        loading: false,
+        error: null,
+        errorTimestamp: null,
+        filters: null,
+      },
+    });
+
+    expect(screen.queryByRole('button', { name: 'Edit item' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add stock' })).toBeNull();
+    expect(screen.queryByText('Stock Level & Status')).toBeNull();
+    expect(screen.getByText('Steel Bar 12mm')).toBeTruthy();
   });
 });

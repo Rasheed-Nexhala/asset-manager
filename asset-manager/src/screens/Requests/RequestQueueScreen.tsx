@@ -3,6 +3,7 @@ import {
   View,
   Text,
   FlatList,
+  TextInput,
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
@@ -18,7 +19,7 @@ import { requestService } from '../../services/firebase/requestService';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { setRequests, setLoading, setFilters } from '../../store/slices/requestsSlice';
 import {
-  selectFilteredRequestsSortedByDate,
+  selectFilteredAndSearchedRequestsSortedByDate,
   selectRequestsLoading,
   selectRequestsFilters,
 } from '../../store/selectors/requestSelectors';
@@ -35,8 +36,12 @@ export const RequestQueueScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const dispatch = useAppDispatch();
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
-  const requests = useAppSelector(selectFilteredRequestsSortedByDate);
+  const requests = useAppSelector((state) =>
+    selectFilteredAndSearchedRequestsSortedByDate(state, searchQuery)
+  );
   const isLoading = useAppSelector(selectRequestsLoading);
   const filters = useAppSelector(selectRequestsFilters);
   const sites = useAppSelector(selectAllSites);
@@ -69,6 +74,14 @@ export const RequestQueueScreen: React.FC = () => {
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 800);
+  }, []);
+
+  const handleSearchChange = useCallback((text: string) => {
+    setSearchQuery(text);
+  }, []);
+
+  const handleToggleFilters = useCallback(() => {
+    setShowFilters((prev) => !prev);
   }, []);
 
   const handleRequestPress = useCallback(
@@ -133,7 +146,8 @@ export const RequestQueueScreen: React.FC = () => {
   const hasActiveFilters =
     filters.status !== 'all' ||
     filters.siteId !== 'all' ||
-    filters.priority !== 'all';
+    filters.priority !== 'all' ||
+    searchQuery.trim().length > 0;
 
   if (isLoading && requests.length === 0) {
     return (
@@ -155,114 +169,158 @@ export const RequestQueueScreen: React.FC = () => {
 
   return (
     <ScreenLayout edges={['top']}>
-      <ScreenHeader title="Request Queue" />
+      <ScreenHeader
+        title="Request Queue"
+        rightAction={{
+          icon: showFilters ? 'filter' : 'filter-outline',
+          iconColor: showFilters ? '#1E40AF' : '#64748B',
+          onPress: handleToggleFilters,
+          accessibilityLabel: 'Toggle filters',
+        }}
+      />
 
-      {/* Filters */}
+      {/* CIAMS Search Bar */}
       <View className="bg-white border-b border-[#E2E8F0] px-4 py-3">
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8 }}
-        >
-          <View className="flex-row items-center gap-2">
-            <Text className="text-[13px] text-[#64748B]">Priority:</Text>
-            {renderFilterChip(
-              'All',
-              filters.priority === 'all',
-              () => dispatch(setFilters({ priority: 'all' })),
-              'Filter by all priorities'
-            )}
-            {renderFilterChip(
-              'High',
-              filters.priority === 'high',
-              () => dispatch(setFilters({ priority: 'high' })),
-              'Filter by high priority'
-            )}
-            {renderFilterChip(
-              'Medium',
-              filters.priority === 'medium',
-              () => dispatch(setFilters({ priority: 'medium' })),
-              'Filter by medium priority'
-            )}
-            {renderFilterChip(
-              'Low',
-              filters.priority === 'low',
-              () => dispatch(setFilters({ priority: 'low' })),
-              'Filter by low priority'
-            )}
-          </View>
-        </ScrollView>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8, marginTop: 8 }}
-        >
-          <View className="flex-row items-center gap-2">
-            <Text className="text-[13px] text-[#64748B]">Site:</Text>
-            {renderFilterChip(
-              'All',
-              filters.siteId === 'all',
-              () => dispatch(setFilters({ siteId: 'all' })),
-              'Filter by all sites'
-            )}
-            {sites.map((site) => (
-              <React.Fragment key={site.id}>
-                {renderFilterChip(
-                  site.name,
-                  filters.siteId === site.id,
-                  () => dispatch(setFilters({ siteId: site.id })),
-                  `Filter by ${site.name}`
-                )}
-              </React.Fragment>
-            ))}
-          </View>
-        </ScrollView>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8, marginTop: 8 }}
-        >
-          <View className="flex-row items-center gap-2">
-            <Text className="text-[13px] text-[#64748B]">Status:</Text>
-            {renderFilterChip(
-              'All',
-              filters.status === 'all',
-              () => dispatch(setFilters({ status: 'all' })),
-              'Filter by all statuses'
-            )}
-            {renderFilterChip(
-              'Pending',
-              filters.status === 'pending',
-              () => dispatch(setFilters({ status: 'pending' })),
-              'Filter by pending'
-            )}
-            {renderFilterChip(
-              'Approved',
-              filters.status === 'approved',
-              () => dispatch(setFilters({ status: 'approved' })),
-              'Filter by approved'
-            )}
-            {renderFilterChip(
-              'Transferred',
-              filters.status === 'transferred',
-              () => dispatch(setFilters({ status: 'transferred' })),
-              'Filter by transferred'
-            )}
-            {renderFilterChip(
-              'Partially Returned',
-              filters.status === 'partially_returned',
-              () => dispatch(setFilters({ status: 'partially_returned' })),
-              'Filter by partially returned'
-            )}
-            {renderFilterChip(
-              'Returned',
-              filters.status === 'returned',
-              () => dispatch(setFilters({ status: 'returned' })),
-              'Filter by returned'
-            )}
-          </View>
-        </ScrollView>
+        <View className="bg-[#F1F5F9] rounded-full h-12 px-4 flex-row items-center">
+          <Ionicons name="search" size={20} color="#94A3B8" />
+          <TextInput
+            className="flex-1 ml-3 text-[15px] text-[#0F172A]"
+            placeholder="Search by request number, site, requester, purpose, or item..."
+            placeholderTextColor="#94A3B8"
+            value={searchQuery}
+            onChangeText={handleSearchChange}
+            accessibilityLabel="Search requests"
+            accessibilityRole="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => handleSearchChange('')}
+              className="w-8 h-8 items-center justify-center"
+              accessibilityLabel="Clear search"
+              accessibilityRole="button"
+            >
+              <Ionicons name="close-circle" size={20} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
+
+      {/* CIAMS Filters Section (collapsible, like Inventory) */}
+      {showFilters && (
+        <View className="bg-white border-b border-[#E2E8F0] px-4 py-4">
+          <View className="gap-4">
+            <View className="gap-1.5">
+              <Text className="text-[15px] text-[#0F172A]">Priority</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8 }}
+              >
+                <View className="flex-row items-center gap-2">
+                  {renderFilterChip(
+                    'All',
+                    filters.priority === 'all',
+                    () => dispatch(setFilters({ priority: 'all' })),
+                    'Filter by all priorities'
+                  )}
+                  {renderFilterChip(
+                    'High',
+                    filters.priority === 'high',
+                    () => dispatch(setFilters({ priority: 'high' })),
+                    'Filter by high priority'
+                  )}
+                  {renderFilterChip(
+                    'Medium',
+                    filters.priority === 'medium',
+                    () => dispatch(setFilters({ priority: 'medium' })),
+                    'Filter by medium priority'
+                  )}
+                  {renderFilterChip(
+                    'Low',
+                    filters.priority === 'low',
+                    () => dispatch(setFilters({ priority: 'low' })),
+                    'Filter by low priority'
+                  )}
+                </View>
+              </ScrollView>
+            </View>
+            <View className="gap-1.5">
+              <Text className="text-[15px] text-[#0F172A]">Site</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8 }}
+              >
+                <View className="flex-row items-center gap-2">
+                  {renderFilterChip(
+                    'All',
+                    filters.siteId === 'all',
+                    () => dispatch(setFilters({ siteId: 'all' })),
+                    'Filter by all sites'
+                  )}
+                  {sites.map((site) => (
+                    <React.Fragment key={site.id}>
+                      {renderFilterChip(
+                        site.name,
+                        filters.siteId === site.id,
+                        () => dispatch(setFilters({ siteId: site.id })),
+                        `Filter by ${site.name}`
+                      )}
+                    </React.Fragment>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+            <View className="gap-1.5">
+              <Text className="text-[15px] text-[#0F172A]">Status</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8 }}
+              >
+                <View className="flex-row items-center gap-2">
+                  {renderFilterChip(
+                    'All',
+                    filters.status === 'all',
+                    () => dispatch(setFilters({ status: 'all' })),
+                    'Filter by all statuses'
+                  )}
+                  {renderFilterChip(
+                    'Pending',
+                    filters.status === 'pending',
+                    () => dispatch(setFilters({ status: 'pending' })),
+                    'Filter by pending'
+                  )}
+                  {renderFilterChip(
+                    'Approved',
+                    filters.status === 'approved',
+                    () => dispatch(setFilters({ status: 'approved' })),
+                    'Filter by approved'
+                  )}
+                  {renderFilterChip(
+                    'Transferred',
+                    filters.status === 'transferred',
+                    () => dispatch(setFilters({ status: 'transferred' })),
+                    'Filter by transferred'
+                  )}
+                  {renderFilterChip(
+                    'Partially Returned',
+                    filters.status === 'partially_returned',
+                    () => dispatch(setFilters({ status: 'partially_returned' })),
+                    'Filter by partially returned'
+                  )}
+                  {renderFilterChip(
+                    'Returned',
+                    filters.status === 'returned',
+                    () => dispatch(setFilters({ status: 'returned' })),
+                    'Filter by returned'
+                  )}
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      )}
 
       {requests.length === 0 ? (
         <View className="flex-1 items-center justify-center px-4">
@@ -272,7 +330,7 @@ export const RequestQueueScreen: React.FC = () => {
           </Text>
           <Text className="text-[15px] text-[#64748B] text-center">
             {hasActiveFilters
-              ? 'Try adjusting your filters to see more requests.'
+              ? 'Try adjusting your filters or search to see more requests.'
               : 'No requests in the queue yet.'}
           </Text>
         </View>

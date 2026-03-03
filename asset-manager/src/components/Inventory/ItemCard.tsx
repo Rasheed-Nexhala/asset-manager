@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { isLowStock } from '../../utils/inventoryUtils';
@@ -6,6 +6,7 @@ import { WeightDisplay } from './WeightDisplay';
 import { ViewModeToggle } from './ViewModeToggle';
 import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
 import { isWeightViewSupported } from '../../utils/weightConversionUtils';
+import type { WeightViewMode } from '../../hooks/useWeightViewPreference';
 import type { Item } from '../../types/inventory';
 
 export interface ItemCardProps {
@@ -14,7 +15,12 @@ export interface ItemCardProps {
 }
 
 export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
-  const { viewMode, toggleViewMode } = useWeightViewPreference();
+  const { viewMode: globalViewMode } = useWeightViewPreference();
+  const [localViewMode, setLocalViewMode] = useState<WeightViewMode>(globalViewMode);
+
+  const toggleViewMode = useCallback(() => {
+    setLocalViewMode((prev) => (prev === 'pieces' ? 'kg' : 'pieces'));
+  }, []);
   const showLowStockBadge = isLowStock(item);
   const itemTypeLabel = item.type === 'consumable' ? 'Consumable' : 'Non-Consumable';
   const isConsumable = item.type === 'consumable';
@@ -55,7 +61,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
         <View className="items-end gap-1.5">
           {/* View Mode Toggle (steel items only): Pcs ↔ Kg */}
           {isSteelItem && (
-            <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} compact />
+            <ViewModeToggle viewMode={localViewMode} onToggle={toggleViewMode} compact />
           )}
           {/* Item Type Badge */}
           <View
@@ -91,7 +97,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
             quantity={item.totalQuantity}
             weightPerMeter={item.weightPerMeter}
             lengthPerPiece={item.lengthPerPiece}
-            viewMode={viewMode}
+            viewMode={localViewMode}
             unit={item.unit}
           />
         </View>
@@ -101,7 +107,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
             quantity={item.centralStoreQuantity}
             weightPerMeter={item.weightPerMeter}
             lengthPerPiece={item.lengthPerPiece}
-            viewMode={viewMode}
+            viewMode={localViewMode}
             unit={item.unit}
           />
         </View>
@@ -114,7 +120,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
             quantity={item.atSitesQuantity}
             weightPerMeter={item.weightPerMeter}
             lengthPerPiece={item.lengthPerPiece}
-            viewMode={viewMode}
+            viewMode={localViewMode}
             unit={item.unit}
           />
         </View>
@@ -124,7 +130,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
             quantity={item.inMaintenanceQuantity}
             weightPerMeter={item.weightPerMeter}
             lengthPerPiece={item.lengthPerPiece}
-            viewMode={viewMode}
+            viewMode={localViewMode}
             unit={item.unit}
           />
         </View>

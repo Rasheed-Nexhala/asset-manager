@@ -16,7 +16,7 @@ import type { InventoryStackParamList } from '../../navigation/InventoryStackNav
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchItemById, adjustQuantity } from '../../store/thunks/inventoryThunks';
 import { selectItemById, selectItemsLoading, selectItemsError } from '../../store/selectors/inventorySelectors';
-import { selectIsAdmin } from '../../store/selectors/authSelectors';
+import { selectIsAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
 import { updateItemInState } from '../../store/slices/inventorySlice';
 import { subscribeItemById, subscribeInventoryByItemId } from '../../services/firebase/inventoryService';
 import type { Item, AdjustmentData, InventoryEntry } from '../../types/inventory';
@@ -124,6 +124,8 @@ export const ItemDetailScreen: React.FC = () => {
   const isLoading = useAppSelector(selectItemsLoading);
   const error = useAppSelector(selectItemsError);
   const isAdmin = useAppSelector(selectIsAdmin);
+  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const canEditItem = isAdmin || isStoreIncharge;
   const { viewMode, toggleViewMode } = useWeightViewPreference();
   const [showStockModal, setShowStockModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -279,11 +281,15 @@ export const ItemDetailScreen: React.FC = () => {
         title="Item Details"
         showBack
         onBackPress={handleBack}
-        rightAction={{
-          icon: 'create-outline',
-          onPress: handleEdit,
-          accessibilityLabel: 'Edit item',
-        }}
+        rightAction={
+          canEditItem
+            ? {
+                icon: 'create-outline',
+                onPress: handleEdit,
+                accessibilityLabel: 'Edit item',
+              }
+            : undefined
+        }
       />
 
       <ScrollView className="flex-1 px-4" showsVerticalScrollIndicator={false}>
@@ -436,7 +442,8 @@ export const ItemDetailScreen: React.FC = () => {
           />
         </View>
 
-        {/* Stock Level & Status Card */}
+        {/* Stock Level & Status Card - hidden for Site Manager (internal store metric) */}
+        {canEditItem && (
         <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-3">
           <Text className="text-[17px] font-semibold text-[#0F172A] mb-4">Stock Level & Status</Text>
           
@@ -530,32 +537,35 @@ export const ItemDetailScreen: React.FC = () => {
             </View>
           </View>
         </View>
+        )}
 
-        {/* Action Buttons */}
-        <View className="mb-6 mt-2 gap-3">
-          {isAdmin && (
+        {/* Action Buttons - Admin/StoreIncharge only; Site Manager has view-only access */}
+        {canEditItem && (
+          <View className="mb-6 mt-2 gap-3">
+            {isAdmin && (
+              <TouchableOpacity
+                className="bg-[#16A34A] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
+                onPress={handleAddStock}
+                activeOpacity={0.7}
+                accessibilityLabel="Add stock"
+                accessibilityRole="button"
+              >
+                <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+                <Text className="text-[15px] font-semibold text-white">Add Stock</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
-              className="bg-[#16A34A] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
-              onPress={handleAddStock}
+              className="border-[1.5px] border-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
+              onPress={handleEdit}
               activeOpacity={0.7}
-              accessibilityLabel="Add stock"
+              accessibilityLabel="Edit item"
               accessibilityRole="button"
             >
-              <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-              <Text className="text-[15px] font-semibold text-white">Add Stock</Text>
+              <Ionicons name="create-outline" size={20} color="#1E40AF" />
+              <Text className="text-[15px] font-semibold text-[#1E40AF]">Edit Item</Text>
             </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            className="border-[1.5px] border-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
-            onPress={handleEdit}
-            activeOpacity={0.7}
-            accessibilityLabel="Edit item"
-            accessibilityRole="button"
-          >
-            <Ionicons name="create-outline" size={20} color="#1E40AF" />
-            <Text className="text-[15px] font-semibold text-[#1E40AF]">Edit Item</Text>
-          </TouchableOpacity>
-        </View>
+          </View>
+        )}
 
         <StockEntryModal
           visible={showStockModal}

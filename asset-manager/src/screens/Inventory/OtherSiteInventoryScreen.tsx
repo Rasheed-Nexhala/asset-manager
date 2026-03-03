@@ -246,7 +246,9 @@ export const OtherSiteInventoryScreen: React.FC = () => {
                   unit={item.unit}
                   weightPerMeter={item.weightPerMeter}
                   lengthPerPiece={item.lengthPerPiece ?? entry.lengthPerPiece}
-                  // Read-only, so no onPress handler
+                  onPress={() => {
+                    navigation.navigate('ItemDetail', { itemId: entry.itemId });
+                  }}
                 />
               ))}
             </View>
