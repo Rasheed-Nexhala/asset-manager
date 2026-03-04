@@ -2,12 +2,16 @@ import {
   collection,
   addDoc,
   getDocs,
+  getDocsFromServer,
+  getCountFromServer,
   doc,
   getDoc,
   updateDoc,
   query,
   where,
   orderBy,
+  limit,
+  startAfter,
   serverTimestamp,
   onSnapshot,
   Unsubscribe,
@@ -15,6 +19,8 @@ import {
   writeBatch,
   Timestamp,
   runTransaction,
+  QueryConstraint,
+  DocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import { auth } from '../../../config/firebase';
@@ -126,6 +132,113 @@ export const listItems = async (filters?: ItemFilters): Promise<Item[]> => {
     return items;
   } catch (error) {
     console.error('Error listing items:', error);
+    throw error;
+  }
+};
+
+/**
+ * Build Firestore query constraints for items (shared by listItemsPaginated and getItemsCount).
+ * Excludes lowStockOnly — that filter is applied client-side.
+ */
+const buildItemsQueryConstraints = (filters?: ItemFilters): QueryConstraint[] => {
+  const constraints: QueryConstraint[] = [];
+  if (filters?.categoryId) {
+    constraints.push(where('categoryId', '==', filters.categoryId));
+  }
+  if (filters?.type) {
+    constraints.push(where('type', '==', filters.type));
+  }
+  if (filters?.status) {
+    constraints.push(where('status', '==', filters.status));
+  }
+  constraints.push(orderBy('name', 'asc'));
+  return constraints;
+};
+
+/** Default page size for paginated item lists */
+export const ITEMS_PAGE_SIZE = 10;
+
+/**
+ * List items with cursor-based pagination.
+ * Uses same Firestore filters as listItems; lowStockOnly is applied client-side.
+ *
+ * @param filters - Optional filters (categoryId, type, status). lowStockOnly is client-side.
+ * @param pageSize - Number of items per page
+ * @param lastDoc - Cursor for next page (from previous response)
+ * @returns Items and cursor for next page
+ */
+export const listItemsPaginated = async (
+  filters: ItemFilters | undefined,
+  pageSize: number,
+  lastDoc?: DocumentSnapshot
+): Promise<{ items: Item[]; lastDoc: DocumentSnapshot | null }> => {
+  try {
+    const constraints = buildItemsQueryConstraints(filters);
+    if (lastDoc) {
+      constraints.push(startAfter(lastDoc));
+    }
+    constraints.push(limit(pageSize));
+
+    const q = query(collection(db, ITEMS_COLLECTION), ...constraints);
+    const snapshot = await getDocsFromServer(q);
+
+    const items: Item[] = snapshot.docs.map((docSnap) => {
+      const data = docSnap.data();
+      const firestoreItem: FirestoreItem = {
+        id: docSnap.id,
+        name: data.name,
+        sku: data.sku,
+        description: data.description,
+        categoryId: data.categoryId,
+        categoryName: data.categoryName,
+        type: data.type,
+        unit: data.unit,
+        imageUrl: data.imageUrl,
+        minStockLevel: data.minStockLevel ?? 0,
+        status: data.status,
+        totalQuantity: data.totalQuantity || 0,
+        centralStoreQuantity: data.centralStoreQuantity || 0,
+        atSitesQuantity: data.atSitesQuantity || 0,
+        inMaintenanceQuantity: data.inMaintenanceQuantity || 0,
+        weightPerMeter: data.weightPerMeter,
+        lengthPerPiece: data.lengthPerPiece,
+        steelMasterId: data.steelMasterId,
+        steelMasterName: data.steelMasterName,
+        isWeightBased: data.isWeightBased,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+      };
+      return firestoreItemToItem(firestoreItem);
+    });
+
+    const newLastDoc =
+      snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
+
+    return { items, lastDoc: newLastDoc };
+  } catch (error) {
+    console.error('Error listing items (paginated):', error);
+    throw error;
+  }
+};
+
+/**
+ * Get total count of items matching Firestore filters.
+ * Must use same where/orderBy as listItemsPaginated for consistency.
+ * lowStockOnly is not applied — total reflects Firestore filters only.
+ *
+ * @param filters - Same filters as listItemsPaginated (categoryId, type, status)
+ * @returns Total count from server
+ */
+export const getItemsCount = async (
+  filters: ItemFilters | undefined
+): Promise<number> => {
+  try {
+    const constraints = buildItemsQueryConstraints(filters);
+    const q = query(collection(db, ITEMS_COLLECTION), ...constraints);
+    const snapshot = await getCountFromServer(q);
+    return snapshot.data().count;
+  } catch (error) {
+    console.error('Error getting items count:', error);
     throw error;
   }
 };

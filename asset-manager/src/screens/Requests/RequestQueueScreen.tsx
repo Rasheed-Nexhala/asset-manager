@@ -15,13 +15,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { RequestCard } from '../../components/Requests/RequestCard';
-import { requestService } from '../../services/firebase/requestService';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { setRequests, setLoading, setFilters } from '../../store/slices/requestsSlice';
+import { setFilters } from '../../store/slices/requestsSlice';
+import {
+  fetchRequestsPaginated,
+  loadMoreRequests,
+} from '../../store/thunks/requestThunks';
 import {
   selectFilteredAndSearchedRequestsSortedByDate,
   selectRequestsLoading,
   selectRequestsFilters,
+  selectRequestsTotalCount,
+  selectRequestsHasMore,
+  selectRequestsLoadingMore,
 } from '../../store/selectors/requestSelectors';
 import { selectAllSites } from '../../store/selectors/sitesSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
@@ -44,6 +50,9 @@ export const RequestQueueScreen: React.FC = () => {
   );
   const isLoading = useAppSelector(selectRequestsLoading);
   const filters = useAppSelector(selectRequestsFilters);
+  const totalCount = useAppSelector(selectRequestsTotalCount);
+  const hasMore = useAppSelector(selectRequestsHasMore);
+  const loadingMore = useAppSelector(selectRequestsLoadingMore);
   const sites = useAppSelector(selectAllSites);
   const allItems = useAppSelector(selectAllItems);
 
@@ -58,23 +67,20 @@ export const RequestQueueScreen: React.FC = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    dispatch(setLoading(true));
-    const unsubscribe = requestService.subscribeToRequests(
-      {
-        status: filters.status,
-        siteId: filters.siteId,
-      },
-      (reqs) => {
-        dispatch(setRequests(reqs));
-      }
-    );
-    return unsubscribe;
+    dispatch(fetchRequestsPaginated());
   }, [dispatch, filters.status, filters.siteId]);
+
+  const handleLoadMore = useCallback(() => {
+    if (hasMore && !loadingMore) {
+      dispatch(loadMoreRequests());
+    }
+  }, [dispatch, hasMore, loadingMore]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
+    dispatch(fetchRequestsPaginated());
     setTimeout(() => setRefreshing(false), 800);
-  }, []);
+  }, [dispatch]);
 
   const handleSearchChange = useCallback((text: string) => {
     setSearchQuery(text);
@@ -149,7 +155,8 @@ export const RequestQueueScreen: React.FC = () => {
     filters.priority !== 'all' ||
     searchQuery.trim().length > 0;
 
-  if (isLoading && requests.length === 0) {
+  const isInitialOrRefetching = requests.length === 0 && totalCount === null;
+  if (isInitialOrRefetching || (isLoading && requests.length === 0)) {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader title="Request Queue" />
@@ -335,20 +342,38 @@ export const RequestQueueScreen: React.FC = () => {
           </Text>
         </View>
       ) : (
-        <FlatList
-          data={requests}
-          keyExtractor={(item) => item.id}
-          renderItem={renderRequestCard}
-          contentContainerStyle={{ paddingVertical: 16, paddingBottom: 80 }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor="#1E40AF"
-            />
-          }
-          showsVerticalScrollIndicator={false}
-        />
+        <>
+          {totalCount != null && (
+            <View className="bg-white px-4 py-2 border-b border-[#E2E8F0]">
+              <Text className="text-[13px] text-[#64748B]">
+                Showing {requests.length} of {totalCount}
+              </Text>
+            </View>
+          )}
+          <FlatList
+            data={requests}
+            keyExtractor={(item) => item.id}
+            renderItem={renderRequestCard}
+            contentContainerStyle={{ paddingVertical: 16, paddingBottom: 80 }}
+            onEndReached={hasMore && !loadingMore ? handleLoadMore : undefined}
+            onEndReachedThreshold={0.5}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor="#1E40AF"
+              />
+            }
+            ListFooterComponent={
+              loadingMore ? (
+                <View className="py-4 items-center">
+                  <ActivityIndicator size="small" color="#1E40AF" />
+                </View>
+              ) : null
+            }
+            showsVerticalScrollIndicator={false}
+          />
+        </>
       )}
     </ScreenLayout>
   );

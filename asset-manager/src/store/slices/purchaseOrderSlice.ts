@@ -7,7 +7,11 @@ interface PurchaseOrderState {
   selectedPO: PurchaseOrder | null;
   vendors: Vendor[];
   loading: boolean;
+  loadingMore: boolean;
   error: string | null;
+  totalCount: number | null;
+  lastDoc: unknown;
+  hasMore: boolean;
   filters: {
     status: string;
   };
@@ -18,7 +22,11 @@ const initialState: PurchaseOrderState = {
   selectedPO: null,
   vendors: [],
   loading: false,
+  loadingMore: false,
   error: null,
+  totalCount: null,
+  lastDoc: null,
+  hasMore: false,
   filters: {
     status: 'all',
   },
@@ -64,6 +72,11 @@ const purchaseOrderSlice = createSlice({
 
     setFilters: (state, action: PayloadAction<Partial<PurchaseOrderState['filters']>>) => {
       state.filters = { ...state.filters, ...action.payload };
+      // Reset pagination when filters change
+      state.purchaseOrders = [];
+      state.totalCount = null;
+      state.lastDoc = null;
+      state.hasMore = false;
     },
 
     setLoading: (state, action: PayloadAction<boolean>) => {
@@ -82,9 +95,54 @@ const purchaseOrderSlice = createSlice({
     clearPurchaseOrders: (state) => {
       state.purchaseOrders = [];
       state.selectedPO = null;
+      state.totalCount = null;
+      state.lastDoc = null;
+      state.hasMore = false;
       state.loading = false;
+      state.loadingMore = false;
       state.error = null;
     },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase('purchaseOrders/fetchPurchaseOrdersPaginated/pending', (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase('purchaseOrders/fetchPurchaseOrdersPaginated/fulfilled', (state, action) => {
+        const { orders, totalCount, lastDoc, pageSize } = action.payload as {
+          orders: PurchaseOrder[];
+          totalCount: number;
+          lastDoc: unknown;
+          pageSize: number;
+        };
+        state.purchaseOrders = orders;
+        state.totalCount = totalCount;
+        state.lastDoc = lastDoc;
+        state.hasMore = orders.length >= pageSize;
+        state.loading = false;
+      })
+      .addCase('purchaseOrders/fetchPurchaseOrdersPaginated/rejected', (state, action) => {
+        state.loading = false;
+        state.error = (action.payload as string) ?? 'Failed to load purchase orders';
+      })
+      .addCase('purchaseOrders/loadMorePurchaseOrders/pending', (state) => {
+        state.loadingMore = true;
+      })
+      .addCase('purchaseOrders/loadMorePurchaseOrders/fulfilled', (state, action) => {
+        const { orders, lastDoc, pageSize } = action.payload as {
+          orders: PurchaseOrder[];
+          lastDoc: unknown;
+          pageSize: number;
+        };
+        state.purchaseOrders = [...state.purchaseOrders, ...orders];
+        state.lastDoc = lastDoc;
+        state.hasMore = orders.length >= pageSize;
+        state.loadingMore = false;
+      })
+      .addCase('purchaseOrders/loadMorePurchaseOrders/rejected', (state) => {
+        state.loadingMore = false;
+      });
   },
 });
 

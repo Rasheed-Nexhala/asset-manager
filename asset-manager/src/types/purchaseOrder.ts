@@ -73,6 +73,7 @@ export interface PurchaseOrderFirestore {
 
   createdBy: string;
   createdByName: string;
+  createdByRole?: string;
   createdAt: Timestamp;
 
   reviewedBy: string | null;
@@ -119,6 +120,7 @@ export interface PurchaseOrder {
 
   createdBy: string;
   createdByName: string;
+  createdByRole?: string;
   createdAt: string;
 
   reviewedBy: string | null;

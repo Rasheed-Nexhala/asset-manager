@@ -31,17 +31,12 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-const mockUnsubItems = jest.fn();
 const mockUnsubCategories = jest.fn();
-let mockItemsToReturn: Item[] | null = null;
 let mockCategoriesToReturn: Category[] | null = null;
 jest.mock('../../../services/firebase/inventoryService', () => ({
-  subscribeItems: jest.fn((callback: (items: Item[]) => void) => {
-    if (mockItemsToReturn !== null) {
-      callback(mockItemsToReturn);
-    }
-    return mockUnsubItems;
-  }),
+  listItemsPaginated: jest.fn(),
+  getItemsCount: jest.fn(),
+  subscribeItems: jest.fn(),
 }));
 jest.mock('../../../services/firebase/categoryService', () => ({
   subscribeCategories: jest.fn((callback: (categories: Category[]) => void) => {
@@ -52,7 +47,11 @@ jest.mock('../../../services/firebase/categoryService', () => ({
   }),
 }));
 
-let mockFetchItemsResult: Item[] | 'reject' | 'pending' = [];
+type FetchItemsPaginatedResult =
+  | { items: Item[]; totalCount: number; lastDoc: unknown }
+  | 'reject'
+  | 'pending';
+let mockFetchItemsPaginatedResult: FetchItemsPaginatedResult = { items: [], totalCount: 0, lastDoc: null };
 let mockFetchCategoriesResult: Category[] | 'reject' | 'pending' = [];
 jest.mock('../../../store/thunks/authThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
@@ -80,15 +79,17 @@ jest.mock('../../../store/thunks/managerValidationThunks', () => {
 jest.mock('../../../store/thunks/inventoryThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
-    fetchItems: createAsyncThunk('inventory/fetchItems', async (_, { rejectWithValue }) => {
-      if (mockFetchItemsResult === 'reject') {
+    fetchItems: createAsyncThunk('inventory/fetchItems', async () => []),
+    fetchItemsPaginated: createAsyncThunk('inventory/fetchItemsPaginated', async (_, { rejectWithValue }) => {
+      if (mockFetchItemsPaginatedResult === 'reject') {
         return rejectWithValue('Failed to load items');
       }
-      if (mockFetchItemsResult === 'pending') {
+      if (mockFetchItemsPaginatedResult === 'pending') {
         await new Promise(() => {});
       }
-      return (mockFetchItemsResult as Item[]) ?? [];
+      return mockFetchItemsPaginatedResult as { items: Item[]; totalCount: number; lastDoc: unknown };
     }),
+    loadMoreItems: createAsyncThunk('inventory/loadMoreItems', async () => ({ items: [], lastDoc: null })),
     fetchCategories: createAsyncThunk('inventory/fetchCategories', async (_, { rejectWithValue }) => {
       if (mockFetchCategoriesResult === 'reject') {
         return rejectWithValue('Failed to load categories');
@@ -204,16 +205,18 @@ const defaultInventoryState = {
   error: null,
   errorTimestamp: null,
   filters: null,
+  totalCount: null,
+  lastDoc: null,
+  hasMore: false,
+  loadingMore: false,
 };
 
 describe('CentralStoreInventoryScreen', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
-    mockUnsubItems.mockClear();
     mockUnsubCategories.mockClear();
-    mockItemsToReturn = null;
     mockCategoriesToReturn = null;
-    mockFetchItemsResult = [];
+    mockFetchItemsPaginatedResult = { items: [], totalCount: 0, lastDoc: null };
     mockFetchCategoriesResult = [];
   });
 
@@ -300,10 +303,9 @@ describe('CentralStoreInventoryScreen', () => {
   });
 
   it('renders item list when items exist', async () => {
-    mockItemsToReturn = [mockItem];
+    mockFetchItemsPaginatedResult = { items: [mockItem], totalCount: 1, lastDoc: null };
     mockCategoriesToReturn = [mockCategory];
-    mockFetchItemsResult = 'pending';
-    mockFetchCategoriesResult = 'pending';
+    mockFetchCategoriesResult = [mockCategory];
 
     renderWithStore(<CentralStoreInventoryScreen />, {
       auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
@@ -317,10 +319,9 @@ describe('CentralStoreInventoryScreen', () => {
   });
 
   it('navigates to ItemDetail when item pressed', async () => {
-    mockItemsToReturn = [mockItem];
+    mockFetchItemsPaginatedResult = { items: [mockItem], totalCount: 1, lastDoc: null };
     mockCategoriesToReturn = [mockCategory];
-    mockFetchItemsResult = 'pending';
-    mockFetchCategoriesResult = 'pending';
+    mockFetchCategoriesResult = [mockCategory];
 
     renderWithStore(<CentralStoreInventoryScreen />, {
       auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
@@ -334,8 +335,8 @@ describe('CentralStoreInventoryScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('ItemDetail', { itemId: 'item-1' });
   });
 
-  it('shows loading state when fetchItems is pending', async () => {
-    mockFetchItemsResult = 'pending';
+  it('shows loading state when fetchItemsPaginated is pending', async () => {
+    mockFetchItemsPaginatedResult = 'pending';
     mockFetchCategoriesResult = 'pending';
 
     renderWithStore(<CentralStoreInventoryScreen />, {
@@ -348,8 +349,8 @@ describe('CentralStoreInventoryScreen', () => {
     });
   });
 
-  it('shows error state when fetchItems rejects', async () => {
-    mockFetchItemsResult = 'reject';
+  it('shows error state when fetchItemsPaginated rejects', async () => {
+    mockFetchItemsPaginatedResult = 'reject';
     mockFetchCategoriesResult = 'pending';
 
     renderWithStore(<CentralStoreInventoryScreen />, {

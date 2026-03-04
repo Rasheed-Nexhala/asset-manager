@@ -1,6 +1,10 @@
+import type { DocumentSnapshot } from 'firebase/firestore';
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import {
   listItems,
+  listItemsPaginated,
+  getItemsCount,
+  ITEMS_PAGE_SIZE,
   getItemById as getItemByIdService,
   createItem as createItemService,
   updateItem as updateItemService,
@@ -37,6 +41,63 @@ export const fetchItems = createAsyncThunk(
       return items;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch items');
+    }
+  }
+);
+
+/**
+ * Fetch items with pagination (first page) and total count.
+ * Runs getItemsCount and listItemsPaginated in parallel.
+ */
+export const fetchItemsPaginated = createAsyncThunk(
+  'inventory/fetchItemsPaginated',
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const state = getState() as RootState;
+      const filters = state.inventory.filters ?? undefined;
+
+      const [countResult, listResult] = await Promise.all([
+        getItemsCount(filters),
+        listItemsPaginated(filters, ITEMS_PAGE_SIZE),
+      ]);
+
+      return {
+        items: listResult.items,
+        totalCount: countResult,
+        lastDoc: listResult.lastDoc,
+      };
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch items');
+    }
+  }
+);
+
+/**
+ * Load next page of items (append to existing).
+ */
+export const loadMoreItems = createAsyncThunk(
+  'inventory/loadMoreItems',
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const state = getState() as RootState;
+      const { filters, lastDoc } = state.inventory;
+
+      if (!lastDoc) {
+        return { items: [], lastDoc: null };
+      }
+
+      const result = await listItemsPaginated(
+        filters ?? undefined,
+        ITEMS_PAGE_SIZE,
+        lastDoc as DocumentSnapshot
+      );
+
+      return {
+        items: result.items,
+        lastDoc: result.lastDoc,
+      };
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to load more items');
     }
   }
 );

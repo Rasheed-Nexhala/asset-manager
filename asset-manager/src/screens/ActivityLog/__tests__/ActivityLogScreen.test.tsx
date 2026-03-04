@@ -47,6 +47,8 @@ jest.mock('../../../store/thunks/inventoryThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
     fetchItems: createAsyncThunk('inventory/fetchItems', async () => []),
+    fetchItemsPaginated: createAsyncThunk('inventory/fetchItemsPaginated', async () => ({ items: [], totalCount: 0, lastDoc: null })),
+    loadMoreItems: createAsyncThunk('inventory/loadMoreItems', async () => ({ items: [], lastDoc: null })),
     fetchItemById: createAsyncThunk('inventory/fetchItemById', async () => null),
     createItem: createAsyncThunk('inventory/createItem', async () => null),
     updateItem: createAsyncThunk('inventory/updateItem', async () => null),
@@ -80,11 +82,24 @@ jest.mock('../../../store/thunks/maintenanceThunks', () => {
     addMaintenanceUpdateThunk: createAsyncThunk('maintenance/update', async () => null),
   };
 });
+let mockFetchReject = false;
 jest.mock('../../../store/thunks/activityLogThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
-    fetchActivityLogs: createAsyncThunk('activityLog/fetch', async () => ({ logs: [], lastDoc: null })),
-    loadMoreActivityLogs: createAsyncThunk('activityLog/loadMore', async () => ({ logs: [], lastDoc: null })),
+    fetchActivityLogs: createAsyncThunk(
+      'activityLog/fetchLogs',
+      async (_, { rejectWithValue }) => {
+        if (mockFetchReject) {
+          return rejectWithValue('Failed to load logs');
+        }
+        return { logs: [], lastDoc: null, totalCount: 0, pageSize: 20 };
+      }
+    ),
+    loadMoreActivityLogs: createAsyncThunk('activityLog/loadMore', async () => ({
+      logs: [],
+      lastDoc: null,
+      pageSize: 20,
+    })),
     fetchMyRecentActivity: createAsyncThunk('activityLog/fetchMy', async () => []),
     exportActivityLogsThunk: createAsyncThunk('activityLog/export', async () => null),
     subscribeToActivityLogsRealtime: () => () => {},
@@ -126,6 +141,7 @@ function renderWithStore(ui: React.ReactElement, preloadedState: Partial<RootSta
 
 const defaultActivityLogState = {
   logs: [],
+  totalCount: 0,
   hasMore: true,
   lastDoc: null,
   myRecentActivity: [],
@@ -180,15 +196,17 @@ describe('ActivityLogScreen', () => {
     expect(screen.getByText('Activity Log')).toBeTruthy();
   });
 
-  it('renders Export button in header', () => {
+  it('renders Export button in header', async () => {
     renderWithStore(<ActivityLogScreen />, {
       activityLog: defaultActivityLogState,
     });
 
-    expect(screen.getByRole('button', { name: 'Export logs as CSV' })).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Export logs as CSV' })).toBeTruthy();
+    });
   });
 
-  it('shows export loading state when exportLoading', () => {
+  it('shows export loading state when exportLoading', async () => {
     renderWithStore(<ActivityLogScreen />, {
       activityLog: {
         ...defaultActivityLogState,
@@ -196,7 +214,9 @@ describe('ActivityLogScreen', () => {
       },
     });
 
-    expect(screen.getByRole('button', { name: /Exporting/ })).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Exporting/ })).toBeTruthy();
+    });
   });
 
   it('shows loading state when loading and no logs', () => {
@@ -211,16 +231,18 @@ describe('ActivityLogScreen', () => {
     expect(screen.getByLabelText('Loading activity logs')).toBeTruthy();
   });
 
-  it('shows empty state when no logs and no filters', () => {
+  it('shows empty state when no logs and no filters', async () => {
     renderWithStore(<ActivityLogScreen />, {
       activityLog: defaultActivityLogState,
     });
 
-    expect(screen.getByText('No Activity Logs Yet')).toBeTruthy();
-    expect(screen.getByText('Activity will appear here as users interact with the system')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('No Activity Logs Yet')).toBeTruthy();
+      expect(screen.getByText('Activity will appear here as users interact with the system')).toBeTruthy();
+    });
   });
 
-  it('shows filter-adjusted empty state when filters applied', () => {
+  it('shows filter-adjusted empty state when filters applied', async () => {
     renderWithStore(<ActivityLogScreen />, {
       activityLog: {
         ...defaultActivityLogState,
@@ -231,27 +253,33 @@ describe('ActivityLogScreen', () => {
       },
     });
 
-    expect(screen.getByText('No Logs Match Your Filters')).toBeTruthy();
-    expect(screen.getByText('Try adjusting your filters to see more results')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('No Logs Match Your Filters')).toBeTruthy();
+      expect(screen.getByText('Try adjusting your filters to see more results')).toBeTruthy();
+    });
   });
 
-  it('renders Open filters button', () => {
+  it('renders Open filters button', async () => {
     renderWithStore(<ActivityLogScreen />, {
       activityLog: defaultActivityLogState,
     });
 
-    expect(screen.getByRole('button', { name: 'Open filters' })).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open filters' })).toBeTruthy();
+    });
   });
 
-  it('shows All Logs when no filters applied', () => {
+  it('shows All Logs when no filters applied', async () => {
     renderWithStore(<ActivityLogScreen />, {
       activityLog: defaultActivityLogState,
     });
 
-    expect(screen.getByText('All Logs')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('All Logs')).toBeTruthy();
+    });
   });
 
-  it('shows Filters Applied when filters applied', () => {
+  it('shows Filters Applied when filters applied', async () => {
     renderWithStore(<ActivityLogScreen />, {
       activityLog: {
         ...defaultActivityLogState,
@@ -262,10 +290,12 @@ describe('ActivityLogScreen', () => {
       },
     });
 
-    expect(screen.getByText('Filters Applied')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('Filters Applied')).toBeTruthy();
+    });
   });
 
-  it('renders Clear filters button when filters applied', () => {
+  it('renders Clear filters button when filters applied', async () => {
     renderWithStore(<ActivityLogScreen />, {
       activityLog: {
         ...defaultActivityLogState,
@@ -276,10 +306,12 @@ describe('ActivityLogScreen', () => {
       },
     });
 
-    expect(screen.getByRole('button', { name: 'Clear filters' })).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Clear filters' })).toBeTruthy();
+    });
   });
 
-  it('dispatches clearFilters when Clear filters pressed', () => {
+  it('dispatches clearFilters when Clear filters pressed', async () => {
     const { store } = renderWithStore(<ActivityLogScreen />, {
       activityLog: {
         ...defaultActivityLogState,
@@ -290,19 +322,23 @@ describe('ActivityLogScreen', () => {
       },
     });
 
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Clear filters' })).toBeTruthy();
+    });
     fireEvent.press(screen.getByRole('button', { name: 'Clear filters' }));
     expect(store.getState().activityLog.filters.actionCategory).toBe('all');
   });
 
-  it('renders error banner when error present', () => {
+  it('renders error banner when error present', async () => {
+    mockFetchReject = true;
     renderWithStore(<ActivityLogScreen />, {
-      activityLog: {
-        ...defaultActivityLogState,
-        error: 'Failed to load logs',
-      },
+      activityLog: defaultActivityLogState,
     });
 
-    expect(screen.getByText('Failed to load logs')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('Failed to load logs')).toBeTruthy();
+    });
+    mockFetchReject = false;
   });
 
   it('renders log list when logs exist', () => {
@@ -312,6 +348,7 @@ describe('ActivityLogScreen', () => {
       activityLog: {
         ...defaultActivityLogState,
         logs: [mockLog],
+        totalCount: 1,
       },
     });
 
@@ -319,11 +356,28 @@ describe('ActivityLogScreen', () => {
     expect(screen.getByText('REQ-2025-0045')).toBeTruthy();
   });
 
-  it('opens filter modal when Open filters pressed', () => {
+  it('shows "Showing X of Y" when logs and totalCount exist', () => {
+    const mockLog = createMockLog();
+
+    renderWithStore(<ActivityLogScreen />, {
+      activityLog: {
+        ...defaultActivityLogState,
+        logs: [mockLog],
+        totalCount: 50,
+      },
+    });
+
+    expect(screen.getByText(/Showing 1 of 50 activity logs/)).toBeTruthy();
+  });
+
+  it('opens filter modal when Open filters pressed', async () => {
     renderWithStore(<ActivityLogScreen />, {
       activityLog: defaultActivityLogState,
     });
 
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open filters' })).toBeTruthy();
+    });
     fireEvent.press(screen.getByRole('button', { name: 'Open filters' }));
     expect(screen.getByText('Filter Logs')).toBeTruthy();
   });

@@ -101,6 +101,8 @@ jest.mock('../../../store/thunks/inventoryThunks', () => {
       }
       return (mockFetchItemsResult as Item[]) ?? [];
     }),
+    fetchItemsPaginated: createAsyncThunk('inventory/fetchItemsPaginated', async () => ({ items: [], totalCount: 0, lastDoc: null })),
+    loadMoreItems: createAsyncThunk('inventory/loadMoreItems', async () => ({ items: [], lastDoc: null })),
     fetchCategories: createAsyncThunk('inventory/fetchCategories', async () => []),
     fetchItemById: createAsyncThunk('inventory/fetchItemById', async () => null),
     createItem: createAsyncThunk('inventory/createItem', async () => null),

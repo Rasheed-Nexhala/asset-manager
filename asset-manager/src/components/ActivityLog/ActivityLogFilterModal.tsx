@@ -61,19 +61,24 @@ export default function ActivityLogFilterModal({
   };
 
   const handleStartDateChange = (
-    _event: unknown,
+    _event: { type: string },
     selectedDate?: Date
   ) => {
-    setShowStartDatePicker(Platform.OS === 'ios');
+    if (Platform.OS === 'android') setShowStartDatePicker(false);
+    if (_event.type === 'dismissed') return;
     if (selectedDate) {
-      setLocalFilters({ ...localFilters, startDate: selectedDate });
+      setLocalFilters((prev) => ({ ...prev, startDate: selectedDate }));
     }
   };
 
-  const handleEndDateChange = (_event: unknown, selectedDate?: Date) => {
-    setShowEndDatePicker(Platform.OS === 'ios');
+  const handleEndDateChange = (
+    _event: { type: string },
+    selectedDate?: Date
+  ) => {
+    if (Platform.OS === 'android') setShowEndDatePicker(false);
+    if (_event.type === 'dismissed') return;
     if (selectedDate) {
-      setLocalFilters({ ...localFilters, endDate: selectedDate });
+      setLocalFilters((prev) => ({ ...prev, endDate: selectedDate }));
     }
   };
 
@@ -89,12 +94,12 @@ export default function ActivityLogFilterModal({
       onRequestClose={onClose}
     >
       <View className="flex-1 bg-black/50 justify-end">
-        <View className="bg-white rounded-t-2xl p-4 h-[90%]">
-          {/* Handle Bar */}
-          <View className="w-10 h-1 bg-[#E2E8F0] rounded-full self-center mb-4" />
+        <View className="bg-white rounded-t-2xl max-h-[85%]">
+          {/* Handle Bar - CIAMS design system */}
+          <View className="w-10 h-1 bg-[#E2E8F0] rounded-full self-center mt-2 mb-2" />
 
           {/* Header */}
-          <View className="pb-4 border-b border-[#E2E8F0] flex-row items-center justify-between">
+          <View className="px-4 pb-4 border-b border-[#E2E8F0] flex-row items-center justify-between">
             <Text className="text-[22px] font-semibold text-[#0F172A]">
               Filter Logs
             </Text>
@@ -108,10 +113,11 @@ export default function ActivityLogFilterModal({
             </TouchableOpacity>
           </View>
 
-          {/* Content */}
+          {/* Content - CIAMS: gap-4 between sections, gap-1.5 label to input */}
           <ScrollView
-            className="flex-1 min-h-0 py-4"
+            className="py-4 px-4"
             showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 16 }}
           >
             {/* Date Range */}
             <View className="gap-4 mb-6">
@@ -125,7 +131,10 @@ export default function ActivityLogFilterModal({
                   <Text className="text-[15px] text-[#0F172A]">From</Text>
                   <TouchableOpacity
                     className="border border-[#E2E8F0] rounded-lg h-12 px-4 justify-center bg-white min-h-[48px]"
-                    onPress={() => setShowStartDatePicker(true)}
+                    onPress={() => {
+                      setShowEndDatePicker(false);
+                      setShowStartDatePicker(true);
+                    }}
                     accessibilityLabel="Select start date"
                     accessibilityRole="button"
                     activeOpacity={0.7}
@@ -135,8 +144,9 @@ export default function ActivityLogFilterModal({
                         ? localFilters.startDate.toLocaleDateString('en-IN', {
                             day: 'numeric',
                             month: 'short',
+                            year: 'numeric',
                           })
-                        : 'Select'}
+                        : 'Select date'}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -146,7 +156,10 @@ export default function ActivityLogFilterModal({
                   <Text className="text-[15px] text-[#0F172A]">To</Text>
                   <TouchableOpacity
                     className="border border-[#E2E8F0] rounded-lg h-12 px-4 justify-center bg-white min-h-[48px]"
-                    onPress={() => setShowEndDatePicker(true)}
+                    onPress={() => {
+                      setShowStartDatePicker(false);
+                      setShowEndDatePicker(true);
+                    }}
                     accessibilityLabel="Select end date"
                     accessibilityRole="button"
                     activeOpacity={0.7}
@@ -156,12 +169,66 @@ export default function ActivityLogFilterModal({
                         ? localFilters.endDate.toLocaleDateString('en-IN', {
                             day: 'numeric',
                             month: 'short',
+                            year: 'numeric',
                           })
-                        : 'Select'}
+                        : 'Select date'}
                     </Text>
                   </TouchableOpacity>
                 </View>
               </View>
+
+              {/* Inline date pickers - inside ScrollView to avoid iOS modal stacking + overflow */}
+              {showStartDatePicker && (
+                <View className="mb-4 overflow-hidden rounded-lg border border-[#E2E8F0] bg-white">
+                  <View className="flex-row items-center justify-between border-b border-[#E2E8F0] px-4 py-2">
+                    <Text className="text-[15px] font-medium text-[#0F172A]">
+                      Select start date
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setShowStartDatePicker(false)}
+                      className="min-h-[44px] min-w-[44px] items-center justify-center"
+                      accessibilityLabel="Close date picker"
+                      accessibilityRole="button"
+                    >
+                      <Ionicons name="close" size={20} color="#64748B" />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ height: 216 }}>
+                    <DateTimePicker
+                      value={localFilters.startDate ?? new Date()}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={handleStartDateChange}
+                    />
+                  </View>
+                </View>
+              )}
+
+              {showEndDatePicker && (
+                <View className="mb-4 overflow-hidden rounded-lg border border-[#E2E8F0] bg-white">
+                  <View className="flex-row items-center justify-between border-b border-[#E2E8F0] px-4 py-2">
+                    <Text className="text-[15px] font-medium text-[#0F172A]">
+                      Select end date
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setShowEndDatePicker(false)}
+                      className="min-h-[44px] min-w-[44px] items-center justify-center"
+                      accessibilityLabel="Close date picker"
+                      accessibilityRole="button"
+                    >
+                      <Ionicons name="close" size={20} color="#64748B" />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ height: 216 }}>
+                    <DateTimePicker
+                      value={localFilters.endDate ?? new Date()}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={handleEndDateChange}
+                    />
+                  </View>
+                </View>
+              )}
             </View>
 
             {/* Action Category */}
@@ -228,8 +295,8 @@ export default function ActivityLogFilterModal({
             </View>
           </ScrollView>
 
-          {/* Footer Actions - Clear (secondary), Apply (primary) */}
-          <View className="pt-4 border-t border-[#E2E8F0] flex-row gap-3">
+          {/* Footer Actions - CIAMS: Clear (secondary), Apply (primary) */}
+          <View className="px-4 pt-4 pb-6 border-t border-[#E2E8F0] flex-row gap-3">
             <TouchableOpacity
               className="flex-1 border-[1.5px] border-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center bg-white"
               onPress={handleClear}
@@ -255,24 +322,6 @@ export default function ActivityLogFilterModal({
             </TouchableOpacity>
           </View>
 
-          {/* Date Pickers */}
-          {showStartDatePicker && (
-            <DateTimePicker
-              value={localFilters.startDate ?? new Date()}
-              mode="date"
-              display="default"
-              onChange={handleStartDateChange}
-            />
-          )}
-
-          {showEndDatePicker && (
-            <DateTimePicker
-              value={localFilters.endDate ?? new Date()}
-              mode="date"
-              display="default"
-              onChange={handleEndDateChange}
-            />
-          )}
         </View>
       </View>
     </Modal>

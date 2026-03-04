@@ -33,6 +33,22 @@ export const selectItemsFilters = createSelector(
   (inventoryState) => inventoryState.filters
 );
 
+// Pagination selectors
+export const selectItemsTotalCount = createSelector(
+  [selectInventoryState],
+  (inventoryState) => inventoryState.totalCount
+);
+
+export const selectItemsHasMore = createSelector(
+  [selectInventoryState],
+  (inventoryState) => inventoryState.hasMore
+);
+
+export const selectItemsLoadingMore = createSelector(
+  [selectInventoryState],
+  (inventoryState) => inventoryState.loadingMore
+);
+
 // Item by ID selector (factory function for dynamic selection)
 export const selectItemById = (itemId: string) =>
   createSelector(

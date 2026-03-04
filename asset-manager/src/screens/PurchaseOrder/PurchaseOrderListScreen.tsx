@@ -3,6 +3,7 @@ import {
   View,
   Text,
   FlatList,
+  TextInput,
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
@@ -14,17 +15,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { POCard } from '../../components/PurchaseOrder/POCard';
-import { subscribeToPurchaseOrders } from '../../services/firebase/purchaseOrderService';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { setFilters } from '../../store/slices/purchaseOrderSlice';
 import {
-  setPurchaseOrders,
-  setFilters,
-  setLoading,
-} from '../../store/slices/purchaseOrderSlice';
+  fetchPurchaseOrdersPaginated,
+  loadMorePurchaseOrders,
+} from '../../store/thunks/purchaseOrderThunks';
 import {
-  selectFilteredPurchaseOrders,
+  selectFilteredPurchaseOrdersForViewer,
   selectPurchaseOrderLoading,
+  selectPurchaseOrderLoadingMore,
   selectPurchaseOrderFilters,
+  selectPurchaseOrderTotalCount,
+  selectPurchaseOrderHasMore,
+  selectPurchaseOrderError,
 } from '../../store/selectors/purchaseOrderSelectors';
 import type { PurchaseOrder } from '../../types/purchaseOrder';
 import type { PurchaseOrderStackParamList } from '../../navigation/PurchaseOrderStackParamList';
@@ -38,35 +42,37 @@ export const PurchaseOrderListScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const dispatch = useAppDispatch();
   const [refreshing, setRefreshing] = useState(false);
-  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
-  const [retryTrigger, setRetryTrigger] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const orders = useAppSelector(selectFilteredPurchaseOrders);
+  const orders = useAppSelector((state) =>
+    selectFilteredPurchaseOrdersForViewer(state, searchQuery)
+  );
   const isLoading = useAppSelector(selectPurchaseOrderLoading);
+  const loadingMore = useAppSelector(selectPurchaseOrderLoadingMore);
+  const totalCount = useAppSelector(selectPurchaseOrderTotalCount);
+  const hasMore = useAppSelector(selectPurchaseOrderHasMore);
+  const error = useAppSelector(selectPurchaseOrderError);
   const filters = useAppSelector(selectPurchaseOrderFilters);
 
   useEffect(() => {
-    dispatch(setLoading(true));
-    setSubscriptionError(null);
-    const unsubscribe = subscribeToPurchaseOrders(
-      (poList, error) => {
-        if (error) {
-          setSubscriptionError(error.message ?? 'Failed to load purchase orders');
-          dispatch(setPurchaseOrders([]));
-        } else {
-          setSubscriptionError(null);
-          dispatch(setPurchaseOrders(poList));
-        }
-      },
-      filters.status !== 'all' ? filters.status : undefined
-    );
-    return unsubscribe;
-  }, [dispatch, filters.status, retryTrigger]);
+    dispatch(fetchPurchaseOrdersPaginated());
+  }, [dispatch, filters.status]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    setRetryTrigger((t) => t + 1);
-    setTimeout(() => setRefreshing(false), 800);
+    dispatch(fetchPurchaseOrdersPaginated()).finally(() =>
+      setTimeout(() => setRefreshing(false), 300)
+    );
+  }, [dispatch]);
+
+  const handleLoadMore = useCallback(() => {
+    if (hasMore && !loadingMore) {
+      dispatch(loadMorePurchaseOrders());
+    }
+  }, [dispatch, hasMore, loadingMore]);
+
+  const handleSearchChange = useCallback((text: string) => {
+    setSearchQuery(text);
   }, []);
 
   const handlePOPress = useCallback(
@@ -123,7 +129,9 @@ export const PurchaseOrderListScreen: React.FC = () => {
     [handlePOPress]
   );
 
-  if (isLoading && orders.length === 0) {
+  const isInitialOrRefetching =
+    orders.length === 0 && totalCount === null && !error;
+  if (isInitialOrRefetching || (isLoading && orders.length === 0)) {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader
@@ -159,17 +167,49 @@ export const PurchaseOrderListScreen: React.FC = () => {
         }}
       />
 
-      {subscriptionError && (
+      {error && (
         <View className="bg-[#DC2626]/15 px-4 py-3 border-b border-[#DC2626]/30 flex-row items-center justify-between">
-          <Text className="text-[14px] text-[#DC2626] flex-1">
-            {subscriptionError}
-          </Text>
+          <Text className="text-[14px] text-[#DC2626] flex-1">{error}</Text>
           <TouchableOpacity
-            onPress={() => setRetryTrigger((t) => t + 1)}
+            onPress={() => dispatch(fetchPurchaseOrdersPaginated())}
             className="ml-2 px-3 py-1.5 bg-[#DC2626] rounded-lg"
           >
             <Text className="text-[13px] font-medium text-white">Retry</Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Search Bar */}
+      <View className="bg-white border-b border-[#E2E8F0] px-4 py-3">
+        <View className="bg-[#F1F5F9] rounded-full h-12 px-4 flex-row items-center">
+          <Ionicons name="search" size={20} color="#94A3B8" />
+          <TextInput
+            className="flex-1 ml-3 text-[15px] text-[#0F172A]"
+            placeholder="Search by PO number, vendor, or item..."
+            placeholderTextColor="#94A3B8"
+            value={searchQuery}
+            onChangeText={handleSearchChange}
+            accessibilityLabel="Search purchase orders"
+            accessibilityRole="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => handleSearchChange('')}
+              className="w-8 h-8 items-center justify-center"
+              accessibilityLabel="Clear search"
+              accessibilityRole="button"
+            >
+              <Ionicons name="close-circle" size={20} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {totalCount != null && orders.length > 0 && (
+        <View className="bg-white border-b border-[#E2E8F0] px-4 py-2">
+          <Text className="text-[13px] text-[#64748B]">
+            Showing {orders.length} of {totalCount} purchase orders
+          </Text>
         </View>
       )}
 
@@ -188,7 +228,6 @@ export const PurchaseOrderListScreen: React.FC = () => {
               'Filter by pending approval'
             )}
             {renderFilterChip('Approved', 'approved', 'Filter by approved')}
-            {renderFilterChip('Ordered', 'ordered', 'Filter by ordered')}
             {renderFilterChip('Received', 'received', 'Filter by received')}
             {renderFilterChip('Draft', 'draft', 'Filter by draft')}
             {renderFilterChip('Rejected', 'rejected', 'Filter by rejected')}
@@ -199,23 +238,27 @@ export const PurchaseOrderListScreen: React.FC = () => {
       {orders.length === 0 ? (
         <View className="flex-1 items-center justify-center px-4">
           <Ionicons
-            name={subscriptionError ? 'cloud-offline-outline' : 'receipt-outline'}
+            name={error ? 'cloud-offline-outline' : 'receipt-outline'}
             size={80}
             color="#64748B"
           />
           <Text className="text-[22px] font-semibold text-[#0F172A] text-center mb-2 mt-4">
-            {subscriptionError
+            {error
               ? 'Could not load purchase orders'
-              : 'No Purchase Orders'}
+              : searchQuery.trim()
+                ? 'No purchase orders match your search'
+                : 'No Purchase Orders'}
           </Text>
           <Text className="text-[15px] text-[#64748B] text-center mb-6">
-            {subscriptionError
+            {error
               ? 'Check your connection and tap Retry above.'
-              : filters.status !== 'all'
-                ? 'Try adjusting your filters to see more orders.'
-                : 'Create your first purchase order to get started.'}
+              : searchQuery.trim()
+                ? 'No purchase orders match your search. Try different keywords.'
+                : filters.status !== 'all'
+                  ? 'Try adjusting your filters to see more orders.'
+                  : 'Create your first purchase order to get started.'}
           </Text>
-          {(filters.status === 'all' || subscriptionError) && (
+          {(filters.status === 'all' || error) && !searchQuery.trim() && (
             <TouchableOpacity
               onPress={() => navigation.navigate('CreatePO', {})}
               className="bg-[#1E40AF] rounded-[10px] h-[50px] px-6 items-center justify-center"
@@ -238,6 +281,26 @@ export const PurchaseOrderListScreen: React.FC = () => {
               onRefresh={handleRefresh}
               tintColor="#1E40AF"
             />
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            loadingMore ? (
+              <View className="py-4 items-center">
+                <ActivityIndicator size="small" color="#1E40AF" />
+              </View>
+            ) : hasMore ? (
+              <TouchableOpacity
+                onPress={handleLoadMore}
+                className="py-4 items-center"
+                accessibilityRole="button"
+                accessibilityLabel="Load more purchase orders"
+              >
+                <Text className="text-[15px] font-medium text-[#1E40AF]">
+                  Load more
+                </Text>
+              </TouchableOpacity>
+            ) : null
           }
           showsVerticalScrollIndicator={false}
         />

@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from '../index';
+import { selectUserId } from './authSelectors';
 
 export const selectPurchaseOrderState = (state: RootState) =>
   state.purchaseOrders;
@@ -15,6 +16,15 @@ export const selectVendors = (state: RootState) =>
 
 export const selectPurchaseOrderLoading = (state: RootState) =>
   state.purchaseOrders.loading;
+
+export const selectPurchaseOrderLoadingMore = (state: RootState) =>
+  state.purchaseOrders.loadingMore;
+
+export const selectPurchaseOrderTotalCount = (state: RootState) =>
+  state.purchaseOrders.totalCount;
+
+export const selectPurchaseOrderHasMore = (state: RootState) =>
+  state.purchaseOrders.hasMore;
 
 export const selectPurchaseOrderError = (state: RootState) =>
   state.purchaseOrders.error;
@@ -33,6 +43,58 @@ export const selectFilteredPurchaseOrders = createSelector(
       filtered = filtered.filter((o) => o.status === filters.status);
     }
     return filtered;
+  }
+);
+
+/** Pass-through for search query (used as second arg to selectors) */
+const selectSearchQueryArg = (_state: RootState, searchQuery: string) => searchQuery;
+
+/**
+ * Filter purchase orders by search query (poNumber, vendorName, vendorContact, justification, item names/SKUs).
+ * Use: useAppSelector((state) => selectFilteredPurchaseOrdersBySearchQuery(state, searchQuery))
+ */
+export const selectFilteredPurchaseOrdersBySearchQuery = createSelector(
+  [selectFilteredPurchaseOrders, selectSearchQueryArg],
+  (filteredOrders, searchQuery) => {
+    const trimmedQuery = searchQuery?.trim() || '';
+    if (!trimmedQuery) return filteredOrders;
+
+    const lowerQuery = trimmedQuery.toLowerCase();
+    return filteredOrders.filter((o) => {
+      const matchesPoNumber = (o.poNumber ?? '').toLowerCase().includes(lowerQuery);
+      const matchesVendorName = (o.vendorName ?? '').toLowerCase().includes(lowerQuery);
+      const matchesVendorContact = (o.vendorContact ?? '').toLowerCase().includes(lowerQuery);
+      const matchesJustification = (o.justification ?? '').toLowerCase().includes(lowerQuery);
+      const matchesItem = Array.isArray(o.items)
+        ? o.items.some(
+            (item) =>
+              (item.itemName ?? '').toLowerCase().includes(lowerQuery) ||
+              (item.itemSku ?? '').toLowerCase().includes(lowerQuery)
+          )
+        : false;
+      return (
+        matchesPoNumber ||
+        matchesVendorName ||
+        matchesVendorContact ||
+        matchesJustification ||
+        matchesItem
+      );
+    });
+  }
+);
+
+/**
+ * Filter drafts by creator: each user sees only their own drafts (createdBy === userId).
+ * Non-draft POs are visible to all. Admin drafts hidden from store incharge and vice versa.
+ * Use: useAppSelector((state) => selectFilteredPurchaseOrdersForViewer(state, searchQuery))
+ */
+export const selectFilteredPurchaseOrdersForViewer = createSelector(
+  [selectFilteredPurchaseOrdersBySearchQuery, selectUserId],
+  (filteredOrders, userId) => {
+    if (!userId) return filteredOrders;
+    return filteredOrders.filter(
+      (o) => o.status !== 'draft' || o.createdBy === userId
+    );
   }
 );
 

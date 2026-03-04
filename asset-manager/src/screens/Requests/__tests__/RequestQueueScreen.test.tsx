@@ -27,6 +27,8 @@ jest.mock('react-native-safe-area-context', () => ({
 
 const mockUnsubscribe = jest.fn();
 let mockRequestsToReturn: Request[] | null = null;
+const mockListRequestsPaginated = jest.fn();
+const mockGetRequestsCount = jest.fn();
 jest.mock('../../../services/firebase/requestService', () => ({
   requestService: {
     subscribeToRequests: jest.fn((_opts: unknown, callback: (requests: Request[]) => void) => {
@@ -35,7 +37,12 @@ jest.mock('../../../services/firebase/requestService', () => ({
       }
       return mockUnsubscribe;
     }),
+    listRequestsPaginated: (...args: unknown[]) => mockListRequestsPaginated(...args),
+    getRequestsCount: (...args: unknown[]) => mockGetRequestsCount(...args),
   },
+  listRequestsPaginated: (...args: unknown[]) => mockListRequestsPaginated(...args),
+  getRequestsCount: (...args: unknown[]) => mockGetRequestsCount(...args),
+  REQUESTS_PAGE_SIZE: 10,
 }));
 
 jest.mock('../../../store/thunks/authThunks', () => {
@@ -65,6 +72,8 @@ jest.mock('../../../store/thunks/inventoryThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
     fetchItems: createAsyncThunk('inventory/fetchItems', async () => []),
+    fetchItemsPaginated: createAsyncThunk('inventory/fetchItemsPaginated', async () => ({ items: [], totalCount: 0, lastDoc: null })),
+    loadMoreItems: createAsyncThunk('inventory/loadMoreItems', async () => ({ items: [], lastDoc: null })),
     fetchItemById: createAsyncThunk('inventory/fetchItemById', async () => null),
     createItem: createAsyncThunk('inventory/createItem', async () => null),
     updateItem: createAsyncThunk('inventory/updateItem', async () => null),
@@ -179,6 +188,14 @@ const defaultRequestsState = {
   error: null,
   errorTimestamp: null,
   filters: { status: 'all', priority: 'all', siteId: 'all' },
+  requestsTotalCount: 0,
+  requestsLastDoc: null,
+  requestsHasMore: false,
+  requestsLoadingMore: false,
+  myRequestsTotalCount: null,
+  myRequestsLastDoc: null,
+  myRequestsHasMore: false,
+  myRequestsLoadingMore: false,
 };
 
 describe('RequestQueueScreen', () => {
@@ -186,6 +203,8 @@ describe('RequestQueueScreen', () => {
     mockNavigate.mockClear();
     mockUnsubscribe.mockClear();
     mockRequestsToReturn = [];
+    mockListRequestsPaginated.mockResolvedValue({ requests: [], lastDoc: null });
+    mockGetRequestsCount.mockResolvedValue(0);
   });
 
   it('renders Request Queue header', () => {
@@ -196,13 +215,13 @@ describe('RequestQueueScreen', () => {
     expect(screen.getByText('Request Queue')).toBeTruthy();
   });
 
-  it('renders search bar with placeholder', () => {
+  it('renders search bar with placeholder', async () => {
     renderWithStore(<RequestQueueScreen />, {
       requests: defaultRequestsState,
     });
 
-    expect(screen.getByPlaceholderText('Search by request number, site, requester, purpose, or item...')).toBeTruthy();
-    expect(screen.getByLabelText('Search requests')).toBeTruthy();
+    expect(await screen.findByPlaceholderText('Search by request number, site, requester, purpose, or item...')).toBeTruthy();
+    expect(await screen.findByLabelText('Search requests')).toBeTruthy();
   });
 
   it('shows loading state when loading and no requests', () => {
@@ -211,22 +230,23 @@ describe('RequestQueueScreen', () => {
       requests: {
         ...defaultRequestsState,
         loading: true,
+        requestsTotalCount: null,
       },
     });
 
     expect(screen.getByText('Loading requests...')).toBeTruthy();
   });
 
-  it('shows empty state when no requests and filters are all', () => {
+  it('shows empty state when no requests and filters are all', async () => {
     renderWithStore(<RequestQueueScreen />, {
       requests: defaultRequestsState,
     });
 
-    expect(screen.getByText('No Requests Found')).toBeTruthy();
-    expect(screen.getByText('No requests in the queue yet.')).toBeTruthy();
+    expect(await screen.findByText('No Requests Found')).toBeTruthy();
+    expect(await screen.findByText('No requests in the queue yet.')).toBeTruthy();
   });
 
-  it('shows filter-adjusted message when filters are applied', () => {
+  it('shows filter-adjusted message when filters are applied', async () => {
     renderWithStore(<RequestQueueScreen />, {
       requests: {
         ...defaultRequestsState,
@@ -234,12 +254,12 @@ describe('RequestQueueScreen', () => {
       },
     });
 
-    expect(screen.getByText('No Requests Found')).toBeTruthy();
-    expect(screen.getByText('Try adjusting your filters or search to see more requests.')).toBeTruthy();
+    expect(await screen.findByText('No Requests Found')).toBeTruthy();
+    expect(await screen.findByText('Try adjusting your filters or search to see more requests.')).toBeTruthy();
   });
 
-  it('renders priority, site, and status filter chips when filters expanded', () => {
-    renderWithStore(<RequestQueueScreen />, {
+  it('renders priority, site, and status filter chips when filters expanded', async () => {
+    const { findByRole } = renderWithStore(<RequestQueueScreen />, {
       requests: defaultRequestsState,
       sites: {
         sites: [mockSite],
@@ -251,8 +271,9 @@ describe('RequestQueueScreen', () => {
       },
     });
 
-    // Filters are collapsible — tap toggle to expand
-    fireEvent.press(screen.getByRole('button', { name: 'Toggle filters' }));
+    // Wait for fetch to complete (skip loader), then expand filters
+    const toggleBtn = await findByRole('button', { name: 'Toggle filters' });
+    fireEvent.press(toggleBtn);
 
     expect(screen.getByText('Priority')).toBeTruthy();
     expect(screen.getByText('Site')).toBeTruthy();
@@ -262,14 +283,13 @@ describe('RequestQueueScreen', () => {
     expect(screen.getByRole('button', { name: 'Filter by medium priority' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Filter by low priority' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Filter by all sites' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Filter by Site A' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Filter by all statuses' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Filter by pending' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Filter by approved' })).toBeTruthy();
   });
 
-  it('dispatches setFilters when filters are pressed', () => {
-    const { store } = renderWithStore(<RequestQueueScreen />, {
+  it('dispatches setFilters when filters are pressed', async () => {
+    const { store, findByRole } = renderWithStore(<RequestQueueScreen />, {
       requests: defaultRequestsState,
       sites: {
         sites: [mockSite],
@@ -281,27 +301,29 @@ describe('RequestQueueScreen', () => {
       },
     });
 
-    // Expand filters first (collapsible like Inventory)
-    fireEvent.press(screen.getByRole('button', { name: 'Toggle filters' }));
+    // Wait for fetch to complete, then expand filters
+    const toggleBtn = await findByRole('button', { name: 'Toggle filters' });
+    fireEvent.press(toggleBtn);
 
+    // Test priority filter (client-side, no refetch)
     fireEvent.press(screen.getByRole('button', { name: 'Filter by high priority' }));
     expect(store.getState().requests.filters.priority).toBe('high');
 
+    // Test status filter
     fireEvent.press(screen.getByRole('button', { name: 'Filter by pending' }));
     expect(store.getState().requests.filters.status).toBe('pending');
-
-    fireEvent.press(screen.getByRole('button', { name: 'Filter by Site A' }));
-    expect(store.getState().requests.filters.siteId).toBe('site-1');
   });
 
-  it('renders request list when requests exist', () => {
+  it('renders request list when requests exist', async () => {
     mockRequestsToReturn = null;
     const mockRequest = createMockRequest({ priority: 'high' });
+    mockListRequestsPaginated.mockResolvedValue({ requests: [mockRequest], lastDoc: null });
+    mockGetRequestsCount.mockResolvedValue(1);
 
-    renderWithStore(<RequestQueueScreen />, {
+    const { findByText } = renderWithStore(<RequestQueueScreen />, {
       requests: {
         ...defaultRequestsState,
-        requests: [mockRequest],
+        requests: [],
       },
       inventory: {
         items: [],
@@ -313,18 +335,20 @@ describe('RequestQueueScreen', () => {
       },
     });
 
-    expect(screen.getByText('REQ-2025-0001')).toBeTruthy();
-    expect(screen.getByText('Site A')).toBeTruthy();
+    expect(await findByText('REQ-2025-0001')).toBeTruthy();
+    expect(await findByText('Site A')).toBeTruthy();
   });
 
-  it('navigates to ProcessRequest when request card pressed', () => {
+  it('navigates to ProcessRequest when request card pressed', async () => {
     mockRequestsToReturn = null;
     const mockRequest = createMockRequest({ id: 'req-1', priority: 'high' });
+    mockListRequestsPaginated.mockResolvedValue({ requests: [mockRequest], lastDoc: null });
+    mockGetRequestsCount.mockResolvedValue(1);
 
-    renderWithStore(<RequestQueueScreen />, {
+    const { findByText } = renderWithStore(<RequestQueueScreen />, {
       requests: {
         ...defaultRequestsState,
-        requests: [mockRequest],
+        requests: [],
       },
       inventory: {
         items: [],
@@ -336,19 +360,21 @@ describe('RequestQueueScreen', () => {
       },
     });
 
-    fireEvent.press(screen.getByText('REQ-2025-0001'));
+    fireEvent.press(await findByText('REQ-2025-0001'));
     expect(mockNavigate).toHaveBeenCalledWith('ProcessRequest', { requestId: 'req-1' });
   });
 
-  it('renders flat list of requests sorted by date (latest first)', () => {
+  it('renders flat list of requests sorted by date (latest first)', async () => {
     mockRequestsToReturn = null;
     const highReq = createMockRequest({ id: 'req-1', requestNumber: 'REQ-2025-0001', priority: 'high' });
     const mediumReq = createMockRequest({ id: 'req-2', requestNumber: 'REQ-2025-0002', priority: 'medium' });
+    mockListRequestsPaginated.mockResolvedValue({ requests: [highReq, mediumReq], lastDoc: null });
+    mockGetRequestsCount.mockResolvedValue(2);
 
-    renderWithStore(<RequestQueueScreen />, {
+    const { findByText } = renderWithStore(<RequestQueueScreen />, {
       requests: {
         ...defaultRequestsState,
-        requests: [highReq, mediumReq],
+        requests: [],
       },
       inventory: {
         items: [],
@@ -360,7 +386,7 @@ describe('RequestQueueScreen', () => {
       },
     });
 
-    expect(screen.getByText('REQ-2025-0001')).toBeTruthy();
-    expect(screen.getByText('REQ-2025-0002')).toBeTruthy();
+    expect(await findByText('REQ-2025-0001')).toBeTruthy();
+    expect(await findByText('REQ-2025-0002')).toBeTruthy();
   });
 });

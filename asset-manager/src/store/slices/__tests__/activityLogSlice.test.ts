@@ -2,8 +2,13 @@ jest.mock('../../thunks/activityLogThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
     fetchActivityLogs: createAsyncThunk(
-      'activityLog/fetch',
-      async () => ({ logs: [], lastDoc: null })
+      'activityLog/fetchLogs',
+      async () => ({
+        logs: [],
+        lastDoc: null,
+        totalCount: 0,
+        pageSize: 20,
+      })
     ),
     fetchMyRecentActivity: createAsyncThunk(
       'activityLog/fetchMy',
@@ -11,7 +16,7 @@ jest.mock('../../thunks/activityLogThunks', () => {
     ),
     loadMoreActivityLogs: createAsyncThunk(
       'activityLog/loadMore',
-      async () => ({ logs: [], lastDoc: null })
+      async () => ({ logs: [], lastDoc: null, pageSize: 20 })
     ),
     exportActivityLogsThunk: createAsyncThunk(
       'activityLog/export',
@@ -44,6 +49,7 @@ const mockLog = {
 describe('activityLogSlice', () => {
   const initialState = {
     logs: [],
+    totalCount: null,
     hasMore: true,
     lastDoc: null,
     myRecentActivity: [],
@@ -143,11 +149,17 @@ describe('activityLogSlice', () => {
     const state = activityLogReducer(
       initialState,
       fetchActivityLogs.fulfilled(
-        { logs: [mockLog], lastDoc: null },
+        {
+          logs: [mockLog],
+          lastDoc: null,
+          totalCount: 1,
+          pageSize: 20,
+        },
         'req1'
       )
     );
     expect(state.logs).toEqual([mockLog]);
+    expect(state.totalCount).toBe(1);
     expect(state.loading).toBe(false);
   });
 

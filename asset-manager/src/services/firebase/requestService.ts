@@ -4,12 +4,15 @@ import {
   getDoc,
   getDocFromServer,
   getDocs,
+  getDocsFromServer,
+  getCountFromServer,
   addDoc,
   updateDoc,
   query,
   where,
   orderBy,
   limit,
+  startAfter,
   onSnapshot,
   serverTimestamp,
   runTransaction,
@@ -17,6 +20,7 @@ import {
   increment,
   Timestamp,
 } from 'firebase/firestore';
+import type { DocumentSnapshot, QueryConstraint } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import type {
   Request,
@@ -872,6 +876,101 @@ export const getRequestById = async (requestId: string): Promise<Request | null>
   }
 };
 
+/** Filters for paginated request list (queue: status, siteId; my: userId) */
+export interface RequestListFilters {
+  status?: string;
+  siteId?: string;
+  userId?: string;
+}
+
+/** Default page size for paginated request lists */
+export const REQUESTS_PAGE_SIZE = 10;
+
+/**
+ * Build Firestore query constraints for requests (shared by listPaginated and getCount).
+ * - Queue (no userId): excludes drafts via status filter; optional status/siteId
+ * - My Requests (userId): includes drafts; filters by requestedBy
+ */
+const buildRequestQueryConstraints = (filters?: RequestListFilters): QueryConstraint[] => {
+  const constraints: QueryConstraint[] = [];
+
+  if (filters?.userId) {
+    constraints.push(where('requestedBy', '==', filters.userId));
+  } else {
+    // Queue: exclude drafts (Store Incharge/Admin never see drafts)
+    if (filters?.status && filters.status !== 'all') {
+      constraints.push(where('status', '==', filters.status));
+    } else {
+      constraints.push(where('status', '!=', 'draft'));
+    }
+    if (filters?.siteId && filters.siteId !== 'all') {
+      constraints.push(where('siteId', '==', filters.siteId));
+    }
+  }
+
+  constraints.push(orderBy('createdAt', 'desc'));
+  return constraints;
+};
+
+/**
+ * List requests with cursor-based pagination.
+ *
+ * @param filters - status, siteId (queue) or userId (my requests)
+ * @param pageSize - Number of requests per page
+ * @param lastDoc - Cursor for next page (from previous response)
+ * @returns Requests and cursor for next page
+ */
+export const listRequestsPaginated = async (
+  filters: RequestListFilters | undefined,
+  pageSize: number,
+  lastDoc?: DocumentSnapshot
+): Promise<{ requests: Request[]; lastDoc: DocumentSnapshot | null }> => {
+  try {
+    const constraints = buildRequestQueryConstraints(filters);
+    if (lastDoc) {
+      constraints.push(startAfter(lastDoc));
+    }
+    constraints.push(limit(pageSize));
+
+    const q = query(collection(db, REQUESTS_COLLECTION), ...constraints);
+    const snapshot = await getDocsFromServer(q);
+
+    const requests: Request[] = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    })) as Request[];
+
+    const newLastDoc =
+      snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
+
+    return { requests, lastDoc: newLastDoc };
+  } catch (error) {
+    console.error('Error listing requests (paginated):', error);
+    throw error;
+  }
+};
+
+/**
+ * Get total count of requests matching Firestore filters.
+ * Must use same where/orderBy as listRequestsPaginated.
+ *
+ * @param filters - Same filters as listRequestsPaginated
+ * @returns Total count from server
+ */
+export const getRequestsCount = async (
+  filters: RequestListFilters | undefined
+): Promise<number> => {
+  try {
+    const constraints = buildRequestQueryConstraints(filters);
+    const q = query(collection(db, REQUESTS_COLLECTION), ...constraints);
+    const snapshot = await getCountFromServer(q);
+    return snapshot.data().count;
+  } catch (error) {
+    console.error('Error getting requests count:', error);
+    throw error;
+  }
+};
+
 /**
  * Subscribe to requests (real-time)
  */
@@ -1003,6 +1102,8 @@ export const requestService = {
   returnItems,
   cancelRequest,
   getRequestById,
+  listRequestsPaginated,
+  getRequestsCount,
   subscribeToRequests,
   subscribeToRequest,
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MyRequestsScreen } from '../MyRequestsScreen';
@@ -11,6 +11,7 @@ import steelMasterReducer from '../../../store/slices/steelMasterSlice';
 import maintenanceReducer from '../../../store/slices/maintenanceSlice';
 import activityLogReducer from '../../../store/slices/activityLogSlice';
 import purchaseOrderReducer from '../../../store/slices/purchaseOrderSlice';
+import type { User } from 'firebase/auth';
 import type { RootState } from '../../../store';
 import type { Request } from '../../../types/request';
 
@@ -27,6 +28,8 @@ jest.mock('react-native-safe-area-context', () => ({
 
 const mockUnsubscribe = jest.fn();
 let mockRequestsToReturn: Request[] | null = null;
+const mockListRequestsPaginated = jest.fn();
+const mockGetRequestsCount = jest.fn();
 jest.mock('../../../services/firebase/requestService', () => ({
   requestService: {
     subscribeToRequests: jest.fn((_opts: unknown, callback: (requests: Request[]) => void) => {
@@ -35,7 +38,12 @@ jest.mock('../../../services/firebase/requestService', () => ({
       }
       return mockUnsubscribe;
     }),
+    listRequestsPaginated: (...args: unknown[]) => mockListRequestsPaginated(...args),
+    getRequestsCount: (...args: unknown[]) => mockGetRequestsCount(...args),
   },
+  listRequestsPaginated: (...args: unknown[]) => mockListRequestsPaginated(...args),
+  getRequestsCount: (...args: unknown[]) => mockGetRequestsCount(...args),
+  REQUESTS_PAGE_SIZE: 10,
 }));
 
 jest.mock('../../../store/thunks/authThunks', () => {
@@ -48,8 +56,17 @@ jest.mock('../../../store/thunks/authThunks', () => {
 });
 jest.mock('../../../store/thunks/sitesThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
+  const mockSiteForSites = {
+    id: 'site-1',
+    name: 'Site A',
+    managerId: 'sm-1',
+    status: 'active',
+    address: '123 Main St',
+    createdAt: '2025-01-01',
+    updatedAt: '2025-01-01',
+  };
   return {
-    fetchSites: createAsyncThunk('sites/fetchSites', async () => []),
+    fetchSites: createAsyncThunk('sites/fetchSites', async () => [mockSiteForSites]),
     createSite: createAsyncThunk('sites/createSite', async () => null),
     updateSite: createAsyncThunk('sites/updateSite', async () => null),
   };
@@ -65,6 +82,8 @@ jest.mock('../../../store/thunks/inventoryThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
     fetchItems: createAsyncThunk('inventory/fetchItems', async () => []),
+    fetchItemsPaginated: createAsyncThunk('inventory/fetchItemsPaginated', async () => ({ items: [], totalCount: 0, lastDoc: null })),
+    loadMoreItems: createAsyncThunk('inventory/loadMoreItems', async () => ({ items: [], lastDoc: null })),
     fetchItemById: createAsyncThunk('inventory/fetchItemById', async () => null),
     createItem: createAsyncThunk('inventory/createItem', async () => null),
     updateItem: createAsyncThunk('inventory/updateItem', async () => null),
@@ -136,7 +155,7 @@ const mockSiteManagerUser = {
   uid: 'sm-1',
   email: 'sm@example.com',
   displayName: 'Site Manager',
-};
+} as User;
 
 const mockSiteManagerRole = {
   role: 'SiteManager' as const,
@@ -183,11 +202,31 @@ const createMockRequest = (overrides: Partial<Request> = {}): Request =>
     ...overrides,
   }) as Request;
 
+const defaultRequestsState = {
+  requests: [],
+  myRequests: [],
+  selectedRequest: null,
+  loading: false,
+  error: null,
+  errorTimestamp: null,
+  filters: { status: 'all', priority: 'all', siteId: 'all' },
+  requestsTotalCount: null,
+  requestsLastDoc: null,
+  requestsHasMore: false,
+  requestsLoadingMore: false,
+  myRequestsTotalCount: 0,
+  myRequestsLastDoc: null,
+  myRequestsHasMore: false,
+  myRequestsLoadingMore: false,
+};
+
 describe('MyRequestsScreen', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
     mockUnsubscribe.mockClear();
     mockRequestsToReturn = [];
+    mockListRequestsPaginated.mockResolvedValue({ requests: [], lastDoc: null });
+    mockGetRequestsCount.mockResolvedValue(0);
   });
 
   it('renders My Requests header', () => {
@@ -202,20 +241,14 @@ describe('MyRequestsScreen', () => {
         error: null,
       },
       requests: {
-        requests: [],
-        myRequests: [],
-        selectedRequest: null,
-        loading: false,
-        error: null,
-        errorTimestamp: null,
-        filters: { status: 'all', priority: 'all', siteId: 'all' },
+        ...defaultRequestsState,
       },
     });
 
     expect(screen.getByText('My Requests')).toBeTruthy();
   });
 
-  it('renders all tabs', () => {
+  it('renders all tabs', async () => {
     renderWithStore(<MyRequestsScreen />, {
       auth: {
         user: mockSiteManagerUser,
@@ -227,23 +260,17 @@ describe('MyRequestsScreen', () => {
         error: null,
       },
       requests: {
-        requests: [],
-        myRequests: [],
-        selectedRequest: null,
-        loading: false,
-        error: null,
-        errorTimestamp: null,
-        filters: { status: 'all', priority: 'all', siteId: 'all' },
+        ...defaultRequestsState,
       },
     });
 
-    expect(screen.getByRole('tab', { name: 'All tab' })).toBeTruthy();
+    expect(await screen.findByRole('tab', { name: 'All tab' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Pending tab' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Approved tab' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Rejected tab' })).toBeTruthy();
   });
 
-  it('shows empty state when no requests', () => {
+  it('shows empty state when no requests', async () => {
     renderWithStore(<MyRequestsScreen />, {
       auth: {
         user: mockSiteManagerUser,
@@ -263,21 +290,15 @@ describe('MyRequestsScreen', () => {
         lastValidationAt: null,
       },
       requests: {
-        requests: [],
-        myRequests: [],
-        selectedRequest: null,
-        loading: false,
-        error: null,
-        errorTimestamp: null,
-        filters: { status: 'all', priority: 'all', siteId: 'all' },
+        ...defaultRequestsState,
       },
     });
 
-    expect(screen.getByText('No Requests Yet')).toBeTruthy();
+    expect(await screen.findByText('No Requests Yet')).toBeTruthy();
     expect(screen.getByText('Create your first request to get started.')).toBeTruthy();
   });
 
-  it('shows Create new request button for SiteManager with assigned site', () => {
+  it('shows Create new request button for SiteManager with assigned site', async () => {
     renderWithStore(<MyRequestsScreen />, {
       auth: {
         user: mockSiteManagerUser,
@@ -297,20 +318,14 @@ describe('MyRequestsScreen', () => {
         lastValidationAt: null,
       },
       requests: {
-        requests: [],
-        myRequests: [],
-        selectedRequest: null,
-        loading: false,
-        error: null,
-        errorTimestamp: null,
-        filters: { status: 'all', priority: 'all', siteId: 'all' },
+        ...defaultRequestsState,
       },
     });
 
-    expect(screen.getAllByRole('button', { name: 'Create new request' }).length).toBeGreaterThan(0);
+    expect(await screen.findByText('New Request')).toBeTruthy();
   });
 
-  it('navigates to CreateRequest when Create button pressed', () => {
+  it('navigates to CreateRequest when Create button pressed', async () => {
     renderWithStore(<MyRequestsScreen />, {
       auth: {
         user: mockSiteManagerUser,
@@ -330,18 +345,12 @@ describe('MyRequestsScreen', () => {
         lastValidationAt: null,
       },
       requests: {
-        requests: [],
-        myRequests: [],
-        selectedRequest: null,
-        loading: false,
-        error: null,
-        errorTimestamp: null,
-        filters: { status: 'all', priority: 'all', siteId: 'all' },
+        ...defaultRequestsState,
       },
     });
 
-    const createButtons = screen.getAllByRole('button', { name: 'Create new request' });
-    fireEvent.press(createButtons[0]);
+    const createButton = await screen.findByText('New Request');
+    fireEvent.press(createButton);
     expect(mockNavigate).toHaveBeenCalledWith('CreateRequest', { siteId: 'site-1' });
   });
 
@@ -358,24 +367,22 @@ describe('MyRequestsScreen', () => {
         error: null,
       },
       requests: {
-        requests: [],
-        myRequests: [],
-        selectedRequest: null,
+        ...defaultRequestsState,
         loading: true,
-        error: null,
-        errorTimestamp: null,
-        filters: { status: 'all', priority: 'all', siteId: 'all' },
+        myRequestsTotalCount: null,
       },
     });
 
     expect(screen.getByText('Loading your requests...')).toBeTruthy();
   });
 
-  it('renders request list when requests exist', () => {
+  it('renders request list when requests exist', async () => {
     mockRequestsToReturn = null;
     const mockRequest = createMockRequest();
+    mockListRequestsPaginated.mockResolvedValue({ requests: [mockRequest], lastDoc: null });
+    mockGetRequestsCount.mockResolvedValue(1);
 
-    renderWithStore(<MyRequestsScreen />, {
+    const { findByText } = renderWithStore(<MyRequestsScreen />, {
       auth: {
         user: mockSiteManagerUser,
         userRole: mockSiteManagerRole,
@@ -386,20 +393,15 @@ describe('MyRequestsScreen', () => {
         error: null,
       },
       requests: {
-        requests: [],
-        myRequests: [mockRequest],
-        selectedRequest: null,
-        loading: false,
-        error: null,
-        errorTimestamp: null,
-        filters: { status: 'all', priority: 'all', siteId: 'all' },
+        ...defaultRequestsState,
+        myRequests: [],
       },
     });
 
-    expect(screen.getByText('REQ-2025-0001')).toBeTruthy();
+    expect(await findByText('REQ-2025-0001')).toBeTruthy();
   });
 
-  it('switches tab when tab pressed', () => {
+  it('switches tab when tab pressed', async () => {
     renderWithStore(<MyRequestsScreen />, {
       auth: {
         user: mockSiteManagerUser,
@@ -411,17 +413,12 @@ describe('MyRequestsScreen', () => {
         error: null,
       },
       requests: {
-        requests: [],
-        myRequests: [],
-        selectedRequest: null,
-        loading: false,
-        error: null,
-        errorTimestamp: null,
-        filters: { status: 'all', priority: 'all', siteId: 'all' },
+        ...defaultRequestsState,
       },
     });
 
-    fireEvent.press(screen.getByRole('tab', { name: 'Pending tab' }));
+    const pendingTab = await screen.findByRole('tab', { name: 'Pending tab' });
+    fireEvent.press(pendingTab);
     expect(screen.getByRole('tab', { name: 'Pending tab' })).toBeTruthy();
   });
 });

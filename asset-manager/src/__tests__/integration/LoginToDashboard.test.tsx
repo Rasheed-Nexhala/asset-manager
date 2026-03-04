@@ -13,7 +13,7 @@ jest.mock('firebase/firestore', () => ({
   setDoc: jest.fn(),
   updateDoc: jest.fn(),
   collection: jest.fn(),
-  getDocs: jest.fn(),
+  getDocs: jest.fn().mockResolvedValue({ docs: [], size: 0, empty: true, forEach: () => {} }),
   addDoc: jest.fn(),
   query: jest.fn(),
   where: jest.fn(),
@@ -133,6 +133,8 @@ jest.mock('../../store/thunks/inventoryThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
     fetchItems: createAsyncThunk('inventory/fetchItems', async () => []),
+    fetchItemsPaginated: createAsyncThunk('inventory/fetchItemsPaginated', async () => ({ items: [], totalCount: 0, lastDoc: null })),
+    loadMoreItems: createAsyncThunk('inventory/loadMoreItems', async () => ({ items: [], lastDoc: null })),
     fetchItemById: createAsyncThunk('inventory/fetchItemById', async () => null),
     createItem: createAsyncThunk('inventory/createItem', async () => null),
     updateItem: createAsyncThunk('inventory/updateItem', async () => null),

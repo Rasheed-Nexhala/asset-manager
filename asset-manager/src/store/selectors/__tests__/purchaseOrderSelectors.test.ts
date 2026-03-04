@@ -6,14 +6,28 @@ import {
   selectPurchaseOrderError,
   selectPurchaseOrderFilters,
   selectFilteredPurchaseOrders,
+  selectFilteredPurchaseOrdersBySearchQuery,
+  selectFilteredPurchaseOrdersForViewer,
   selectPendingApprovalCount,
   selectPOById,
 } from '../purchaseOrderSelectors';
 import type { RootState } from '../../index';
 
-const createMockState = (purchaseOrders: Partial<RootState['purchaseOrders']>): RootState =>
+const createMockState = (
+  purchaseOrders: Partial<RootState['purchaseOrders']>,
+  auth?: Partial<RootState['auth']>
+): RootState =>
   ({
-    auth: { user: null, userRole: null, isAuthenticated: false, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
+    auth: {
+      user: null,
+      userRole: null,
+      isAuthenticated: false,
+      isLoading: false,
+      isRoleLoading: false,
+      authInitialized: false,
+      error: null,
+      ...auth,
+    },
     sites: { sites: [], isLoading: false, error: null, searchQuery: '', validationLoading: false, lastValidationAt: null },
     inventory: { items: [], categories: [], inventoryByLocation: {}, lowStockItemIds: [], loading: false, error: null, errorTimestamp: null, filters: null },
     requests: { requests: [], myRequests: [], selectedRequest: null, loading: false, error: null, errorTimestamp: null, filters: { status: 'all', priority: 'all', siteId: 'all' } },
@@ -90,6 +104,92 @@ describe('purchaseOrderSelectors', () => {
     const result = selectFilteredPurchaseOrders(state);
     expect(result).toHaveLength(2);
     expect(result.every((o) => o.status === 'pending_approval')).toBe(true);
+  });
+
+  it('selectFilteredPurchaseOrdersBySearchQuery returns all when search is empty', () => {
+    const pos = [mockPO('1', 'draft'), mockPO('2', 'pending_approval')];
+    const state = createMockState({ purchaseOrders: pos, filters: { status: 'all' } });
+    expect(selectFilteredPurchaseOrdersBySearchQuery(state, '')).toHaveLength(2);
+    expect(selectFilteredPurchaseOrdersBySearchQuery(state, '   ')).toHaveLength(2);
+  });
+
+  it('selectFilteredPurchaseOrdersBySearchQuery filters by poNumber', () => {
+    const pos = [
+      { ...mockPO('1', 'draft'), poNumber: 'PO-2025-0001', vendorName: 'Acme' },
+      { ...mockPO('2', 'draft'), poNumber: 'PO-2025-0002', vendorName: 'Beta' },
+    ];
+    const state = createMockState({ purchaseOrders: pos, filters: { status: 'all' } });
+    const result = selectFilteredPurchaseOrdersBySearchQuery(state, '0001');
+    expect(result).toHaveLength(1);
+    expect(result[0].poNumber).toBe('PO-2025-0001');
+  });
+
+  it('selectFilteredPurchaseOrdersBySearchQuery filters by vendorName', () => {
+    const pos = [
+      { ...mockPO('1', 'draft'), vendorName: 'Steel Suppliers Ltd' },
+      { ...mockPO('2', 'draft'), vendorName: 'Concrete Co' },
+    ];
+    const state = createMockState({ purchaseOrders: pos, filters: { status: 'all' } });
+    const result = selectFilteredPurchaseOrdersBySearchQuery(state, 'Steel');
+    expect(result).toHaveLength(1);
+    expect(result[0].vendorName).toBe('Steel Suppliers Ltd');
+  });
+
+  it('selectFilteredPurchaseOrdersBySearchQuery filters by item name', () => {
+    const pos = [
+      { ...mockPO('1', 'draft'), items: [{ itemName: 'Steel Beam', itemSku: 'SB-001' }] },
+      { ...mockPO('2', 'draft'), items: [{ itemName: 'Concrete Mix', itemSku: 'CM-001' }] },
+    ];
+    const state = createMockState({ purchaseOrders: pos, filters: { status: 'all' } });
+    const result = selectFilteredPurchaseOrdersBySearchQuery(state, 'Beam');
+    expect(result).toHaveLength(1);
+    expect(result[0].items[0].itemName).toBe('Steel Beam');
+  });
+
+  it('selectFilteredPurchaseOrdersBySearchQuery filters by item SKU', () => {
+    const pos = [
+      { ...mockPO('1', 'draft'), items: [{ itemName: 'Steel Beam', itemSku: 'SB-001' }] },
+      { ...mockPO('2', 'draft'), items: [{ itemName: 'Concrete Mix', itemSku: 'CM-001' }] },
+    ];
+    const state = createMockState({ purchaseOrders: pos, filters: { status: 'all' } });
+    const result = selectFilteredPurchaseOrdersBySearchQuery(state, 'CM-001');
+    expect(result).toHaveLength(1);
+    expect(result[0].items[0].itemSku).toBe('CM-001');
+  });
+
+  it('selectFilteredPurchaseOrdersForViewer shows only own drafts (filters others drafts)', () => {
+    const pos = [
+      { ...mockPO('1', 'draft'), createdBy: 'userA' },
+      { ...mockPO('2', 'draft'), createdBy: 'userB' },
+      { ...mockPO('3', 'pending_approval'), createdBy: 'userB' },
+    ];
+    const state = createMockState(
+      { purchaseOrders: pos, filters: { status: 'all' } },
+      { user: { uid: 'userA', email: null } }
+    );
+    const result = selectFilteredPurchaseOrdersForViewer(state, '');
+    expect(result).toHaveLength(2);
+    expect(result.map((o) => o.id)).toEqual(['1', '3']);
+  });
+
+  it('selectFilteredPurchaseOrdersForViewer shows all non-draft POs regardless of creator', () => {
+    const pos = [
+      { ...mockPO('1', 'pending_approval'), createdBy: 'userA' },
+      { ...mockPO('2', 'approved'), createdBy: 'userB' },
+    ];
+    const state = createMockState(
+      { purchaseOrders: pos, filters: { status: 'all' } },
+      { user: { uid: 'userC', email: null } }
+    );
+    const result = selectFilteredPurchaseOrdersForViewer(state, '');
+    expect(result).toHaveLength(2);
+  });
+
+  it('selectFilteredPurchaseOrdersForViewer returns all when no userId', () => {
+    const pos = [mockPO('1', 'draft'), mockPO('2', 'pending_approval')];
+    const state = createMockState({ purchaseOrders: pos, filters: { status: 'all' } });
+    const result = selectFilteredPurchaseOrdersForViewer(state, '');
+    expect(result).toHaveLength(2);
   });
 
   it('selectPendingApprovalCount returns count of pending_approval POs', () => {

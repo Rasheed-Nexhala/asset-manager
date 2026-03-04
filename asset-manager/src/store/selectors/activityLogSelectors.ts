@@ -52,6 +52,8 @@ export const selectActivityLogError = (state: RootState) =>
 /** Pagination */
 export const selectHasMoreLogs = (state: RootState) =>
   state.activityLog.hasMore;
+export const selectActivityLogTotalCount = (state: RootState) =>
+  state.activityLog.totalCount;
 
 /** Logs by category (memoized factory selector) */
 export const selectLogsByCategory = (category: ActionCategory) =>

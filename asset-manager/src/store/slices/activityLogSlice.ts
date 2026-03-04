@@ -2,9 +2,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { ActivityLog, ActivityLogFiltersStore } from '../../types/activityLog';
 import { dateToIso } from '../../utils/dateSerialization';
 import {
-  fetchActivityLogs,
   fetchMyRecentActivity,
-  loadMoreActivityLogs,
   exportActivityLogsThunk,
 } from '../thunks/activityLogThunks';
 
@@ -13,6 +11,7 @@ const PAGE_SIZE = 20;
 interface ActivityLogState {
   /** Full activity logs (Admin only) */
   logs: ActivityLog[];
+  totalCount: number | null;
   hasMore: boolean;
   lastDoc: unknown | null;
 
@@ -35,6 +34,7 @@ interface ActivityLogState {
 
 const initialState: ActivityLogState = {
   logs: [],
+  totalCount: null,
   hasMore: true,
   lastDoc: null,
   myRecentActivity: [],
@@ -67,6 +67,7 @@ const activityLogSlice = createSlice({
       };
       state.filters = { ...state.filters, ...normalized };
       state.logs = [];
+      state.totalCount = null;
       state.hasMore = true;
       state.lastDoc = null;
     },
@@ -74,6 +75,7 @@ const activityLogSlice = createSlice({
     clearFilters: (state) => {
       state.filters = initialState.filters;
       state.logs = [];
+      state.totalCount = null;
       state.hasMore = true;
       state.lastDoc = null;
     },
@@ -102,6 +104,7 @@ const activityLogSlice = createSlice({
 
     clearActivityLogs: (state) => {
       state.logs = [];
+      state.totalCount = null;
       state.myRecentActivity = [];
       state.hasMore = true;
       state.lastDoc = null;
@@ -120,6 +123,7 @@ const activityLogSlice = createSlice({
      */
     updateLogsFromSnapshot: (state, action: PayloadAction<ActivityLog[]>) => {
       state.logs = action.payload;
+      state.totalCount = null;
       state.loading = false;
       state.error = null;
       state.errorTimestamp = null;
@@ -135,36 +139,48 @@ const activityLogSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchActivityLogs.pending, (state) => {
+      .addCase('activityLog/fetchLogs/pending', (state) => {
         state.loading = true;
         state.error = null;
         state.errorTimestamp = null;
       })
-      .addCase(fetchActivityLogs.fulfilled, (state, action) => {
+      .addCase('activityLog/fetchLogs/fulfilled', (state, action) => {
+        const { logs, lastDoc, totalCount, pageSize } = action.payload as {
+          logs: ActivityLog[];
+          lastDoc: unknown;
+          totalCount: number;
+          pageSize: number;
+        };
         state.loading = false;
-        state.logs = action.payload.logs;
-        state.lastDoc = action.payload.lastDoc;
-        state.hasMore = action.payload.logs.length >= PAGE_SIZE;
+        state.logs = logs;
+        state.totalCount = totalCount;
+        state.lastDoc = lastDoc;
+        state.hasMore = logs.length >= pageSize;
         state.error = null;
         state.errorTimestamp = null;
       })
-      .addCase(fetchActivityLogs.rejected, (state, action) => {
+      .addCase('activityLog/fetchLogs/rejected', (state, action) => {
         state.loading = false;
         state.error = (action.payload as string) ?? 'Failed to fetch activity logs';
         state.errorTimestamp = Date.now();
       })
 
-      .addCase(loadMoreActivityLogs.pending, (state) => {
+      .addCase('activityLog/loadMore/pending', (state) => {
         state.loadingMore = true;
         state.error = null;
       })
-      .addCase(loadMoreActivityLogs.fulfilled, (state, action) => {
+      .addCase('activityLog/loadMore/fulfilled', (state, action) => {
+        const { logs, lastDoc, pageSize } = action.payload as {
+          logs: ActivityLog[];
+          lastDoc: unknown;
+          pageSize: number;
+        };
         state.loadingMore = false;
-        state.logs = [...state.logs, ...action.payload.logs];
-        state.lastDoc = action.payload.lastDoc;
-        state.hasMore = action.payload.logs.length >= PAGE_SIZE;
+        state.logs = [...state.logs, ...logs];
+        state.lastDoc = lastDoc;
+        state.hasMore = logs.length >= pageSize;
       })
-      .addCase(loadMoreActivityLogs.rejected, (state, action) => {
+      .addCase('activityLog/loadMore/rejected', (state, action) => {
         state.loadingMore = false;
         state.error = (action.payload as string) ?? 'Failed to load more activity logs';
         state.errorTimestamp = Date.now();

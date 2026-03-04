@@ -3,10 +3,12 @@ import { createAsyncThunk } from '@reduxjs/toolkit';
 import type { AppDispatch } from '../index';
 import {
   listActivityLogs,
+  getActivityLogsCount,
   getMyRecentActivity,
   exportActivityLogs,
   subscribeToActivityLogs,
   subscribeToMyRecentActivity,
+  ACTIVITY_LOGS_PAGE_SIZE,
 } from '../../services/firebase/activityLogService';
 import { saveCsvAndShare } from '../../utils/csvExport';
 import {
@@ -17,8 +19,6 @@ import {
   setError,
 } from '../slices/activityLogSlice';
 import type { RootState } from '../index';
-
-const PAGE_SIZE = 50;
 
 /**
  * Subscription manager - stores unsubscribe functions
@@ -35,7 +35,8 @@ let myActivitySubscribedUserId: string | null = null;
 let myActivityTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 /**
- * Fetch activity logs with filters and pagination
+ * Fetch activity logs with filters and pagination.
+ * Fetches count + first page in parallel for "Showing X of Y" display.
  */
 export const fetchActivityLogs = createAsyncThunk(
   'activityLog/fetchLogs',
@@ -44,11 +45,17 @@ export const fetchActivityLogs = createAsyncThunk(
       const state = getState() as RootState;
       const { filters } = state.activityLog;
 
-      const { logs, lastDoc } = await listActivityLogs(
-        filters,
-        PAGE_SIZE
-      );
-      return { logs, lastDoc };
+      const [countResult, listResult] = await Promise.all([
+        getActivityLogsCount(filters),
+        listActivityLogs(filters, ACTIVITY_LOGS_PAGE_SIZE),
+      ]);
+
+      return {
+        logs: listResult.logs,
+        lastDoc: listResult.lastDoc,
+        totalCount: countResult,
+        pageSize: ACTIVITY_LOGS_PAGE_SIZE,
+      };
     } catch (error: unknown) {
       const err = error as Error;
       return rejectWithValue(
@@ -69,15 +76,19 @@ export const loadMoreActivityLogs = createAsyncThunk(
       const { filters, lastDoc } = state.activityLog;
 
       if (!lastDoc) {
-        return rejectWithValue('No more logs to load');
+        return { logs: [], lastDoc: null, pageSize: ACTIVITY_LOGS_PAGE_SIZE };
       }
 
       const { logs, lastDoc: newLastDoc } = await listActivityLogs(
         filters,
-        PAGE_SIZE,
+        ACTIVITY_LOGS_PAGE_SIZE,
         lastDoc as DocumentSnapshot
       );
-      return { logs, lastDoc: newLastDoc };
+      return {
+        logs,
+        lastDoc: newLastDoc,
+        pageSize: ACTIVITY_LOGS_PAGE_SIZE,
+      };
     } catch (error: unknown) {
       const err = error as Error;
       return rejectWithValue(
@@ -158,7 +169,7 @@ export const subscribeToActivityLogsRealtime = () => {
     // Set up new subscription
     activityLogsUnsubscribe = subscribeToActivityLogs(
       filters,
-      PAGE_SIZE,
+      ACTIVITY_LOGS_PAGE_SIZE,
       (logs) => {
         // Firestore onSnapshot fires almost immediately (often from cache).
         // Delay clearing loader so users actually see it.

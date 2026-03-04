@@ -1,5 +1,12 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { Request } from '../../types/request';
+import { REQUESTS_PAGE_SIZE } from '../../services/firebase/requestService';
+
+/** Action type strings for pagination thunks (avoids circular deps and works when tests mock requestThunks) */
+const FETCH_REQUESTS_PAGINATED = 'requests/fetchRequestsPaginated';
+const LOAD_MORE_REQUESTS = 'requests/loadMoreRequests';
+const FETCH_MY_REQUESTS_PAGINATED = 'requests/fetchMyRequestsPaginated';
+const LOAD_MORE_MY_REQUESTS = 'requests/loadMoreMyRequests';
 
 interface RequestsState {
   requests: Request[];
@@ -13,6 +20,16 @@ interface RequestsState {
     priority: string;
     siteId: string;
   };
+  /** Pagination for queue (requests) */
+  requestsTotalCount: number | null;
+  requestsLastDoc: unknown;
+  requestsHasMore: boolean;
+  requestsLoadingMore: boolean;
+  /** Pagination for my requests */
+  myRequestsTotalCount: number | null;
+  myRequestsLastDoc: unknown;
+  myRequestsHasMore: boolean;
+  myRequestsLoadingMore: boolean;
 }
 
 const initialState: RequestsState = {
@@ -27,6 +44,14 @@ const initialState: RequestsState = {
     priority: 'all',
     siteId: 'all',
   },
+  requestsTotalCount: null,
+  requestsLastDoc: null,
+  requestsHasMore: false,
+  requestsLoadingMore: false,
+  myRequestsTotalCount: null,
+  myRequestsLastDoc: null,
+  myRequestsHasMore: false,
+  myRequestsLoadingMore: false,
 };
 
 const requestsSlice = createSlice({
@@ -42,6 +67,10 @@ const requestsSlice = createSlice({
       });
       state.requests = Array.from(byId.values());
       state.loading = false;
+      // Clear queue pagination (subscription replaces paginated data)
+      state.requestsTotalCount = null;
+      state.requestsLastDoc = null;
+      state.requestsHasMore = false;
     },
 
     setMyRequests: (state, action: PayloadAction<Request[]>) => {
@@ -52,6 +81,10 @@ const requestsSlice = createSlice({
       });
       state.myRequests = Array.from(byId.values());
       state.loading = false;
+      // Clear my-requests pagination (subscription replaces paginated data)
+      state.myRequestsTotalCount = null;
+      state.myRequestsLastDoc = null;
+      state.myRequestsHasMore = false;
     },
 
     setSelectedRequest: (state, action: PayloadAction<Request | null>) => {
@@ -105,9 +138,19 @@ const requestsSlice = createSlice({
       }
     },
 
-    // Filters
+    // Filters (resets queue pagination when Firestore filters change: status, siteId)
     setFilters: (state, action: PayloadAction<Partial<RequestsState['filters']>>) => {
+      const prev = state.filters;
       state.filters = { ...state.filters, ...action.payload };
+      const firestoreFilterChanged =
+        ('status' in action.payload && action.payload.status !== prev.status) ||
+        ('siteId' in action.payload && action.payload.siteId !== prev.siteId);
+      if (firestoreFilterChanged) {
+        state.requests = [];
+        state.requestsTotalCount = null;
+        state.requestsLastDoc = null;
+        state.requestsHasMore = false;
+      }
     },
 
     clearFilters: (state) => {
@@ -138,7 +181,72 @@ const requestsSlice = createSlice({
       state.loading = false;
       state.error = null;
       state.errorTimestamp = null;
+      state.requestsTotalCount = null;
+      state.requestsLastDoc = null;
+      state.requestsHasMore = false;
+      state.myRequestsTotalCount = null;
+      state.myRequestsLastDoc = null;
+      state.myRequestsHasMore = false;
     },
+  },
+  extraReducers: (builder) => {
+    // Queue pagination (use action type strings so slice works when tests mock requestThunks)
+    builder
+      .addCase(`${FETCH_REQUESTS_PAGINATED}/pending`, (state) => {
+        state.loading = true;
+      })
+      .addCase(`${FETCH_REQUESTS_PAGINATED}/fulfilled`, (state, action) => {
+        state.requests = action.payload.requests;
+        state.requestsTotalCount = action.payload.totalCount;
+        state.requestsLastDoc = action.payload.lastDoc;
+        state.requestsHasMore = action.payload.requests.length >= REQUESTS_PAGE_SIZE;
+        state.requestsLoadingMore = false;
+        state.loading = false;
+      })
+      .addCase(`${FETCH_REQUESTS_PAGINATED}/rejected`, (state) => {
+        state.loading = false;
+      })
+      .addCase(`${LOAD_MORE_REQUESTS}/pending`, (state) => {
+        state.requestsLoadingMore = true;
+      })
+      .addCase(`${LOAD_MORE_REQUESTS}/fulfilled`, (state, action) => {
+        state.requests = [...state.requests, ...action.payload.requests];
+        state.requestsLastDoc = action.payload.lastDoc;
+        state.requestsHasMore = action.payload.requests.length >= REQUESTS_PAGE_SIZE;
+        state.requestsLoadingMore = false;
+      })
+      .addCase(`${LOAD_MORE_REQUESTS}/rejected`, (state) => {
+        state.requestsLoadingMore = false;
+      });
+
+    // My requests pagination
+    builder
+      .addCase(`${FETCH_MY_REQUESTS_PAGINATED}/pending`, (state) => {
+        state.loading = true;
+      })
+      .addCase(`${FETCH_MY_REQUESTS_PAGINATED}/fulfilled`, (state, action) => {
+        state.myRequests = action.payload.requests;
+        state.myRequestsTotalCount = action.payload.totalCount;
+        state.myRequestsLastDoc = action.payload.lastDoc;
+        state.myRequestsHasMore = action.payload.requests.length >= REQUESTS_PAGE_SIZE;
+        state.myRequestsLoadingMore = false;
+        state.loading = false;
+      })
+      .addCase(`${FETCH_MY_REQUESTS_PAGINATED}/rejected`, (state) => {
+        state.loading = false;
+      })
+      .addCase(`${LOAD_MORE_MY_REQUESTS}/pending`, (state) => {
+        state.myRequestsLoadingMore = true;
+      })
+      .addCase(`${LOAD_MORE_MY_REQUESTS}/fulfilled`, (state, action) => {
+        state.myRequests = [...state.myRequests, ...action.payload.requests];
+        state.myRequestsLastDoc = action.payload.lastDoc;
+        state.myRequestsHasMore = action.payload.requests.length >= REQUESTS_PAGE_SIZE;
+        state.myRequestsLoadingMore = false;
+      })
+      .addCase(`${LOAD_MORE_MY_REQUESTS}/rejected`, (state) => {
+        state.myRequestsLoadingMore = false;
+      });
   },
 });
 

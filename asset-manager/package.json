@@ -37,6 +37,7 @@
     "react": "19.1.0",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
+    "react-native-modal-datetime-picker": "^18.0.0",
     "react-native-reanimated": "~3.19.5",
     "react-native-safe-area-context": "^5.4.0",
     "react-native-screens": "~4.16.0",
@@ -58,9 +59,11 @@
   "jest": {
     "preset": "jest-expo",
     "moduleNameMapper": {
-      "^@expo/vector-icons$": "<rootDir>/jest/mocks/@expo-vector-icons.js"
+      "^@expo/vector-icons$": "<rootDir>/jest/mocks/@expo-vector-icons.js",
+      "^.*config/firebase$": "<rootDir>/config/__mocks__/firebase.ts"
     },
     "setupFiles": [
+      "<rootDir>/jest/mocks/firebase.js",
       "<rootDir>/node_modules/react-native-gesture-handler/jestSetup.js"
     ],
     "setupFilesAfterEnv": [

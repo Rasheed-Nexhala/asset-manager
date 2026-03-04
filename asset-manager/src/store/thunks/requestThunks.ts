@@ -1,5 +1,13 @@
+import type { DocumentSnapshot } from 'firebase/firestore';
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { requestService } from '../../services/firebase/requestService';
+import {
+  requestService,
+  listRequestsPaginated,
+  getRequestsCount,
+  REQUESTS_PAGE_SIZE,
+} from '../../services/firebase/requestService';
+import type { RequestListFilters } from '../../services/firebase/requestService';
+import type { RootState } from '../index';
 import type {
   CreateRequestData,
   EditRequestData,
@@ -354,5 +362,89 @@ export const cancelRequest = createAsyncThunk(
       dispatch(setError(errorMessage));
       return rejectWithValue(errorMessage);
     }
+  }
+);
+
+/**
+ * Fetch requests with pagination (queue: first page + total count).
+ * Runs getRequestsCount and listRequestsPaginated in parallel.
+ */
+export const fetchRequestsPaginated = createAsyncThunk(
+  'requests/fetchRequestsPaginated',
+  async (_arg, { getState }) => {
+    const { filters } = (getState() as RootState).requests;
+    const listFilters: RequestListFilters = {
+      status: filters.status,
+      siteId: filters.siteId,
+    };
+    const [totalCount, listResult] = await Promise.all([
+      getRequestsCount(listFilters),
+      listRequestsPaginated(listFilters, REQUESTS_PAGE_SIZE),
+    ]);
+    return {
+      requests: listResult.requests,
+      totalCount,
+      lastDoc: listResult.lastDoc,
+    };
+  }
+);
+
+/**
+ * Load more requests (queue: next page).
+ */
+export const loadMoreRequests = createAsyncThunk(
+  'requests/loadMoreRequests',
+  async (_arg, { getState }) => {
+    const { filters, requestsLastDoc } = (getState() as RootState).requests;
+    const lastDoc = requestsLastDoc as DocumentSnapshot | null | undefined;
+    if (!lastDoc) return { requests: [], lastDoc: null };
+    const listFilters: RequestListFilters = {
+      status: filters.status,
+      siteId: filters.siteId,
+    };
+    const { requests, lastDoc: newLastDoc } = await listRequestsPaginated(
+      listFilters,
+      REQUESTS_PAGE_SIZE,
+      lastDoc
+    );
+    return { requests, lastDoc: newLastDoc };
+  }
+);
+
+/**
+ * Fetch my requests with pagination (first page + total count).
+ */
+export const fetchMyRequestsPaginated = createAsyncThunk(
+  'requests/fetchMyRequestsPaginated',
+  async (userId: string) => {
+    const listFilters: RequestListFilters = { userId };
+    const [totalCount, listResult] = await Promise.all([
+      getRequestsCount(listFilters),
+      listRequestsPaginated(listFilters, REQUESTS_PAGE_SIZE),
+    ]);
+    return {
+      requests: listResult.requests,
+      totalCount,
+      lastDoc: listResult.lastDoc,
+    };
+  }
+);
+
+/**
+ * Load more my requests (next page).
+ */
+export const loadMoreMyRequests = createAsyncThunk(
+  'requests/loadMoreMyRequests',
+  async (userId: string, { getState }) => {
+    const state = (getState() as RootState).requests;
+    const lastDoc = state.myRequestsLastDoc as DocumentSnapshot | null | undefined;
+    if (!lastDoc) return { requests: [], lastDoc: null };
+    const listFilters: RequestListFilters = { userId };
+    const { requests, lastDoc: newLastDoc } = await listRequestsPaginated(
+      listFilters,
+      REQUESTS_PAGE_SIZE,
+      lastDoc
+    );
+    return { requests, lastDoc: newLastDoc };
   }
 );

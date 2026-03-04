@@ -4,18 +4,23 @@ import {
   getDoc,
   getDocFromServer,
   getDocs,
+  getDocsFromServer,
+  getCountFromServer,
   addDoc,
   updateDoc,
   query,
   where,
   orderBy,
   limit,
+  startAfter,
   onSnapshot,
   serverTimestamp,
   runTransaction,
   writeBatch,
   increment,
   Timestamp,
+  DocumentSnapshot,
+  QueryConstraint,
 } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import { getLocationId } from '../../utils/locationUtils';
@@ -143,7 +148,8 @@ export const createPO = async (
   data: CreatePurchaseOrderData,
   userId: string,
   userName: string,
-  isDraft: boolean = false
+  isDraft: boolean = false,
+  createdByRole?: string
 ): Promise<string> => {
   try {
     const poNumber = await generatePoNumber();
@@ -172,6 +178,7 @@ export const createPO = async (
       status: isDraft ? 'draft' : 'pending_approval',
       createdBy: userId,
       createdByName: userName,
+      createdByRole: createdByRole ?? null,
       createdAt: serverTimestamp(),
       reviewedBy: null,
       reviewedByName: null,
@@ -234,6 +241,7 @@ export const getPOById = async (poId: string): Promise<PurchaseOrder | null> => 
       status: data.status,
       createdBy: data.createdBy,
       createdByName: data.createdByName,
+      createdByRole: data.createdByRole ?? undefined,
       createdAt: data.createdAt,
       reviewedBy: data.reviewedBy ?? null,
       reviewedByName: data.reviewedByName ?? null,
@@ -261,7 +269,8 @@ export const getPOById = async (poId: string): Promise<PurchaseOrder | null> => 
 export const updatePO = async (
   poId: string,
   data: CreatePurchaseOrderData,
-  isDraft: boolean = false
+  isDraft: boolean = false,
+  createdByRole?: string
 ): Promise<PurchaseOrder | null> => {
   try {
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
@@ -299,6 +308,7 @@ export const updatePO = async (
       justification: data.justification.trim(),
       expectedDeliveryDate: expectedDeliveryTimestamp,
       status: isDraft ? 'draft' : 'pending_approval',
+      createdByRole: createdByRole ?? null,
       updatedAt: serverTimestamp(),
     });
 
@@ -554,8 +564,111 @@ export const receivePO = async (
 };
 
 /**
+ * Build Firestore query constraints for purchase orders (shared by listPaginated and getCount).
+ * statusFilter 'all' means no status filter.
+ */
+const buildPOQueryConstraints = (statusFilter?: string): QueryConstraint[] => {
+  const constraints: QueryConstraint[] = [];
+  if (statusFilter && statusFilter !== 'all') {
+    constraints.push(where('status', '==', statusFilter));
+  }
+  constraints.push(orderBy('createdAt', 'desc'));
+  return constraints;
+};
+
+/** Default page size for paginated PO lists */
+export const PURCHASE_ORDERS_PAGE_SIZE = 15;
+
+/**
+ * List purchase orders with cursor-based pagination.
+ *
+ * @param statusFilter - 'all' or specific status (pending_approval, approved, etc.)
+ * @param pageSize - Number of POs per page
+ * @param lastDoc - Cursor for next page (from previous response)
+ * @returns POs and cursor for next page
+ */
+export const listPurchaseOrdersPaginated = async (
+  statusFilter: string | undefined,
+  pageSize: number,
+  lastDoc?: DocumentSnapshot
+): Promise<{ orders: PurchaseOrder[]; lastDoc: DocumentSnapshot | null }> => {
+  const constraints = buildPOQueryConstraints(statusFilter);
+  if (lastDoc) constraints.push(startAfter(lastDoc));
+  constraints.push(limit(pageSize));
+
+  const q = query(collection(db, PURCHASE_ORDERS_COLLECTION), ...constraints);
+  const snapshot = await getDocsFromServer(q);
+
+  const orders: PurchaseOrder[] = [];
+  snapshot.forEach((docSnap) => {
+    try {
+      const data = docSnap.data();
+      const items = normalizePOItemsForRead(data.items ?? []);
+      const firestorePO: PurchaseOrderFirestore = {
+        id: docSnap.id,
+        poNumber: data.poNumber,
+        vendorId: data.vendorId,
+        vendorName: data.vendorName,
+        vendorContact: data.vendorContact,
+        vendorEmail: data.vendorEmail,
+        vendorAddress: data.vendorAddress,
+        items,
+        subtotal: data.subtotal,
+        gstPercentage: data.gstPercentage ?? DEFAULT_GST_PERCENTAGE,
+        gstAmount: data.gstAmount,
+        totalAmount: data.totalAmount,
+        justification: data.justification,
+        expectedDeliveryDate: data.expectedDeliveryDate ?? null,
+        documents: data.documents ?? [],
+        pdfUrl: data.pdfUrl,
+        status: data.status,
+        createdBy: data.createdBy,
+        createdByName: data.createdByName,
+        createdByRole: data.createdByRole ?? undefined,
+        createdAt: data.createdAt,
+        reviewedBy: data.reviewedBy ?? null,
+        reviewedByName: data.reviewedByName ?? null,
+        reviewedAt: data.reviewedAt ?? null,
+        adminComments: data.adminComments ?? null,
+        rejectionReason: data.rejectionReason ?? null,
+        receivedAt: data.receivedAt ?? null,
+        receivedBy: data.receivedBy ?? null,
+        receivedByName: data.receivedByName ?? null,
+        receivedNotes: data.receivedNotes ?? null,
+        updatedAt: data.updatedAt,
+      };
+      orders.push(firestorePOToPO(firestorePO));
+    } catch (err) {
+      console.warn('Skipping malformed PO document:', docSnap.id, err);
+    }
+  });
+
+  const newLastDoc =
+    snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
+
+  return { orders, lastDoc: newLastDoc };
+};
+
+/**
+ * Get total count of purchase orders matching Firestore filters.
+ * Must use same where/orderBy as listPurchaseOrdersPaginated.
+ *
+ * @param statusFilter - Same as listPurchaseOrdersPaginated ('all' or specific status)
+ * @returns Total count from server
+ */
+export const getPurchaseOrdersCount = async (
+  statusFilter: string | undefined
+): Promise<number> => {
+  const constraints = buildPOQueryConstraints(statusFilter);
+  const q = query(collection(db, PURCHASE_ORDERS_COLLECTION), ...constraints);
+  const snapshot = await getCountFromServer(q);
+  return snapshot.data().count;
+};
+
+/**
  * Subscribe to purchase orders with optional status filter.
  * On error, callback receives ([], error). On success, callback receives (orders).
+ * @deprecated Prefer fetchPurchaseOrdersPaginated + loadMorePurchaseOrders for paginated lists.
  */
 export const subscribeToPurchaseOrders = (
   callback: (orders: PurchaseOrder[], error?: Error) => void,
@@ -598,6 +711,7 @@ export const subscribeToPurchaseOrders = (
             status: data.status,
             createdBy: data.createdBy,
             createdByName: data.createdByName,
+            createdByRole: data.createdByRole ?? undefined,
             createdAt: data.createdAt,
             reviewedBy: data.reviewedBy ?? null,
             reviewedByName: data.reviewedByName ?? null,

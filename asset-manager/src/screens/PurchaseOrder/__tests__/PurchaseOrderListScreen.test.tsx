@@ -25,21 +25,21 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-const mockUnsubscribe = jest.fn();
-let mockPOsToReturn: PurchaseOrder[] | null = null;
-let mockPOError: Error | null = null;
+let mockFetchPOsResult: { orders: PurchaseOrder[]; totalCount: number } | null = null;
+let mockFetchPOsError: string | null = null;
 jest.mock('../../../services/firebase/purchaseOrderService', () => ({
-  subscribeToPurchaseOrders: jest.fn((
-    callback: (orders: PurchaseOrder[], error?: Error) => void,
-    _statusFilter?: string
-  ) => {
-    if (mockPOError) {
-      callback([], mockPOError);
-    } else if (mockPOsToReturn !== null) {
-      callback(mockPOsToReturn, undefined);
-    }
-    return mockUnsubscribe;
+  getPurchaseOrdersCount: jest.fn(async () => {
+    if (mockFetchPOsError) throw new Error(mockFetchPOsError);
+    return mockFetchPOsResult?.totalCount ?? 0;
   }),
+  listPurchaseOrdersPaginated: jest.fn(async () => {
+    if (mockFetchPOsError) throw new Error(mockFetchPOsError);
+    return {
+      orders: mockFetchPOsResult?.orders ?? [],
+      lastDoc: null,
+    };
+  }),
+  subscribeToPurchaseOrders: jest.fn(() => () => {}),
 }));
 
 jest.mock('../../../store/thunks/authThunks', () => {
@@ -69,6 +69,8 @@ jest.mock('../../../store/thunks/inventoryThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
     fetchItems: createAsyncThunk('inventory/fetchItems', async () => []),
+    fetchItemsPaginated: createAsyncThunk('inventory/fetchItemsPaginated', async () => ({ items: [], totalCount: 0, lastDoc: null })),
+    loadMoreItems: createAsyncThunk('inventory/loadMoreItems', async () => ({ items: [], lastDoc: null })),
     fetchItemById: createAsyncThunk('inventory/fetchItemById', async () => null),
     createItem: createAsyncThunk('inventory/createItem', async () => null),
     updateItem: createAsyncThunk('inventory/updateItem', async () => null),
@@ -118,11 +120,28 @@ jest.mock('../../../store/thunks/activityLogThunks', () => {
 jest.mock('../../../store/thunks/purchaseOrderThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
-    createPurchaseOrder: createAsyncThunk('po/create', async () => null),
-    updatePurchaseOrder: createAsyncThunk('po/update', async () => null),
-    approvePurchaseOrder: createAsyncThunk('po/approve', async () => null),
-    rejectPurchaseOrder: createAsyncThunk('po/reject', async () => null),
-    receivePurchaseOrder: createAsyncThunk('po/receive', async () => null),
+    createPO: createAsyncThunk('purchaseOrders/createPO', async () => null),
+    updatePO: createAsyncThunk('purchaseOrders/updatePO', async () => null),
+    approvePO: createAsyncThunk('purchaseOrders/approvePO', async () => null),
+    rejectPO: createAsyncThunk('purchaseOrders/rejectPO', async () => null),
+    markPOOrdered: createAsyncThunk('purchaseOrders/markPOOrdered', async () => null),
+    receivePO: createAsyncThunk('purchaseOrders/receivePO', async () => null),
+    fetchPurchaseOrdersPaginated: createAsyncThunk(
+      'purchaseOrders/fetchPurchaseOrdersPaginated',
+      async (_, { rejectWithValue }) => {
+        if (mockFetchPOsError) return rejectWithValue(mockFetchPOsError);
+        return {
+          orders: mockFetchPOsResult?.orders ?? [],
+          totalCount: mockFetchPOsResult?.totalCount ?? 0,
+          lastDoc: null,
+          pageSize: 15,
+        };
+      }
+    ),
+    loadMorePurchaseOrders: createAsyncThunk(
+      'purchaseOrders/loadMorePurchaseOrders',
+      async () => ({ orders: [], lastDoc: null, pageSize: 15 })
+    ),
   };
 });
 
@@ -183,16 +202,19 @@ const defaultPOState = {
   vendors: [],
   selectedPO: null,
   loading: false,
+  loadingMore: false,
   error: null,
+  totalCount: 0,
+  lastDoc: null,
+  hasMore: false,
   filters: { status: 'all' },
 };
 
 describe('PurchaseOrderListScreen', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
-    mockUnsubscribe.mockClear();
-    mockPOsToReturn = [];
-    mockPOError = null;
+    mockFetchPOsResult = { orders: [], totalCount: 0 };
+    mockFetchPOsError = null;
   });
 
   it('renders Purchase Orders header', () => {
@@ -221,10 +243,10 @@ describe('PurchaseOrderListScreen', () => {
   });
 
   it('shows loading state when loading and no orders', () => {
-    mockPOsToReturn = null;
     renderWithStore(<PurchaseOrderListScreen />, {
       purchaseOrders: {
         ...defaultPOState,
+        totalCount: null,
         loading: true,
       },
     });
@@ -232,16 +254,18 @@ describe('PurchaseOrderListScreen', () => {
     expect(screen.getByText('Loading purchase orders...')).toBeTruthy();
   });
 
-  it('shows empty state when no orders', () => {
+  it('shows empty state when no orders', async () => {
     renderWithStore(<PurchaseOrderListScreen />, {
       purchaseOrders: defaultPOState,
     });
 
-    expect(screen.getByText('No Purchase Orders')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('No Purchase Orders')).toBeTruthy();
+    });
     expect(screen.getByText('Create your first purchase order to get started.')).toBeTruthy();
   });
 
-  it('shows filter-adjusted message when filters applied', () => {
+  it('shows filter-adjusted message when filters applied', async () => {
     renderWithStore(<PurchaseOrderListScreen />, {
       purchaseOrders: {
         ...defaultPOState,
@@ -249,39 +273,46 @@ describe('PurchaseOrderListScreen', () => {
       },
     });
 
-    expect(screen.getByText('No Purchase Orders')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('No Purchase Orders')).toBeTruthy();
+    });
     expect(screen.getByText('Try adjusting your filters to see more orders.')).toBeTruthy();
   });
 
-  it('renders status filter chips', () => {
+  it('renders status filter chips', async () => {
     renderWithStore(<PurchaseOrderListScreen />, {
       purchaseOrders: defaultPOState,
     });
 
-    expect(screen.getByText('Status:')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('Status:')).toBeTruthy();
+    });
     expect(screen.getByRole('button', { name: 'Filter by all statuses' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Filter by pending approval' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Filter by approved' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Filter by draft' })).toBeTruthy();
   });
 
-  it('dispatches setFilters when filter chip pressed', () => {
+  it('dispatches setFilters when filter chip pressed', async () => {
     const { store } = renderWithStore(<PurchaseOrderListScreen />, {
       purchaseOrders: defaultPOState,
     });
 
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Filter by pending approval' })).toBeTruthy();
+    });
     fireEvent.press(screen.getByRole('button', { name: 'Filter by pending approval' }));
     expect(store.getState().purchaseOrders.filters.status).toBe('pending_approval');
   });
 
   it('renders PO list when orders exist', () => {
-    mockPOsToReturn = null;
     const mockPO = createMockPO();
 
     renderWithStore(<PurchaseOrderListScreen />, {
       purchaseOrders: {
         ...defaultPOState,
         purchaseOrders: [mockPO],
+        totalCount: 1,
       },
     });
 
@@ -290,13 +321,13 @@ describe('PurchaseOrderListScreen', () => {
   });
 
   it('navigates to ApprovePO when pending_approval PO pressed', () => {
-    mockPOsToReturn = null;
     const mockPO = createMockPO({ status: 'pending_approval' });
 
     renderWithStore(<PurchaseOrderListScreen />, {
       purchaseOrders: {
         ...defaultPOState,
         purchaseOrders: [mockPO],
+        totalCount: 1,
       },
     });
 
@@ -305,13 +336,13 @@ describe('PurchaseOrderListScreen', () => {
   });
 
   it('navigates to CreatePO when draft PO pressed', () => {
-    mockPOsToReturn = null;
     const mockPO = createMockPO({ status: 'draft' });
 
     renderWithStore(<PurchaseOrderListScreen />, {
       purchaseOrders: {
         ...defaultPOState,
         purchaseOrders: [mockPO],
+        totalCount: 1,
       },
     });
 
@@ -319,8 +350,8 @@ describe('PurchaseOrderListScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('CreatePO', { poId: 'po-1' });
   });
 
-  it('shows subscription error when subscription fails', async () => {
-    mockPOError = new Error('Failed to load purchase orders');
+  it('shows error when fetch fails', async () => {
+    mockFetchPOsError = 'Failed to load purchase orders';
 
     renderWithStore(<PurchaseOrderListScreen />, {
       purchaseOrders: defaultPOState,
@@ -333,11 +364,48 @@ describe('PurchaseOrderListScreen', () => {
     expect(screen.getByText('Retry')).toBeTruthy();
   });
 
-  it('shows Create Purchase Order button when empty', () => {
+  it('shows Create Purchase Order button when empty', async () => {
     renderWithStore(<PurchaseOrderListScreen />, {
       purchaseOrders: defaultPOState,
     });
 
-    expect(screen.getByText('Create Purchase Order')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('Create Purchase Order')).toBeTruthy();
+    });
+  });
+
+  it('renders search bar with placeholder', async () => {
+    renderWithStore(<PurchaseOrderListScreen />, {
+      purchaseOrders: defaultPOState,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('Search by PO number, vendor, or item...')).toBeTruthy();
+    });
+    expect(screen.getByLabelText('Search purchase orders')).toBeTruthy();
+  });
+
+  it('shows search no-results message when search returns empty', async () => {
+    const mockPO = createMockPO({ poNumber: 'PO-2025-0001', vendorName: 'Steel Co' });
+
+    renderWithStore(<PurchaseOrderListScreen />, {
+      purchaseOrders: {
+        ...defaultPOState,
+        purchaseOrders: [mockPO],
+        totalCount: 1,
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('PO-2025-0001')).toBeTruthy();
+    });
+
+    fireEvent.changeText(
+      screen.getByPlaceholderText('Search by PO number, vendor, or item...'),
+      'nonexistent'
+    );
+
+    expect(screen.getByText('No purchase orders match your search')).toBeTruthy();
+    expect(screen.getByText('No purchase orders match your search. Try different keywords.')).toBeTruthy();
   });
 });

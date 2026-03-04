@@ -17,6 +17,22 @@ export const selectRequestsError = (state: RootState) => state.requests.error;
 
 export const selectRequestsFilters = (state: RootState) => state.requests.filters;
 
+// Pagination (queue)
+export const selectRequestsTotalCount = (state: RootState) =>
+  state.requests.requestsTotalCount;
+export const selectRequestsHasMore = (state: RootState) =>
+  state.requests.requestsHasMore;
+export const selectRequestsLoadingMore = (state: RootState) =>
+  state.requests.requestsLoadingMore;
+
+// Pagination (my requests)
+export const selectMyRequestsTotalCount = (state: RootState) =>
+  state.requests.myRequestsTotalCount;
+export const selectMyRequestsHasMore = (state: RootState) =>
+  state.requests.myRequestsHasMore;
+export const selectMyRequestsLoadingMore = (state: RootState) =>
+  state.requests.myRequestsLoadingMore;
+
 // Helper to get timestamp in milliseconds for comparison
 const getUpdatedAtMs = (request: { updatedAt?: { toMillis?: () => number } | null }): number => {
   const t = request.updatedAt;

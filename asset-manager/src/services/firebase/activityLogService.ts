@@ -5,6 +5,7 @@ import {
   orderBy,
   limit,
   getDocsFromServer,
+  getCountFromServer,
   onSnapshot,
   Timestamp,
   QueryConstraint,
@@ -24,6 +25,68 @@ import type {
 import { isoToDate } from '../../utils/dateSerialization';
 
 const ACTIVITY_LOGS_COLLECTION = 'activityLogs';
+
+/** Page size for paginated activity log list */
+export const ACTIVITY_LOGS_PAGE_SIZE = 10;
+
+/**
+ * Build Firestore query constraints for activity logs (shared by listActivityLogs and getActivityLogsCount).
+ * Excludes searchQuery — that filter is applied client-side.
+ */
+function buildActivityLogQueryConstraints(
+  filters?: ActivityLogFiltersStore
+): QueryConstraint[] {
+  const constraints: QueryConstraint[] = [];
+
+  // Normalize dates to local timezone: start of day for startDate, end of day for endDate
+  const startDate = filters?.startDate ? isoToDate(filters.startDate) : null;
+  const endDate = filters?.endDate ? isoToDate(filters.endDate) : null;
+  if (startDate) {
+    const startOfDay = new Date(
+      startDate.getFullYear(),
+      startDate.getMonth(),
+      startDate.getDate(),
+      0,
+      0,
+      0,
+      0
+    );
+    constraints.push(
+      where('timestamp', '>=', Timestamp.fromDate(startOfDay))
+    );
+  }
+  if (endDate) {
+    const endOfDay = new Date(
+      endDate.getFullYear(),
+      endDate.getMonth(),
+      endDate.getDate(),
+      23,
+      59,
+      59,
+      999
+    );
+    constraints.push(
+      where('timestamp', '<=', Timestamp.fromDate(endOfDay))
+    );
+  }
+
+  if (filters?.userId) {
+    constraints.push(where('userId', '==', filters.userId));
+  }
+
+  if (filters?.actionCategory && filters.actionCategory !== 'all') {
+    constraints.push(
+      where('actionCategory', '==', filters.actionCategory)
+    );
+  }
+
+  if (filters?.actionType && filters.actionType !== 'all') {
+    constraints.push(where('actionType', '==', filters.actionType));
+  }
+
+  constraints.push(orderBy('timestamp', 'desc'));
+  return constraints;
+}
 
 /**
  * Helper: Convert Firestore document to Redux-serializable format
@@ -53,49 +116,11 @@ export function firestoreToActivityLog(
  */
 export async function listActivityLogs(
   filters?: ActivityLogFiltersStore,
-  pageSize: number = 20,
+  pageSize: number = ACTIVITY_LOGS_PAGE_SIZE,
   lastDoc?: DocumentSnapshot
 ): Promise<{ logs: ActivityLog[]; lastDoc: DocumentSnapshot | null }> {
   try {
-    const constraints: QueryConstraint[] = [];
-
-    // Filter by date range (convert ISO strings to Date for Firestore)
-    const startDate = filters?.startDate ? isoToDate(filters.startDate) : null;
-    const endDate = filters?.endDate ? isoToDate(filters.endDate) : null;
-    if (startDate) {
-      constraints.push(
-        where('timestamp', '>=', Timestamp.fromDate(startDate))
-      );
-    }
-    if (endDate) {
-      const endOfDay = new Date(endDate);
-      endOfDay.setHours(23, 59, 59, 999);
-      constraints.push(
-        where('timestamp', '<=', Timestamp.fromDate(endOfDay))
-      );
-    }
-
-    // Filter by user
-    if (filters?.userId) {
-      constraints.push(where('userId', '==', filters.userId));
-    }
-
-    // Filter by action category
-    if (filters?.actionCategory && filters.actionCategory !== 'all') {
-      constraints.push(
-        where('actionCategory', '==', filters.actionCategory)
-      );
-    }
-
-    // Filter by action type
-    if (filters?.actionType && filters.actionType !== 'all') {
-      constraints.push(where('actionType', '==', filters.actionType));
-    }
-
-    // Order by timestamp (descending - newest first)
-    constraints.push(orderBy('timestamp', 'desc'));
-
-    // Pagination
+    const constraints = buildActivityLogQueryConstraints(filters);
     if (lastDoc) {
       constraints.push(startAfter(lastDoc));
     }
@@ -120,6 +145,31 @@ export async function listActivityLogs(
     const err = error as Error;
     console.error('❌ Error listing activity logs:', err);
     throw new Error(err.message ?? 'Failed to fetch activity logs');
+  }
+}
+
+/**
+ * Get total count of activity logs matching filters (for pagination display).
+ * Uses same where/orderBy as listActivityLogs. searchQuery is not applied.
+ *
+ * @param filters - Same filters as listActivityLogs
+ * @returns Total count from server
+ */
+export async function getActivityLogsCount(
+  filters?: ActivityLogFiltersStore
+): Promise<number> {
+  try {
+    const constraints = buildActivityLogQueryConstraints(filters);
+    const q = query(
+      collection(db, ACTIVITY_LOGS_COLLECTION),
+      ...constraints
+    );
+    const snapshot = await getCountFromServer(q);
+    return snapshot.data().count;
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('❌ Error getting activity logs count:', err);
+    throw new Error(err.message ?? 'Failed to get activity logs count');
   }
 }
 
@@ -261,45 +311,7 @@ export function subscribeToActivityLogs(
   onError: (error: Error) => void
 ): Unsubscribe {
   try {
-    const constraints: QueryConstraint[] = [];
-
-    // Filter by date range (convert ISO strings to Date for Firestore)
-    const startDate = filters?.startDate ? isoToDate(filters.startDate) : null;
-    const endDate = filters?.endDate ? isoToDate(filters.endDate) : null;
-    if (startDate) {
-      constraints.push(
-        where('timestamp', '>=', Timestamp.fromDate(startDate))
-      );
-    }
-    if (endDate) {
-      const endOfDay = new Date(endDate);
-      endOfDay.setHours(23, 59, 59, 999);
-      constraints.push(
-        where('timestamp', '<=', Timestamp.fromDate(endOfDay))
-      );
-    }
-
-    // Filter by user
-    if (filters?.userId) {
-      constraints.push(where('userId', '==', filters.userId));
-    }
-
-    // Filter by action category
-    if (filters?.actionCategory && filters.actionCategory !== 'all') {
-      constraints.push(
-        where('actionCategory', '==', filters.actionCategory)
-      );
-    }
-
-    // Filter by action type
-    if (filters?.actionType && filters.actionType !== 'all') {
-      constraints.push(where('actionType', '==', filters.actionType));
-    }
-
-    // Order by timestamp (descending - newest first)
-    constraints.push(orderBy('timestamp', 'desc'));
-
-    // Limit
+    const constraints = buildActivityLogQueryConstraints(filters);
     constraints.push(limit(pageSize));
 
     const q = query(

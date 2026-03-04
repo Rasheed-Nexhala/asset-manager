@@ -17,25 +17,29 @@ import { ItemCard } from '../../components/Inventory/ItemCard';
 import type { InventoryStackParamList } from '../../navigation/InventoryStackNavigator';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
-  fetchItems,
+  fetchItemsPaginated,
+  loadMoreItems,
   fetchCategories,
+  setFilters,
 } from '../../store/slices/inventorySlice';
 import {
   selectAllItems,
   selectItemsBySearchQuery,
   selectAllCategories,
   selectItemsLoading,
+  selectItemsLoadingMore,
+  selectItemsTotalCount,
+  selectItemsHasMore,
   selectLowStockCount,
-  selectTotalItemsCount,
 } from '../../store/selectors/inventorySelectors';
 import {
   selectIsAdmin,
   selectIsStoreIncharge,
 } from '../../store/selectors/authSelectors';
 import { useInventoryError } from '../../hooks/useInventoryError';
-import { subscribeItems } from '../../services/firebase/inventoryService';
 import { subscribeCategories } from '../../services/firebase/categoryService';
-import { setItems, setCategories } from '../../store/slices/inventorySlice';
+import { setCategories } from '../../store/slices/inventorySlice';
+import type { ItemFilters } from '../../types/inventory';
 import { isLowStock } from '../../utils/inventoryUtils';
 import type { Item, ItemType, Category } from '../../types/inventory';
 
@@ -52,6 +56,13 @@ type NavigationProp = StackNavigationProp<
   'CentralStoreInventory'
 >;
 
+/** Convert local filter state to Redux ItemFilters (for Firestore queries) */
+const toItemFilters = (f: FilterState): ItemFilters => ({
+  categoryId: f.categoryId,
+  type: f.type,
+  lowStockOnly: f.stock === 'low_stock',
+});
+
 export const CentralStoreInventoryScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const dispatch = useAppDispatch();
@@ -66,9 +77,11 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   const allItems = useAppSelector(selectAllItems);
   const categories = useAppSelector(selectAllCategories);
   const isLoading = useAppSelector(selectItemsLoading);
+  const loadingMore = useAppSelector(selectItemsLoadingMore);
+  const totalCount = useAppSelector(selectItemsTotalCount);
+  const hasMore = useAppSelector(selectItemsHasMore);
   const error = useInventoryError();
   const lowStockCount = useAppSelector(selectLowStockCount);
-  const totalItemsCount = useAppSelector(selectTotalItemsCount);
   const isAdmin = useAppSelector(selectIsAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
 
@@ -100,29 +113,25 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     return filteredItems.filter((item) => isLowStock(item)).length;
   }, [filteredItems]);
 
-  // Subscribe once on mount — filters are applied in memory via useMemo/selectors
+  // Sync filters to Redux and fetch paginated items when filters change
   useEffect(() => {
-    // Initial fetch (subscription will also fire immediately with current data)
-    dispatch(fetchItems());
+    const itemFilters = toItemFilters(filters);
+    dispatch(setFilters(itemFilters));
+    dispatch(fetchItemsPaginated());
+  }, [dispatch, filters]);
+
+  // Subscribe to categories for real-time updates
+  useEffect(() => {
     dispatch(fetchCategories());
-
-    const unsubscribeItems = subscribeItems((updatedItems: Item[]) => {
-      dispatch(setItems(updatedItems));
-    });
-
     const unsubscribeCategories = subscribeCategories((updatedCategories: Category[]) => {
       dispatch(setCategories(updatedCategories));
     });
-
-    return () => {
-      unsubscribeItems();
-      unsubscribeCategories();
-    };
+    return () => unsubscribeCategories();
   }, [dispatch]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    dispatch(fetchItems())
+    dispatch(fetchItemsPaginated())
       .then(() => dispatch(fetchCategories()))
       .finally(() => {
         setRefreshing(false);
@@ -179,6 +188,12 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   const handleToggleFilters = useCallback(() => {
     setShowFilters(prev => !prev);
   }, []);
+
+  const handleLoadMore = useCallback(() => {
+    if (hasMore && !loadingMore) {
+      dispatch(loadMoreItems());
+    }
+  }, [dispatch, hasMore, loadingMore]);
 
   const renderItemCard = useCallback(
     ({ item }: { item: Item }) => (
@@ -277,8 +292,10 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     </View>
   );
 
-  // Loading state (only full-screen when no data at all, like Sites)
-  if (isLoading && allItems.length === 0) {
+  // Loading state: show loader when we have no items and haven't received a count yet.
+  // This covers initial load and filter changes, avoiding a flash of "No Items" before data arrives.
+  const isInitialOrRefetching = allItems.length === 0 && totalCount === null && !error;
+  if (isInitialOrRefetching || (isLoading && allItems.length === 0)) {
     return (
       <ScreenLayout edges={['top']}>
         {renderCustomHeader()}
@@ -498,6 +515,24 @@ export const CentralStoreInventoryScreen: React.FC = () => {
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
             ItemSeparatorComponent={() => <View className="h-3" />}
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={
+              loadingMore ? (
+                <View className="py-4 items-center">
+                  <ActivityIndicator size="small" color="#1E40AF" />
+                </View>
+              ) : hasMore ? (
+                <TouchableOpacity
+                  className="py-4 items-center"
+                  onPress={handleLoadMore}
+                  accessibilityRole="button"
+                  accessibilityLabel="Load more items"
+                >
+                  <Text className="text-[15px] font-medium text-[#1E40AF]">Load more</Text>
+                </TouchableOpacity>
+              ) : null
+            }
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -512,7 +547,15 @@ export const CentralStoreInventoryScreen: React.FC = () => {
           <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-[#E2E8F0] px-4 py-4">
             <View className="flex-row items-center justify-between">
               <Text className="text-[15px] text-[#64748B]">
-                <Text className="text-[#0F172A] font-semibold">{filteredItems.length}</Text> items found
+                {totalCount != null ? (
+                  <>
+                    Showing <Text className="text-[#0F172A] font-semibold">{filteredItems.length}</Text> of{' '}
+                    <Text className="text-[#0F172A] font-semibold">{totalCount}</Text>
+                  </>
+                ) : (
+                  <Text className="text-[#0F172A] font-semibold">{filteredItems.length}</Text>
+                )}{' '}
+                items
               </Text>
               {filteredLowStockCount > 0 && (
                 <View className="flex-row items-center gap-2">

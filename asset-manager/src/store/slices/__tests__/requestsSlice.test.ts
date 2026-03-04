@@ -27,6 +27,14 @@ describe('requestsSlice', () => {
     error: null,
     errorTimestamp: null,
     filters: { status: 'all', priority: 'all', siteId: 'all' },
+    requestsTotalCount: null,
+    requestsLastDoc: null,
+    requestsHasMore: false,
+    requestsLoadingMore: false,
+    myRequestsTotalCount: null,
+    myRequestsLastDoc: null,
+    myRequestsHasMore: false,
+    myRequestsLoadingMore: false,
   };
 
   it('has correct initial state', () => {

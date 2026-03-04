@@ -13,6 +13,8 @@ const getErrorMessage = (payload: unknown): string => {
 };
 import {
   fetchItems,
+  fetchItemsPaginated,
+  loadMoreItems,
   fetchItemById,
   createItem,
   updateItem,
@@ -24,6 +26,7 @@ import {
   updateCategory,
   deleteCategory,
 } from '../../store/thunks/inventoryThunks';
+import { ITEMS_PAGE_SIZE } from '../../services/firebase/inventoryService';
 
 export interface ClearErrorPayload {
   reason?: string;
@@ -38,6 +41,11 @@ interface InventoryState {
   error: string | null;
   errorTimestamp: number | null; // When error occurred (for auto-clear and debugging)
   filters: ItemFilters | null; // Current filters applied to items list
+  // Pagination (cursor-based)
+  totalCount: number | null; // From getCountFromServer
+  lastDoc: unknown | null; // DocumentSnapshot for startAfter (non-serializable)
+  hasMore: boolean;
+  loadingMore: boolean;
 }
 
 const initialState: InventoryState = {
@@ -49,6 +57,10 @@ const initialState: InventoryState = {
   error: null,
   errorTimestamp: null,
   filters: null,
+  totalCount: null,
+  lastDoc: null,
+  hasMore: false,
+  loadingMore: false,
 };
 
 const inventorySlice = createSlice({
@@ -83,6 +95,11 @@ const inventorySlice = createSlice({
     },
     setFilters: (state, action: PayloadAction<ItemFilters | null>) => {
       state.filters = action.payload;
+      // Reset pagination when filters change
+      state.items = [];
+      state.totalCount = null;
+      state.lastDoc = null;
+      state.hasMore = false;
     },
     clearError: (state, action: PayloadAction<ClearErrorPayload | undefined>) => {
       state.error = null;
@@ -121,6 +138,9 @@ const inventorySlice = createSlice({
       state.inventoryByLocation = {};
       state.lowStockItemIds = [];
       state.filters = null;
+      state.totalCount = null;
+      state.lastDoc = null;
+      state.hasMore = false;
       state.error = null;
       state.errorTimestamp = null;
     },
@@ -147,6 +167,45 @@ const inventorySlice = createSlice({
         state.loading = false;
         state.error = getErrorMessage(action.payload);
         state.errorTimestamp = Date.now();
+      })
+      // Fetch items (paginated)
+      .addCase(fetchItemsPaginated.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(fetchItemsPaginated.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items = action.payload.items;
+        state.totalCount = action.payload.totalCount;
+        state.lastDoc = action.payload.lastDoc;
+        state.hasMore = action.payload.items.length >= ITEMS_PAGE_SIZE;
+        state.lowStockItemIds = action.payload.items
+          .filter((item) => isLowStock(item))
+          .map((item) => item.id);
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(fetchItemsPaginated.rejected, (state, action) => {
+        state.loading = false;
+        state.error = getErrorMessage(action.payload);
+        state.errorTimestamp = Date.now();
+      })
+      // Load more items
+      .addCase(loadMoreItems.pending, (state) => {
+        state.loadingMore = true;
+      })
+      .addCase(loadMoreItems.fulfilled, (state, action) => {
+        state.loadingMore = false;
+        state.items = [...state.items, ...action.payload.items];
+        state.lastDoc = action.payload.lastDoc;
+        state.hasMore = action.payload.items.length >= ITEMS_PAGE_SIZE;
+        state.lowStockItemIds = state.items
+          .filter((item) => isLowStock(item))
+          .map((item) => item.id);
+      })
+      .addCase(loadMoreItems.rejected, (state) => {
+        state.loadingMore = false;
       })
       // Fetch item by ID
       .addCase(fetchItemById.pending, (state) => {
@@ -356,6 +415,20 @@ export const {
   clearInventory,
 } = inventorySlice.actions;
 
-export { fetchItems, fetchItemById, createItem, updateItem, deleteItem, adjustQuantity, fetchInventoryByLocation, fetchCategories, createCategory, updateCategory, deleteCategory } from '../../store/thunks/inventoryThunks';
+export {
+  fetchItems,
+  fetchItemsPaginated,
+  loadMoreItems,
+  fetchItemById,
+  createItem,
+  updateItem,
+  deleteItem,
+  adjustQuantity,
+  fetchInventoryByLocation,
+  fetchCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+} from '../../store/thunks/inventoryThunks';
 
 export default inventorySlice.reducer;

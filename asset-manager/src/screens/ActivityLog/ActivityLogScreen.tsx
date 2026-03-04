@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -23,13 +23,13 @@ import {
   selectActivityLogExportLoading,
   selectActivityLogError,
   selectHasMoreLogs,
+  selectActivityLogTotalCount,
   selectActivityLogFilters,
 } from '../../store/selectors/activityLogSelectors';
 import {
+  fetchActivityLogs,
   loadMoreActivityLogs,
   exportActivityLogsThunk,
-  subscribeToActivityLogsRealtime,
-  unsubscribeFromActivityLogs,
 } from '../../store/thunks/activityLogThunks';
 import {
   setFilters,
@@ -47,40 +47,46 @@ export const ActivityLogScreen: React.FC = () => {
   const exportLoading = useAppSelector(selectActivityLogExportLoading);
   const error = useAppSelector(selectActivityLogError);
   const hasMore = useAppSelector(selectHasMoreLogs);
+  const totalCount = useAppSelector(selectActivityLogTotalCount);
   const filters = useAppSelector(selectActivityLogFilters);
+
+  // Client-side search filter (searchQuery is not in Firestore query)
+  const filteredLogs = useMemo(() => {
+    const q = (filters.searchQuery ?? '').toLowerCase().trim();
+    if (!q) return logs;
+    return logs.filter(
+      (log) =>
+        log.userName.toLowerCase().includes(q) ||
+        (log.targetDisplay ?? '').toLowerCase().includes(q) ||
+        (log.summary ?? '').toLowerCase().includes(q) ||
+        (log.details ?? '').toLowerCase().includes(q)
+    );
+  }, [logs, filters.searchQuery]);
 
   const [refreshing, setRefreshing] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
 
-  // Subscribe to real-time logs on mount and when filters change
+  // Fetch paginated logs on mount and when filters change
   useEffect(() => {
-    dispatch(subscribeToActivityLogsRealtime());
+    dispatch(fetchActivityLogs());
+  }, [dispatch, filters.startDate, filters.endDate, filters.userId, filters.actionCategory, filters.actionType]);
 
-    // Cleanup: unsubscribe on unmount
-    return () => {
-      dispatch(unsubscribeFromActivityLogs());
-    };
-  }, [dispatch, filters]);
-
-  // Refresh handler (resubscribe to force refresh)
-  const handleRefresh = useCallback(async () => {
+  // Refresh handler
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    try {
-      dispatch(subscribeToActivityLogsRealtime());
-    } finally {
-      // Small delay to show refresh animation
-      setTimeout(() => setRefreshing(false), 500);
-    }
+    dispatch(fetchActivityLogs()).finally(() =>
+      setTimeout(() => setRefreshing(false), 300)
+    );
   }, [dispatch]);
 
   // Load more handler
   const handleLoadMore = useCallback(() => {
-    if (!loading && !loadingMore && hasMore) {
+    if (hasMore && !loadingMore) {
       dispatch(loadMoreActivityLogs());
     }
-  }, [dispatch, loading, loadingMore, hasMore]);
+  }, [dispatch, hasMore, loadingMore]);
 
   // Export handler
   const handleExport = useCallback(async () => {
@@ -126,8 +132,13 @@ export const ActivityLogScreen: React.FC = () => {
     (filters.actionCategory && filters.actionCategory !== 'all') ||
     (filters.actionType && filters.actionType !== 'all');
 
-  // Full-screen initial loader: show when loading and no data yet (prevents page flash)
-  if (loading && logs.length === 0) {
+  // Avoid flash of empty state: show loader when no fetch has completed yet
+  const isInitialOrRefetching =
+    logs.length === 0 && totalCount === null && !error;
+  if (
+    isInitialOrRefetching ||
+    (loading && logs.length === 0)
+  ) {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader title="Activity Log" />
@@ -194,9 +205,19 @@ export const ActivityLogScreen: React.FC = () => {
         )}
       </View>
 
+      {/* Total count: "Showing X of Y" */}
+      {totalCount != null && logs.length > 0 && (
+        <View className="px-4 pb-2">
+          <Text className="text-[13px] text-[#64748B]">
+            Showing {filteredLogs.length} of {totalCount} activity logs
+            {filters.searchQuery && ' (filtered by search)'}
+          </Text>
+        </View>
+      )}
+
       {/* Activity Log List */}
       <FlatList
-        data={logs}
+        data={filteredLogs}
         renderItem={({ item }) => (
           <ActivityLogCard
             log={item}
@@ -229,12 +250,12 @@ export const ActivityLogScreen: React.FC = () => {
               color="#94A3B8"
             />
             <Text className="text-[22px] font-semibold text-[#0F172A] text-center mt-4 mb-2">
-              {hasActiveFilters
+              {hasActiveFilters || filters.searchQuery
                 ? 'No Logs Match Your Filters'
                 : 'No Activity Logs Yet'}
             </Text>
             <Text className="text-[15px] text-[#64748B] text-center">
-              {hasActiveFilters
+              {hasActiveFilters || filters.searchQuery
                 ? 'Try adjusting your filters to see more results'
                 : 'Activity will appear here as users interact with the system'}
             </Text>
@@ -244,6 +265,18 @@ export const ActivityLogScreen: React.FC = () => {
           loadingMore ? (
             <View className="py-4">
               <ActivityIndicator size="small" color="#1E40AF" />
+            </View>
+          ) : hasMore ? (
+            <View className="py-4 items-center">
+              <TouchableOpacity
+                className="px-6 py-2 rounded-lg bg-[#1E40AF]/10"
+                onPress={() => handleLoadMore()}
+                accessibilityLabel="Load more activity logs"
+              >
+                <Text className="text-[15px] font-medium text-[#1E40AF]">
+                  Load more
+                </Text>
+              </TouchableOpacity>
             </View>
           ) : null
         }

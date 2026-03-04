@@ -30,7 +30,11 @@ describe('purchaseOrderSlice', () => {
     selectedPO: null,
     vendors: [],
     loading: false,
+    loadingMore: false,
     error: null,
+    totalCount: null,
+    lastDoc: null,
+    hasMore: false,
     filters: { status: 'all' },
   };
 
