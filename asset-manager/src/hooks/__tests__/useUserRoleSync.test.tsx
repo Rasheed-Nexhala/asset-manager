@@ -177,4 +177,32 @@ describe('useUserRoleSync', () => {
 
     expect(subscribeToUserRole).not.toHaveBeenCalled();
   });
+
+  it('dispatches signOutUser when user becomes inactive', async () => {
+    const store = createStore({
+      auth: {
+        user: { uid: 'user-123' } as any,
+        userRole: { role: 'SiteManager', isActive: true, permissions: [] },
+        isAuthenticated: true,
+        isLoading: false,
+        isRoleLoading: false,
+        authInitialized: true,
+        error: null,
+      },
+    });
+    const customWrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(Provider, { store }, children);
+
+    renderHook(() => useUserRoleSync('user-123'), { wrapper: customWrapper });
+
+    await act(async () => {
+      roleCallback?.({ role: 'SiteManager', isActive: false, permissions: [] });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // signOutUser thunk was dispatched; mock resolves to null and clears auth
+    expect(store.getState().auth.isAuthenticated).toBe(false);
+    expect(store.getState().auth.user).toBeNull();
+  });
 });

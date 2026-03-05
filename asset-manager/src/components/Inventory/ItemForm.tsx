@@ -229,6 +229,49 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     mode,
   ]);
 
+  /** Live validation: min stock level cannot exceed initial/total quantity */
+  useEffect(() => {
+    if (!formData.minStockLevel.trim()) return;
+
+    const minStock = parseFloat(formData.minStockLevel);
+    if (isNaN(minStock)) return;
+
+    let newError: string | undefined;
+    if (mode === 'create' && formData.initialQuantity.trim()) {
+      const initialQty = parseFloat(formData.initialQuantity);
+      if (!isNaN(initialQty) && minStock > initialQty) {
+        newError = 'Minimum stock level cannot exceed initial quantity';
+      }
+    } else if (mode === 'edit' && initialData?.totalQuantity != null) {
+      const totalQtyPieces = Number(initialData.totalQuantity);
+      let totalQtyDisplay: number;
+      if (isWeightBased && weightConfig && isWeightUnit(formData.unit)) {
+        const kg = piecesToKg(totalQtyPieces, weightConfig.weightPerMeter, weightConfig.lengthPerPiece);
+        totalQtyDisplay = formData.unit === 'Ton (MT)' ? kg / TON_TO_KG : kg;
+      } else {
+        totalQtyDisplay = totalQtyPieces;
+      }
+      if (!isNaN(totalQtyDisplay) && minStock > totalQtyDisplay) {
+        newError = 'Minimum stock level cannot exceed current total quantity';
+      }
+    }
+
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (newError) next.minStockLevel = newError;
+      else if (prev.minStockLevel?.includes('cannot exceed')) delete next.minStockLevel;
+      return next;
+    });
+  }, [
+    formData.initialQuantity,
+    formData.minStockLevel,
+    formData.unit,
+    mode,
+    initialData?.totalQuantity,
+    isWeightBased,
+    weightConfig,
+  ]);
+
   /**
    * Handle steel master selection - auto-fill name, SKU, unit
    */
@@ -441,6 +484,23 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       newErrors.minStockLevel = 'Minimum stock level cannot be negative';
     } else if (minStock > MIN_STOCK_MAX) {
       newErrors.minStockLevel = `Minimum stock level seems unreasonably high (max ${MIN_STOCK_MAX.toLocaleString()})`;
+    } else if (mode === 'create') {
+      const initialQty = parseFloat(formData.initialQuantity);
+      if (!isNaN(initialQty) && minStock > initialQty) {
+        newErrors.minStockLevel = 'Minimum stock level cannot exceed initial quantity';
+      }
+    } else if (mode === 'edit' && initialData?.totalQuantity != null) {
+      const totalQtyPieces = Number(initialData.totalQuantity);
+      let totalQtyDisplay: number;
+      if (isWeightBased && weightConfig && isWeightUnit(formData.unit)) {
+        const kg = piecesToKg(totalQtyPieces, weightConfig.weightPerMeter, weightConfig.lengthPerPiece);
+        totalQtyDisplay = formData.unit === 'Ton (MT)' ? kg / TON_TO_KG : kg;
+      } else {
+        totalQtyDisplay = totalQtyPieces;
+      }
+      if (!isNaN(totalQtyDisplay) && minStock > totalQtyDisplay) {
+        newErrors.minStockLevel = 'Minimum stock level cannot exceed current total quantity';
+      }
     } else if (
       isWeightBased &&
       weightConfig &&
@@ -459,7 +519,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, mode, isWeightBased, weightConfig]);
+  }, [formData, mode, isWeightBased, weightConfig, initialData?.totalQuantity]);
 
   /**
    * Check if form is valid (no weight conversion errors)

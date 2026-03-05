@@ -1,5 +1,9 @@
 import { initializeApp } from 'firebase/app';
-import { browserLocalPersistence, connectAuthEmulator, initializeAuth, setPersistence } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  initializeAuth,
+  getReactNativePersistence,
+} from 'firebase/auth';
 import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions } from 'firebase/functions';
 import { connectStorageEmulator, getStorage } from 'firebase/storage';
@@ -8,10 +12,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * Firebase Web SDK Configuration
- * 
+ *
  * This config uses the Firebase Web SDK (not @react-native-firebase).
  * Works in Expo Go, web builds, and native builds.
- * 
+ *
+ * Auth persistence:
+ * - React Native (iOS/Android): AsyncStorage — user stays logged in until sign out
+ * - Web: browserLocalPersistence — session persists in browser storage
+ *
  * Values are extracted from google-services.json and GoogleService-Info.plist.
  * For production, consider using environment variables for sensitive data.
  */
@@ -28,9 +36,16 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase Auth with React Native persistence
+// Initialize Firebase Auth with platform-appropriate persistence
+// React Native: AsyncStorage so auth survives app restarts until user signs out
+// Web: browser localStorage
+const authPersistence =
+  Platform.OS === 'ios' || Platform.OS === 'android'
+    ? getReactNativePersistence(AsyncStorage)
+    : browserLocalPersistence;
+
 export const auth = initializeAuth(app, {
-  persistence: browserLocalPersistence
+  persistence: authPersistence,
 });
 export const db = getFirestore(app);
 export const storage = getStorage(app);

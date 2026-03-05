@@ -28,6 +28,7 @@ import sitesReducer, {
   setLoading,
   setError,
   clearError,
+  clearSites,
 } from '../sitesSlice';
 import { fetchSites } from '../../thunks/sitesThunks';
 
@@ -89,6 +90,15 @@ describe('sitesSlice', () => {
     const withError = sitesReducer(initialState, setError('Error'));
     const state = sitesReducer(withError, clearError());
     expect(state.error).toBe(null);
+  });
+
+  it('clearSites resets to initial state', () => {
+    const withData = sitesReducer(initialState, setSites([mockSite]));
+    const state = sitesReducer(withData, clearSites());
+    expect(state.sites).toEqual([]);
+    expect(state.isLoading).toBe(false);
+    expect(state.error).toBe(null);
+    expect(state.searchQuery).toBe('');
   });
 
   it('fetchSites.fulfilled sets sites', () => {

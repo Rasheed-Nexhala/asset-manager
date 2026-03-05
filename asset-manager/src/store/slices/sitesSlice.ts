@@ -52,6 +52,15 @@ const sitesSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    /** Reset sites state (e.g. on sign-out) */
+    clearSites: (state) => {
+      state.sites = [];
+      state.isLoading = false;
+      state.error = null;
+      state.searchQuery = '';
+      state.validationLoading = false;
+      state.lastValidationAt = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -146,6 +155,7 @@ export const {
   setError,
   setSearchQuery,
   clearError,
+  clearSites,
 } = sitesSlice.actions;
 
 export { fetchSites, createSite, updateSite } from '../thunks/sitesThunks';

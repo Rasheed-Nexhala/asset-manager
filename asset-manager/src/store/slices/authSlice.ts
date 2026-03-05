@@ -22,7 +22,11 @@ const authSlice = createSlice({
       state.user = action.payload;
       state.isAuthenticated = action.payload !== null;
       state.authInitialized = true;
-      state.error = null;
+      // Only clear error on successful login; preserve error when user becomes null
+      // (e.g. signOut due to inactive account - we need to show the deactivated message)
+      if (action.payload !== null) {
+        state.error = null;
+      }
       // Clear userRole when user logs out
       if (action.payload === null) {
         state.userRole = null;

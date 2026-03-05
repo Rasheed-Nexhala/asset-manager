@@ -153,7 +153,24 @@ describe('LoginScreen', () => {
     expect(screen.queryByText(/Password is required/i)).toBeNull();
   });
 
-  it('displays auth error from Redux state', () => {
+  it('displays account deactivated message when auth error is deactivated', () => {
+    const deactivatedMessage = 'Your account is deactivated, please contact admin.';
+    renderWithStore(<LoginScreen />, {
+      auth: {
+        user: null,
+        userRole: null,
+        isAuthenticated: false,
+        isLoading: false,
+        isRoleLoading: false,
+        authInitialized: false,
+        error: deactivatedMessage,
+      },
+    });
+
+    expect(screen.getByText(deactivatedMessage)).toBeTruthy();
+  });
+
+  it('does not display other auth errors (e.g. invalid credentials) in UI', () => {
     renderWithStore(<LoginScreen />, {
       auth: {
         user: null,
@@ -166,7 +183,7 @@ describe('LoginScreen', () => {
       },
     });
 
-    expect(screen.getByText('Invalid email or password')).toBeTruthy();
+    expect(screen.queryByText('Invalid email or password')).toBeNull();
   });
 
   it('shows loading state when isLoading', () => {

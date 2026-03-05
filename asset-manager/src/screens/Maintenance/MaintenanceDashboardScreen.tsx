@@ -68,6 +68,11 @@ export const MaintenanceDashboardScreen: React.FC = () => {
     }, 500);
   }, []);
   
+  // Navigate back to Central Store Inventory
+  const handleBack = useCallback(() => {
+    navigation.goBack();
+  }, [navigation]);
+  
   // Navigate to add screen
   const handleAddToMaintenance = useCallback(() => {
     navigation.navigate('AddToMaintenance');
@@ -84,6 +89,8 @@ export const MaintenanceDashboardScreen: React.FC = () => {
       <ScreenLayout edges={['top']}>
         <ScreenHeader
           title="Maintenance"
+          showBack
+          onBackPress={handleBack}
           rightAction={{
             icon: 'add',
             onPress: handleAddToMaintenance,
@@ -185,6 +192,8 @@ export const MaintenanceDashboardScreen: React.FC = () => {
     <ScreenLayout edges={['top']}>
       <ScreenHeader
         title="Maintenance"
+        showBack
+        onBackPress={handleBack}
         rightAction={{
           icon: 'add',
           onPress: handleAddToMaintenance,

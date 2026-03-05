@@ -82,7 +82,16 @@ async function logAuthEventToCloud(
       }
       return;
     }
-    console.error('Failed to log auth event:', error);
+    // Permission-denied = Firestore/Cloud Function rules block the call; avoid noisy ERROR
+    if (code === 'permission-denied' || message.includes('permission-denied')) {
+      if (__DEV__) {
+        console.info('Activity log (logAuthEvent): permission denied; event not logged.');
+      }
+      return;
+    }
+    if (__DEV__) {
+      console.info('Failed to log auth event:', error);
+    }
     // Don't throw - logging failure should not block auth
   }
 }
@@ -115,6 +124,12 @@ async function logLoginFailedToCloud(
         console.info(
           'Activity log (logAuthEvent) unavailable. Deploy Cloud Functions to enable auth event logging.'
         );
+      }
+      return;
+    }
+    if (code === 'permission-denied' || message.includes('permission-denied')) {
+      if (__DEV__) {
+        console.info('Activity log (login_failed): permission denied; event not logged.');
       }
       return;
     }
@@ -161,6 +176,9 @@ export async function logPasswordChanged(): Promise<void> {
   }
 }
 
+const INACTIVE_ACCOUNT_MESSAGE =
+  'Your account is deactivated, please contact admin.';
+
 export const signIn = async (
   email: string,
   password: string
@@ -176,8 +194,17 @@ export const signIn = async (
     // Without this, the callable can be sent with a stale/missing token and return "unauthenticated".
     await userCredential.user.getIdToken(true);
 
-    // Log login event (non-blocking)
     const userRole = await getUserRole(userCredential.user.uid);
+
+    // Block login for inactive users
+    if (userRole && userRole.isActive === false) {
+      await signOut(auth);
+      const inactiveError = new Error(INACTIVE_ACCOUNT_MESSAGE);
+      (inactiveError as any).code = 'auth/account-disabled';
+      throw inactiveError;
+    }
+
+    // Log login event (non-blocking)
     await logAuthEventToCloud(
       'user_login',
       userCredential.user.displayName ?? userCredential.user.email ?? email,
@@ -187,7 +214,10 @@ export const signIn = async (
     return userCredential;
   } catch (error) {
     const authError = error as AuthError;
-    console.error('Sign in error:', authError.code, authError.message);
+    // Skip console.error for account-disabled; UI shows user-friendly message
+    if (authError.code !== 'auth/account-disabled') {
+      console.error('Sign in error:', authError.code, authError.message);
+    }
     // Log failed login attempt (non-blocking, user is not authenticated)
     logLoginFailedToCloud(email, authError.message ?? authError.code ?? 'Unknown error').catch(() => {});
     throw handleAuthError(authError);
@@ -311,6 +341,8 @@ export const reauthenticateAndUpdatePassword = async (
 
 const handleAuthError = (error: AuthError): Error => {
   const errorMessages: Record<string, string> = {
+    'auth/account-disabled':
+      'Your account is deactivated, please contact admin.',
     'auth/email-already-in-use':
       'This email is already registered. Please sign in or use a different email.',
     'auth/invalid-email': 'Please enter a valid email address.',

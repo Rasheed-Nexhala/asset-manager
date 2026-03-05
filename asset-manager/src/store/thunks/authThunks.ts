@@ -6,7 +6,14 @@ import {
   updateUserProfile,
 } from '../../services/firebase/authService';
 import { createDefaultUserDocument } from '../../services/firebase/userRoleService';
+import { setUser } from '../slices/authSlice';
 import { clearActivityLogs } from '../slices/activityLogSlice';
+import { clearInventory } from '../slices/inventorySlice';
+import { clearRequests } from '../slices/requestsSlice';
+import { clearMaintenance } from '../slices/maintenanceSlice';
+import { clearPurchaseOrders } from '../slices/purchaseOrderSlice';
+import { clearSteelMasters } from '../slices/steelMasterSlice';
+import { clearSites } from '../slices/sitesSlice';
 import {
   unsubscribeFromActivityLogs,
   unsubscribeFromMyRecentActivity,
@@ -58,10 +65,30 @@ export const signOutUser = createAsyncThunk<
   'auth/signOut',
   async (_, { dispatch, rejectWithValue }) => {
     try {
+      // 1. Unsubscribe from thunk-managed listeners
       dispatch(unsubscribeFromActivityLogs());
       dispatch(unsubscribeFromMyRecentActivity());
-      await logout();
+
+      // 2. Clear user in Redux FIRST so RootNavigator switches to Auth screen.
+      //    This unmounts MainStackNavigator and all Firestore subscriptions
+      //    BEFORE we invalidate auth. Prevents "Missing or insufficient permissions"
+      //    errors from subscriptions firing with null auth.
+      dispatch(setUser(null));
+
+      // 3. Let React flush the unmount so subscriptions clean up
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // 4. Clear all feature-domain state
       dispatch(clearActivityLogs());
+      dispatch(clearInventory());
+      dispatch(clearRequests());
+      dispatch(clearMaintenance());
+      dispatch(clearPurchaseOrders());
+      dispatch(clearSteelMasters());
+      dispatch(clearSites());
+
+      // 5. Invalidate Firebase auth last (after subscriptions are torn down)
+      await logout();
       return null;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Sign out failed. Please try again.');

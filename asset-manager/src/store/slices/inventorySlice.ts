@@ -127,6 +127,23 @@ const inventorySlice = createSlice({
         state.lowStockItemIds.push(action.payload.id);
       }
     },
+    /**
+     * Set items from Firestore snapshot subscription (real-time updates).
+     * Replaces pagination state with full list from subscription.
+     */
+    setItemsFromSubscription: (state, action: PayloadAction<Item[]>) => {
+      state.items = action.payload;
+      state.lowStockItemIds = action.payload
+        .filter((item) => isLowStock(item))
+        .map((item) => item.id);
+      state.totalCount = action.payload.length;
+      state.lastDoc = null;
+      state.hasMore = false;
+      state.loading = false;
+      state.loadingMore = false;
+      state.error = null;
+      state.errorTimestamp = null;
+    },
     // Clear inventory for a location (useful when location is removed or user logs out)
     clearInventoryForLocation: (state, action: PayloadAction<string>) => {
       delete state.inventoryByLocation[action.payload];
@@ -411,6 +428,7 @@ export const {
   clearError,
   updateItemInState,
   addItem,
+  setItemsFromSubscription,
   clearInventoryForLocation,
   clearInventory,
 } = inventorySlice.actions;

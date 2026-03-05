@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState, useMemo } from 'react';
+import React, { useEffect, useCallback, useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,19 +17,17 @@ import { ItemCard } from '../../components/Inventory/ItemCard';
 import type { InventoryStackParamList } from '../../navigation/InventoryStackNavigator';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
-  fetchItemsPaginated,
-  loadMoreItems,
   fetchCategories,
   setFilters,
+  setItemsFromSubscription,
+  setLoading,
 } from '../../store/slices/inventorySlice';
 import {
   selectAllItems,
   selectItemsBySearchQuery,
   selectAllCategories,
   selectItemsLoading,
-  selectItemsLoadingMore,
   selectItemsTotalCount,
-  selectItemsHasMore,
   selectLowStockCount,
 } from '../../store/selectors/inventorySelectors';
 import {
@@ -38,6 +36,7 @@ import {
 } from '../../store/selectors/authSelectors';
 import { useInventoryError } from '../../hooks/useInventoryError';
 import { subscribeCategories } from '../../services/firebase/categoryService';
+import { subscribeItems } from '../../services/firebase/inventoryService';
 import { setCategories } from '../../store/slices/inventorySlice';
 import type { ItemFilters } from '../../types/inventory';
 import { isLowStock } from '../../utils/inventoryUtils';
@@ -73,13 +72,14 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   });
   const [showFilters, setShowFilters] = useState<boolean>(false);
 
+  // Ref to hold unsubscribe for items subscription (used for refresh and cleanup)
+  const unsubscribeItemsRef = useRef<(() => void) | null>(null);
+
   // Redux selectors
   const allItems = useAppSelector(selectAllItems);
   const categories = useAppSelector(selectAllCategories);
   const isLoading = useAppSelector(selectItemsLoading);
-  const loadingMore = useAppSelector(selectItemsLoadingMore);
   const totalCount = useAppSelector(selectItemsTotalCount);
-  const hasMore = useAppSelector(selectItemsHasMore);
   const error = useInventoryError();
   const lowStockCount = useAppSelector(selectLowStockCount);
   const isAdmin = useAppSelector(selectIsAdmin);
@@ -113,11 +113,21 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     return filteredItems.filter((item) => isLowStock(item)).length;
   }, [filteredItems]);
 
-  // Sync filters to Redux and fetch paginated items when filters change
+  // Snapshot-based real-time subscription: items auto-update when added/edited/deleted
   useEffect(() => {
     const itemFilters = toItemFilters(filters);
     dispatch(setFilters(itemFilters));
-    dispatch(fetchItemsPaginated());
+    dispatch(setLoading(true));
+
+    const unsubscribe = subscribeItems((items: Item[]) => {
+      dispatch(setItemsFromSubscription(items));
+    }, itemFilters);
+    unsubscribeItemsRef.current = unsubscribe;
+
+    return () => {
+      unsubscribeItemsRef.current?.();
+      unsubscribeItemsRef.current = null;
+    };
   }, [dispatch, filters]);
 
   // Subscribe to categories for real-time updates
@@ -131,12 +141,16 @@ export const CentralStoreInventoryScreen: React.FC = () => {
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    dispatch(fetchItemsPaginated())
-      .then(() => dispatch(fetchCategories()))
-      .finally(() => {
-        setRefreshing(false);
-      });
-  }, [dispatch]);
+    // Re-subscribe to force a fresh snapshot from Firestore
+    unsubscribeItemsRef.current?.();
+    const itemFilters = toItemFilters(filters);
+    const unsubscribe = subscribeItems((items: Item[]) => {
+      dispatch(setItemsFromSubscription(items));
+      setRefreshing(false);
+    }, itemFilters);
+    unsubscribeItemsRef.current = unsubscribe;
+    dispatch(fetchCategories());
+  }, [dispatch, filters]);
 
   const handleAddItem = useCallback(() => {
     navigation.navigate('AddEditItem');
@@ -188,12 +202,6 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   const handleToggleFilters = useCallback(() => {
     setShowFilters(prev => !prev);
   }, []);
-
-  const handleLoadMore = useCallback(() => {
-    if (hasMore && !loadingMore) {
-      dispatch(loadMoreItems());
-    }
-  }, [dispatch, hasMore, loadingMore]);
 
   const renderItemCard = useCallback(
     ({ item }: { item: Item }) => (
@@ -515,24 +523,6 @@ export const CentralStoreInventoryScreen: React.FC = () => {
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
             ItemSeparatorComponent={() => <View className="h-3" />}
-            onEndReached={handleLoadMore}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={
-              loadingMore ? (
-                <View className="py-4 items-center">
-                  <ActivityIndicator size="small" color="#1E40AF" />
-                </View>
-              ) : hasMore ? (
-                <TouchableOpacity
-                  className="py-4 items-center"
-                  onPress={handleLoadMore}
-                  accessibilityRole="button"
-                  accessibilityLabel="Load more items"
-                >
-                  <Text className="text-[15px] font-medium text-[#1E40AF]">Load more</Text>
-                </TouchableOpacity>
-              ) : null
-            }
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}

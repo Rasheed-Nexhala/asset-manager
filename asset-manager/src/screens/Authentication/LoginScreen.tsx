@@ -21,6 +21,10 @@ const defaultValues: AuthFormValues = {
   password: '',
 };
 
+/** Only show this specific message in UI; other auth errors (e.g. wrong password) are not displayed */
+const ACCOUNT_DEACTIVATED_MESSAGE =
+  'Your account is deactivated, please contact admin.';
+
 interface LoginScreenProps {
   onGoToSignup?: () => void;
 }
@@ -33,18 +37,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onGoToSignup }) => {
   const [values, setValues] = useState<AuthFormValues>(defaultValues);
   const [errors, setErrors] = useState<AuthFormErrors>({});
 
-  // Auto-dismiss auth error after a few seconds so it doesn't persist indefinitely
-  const AUTH_ERROR_DISMISS_MS = 4000;
+  const showDeactivatedMessage = authError === ACCOUNT_DEACTIVATED_MESSAGE;
+
+  // Auto-dismiss account deactivated message after 10 seconds
+  const AUTH_ERROR_DISMISS_MS = 10000;
   useEffect(() => {
-    if (!authError) return;
+    if (!showDeactivatedMessage) return;
     const timer = setTimeout(() => dispatch(clearError()), AUTH_ERROR_DISMISS_MS);
     return () => clearTimeout(timer);
-  }, [authError, dispatch]);
+  }, [showDeactivatedMessage, dispatch]);
 
   const updateField = useCallback((field: keyof AuthFormValues, text: string) => {
     setValues((prev) => ({ ...prev, [field]: text }));
     setErrors((prev) => ({ ...prev, [field]: undefined }));
-    // Clear auth error when user starts typing to fix their input
     if (authError) dispatch(clearError());
   }, [authError, dispatch]);
 
@@ -58,8 +63,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onGoToSignup }) => {
 
     try {
       await dispatch(signInUser({ email: trimmedEmail, password: trimmedPassword })).unwrap();
-    } catch (error: unknown) {
-      console.error('Login error:', error);
+    } catch {
+      // Error is handled in Redux (authSlice) and displayed via authError above
     }
   }, [values, dispatch]);
 
@@ -107,6 +112,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onGoToSignup }) => {
               accessibilityLabel="Password"
             />
 
+            {showDeactivatedMessage ? (
+              <View
+                className="p-3 rounded-lg bg-[#DC2626]/10 border-[1.5px] border-[#DC2626]"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+              >
+                <Text className="text-[14px] text-[#DC2626] leading-5">
+                  {ACCOUNT_DEACTIVATED_MESSAGE}
+                </Text>
+              </View>
+            ) : null}
+
             <TouchableOpacity
               className={`rounded-[10px] h-[50px] flex-row items-center justify-center gap-2 ${
                 isLoading ? 'bg-[#1E40AF]/70' : 'bg-[#1E40AF]'
@@ -127,16 +144,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onGoToSignup }) => {
                 <Text className="text-[15px] font-semibold text-white">Log in</Text>
               )}
             </TouchableOpacity>
-
-            {authError ? (
-              <View
-                className="p-3 rounded-lg bg-[#DC2626]/10 border-[1.5px] border-[#DC2626]"
-                accessibilityRole="alert"
-                accessibilityLiveRegion="polite"
-              >
-                <Text className="text-[14px] text-[#DC2626] leading-5">{authError}</Text>
-              </View>
-            ) : null}
           </View>
 
           {onGoToSignup && (

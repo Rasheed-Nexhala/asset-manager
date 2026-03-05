@@ -121,16 +121,26 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
   );
 
   /**
+   * Check if the target user is an Admin (admins cannot be updated by other admins)
+   */
+  const isTargetUserAdmin = useCallback(
+    (user: UserListItem) => user.role === 'Admin',
+    []
+  );
+
+  /**
    * Open role selection modal for a user
+   * Does not open for Admin users (admins cannot update other admins)
    */
   const handleRoleSelectPress = useCallback(
-    (userId: string) => {
-      const currentRole = getCurrentUserValue(userId, 'role') as UserRole;
-      setSelectedUserId(userId);
+    (user: UserListItem) => {
+      if (isTargetUserAdmin(user)) return;
+      const currentRole = getCurrentUserValue(user.id, 'role') as UserRole;
+      setSelectedUserId(user.id);
       setSelectedUserCurrentRole(currentRole);
       setRoleModalVisible(true);
     },
-    [getCurrentUserValue]
+    [getCurrentUserValue, isTargetUserAdmin]
   );
 
   /**
@@ -157,43 +167,50 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
 
   /**
    * Update pending active status change (does not save to Firestore)
+   * Does not apply for Admin users (admins cannot update other admins)
    */
-  const handleActiveStatusChange = useCallback((userId: string, newIsActive: boolean) => {
-    setPendingChanges((prev) => ({
-      ...prev,
-      [userId]: {
-        ...prev[userId],
-        isActive: newIsActive,
-      },
-    }));
-  }, []);
+  const handleActiveStatusChange = useCallback(
+    (user: UserListItem, newIsActive: boolean) => {
+      if (isTargetUserAdmin(user)) return;
+      setPendingChanges((prev) => ({
+        ...prev,
+        [user.id]: {
+          ...prev[user.id],
+          isActive: newIsActive,
+        },
+      }));
+    },
+    [isTargetUserAdmin]
+  );
 
   /**
    * Save changes for a user to Firestore
+   * Does not save for Admin users (admins cannot update other admins)
    */
   const handleSaveChanges = useCallback(
-    async (userId: string) => {
-      const changes = pendingChanges[userId];
+    async (user: UserListItem) => {
+      if (isTargetUserAdmin(user)) return;
+      const changes = pendingChanges[user.id];
       if (!changes || Object.keys(changes).length === 0) return;
 
-      setSavingUserId(userId);
+      setSavingUserId(user.id);
       setError(null);
 
       try {
         // Update role if changed
         if (changes.role !== undefined) {
-          await updateUserRole(userId, changes.role);
+          await updateUserRole(user.id, changes.role);
         }
 
         // Update active status if changed
         if (changes.isActive !== undefined) {
-          await updateUserActiveStatus(userId, changes.isActive);
+          await updateUserActiveStatus(user.id, changes.isActive);
         }
 
         // Clear pending changes for this user
         setPendingChanges((prev) => {
           const newChanges = { ...prev };
-          delete newChanges[userId];
+          delete newChanges[user.id];
           return newChanges;
         });
 
@@ -204,14 +221,14 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
         // Revert pending changes on error since real-time listener will show original state
         setPendingChanges((prev) => {
           const newChanges = { ...prev };
-          delete newChanges[userId];
+          delete newChanges[user.id];
           return newChanges;
         });
       } finally {
         setSavingUserId(null);
       }
     },
-    [pendingChanges]
+    [pendingChanges, isTargetUserAdmin]
   );
 
   /**
@@ -230,15 +247,17 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
    */
   const renderUserCard = useCallback(
     ({ item }: { item: UserListItem }) => {
+      const isTargetAdmin = isTargetUserAdmin(item);
       const isSaving = savingUserId === item.id;
       const hasChanges = hasPendingChanges(item.id);
       const currentRole = getCurrentUserValue(item.id, 'role') as UserRole;
       const currentIsActive = getCurrentUserValue(item.id, 'isActive') as boolean;
       const displayName = item.displayName || item.email || 'Unknown User';
       const email = item.email && item.displayName ? item.email : null;
+      const isReadOnly = isTargetAdmin;
 
       return (
-        <View className={`bg-white rounded-[10px] p-4 border mb-3 ${hasChanges ? 'border-[#1E40AF]' : 'border-[#E2E8F0]'}`}>
+        <View className={`bg-white rounded-[10px] p-4 border mb-3 ${hasChanges ? 'border-[#1E40AF]' : 'border-[#E2E8F0]'} ${isReadOnly ? 'opacity-90' : ''}`}>
           {/* Top Row: Name + Status Badge */}
           <View className="flex-row justify-between items-center mb-3">
             <View className="flex-1">
@@ -262,18 +281,27 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
           <View className="mb-3">
             <Text className="text-[13px] text-[#64748B] mb-1.5">Role</Text>
             <TouchableOpacity
-              className={`border border-[#E2E8F0] rounded-lg h-12 px-4 bg-white flex-row items-center justify-between ${
-                isSaving ? 'opacity-50' : ''
+              className={`border border-[#E2E8F0] rounded-lg h-12 px-4 flex-row items-center justify-between ${
+                isSaving || isReadOnly ? 'opacity-50 bg-[#F8FAFC]' : 'bg-white'
               }`}
-              onPress={() => handleRoleSelectPress(item.id)}
-              disabled={isSaving}
+              onPress={() => handleRoleSelectPress(item)}
+              disabled={isSaving || isReadOnly}
               activeOpacity={0.7}
-              accessibilityLabel={`Change role for ${displayName}. Current role: ${currentRole}`}
+              accessibilityLabel={
+                isReadOnly
+                  ? `${displayName} is an Admin. Admin users cannot be modified.`
+                  : `Change role for ${displayName}. Current role: ${currentRole}`
+              }
               accessibilityRole="button"
             >
               <Text className="text-[15px] text-[#0F172A]">{currentRole}</Text>
-              <Text className="text-[#64748B]">▼</Text>
+              {!isReadOnly && <Text className="text-[#64748B]">▼</Text>}
             </TouchableOpacity>
+            {isReadOnly && (
+              <Text className="text-[12px] text-[#64748B] mt-1.5">
+                Admin users cannot be modified
+              </Text>
+            )}
           </View>
 
           {/* Active Status Toggle */}
@@ -286,16 +314,20 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
             </View>
             <Switch
               value={currentIsActive}
-              onValueChange={(value) => handleActiveStatusChange(item.id, value)}
-              disabled={isSaving}
+              onValueChange={(value) => handleActiveStatusChange(item, value)}
+              disabled={isSaving || isReadOnly}
               trackColor={{ false: '#E2E8F0', true: '#1E40AF' }}
               thumbColor={currentIsActive ? '#FFFFFF' : '#94A3B8'}
-              accessibilityLabel={`Toggle active status for ${displayName}`}
+              accessibilityLabel={
+                isReadOnly
+                  ? `Active status for ${displayName} cannot be changed. Admin users cannot be modified.`
+                  : `Toggle active status for ${displayName}`
+              }
             />
           </View>
 
-          {/* Save and Cancel Buttons (only shown when there are changes) */}
-          {hasChanges && (
+          {/* Save and Cancel Buttons (only shown when there are changes and user is not read-only) */}
+          {hasChanges && !isReadOnly && (
             <View className="flex-row gap-3 border-t border-[#E2E8F0] pt-3">
               <TouchableOpacity
                 className={`flex-1 border-[1.5px] border-[#E2E8F0] rounded-[10px] h-[48px] items-center justify-center ${
@@ -313,7 +345,7 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
                 className={`flex-1 rounded-[10px] h-[48px] flex-row items-center justify-center gap-2 ${
                   isSaving ? 'bg-[#1E40AF]/70' : 'bg-[#1E40AF]'
                 }`}
-                onPress={() => handleSaveChanges(item.id)}
+                onPress={() => handleSaveChanges(item)}
                 disabled={isSaving}
                 activeOpacity={0.7}
                 accessibilityLabel={isSaving ? 'Saving changes, please wait' : 'Save changes'}
@@ -338,6 +370,7 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
       savingUserId,
       hasPendingChanges,
       getCurrentUserValue,
+      isTargetUserAdmin,
       handleRoleSelectPress,
       handleActiveStatusChange,
       handleSaveChanges,

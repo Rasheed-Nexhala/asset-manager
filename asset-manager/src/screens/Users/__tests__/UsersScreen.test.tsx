@@ -160,4 +160,17 @@ describe('UsersScreen', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Go back' }));
     expect(mockGoBack).toHaveBeenCalledTimes(1);
   });
+
+  it('disables editing for Admin users and shows hint', async () => {
+    renderWithStore(<UsersScreen />);
+
+    await act(async () => {
+      mockSubscribeCallbackRef.current?.([mockUserListItem]);
+    });
+
+    expect(screen.getByText('Admin users cannot be modified')).toBeTruthy();
+    const roleButton = screen.getByLabelText(/Admin User is an Admin/);
+    expect(roleButton).toBeTruthy();
+    expect(roleButton.props.accessibilityState?.disabled ?? roleButton.props.disabled).toBeTruthy();
+  });
 });
