@@ -3,7 +3,7 @@ import './config/firebase';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { LogBox } from 'react-native';
+import { LogBox, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
 import { store } from './src/store';
@@ -15,6 +15,8 @@ import { useAppSelector } from './src/store/hooks';
 import { selectUserId, selectAuthInitialized } from './src/store/selectors/authSelectors';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { WeightViewPreferenceProvider } from './src/hooks/useWeightViewPreference';
+import { useNetworkStatus } from './src/hooks/useNetworkStatus';
+import { NoInternetScreen } from './src/components/NoInternetScreen';
 
 // Keep splash screen visible until auth state is resolved
 SplashScreen.preventAutoHideAsync();
@@ -32,6 +34,7 @@ function AppContent() {
   useUserRoleSync(userId);
   useManagerValidationSync();
   usePushTokenRegistration(userId);
+  const { isOffline, retry } = useNetworkStatus();
 
   useEffect(() => {
     if (authInitialized) {
@@ -42,10 +45,26 @@ function AppContent() {
   return (
     <>
       <StatusBar style="dark" />
-      <RootNavigator />
+      <View style={styles.container}>
+        <RootNavigator />
+        {isOffline && (
+          <View style={[StyleSheet.absoluteFillObject, styles.overlay]}>
+            <NoInternetScreen onRetry={retry} />
+          </View>
+        )}
+      </View>
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  overlay: {
+    backgroundColor: '#F8FAFC',
+  },
+});
 
 export default function App() {
   return (

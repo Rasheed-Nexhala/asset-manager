@@ -15,6 +15,7 @@ export type { UpdatePasswordSectionProps } from './UserProfile/UpdatePasswordSec
 export { Users } from './Users/Users';
 export { ScreenLayout } from './layout/ScreenLayout';
 export type { ScreenLayoutProps } from './layout/ScreenLayout';
+export { NoInternetScreen } from './NoInternetScreen';
 export { SiteCard } from './Sites/SiteCard';
 export type { SiteCardProps } from './Sites/SiteCard';
 export { SiteForm } from './Sites/SiteForm';
