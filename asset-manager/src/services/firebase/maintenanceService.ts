@@ -394,17 +394,18 @@ export async function writeOffItem(
       const isFullWriteOff = remainingQuantity === 0;
       const newStatus = isFullWriteOff ? 'written_off' : 'partial_return';
 
+      const explanationText = writeOffData.explanation?.trim() || null;
       transaction.update(maintenanceRef, {
         quantity: remainingQuantity,
         status: newStatus,
         writtenOffAt: Timestamp.now(),
         writeOffReason: writeOffData.reason,
-        writeOffExplanation: writeOffData.explanation,
+        writeOffExplanation: explanationText,
         updatedAt: Timestamp.now(),
         updates: [
           ...maintenanceData.updates,
           {
-            note: `Written off ${writeOffData.writeOffQuantity} items. Reason: ${writeOffData.reason}. ${writeOffData.explanation}`,
+            note: `Written off ${writeOffData.writeOffQuantity} items. Reason: ${writeOffData.reason}.${explanationText ? ` ${explanationText}` : ''}`,
             addedBy: userId,
             addedByName: userName,
             addedAt: Timestamp.now(),

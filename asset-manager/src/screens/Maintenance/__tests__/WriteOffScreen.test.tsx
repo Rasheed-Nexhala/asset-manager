@@ -1,7 +1,7 @@
 /**
  * WriteOffScreen tests
- * Tests loading state, form rendering, quantity controls, validation,
- * reason selector, and full submit flow with confirmation Alert.
+ * Tests loading state, form rendering, quantity controls, validation
+ * (reason required; explanation optional), reason selector, and full submit flow.
  */
 import React from 'react';
 import { Alert } from 'react-native';
@@ -242,7 +242,7 @@ describe('WriteOffScreen', () => {
     expect(screen.getByText('SKU: SKU-001')).toBeTruthy();
     expect(screen.getByText('5')).toBeTruthy(); // Available quantity
     expect(screen.getByRole('button', { name: 'Write-off reason selector' })).toBeTruthy();
-    expect(screen.getByPlaceholderText('Detailed explanation for write-off (min 20 chars)')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Detailed explanation for write-off')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Write off item' })).toBeTruthy();
   });
 
@@ -270,33 +270,43 @@ describe('WriteOffScreen', () => {
   it('validation: submit without reason shows error', () => {
     renderWithStore(<WriteOffScreen />, defaultPreloadedState);
 
-    fireEvent.changeText(
-      screen.getByPlaceholderText('Detailed explanation for write-off (min 20 chars)'),
-      'This item is beyond repair and cannot be fixed.'
-    );
-
     fireEvent.press(screen.getByRole('button', { name: 'Write off item' }));
 
     expect(screen.getByText('Write-off reason is required')).toBeTruthy();
   });
 
-  it('validation: submit without explanation or < 20 chars shows error', () => {
-    renderWithStore(<WriteOffScreen />, defaultPreloadedState);
+  it('submit without explanation succeeds (explanation is optional)', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((title, _message, buttons) => {
+      if (title === 'Confirm Write Off') {
+        buttons?.find((b) => b.text === 'Confirm Write Off')?.onPress?.();
+      } else if (title === 'Success') {
+        buttons?.find((b) => b.text === 'OK')?.onPress?.();
+      }
+    });
+
+    const { store } = renderWithStore(<WriteOffScreen />, defaultPreloadedState);
+    const dispatchSpy = jest.spyOn(store, 'dispatch');
 
     fireEvent.press(screen.getByRole('button', { name: 'Write-off reason selector' }));
     fireEvent.press(screen.getByText('Beyond Repair'));
 
-    // Submit with empty explanation
+    // Submit without filling explanation
     fireEvent.press(screen.getByRole('button', { name: 'Write off item' }));
-    expect(screen.getByText('Explanation is required')).toBeTruthy();
 
-    // Submit with short explanation
-    fireEvent.changeText(
-      screen.getByPlaceholderText('Detailed explanation for write-off (min 20 chars)'),
-      'Short'
-    );
-    fireEvent.press(screen.getByRole('button', { name: 'Write off item' }));
-    expect(screen.getByText('Explanation must be at least 20 characters')).toBeTruthy();
+    mockWriteOffResolve!();
+
+    await waitFor(() => {
+      expect(dispatchSpy).toHaveBeenCalled();
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Success',
+        expect.stringMatching(/\d+ (item|items) written off successfully/),
+        expect.any(Array)
+      );
+    });
+
+    expect(mockGoBack).toHaveBeenCalled();
+    alertSpy.mockRestore();
+    dispatchSpy.mockRestore();
   });
 
   it('select reason via WriteOffReasonSelector', () => {
@@ -327,7 +337,7 @@ describe('WriteOffScreen', () => {
     fireEvent.press(screen.getByText('Beyond Repair'));
 
     fireEvent.changeText(
-      screen.getByPlaceholderText('Detailed explanation for write-off (min 20 chars)'),
+      screen.getByPlaceholderText('Detailed explanation for write-off'),
       'This item is beyond repair and cannot be fixed.'
     );
 

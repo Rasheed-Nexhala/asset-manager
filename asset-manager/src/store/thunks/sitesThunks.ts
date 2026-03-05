@@ -67,17 +67,17 @@ export const createSite = createAsyncThunk(
       const userName = user?.displayName ?? user?.email ?? 'Unknown';
       const userRoleType = userRole?.role ?? 'Admin';
 
+      const desc = (formData.description ?? '').trim();
+      const contact = (formData.contactNumber ?? '').trim();
       const createData: CreateSiteData = {
         name: formData.name.trim(),
-        description: formData.description.trim() || undefined,
         address: formData.address.trim(),
-        contactNumber: formData.contactNumber.trim() || undefined,
         managerId: formData.managerId || null,
         managerName,
         status: formData.status,
-        createdBy: userId ?? undefined,
-        createdByName: userId ? userName : undefined,
-        createdByRole: userId ? userRoleType : undefined,
+        ...(desc && { description: desc }),
+        ...(contact && { contactNumber: contact }),
+        ...(userId && { createdBy: userId, createdByName: userName, createdByRole: userRoleType }),
       };
 
       const siteId = await createSiteService(createData);
@@ -105,11 +105,7 @@ export const updateSite = createAsyncThunk(
     { getState, rejectWithValue }
   ) => {
     try {
-      // Validate site name uniqueness (excluding current site)
-      const nameExists = await checkSiteNameExists(formData.name, siteId);
-      if (nameExists) {
-        return rejectWithValue('Site name already exists. Please choose a different name.');
-      }
+      // Site name cannot be changed when editing — no name uniqueness check needed
 
       // Handle manager assignment
       let managerName: string | null = null;
@@ -138,18 +134,20 @@ export const updateSite = createAsyncThunk(
       const userName = user?.displayName ?? user?.email ?? 'Unknown';
       const userRoleType = userRole?.role ?? 'Admin';
 
+      const desc = (formData.description ?? '').trim();
+      const contact = (formData.contactNumber ?? '').trim();
+      const isInactive = formData.status === 'inactive';
       const updateData: UpdateSiteData = {
-        name: formData.name.trim(),
-        description: formData.description.trim() || undefined,
         address: formData.address.trim(),
-        contactNumber: formData.contactNumber.trim() || undefined,
-        managerId: formData.managerId || null,
-        managerName,
+        managerId: isInactive ? null : (formData.managerId || null),
+        managerName: isInactive ? null : managerName,
         status: formData.status,
-        updatedBy: userId ?? undefined,
-        updatedByName: userId ? userName : undefined,
-        updatedByRole: userId ? userRoleType : undefined,
+        ...(desc && { description: desc }),
+        ...(contact && { contactNumber: contact }),
+        ...(userId && { updatedBy: userId, updatedByName: userName, updatedByRole: userRoleType }),
       };
+      // Note: name is intentionally omitted — site name cannot be changed when editing
+      // Note: when status is inactive, manager is always removed (inactive sites cannot have a manager)
 
       await updateSiteService(siteId, updateData);
       

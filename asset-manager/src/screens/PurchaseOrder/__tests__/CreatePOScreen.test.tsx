@@ -278,8 +278,8 @@ describe('CreatePOScreen', () => {
     renderWithStore(<CreatePOScreen />, defaultPreloadedState);
 
     expect(screen.getByText('Select Saved Vendor')).toBeTruthy();
-    expect(screen.getByText('Add New Vendor')).toBeTruthy();
-    expect(screen.getByText('Manage Vendors')).toBeTruthy();
+    expect(screen.getByText('Add New')).toBeTruthy();
+    expect(screen.getByText('Manage')).toBeTruthy();
     expect(screen.getByText('Add')).toBeTruthy();
   });
 

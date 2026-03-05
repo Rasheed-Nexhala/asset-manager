@@ -17,6 +17,7 @@ import type { PurchaseOrder } from '../../../types/purchaseOrder';
 const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: mockNavigate, goBack: jest.fn() }),
+  useIsFocused: () => true,
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -39,7 +40,16 @@ jest.mock('../../../services/firebase/purchaseOrderService', () => ({
       lastDoc: null,
     };
   }),
-  subscribeToPurchaseOrders: jest.fn(() => () => {}),
+  subscribeToPurchaseOrders: jest.fn((callback: (orders: PurchaseOrder[], err?: Error) => void) => {
+    setImmediate(() => {
+      if (mockFetchPOsError) {
+        callback([], new Error(mockFetchPOsError));
+      } else {
+        callback(mockFetchPOsResult?.orders ?? []);
+      }
+    });
+    return () => {};
+  }),
 }));
 
 jest.mock('../../../store/thunks/authThunks', () => {

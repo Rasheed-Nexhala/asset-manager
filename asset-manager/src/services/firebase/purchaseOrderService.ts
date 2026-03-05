@@ -683,9 +683,9 @@ export const getPurchaseOrdersCount = async (
 };
 
 /**
- * Subscribe to purchase orders with optional status filter.
+ * Subscribe to purchase orders with optional status filter (real-time Firestore snapshot).
  * On error, callback receives ([], error). On success, callback receives (orders).
- * @deprecated Prefer fetchPurchaseOrdersPaginated + loadMorePurchaseOrders for paginated lists.
+ * Used by PurchaseOrderListScreen for live updates. Loads full list (no pagination).
  */
 export const subscribeToPurchaseOrders = (
   callback: (orders: PurchaseOrder[], error?: Error) => void,

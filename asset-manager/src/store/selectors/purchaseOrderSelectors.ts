@@ -99,6 +99,16 @@ export const selectFilteredPurchaseOrdersForViewer = createSelector(
 );
 
 /**
+ * Total count of POs visible to the current user (after status + viewer filters, before search).
+ * Use for "Showing X of Y" so the total reflects what the user can actually see
+ * (e.g. excludes other users' drafts when filtering by draft).
+ */
+export const selectVisiblePurchaseOrderCount = createSelector(
+  [(state: RootState) => selectFilteredPurchaseOrdersForViewer(state, '')],
+  (orders) => orders.length
+);
+
+/**
  * Get count of POs pending approval (Admin badge)
  */
 export const selectPendingApprovalCount = createSelector(

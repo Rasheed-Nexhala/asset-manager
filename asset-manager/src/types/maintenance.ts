@@ -149,7 +149,7 @@ export interface AddToMaintenanceData {
  */
 export interface ReturnFromMaintenanceData {
   returnQuantity: number;
-  repairSummary: string;
+  repairSummary?: string;
   repairCost?: number;
   repairedBy?: string;
 }
@@ -163,7 +163,7 @@ export interface ReturnFromMaintenanceData {
 export interface WriteOffData {
   writeOffQuantity: number;
   reason: WriteOffReason;
-  explanation: string;
+  explanation?: string;
 }
 
 /**

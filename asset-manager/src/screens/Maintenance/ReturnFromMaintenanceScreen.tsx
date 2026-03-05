@@ -91,12 +91,7 @@ export const ReturnFromMaintenanceScreen: React.FC = () => {
       newErrors.returnQuantity = `Cannot exceed ${maintenance.quantity}`;
     }
 
-    // Validate repair summary
-    if (!repairSummary.trim()) {
-      newErrors.repairSummary = 'Repair summary is required';
-    } else if (repairSummary.trim().length < 10) {
-      newErrors.repairSummary = 'Repair summary must be at least 10 characters';
-    }
+    // Repair summary is optional - no validation
 
     // Validate repair cost (if provided)
     if (repairCost.trim()) {
@@ -108,14 +103,14 @@ export const ReturnFromMaintenanceScreen: React.FC = () => {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [returnQuantity, repairSummary, repairCost, maintenance]);
+  }, [returnQuantity, repairCost, maintenance]);
 
   const handleSubmit = useCallback(async () => {
     if (!validateForm() || !maintenance || !userId || !userName) return;
 
     const returnData: ReturnFromMaintenanceData = {
       returnQuantity,
-      repairSummary: repairSummary.trim(),
+      repairSummary: repairSummary.trim() || undefined,
       repairCost: repairCost.trim() ? parseFloat(repairCost) : undefined,
       repairedBy: repairedBy.trim() || undefined,
     };
@@ -250,33 +245,21 @@ export const ReturnFromMaintenanceScreen: React.FC = () => {
             )}
           </View>
 
-          {/* Repair Summary Field (Required) */}
+          {/* Repair Summary Field (Optional) */}
           <View className="gap-1.5">
-            <Text className="text-[15px] text-[#0F172A]">
-              Repair Summary <Text className="text-[#DC2626]">*</Text>
-            </Text>
+            <Text className="text-[15px] text-[#0F172A]">Repair Summary (Optional)</Text>
             <TextInput
-              className={`rounded-lg px-4 py-3 bg-white text-[15px] text-[#0F172A] border ${
-                errors.repairSummary ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
-              }`}
-              placeholder="Describe the repairs performed (min 10 characters)"
+              className="rounded-lg px-4 py-3 bg-white text-[15px] text-[#0F172A] border border-[#E2E8F0]"
+              placeholder="Describe the repairs performed"
               placeholderTextColor="#94A3B8"
               value={repairSummary}
-              onChangeText={(text) => {
-                setRepairSummary(text);
-                if (errors.repairSummary) {
-                  setErrors((prev) => ({ ...prev, repairSummary: '' }));
-                }
-              }}
+              onChangeText={setRepairSummary}
               multiline
               numberOfLines={4}
               textAlignVertical="top"
               style={{ minHeight: 100 }}
               accessibilityLabel="Repair summary"
             />
-            {errors.repairSummary && (
-              <Text className="text-[13px] text-[#DC2626] mt-1">{errors.repairSummary}</Text>
-            )}
           </View>
 
           {/* Repair Cost Field (Optional) */}

@@ -6,6 +6,12 @@
  * - Loading when authenticated but role still loading
  * - Main/Dashboard when authenticated and role loaded
  */
+jest.mock('expo-notifications', () => ({
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  getExpoPushTokenAsync: jest.fn(),
+  setNotificationHandler: jest.fn(),
+}));
+
 jest.mock('firebase/auth', () => ({ User: function User() {} }));
 jest.mock('firebase/firestore', () => ({
   doc: jest.fn(),

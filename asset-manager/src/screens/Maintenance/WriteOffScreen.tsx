@@ -96,16 +96,11 @@ export const WriteOffScreen: React.FC = () => {
       newErrors.reason = 'Write-off reason is required';
     }
 
-    // Validate explanation
-    if (!explanation.trim()) {
-      newErrors.explanation = 'Explanation is required';
-    } else if (explanation.trim().length < 20) {
-      newErrors.explanation = 'Explanation must be at least 20 characters';
-    }
+    // Explanation is optional - no validation
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [writeOffQuantity, reason, explanation, maintenance]);
+  }, [writeOffQuantity, reason, maintenance]);
 
   const handleWriteOff = useCallback(() => {
     if (!validateForm()) return;
@@ -131,7 +126,7 @@ export const WriteOffScreen: React.FC = () => {
     const writeOffData: WriteOffData = {
       writeOffQuantity,
       reason,
-      explanation: explanation.trim(),
+      explanation: explanation.trim() || undefined,
     };
 
     setIsSubmitting(true);
@@ -278,33 +273,21 @@ export const WriteOffScreen: React.FC = () => {
             />
           </View>
 
-          {/* Explanation Field */}
+          {/* Explanation Field (Optional) */}
           <View className="gap-1.5">
-            <Text className="text-[15px] text-[#0F172A]">
-              Explanation <Text className="text-[#DC2626]">*</Text>
-            </Text>
+            <Text className="text-[15px] text-[#0F172A]">Explanation (Optional)</Text>
             <TextInput
-              className={`border rounded-lg px-4 py-3 bg-white text-[15px] text-[#0F172A] ${
-                errors.explanation ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
-              }`}
-              placeholder="Detailed explanation for write-off (min 20 chars)"
+              className="border border-[#E2E8F0] rounded-lg px-4 py-3 bg-white text-[15px] text-[#0F172A]"
+              placeholder="Detailed explanation for write-off"
               placeholderTextColor="#94A3B8"
               value={explanation}
-              onChangeText={(text) => {
-                setExplanation(text);
-                if (errors.explanation) {
-                  setErrors((prev) => ({ ...prev, explanation: '' }));
-                }
-              }}
+              onChangeText={setExplanation}
               multiline
               numberOfLines={5}
               textAlignVertical="top"
               style={{ minHeight: 120 }}
               accessibilityLabel="Explanation"
             />
-            {errors.explanation && (
-              <Text className="text-[13px] text-[#DC2626] mt-1">{errors.explanation}</Text>
-            )}
             <Text className="text-[13px] text-[#64748B]">
               Provide details about why this item cannot be repaired or returned
             </Text>

@@ -207,15 +207,16 @@ describe('EditSiteScreen', () => {
       expect(screen.getByDisplayValue('Site Alpha')).toBeTruthy();
     });
 
-    fireEvent.changeText(screen.getByPlaceholderText('e.g. Site A'), 'Site Beta Updated');
+    // Site name is read-only when editing — change address instead
+    fireEvent.changeText(screen.getByPlaceholderText('Street, city'), '456 Oak Ave');
     fireEvent.press(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
       expect(mockUpdateSite).toHaveBeenCalledWith({
         siteId: 's1',
         formData: expect.objectContaining({
-          name: 'Site Beta Updated',
-          address: '123 Main St',
+          name: 'Site Alpha',
+          address: '456 Oak Ave',
           status: 'active',
         }),
       });

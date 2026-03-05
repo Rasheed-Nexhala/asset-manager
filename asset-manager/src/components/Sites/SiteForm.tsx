@@ -70,9 +70,12 @@ export const SiteForm: React.FC<SiteFormProps> = ({
   ]);
 
   const handleFieldChange = useCallback((field: keyof SiteFormData, value: string | null) => {
+    // Normalize string fields: optional fields (description, contactNumber) can be empty
+    const normalizedValue =
+      field === 'managerId' ? value : (value ?? '');
     setFormData((prev) => ({
       ...prev,
-      [field]: value,
+      [field]: normalizedValue,
     }));
     if (errors[field as keyof FormErrors]) {
       setErrors((prev) => {
@@ -173,18 +176,19 @@ export const SiteForm: React.FC<SiteFormProps> = ({
     <ScrollView className="flex-1 bg-[#F8FAFC]" contentContainerStyle={{ padding: 16 }}>
       <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] gap-4">
         <FormField
-          label="Site Name"
+          label={siteId ? 'Site Name (cannot be changed)' : 'Site Name'}
           required
           value={formData.name}
           onChangeText={(text) => handleFieldChange('name', text)}
           placeholder="e.g. Site A"
           error={errors.name}
           accessibilityLabel="Site name"
+          editable={!siteId}
         />
 
         <FormField
-          label="Project Description"
-          value={formData.description}
+          label="Project Description (Optional)"
+          value={formData.description ?? ''}
           onChangeText={(text) => handleFieldChange('description', text)}
           placeholder="Brief project description"
           multiline
@@ -203,8 +207,8 @@ export const SiteForm: React.FC<SiteFormProps> = ({
         />
 
         <FormField
-          label="Contact Number"
-          value={formData.contactNumber}
+          label="Contact Number (Optional)"
+          value={formData.contactNumber ?? ''}
           onChangeText={(text) => handleFieldChange('contactNumber', text)}
           placeholder="Phone number"
           keyboardType="phone-pad"

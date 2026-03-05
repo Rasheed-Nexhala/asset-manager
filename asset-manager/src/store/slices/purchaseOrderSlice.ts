@@ -45,6 +45,20 @@ const purchaseOrderSlice = createSlice({
       state.loading = false;
     },
 
+    /** Real-time: replace list from Firestore snapshot (no pagination) */
+    setPurchaseOrdersFromSubscription: (state, action: PayloadAction<PurchaseOrder[]>) => {
+      const byId = new Map<string, PurchaseOrder>();
+      action.payload.forEach((po) => {
+        if (!byId.has(po.id)) byId.set(po.id, po);
+      });
+      state.purchaseOrders = Array.from(byId.values());
+      state.totalCount = action.payload.length;
+      state.lastDoc = null;
+      state.hasMore = false;
+      state.loading = false;
+      state.error = null;
+    },
+
     setSelectedPO: (state, action: PayloadAction<PurchaseOrder | null>) => {
       state.selectedPO = action.payload;
     },
@@ -110,34 +124,35 @@ const purchaseOrderSlice = createSlice({
         state.error = null;
       })
       .addCase('purchaseOrders/fetchPurchaseOrdersPaginated/fulfilled', (state, action) => {
-        const { orders, totalCount, lastDoc, pageSize } = action.payload as {
+        const payload = (action as PayloadAction<{
           orders: PurchaseOrder[];
           totalCount: number;
           lastDoc: unknown;
           pageSize: number;
-        };
-        state.purchaseOrders = orders;
-        state.totalCount = totalCount;
-        state.lastDoc = lastDoc;
-        state.hasMore = orders.length >= pageSize;
+        }>).payload;
+        state.purchaseOrders = payload.orders;
+        state.totalCount = payload.totalCount;
+        state.lastDoc = payload.lastDoc;
+        state.hasMore = payload.orders.length >= payload.pageSize;
         state.loading = false;
       })
       .addCase('purchaseOrders/fetchPurchaseOrdersPaginated/rejected', (state, action) => {
         state.loading = false;
-        state.error = (action.payload as string) ?? 'Failed to load purchase orders';
+        const payload = (action as PayloadAction<string | undefined>).payload;
+        state.error = payload ?? 'Failed to load purchase orders';
       })
       .addCase('purchaseOrders/loadMorePurchaseOrders/pending', (state) => {
         state.loadingMore = true;
       })
       .addCase('purchaseOrders/loadMorePurchaseOrders/fulfilled', (state, action) => {
-        const { orders, lastDoc, pageSize } = action.payload as {
+        const payload = (action as PayloadAction<{
           orders: PurchaseOrder[];
           lastDoc: unknown;
           pageSize: number;
-        };
-        state.purchaseOrders = [...state.purchaseOrders, ...orders];
-        state.lastDoc = lastDoc;
-        state.hasMore = orders.length >= pageSize;
+        }>).payload;
+        state.purchaseOrders = [...state.purchaseOrders, ...payload.orders];
+        state.lastDoc = payload.lastDoc;
+        state.hasMore = payload.orders.length >= payload.pageSize;
         state.loadingMore = false;
       })
       .addCase('purchaseOrders/loadMorePurchaseOrders/rejected', (state) => {
@@ -148,6 +163,7 @@ const purchaseOrderSlice = createSlice({
 
 export const {
   setPurchaseOrders,
+  setPurchaseOrdersFromSubscription,
   setSelectedPO,
   setVendors,
   addOrUpdatePO,

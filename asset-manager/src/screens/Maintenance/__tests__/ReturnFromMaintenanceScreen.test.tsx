@@ -1,7 +1,7 @@
 /**
  * Return from Maintenance flow
  * Tests loading state, form render, quantity increment/decrement,
- * validation (repair summary required, min 10 chars), submit success, goBack on Alert OK.
+ * validation (return quantity only; repair summary is optional), submit success, goBack on Alert OK.
  */
 import React from 'react';
 import { Alert } from 'react-native';
@@ -280,25 +280,23 @@ describe('ReturnFromMaintenanceScreen', () => {
     expect(quantityInput.props.value).toBe('5');
   });
 
-  it('validation: submit without repair summary shows error', () => {
+  it('submit without repair summary succeeds (repair summary is optional)', async () => {
     renderWithStore(<ReturnFromMaintenanceScreen />, stateWithMaintenance);
 
     fireEvent.press(screen.getByRole('button', { name: 'Return to inventory' }));
 
-    expect(screen.getByText('Repair summary is required')).toBeTruthy();
+    mockReturnFromMaintenanceResolve!();
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Success',
+        '5 items returned to inventory successfully',
+        expect.any(Array)
+      );
+    });
   });
 
-  it('validation: repair summary < 10 chars shows error', () => {
-    renderWithStore(<ReturnFromMaintenanceScreen />, stateWithMaintenance);
-
-    fireEvent.changeText(screen.getByLabelText('Repair summary'), 'Short');
-
-    fireEvent.press(screen.getByRole('button', { name: 'Return to inventory' }));
-
-    expect(screen.getByText('Repair summary must be at least 10 characters')).toBeTruthy();
-  });
-
-  it('submit with valid data dispatches returnFromMaintenanceThunk and shows success Alert', async () => {
+  it('submit with repair summary dispatches returnFromMaintenanceThunk and shows success Alert', async () => {
     renderWithStore(<ReturnFromMaintenanceScreen />, stateWithMaintenance);
 
     fireEvent.changeText(screen.getByLabelText('Repair summary'), 'Motor was repaired and tested successfully');
@@ -318,8 +316,6 @@ describe('ReturnFromMaintenanceScreen', () => {
 
   it('success Alert OK calls navigation.goBack', async () => {
     renderWithStore(<ReturnFromMaintenanceScreen />, stateWithMaintenance);
-
-    fireEvent.changeText(screen.getByLabelText('Repair summary'), 'Motor was repaired and tested successfully');
 
     fireEvent.press(screen.getByRole('button', { name: 'Return to inventory' }));
 

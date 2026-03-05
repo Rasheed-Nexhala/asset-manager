@@ -9,24 +9,29 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { POCard } from '../../components/PurchaseOrder/POCard';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { setFilters } from '../../store/slices/purchaseOrderSlice';
 import {
-  fetchPurchaseOrdersPaginated,
-  loadMorePurchaseOrders,
-} from '../../store/thunks/purchaseOrderThunks';
+  setFilters,
+  setPurchaseOrdersFromSubscription,
+  setLoading,
+  setError,
+  clearError,
+} from '../../store/slices/purchaseOrderSlice';
+import { loadMorePurchaseOrders } from '../../store/thunks/purchaseOrderThunks';
+import { subscribeToPurchaseOrders } from '../../services/firebase/purchaseOrderService';
 import {
   selectFilteredPurchaseOrdersForViewer,
   selectPurchaseOrderLoading,
   selectPurchaseOrderLoadingMore,
   selectPurchaseOrderFilters,
   selectPurchaseOrderTotalCount,
+  selectVisiblePurchaseOrderCount,
   selectPurchaseOrderHasMore,
   selectPurchaseOrderError,
 } from '../../store/selectors/purchaseOrderSelectors';
@@ -41,8 +46,10 @@ type NavigationProp = StackNavigationProp<
 export const PurchaseOrderListScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const dispatch = useAppDispatch();
+  const isFocused = useIsFocused();
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [retryTrigger, setRetryTrigger] = useState(0);
 
   const orders = useAppSelector((state) =>
     selectFilteredPurchaseOrdersForViewer(state, searchQuery)
@@ -50,25 +57,50 @@ export const PurchaseOrderListScreen: React.FC = () => {
   const isLoading = useAppSelector(selectPurchaseOrderLoading);
   const loadingMore = useAppSelector(selectPurchaseOrderLoadingMore);
   const totalCount = useAppSelector(selectPurchaseOrderTotalCount);
+  const visibleTotalCount = useAppSelector(selectVisiblePurchaseOrderCount);
   const hasMore = useAppSelector(selectPurchaseOrderHasMore);
   const error = useAppSelector(selectPurchaseOrderError);
   const filters = useAppSelector(selectPurchaseOrderFilters);
 
+  // Real-time Firestore subscription when screen is focused
   useEffect(() => {
-    dispatch(fetchPurchaseOrdersPaginated());
-  }, [dispatch, filters.status]);
+    if (!isFocused) return;
+
+    dispatch(setLoading(true));
+    dispatch(clearError());
+
+    const statusFilter =
+      filters.status !== 'all' ? filters.status : undefined;
+
+    const unsubscribe = subscribeToPurchaseOrders(
+      (ordersData, err) => {
+        if (err) {
+          dispatch(setLoading(false));
+          dispatch(setError(err.message));
+        } else {
+          dispatch(setPurchaseOrdersFromSubscription(ordersData));
+        }
+      },
+      statusFilter
+    );
+
+    return () => unsubscribe();
+  }, [isFocused, filters.status, dispatch, retryTrigger]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    dispatch(fetchPurchaseOrdersPaginated()).finally(() =>
-      setTimeout(() => setRefreshing(false), 300)
-    );
+    setRetryTrigger((t) => t + 1);
+    setTimeout(() => setRefreshing(false), 400);
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    dispatch(clearError());
+    setRetryTrigger((t) => t + 1);
   }, [dispatch]);
 
   const handleLoadMore = useCallback(() => {
-    if (hasMore && !loadingMore) {
-      dispatch(loadMorePurchaseOrders());
-    }
+    if (!hasMore || loadingMore) return;
+    dispatch(loadMorePurchaseOrders());
   }, [dispatch, hasMore, loadingMore]);
 
   const handleSearchChange = useCallback((text: string) => {
@@ -171,7 +203,7 @@ export const PurchaseOrderListScreen: React.FC = () => {
         <View className="bg-[#DC2626]/15 px-4 py-3 border-b border-[#DC2626]/30 flex-row items-center justify-between">
           <Text className="text-[14px] text-[#DC2626] flex-1">{error}</Text>
           <TouchableOpacity
-            onPress={() => dispatch(fetchPurchaseOrdersPaginated())}
+            onPress={handleRetry}
             className="ml-2 px-3 py-1.5 bg-[#DC2626] rounded-lg"
           >
             <Text className="text-[13px] font-medium text-white">Retry</Text>
@@ -205,10 +237,12 @@ export const PurchaseOrderListScreen: React.FC = () => {
         </View>
       </View>
 
-      {totalCount != null && orders.length > 0 && (
+      {visibleTotalCount > 0 && (
         <View className="bg-white border-b border-[#E2E8F0] px-4 py-2">
           <Text className="text-[13px] text-[#64748B]">
-            Showing {orders.length} of {totalCount} purchase orders
+            {searchQuery.trim()
+              ? `Showing ${orders.length} of ${visibleTotalCount} purchase orders`
+              : `${visibleTotalCount} purchase order${visibleTotalCount === 1 ? '' : 's'}`}
           </Text>
         </View>
       )}

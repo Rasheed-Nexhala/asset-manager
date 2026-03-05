@@ -101,6 +101,20 @@ describe('SiteForm', () => {
     expect(screen.getByRole('button', { name: 'Saving site, please wait' })).toBeTruthy();
   });
 
+  it('disables site name field when siteId is provided (edit mode)', () => {
+    render(
+      <SiteForm
+        onSubmit={mockOnSubmit}
+        siteId="s1"
+        initialData={{ name: 'Site Alpha', address: '123 Main St', status: 'active' }}
+      />
+    );
+
+    expect(screen.getByText('Site Name (cannot be changed)')).toBeTruthy();
+    const nameInput = screen.getByPlaceholderText('e.g. Site A');
+    expect(nameInput.props.editable).toBe(false);
+  });
+
   it('switches to active status when Active button pressed', () => {
     render(
       <SiteForm

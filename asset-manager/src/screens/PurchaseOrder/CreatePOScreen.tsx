@@ -493,9 +493,9 @@ export const CreatePOScreen: React.FC = () => {
         keyboardShouldPersistTaps="handled"
       >
         <View className="px-4 py-4 gap-6">
-          {/* Vendor */}
-          <View>
-            <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">
+          {/* Vendor — CIAMS card layout */}
+          <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
+            <Text className="text-[17px] font-semibold text-[#0F172A] mb-4">
               VENDOR
             </Text>
             <VendorSelector
@@ -504,45 +504,55 @@ export const CreatePOScreen: React.FC = () => {
               onSelect={(v: Vendor | null) => setSelectedVendorId(v?.id ?? null)}
               placeholder="Select Saved Vendor"
             />
-            <View className="flex-row gap-4 mt-2">
+            <View className="flex-row gap-3 mt-4">
               <TouchableOpacity
                 onPress={() => navigation.navigate('AddVendor', {})}
-                className="flex-row items-center gap-2"
+                className="flex-1 flex-row items-center justify-center gap-2 py-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] min-h-[48px]"
+                activeOpacity={0.7}
+                accessibilityLabel="Add new vendor"
+                accessibilityRole="button"
               >
                 <Ionicons name="add-circle-outline" size={20} color="#1E40AF" />
                 <Text className="text-[15px] font-medium text-[#1E40AF]">
-                  Add New Vendor
+                  Add New
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => navigation.navigate('VendorManagement')}
-                className="flex-row items-center gap-2"
+                className="flex-1 flex-row items-center justify-center gap-2 py-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] min-h-[48px]"
+                activeOpacity={0.7}
+                accessibilityLabel="Manage vendors"
+                accessibilityRole="button"
               >
                 <Ionicons name="list-outline" size={20} color="#1E40AF" />
                 <Text className="text-[15px] font-medium text-[#1E40AF]">
-                  Manage Vendors
+                  Manage
                 </Text>
               </TouchableOpacity>
             </View>
-            <Text className="text-[13px] text-[#64748B] mt-3 mb-2">
-              — OR Enter Manually —
-            </Text>
-            <FormField
-              label="Vendor Name"
-              value={vendorName}
-              onChangeText={setVendorName}
-              placeholder="e.g. ABC Building Supplies"
-              error={errors.vendorName}
-              required
-            />
-            <FormField
-              label="Contact Number"
-              value={vendorContact}
-              onChangeText={setVendorContact}
-              placeholder="+91-"
-              keyboardType="phone-pad"
-              error={errors.vendorContact}
-            />
+            <View className="mt-4 pt-4 border-t border-[#E2E8F0]">
+              <Text className="text-[13px] text-[#64748B] mb-3">
+                Or enter vendor details manually
+              </Text>
+              <View className="gap-4">
+                <FormField
+                  label="Vendor Name"
+                  value={vendorName}
+                  onChangeText={setVendorName}
+                  placeholder="e.g. ABC Building Supplies"
+                  error={errors.vendorName}
+                  required
+                />
+                <FormField
+                  label="Contact Number"
+                  value={vendorContact}
+                  onChangeText={setVendorContact}
+                  placeholder="+91-"
+                  keyboardType="phone-pad"
+                  error={errors.vendorContact}
+                />
+              </View>
+            </View>
           </View>
 
           {/* Items */}
