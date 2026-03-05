@@ -85,55 +85,55 @@ export const VendorSelector: React.FC<VendorSelectorProps> = ({
             keyboardVerticalOffset={0}
           >
             <View className="bg-white rounded-t-2xl max-h-[80%]">
-            <View className="w-10 h-1 bg-[#E2E8F0] rounded-full self-center mt-2 mb-4" />
-            <View className="px-4 pb-3 border-b border-[#E2E8F0]">
-              <View className="flex-row justify-between items-center mb-3">
-                <Text className="text-[22px] font-semibold text-[#0F172A]">
-                  Select Vendor
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setModalVisible(false)}
-                  className="w-9 h-9 items-center justify-center"
-                >
-                  <Ionicons name="close" size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-              <View className="relative">
-                <View className="absolute left-3 top-0 h-12 items-center justify-center z-10">
-                  <Ionicons name="search" size={20} color="#64748B" />
-                </View>
-                <TextInput
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  placeholder="Search vendors..."
-                  placeholderTextColor="#94A3B8"
-                  className="border border-[#E2E8F0] rounded-lg h-12 pl-10 pr-4 bg-white"
-                />
-              </View>
-            </View>
-            <FlatList
-              data={filteredVendors}
-              keyExtractor={(item) => item.id}
-              keyboardShouldPersistTaps="handled"
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  onPress={() => handleSelect(item)}
-                  className="px-4 py-3 border-b border-[#E2E8F0]"
-                >
-                  <Text className="text-[15px] font-medium text-[#0F172A]">
-                    {item.name}
+              <View className="w-10 h-1 bg-[#E2E8F0] rounded-full self-center mt-2 mb-4" />
+              <View className="px-4 pb-3 border-b border-[#E2E8F0]">
+                <View className="flex-row justify-between items-center mb-3">
+                  <Text className="text-[22px] font-semibold text-[#0F172A]">
+                    Select Vendor
                   </Text>
-                  <Text className="text-[13px] text-[#64748B]">{item.phone}</Text>
-                </TouchableOpacity>
-              )}
-              ListEmptyComponent={
-                <View className="p-4 items-center">
-                  <Text className="text-[15px] text-[#64748B]">
-                    No vendors found
-                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setModalVisible(false)}
+                    className="w-9 h-9 items-center justify-center"
+                  >
+                    <Ionicons name="close" size={24} color="#64748B" />
+                  </TouchableOpacity>
                 </View>
-              }
-            />
+                <View className="relative">
+                  <View className="absolute left-3 top-0 h-12 items-center justify-center z-10">
+                    <Ionicons name="search" size={20} color="#64748B" />
+                  </View>
+                  <TextInput
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    placeholder="Search vendors..."
+                    placeholderTextColor="#94A3B8"
+                    className="border border-[#E2E8F0] rounded-lg h-12 pl-10 pr-4 bg-white"
+                  />
+                </View>
+              </View>
+              <FlatList
+                data={filteredVendors}
+                keyExtractor={(item) => item.id}
+                keyboardShouldPersistTaps="handled"
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    onPress={() => handleSelect(item)}
+                    className="px-4 py-3 border-b border-[#E2E8F0]"
+                  >
+                    <Text className="text-[15px] font-medium text-[#0F172A]">
+                      {item.name}
+                    </Text>
+                    <Text className="text-[13px] text-[#64748B]">{item.phone}</Text>
+                  </TouchableOpacity>
+                )}
+                ListEmptyComponent={
+                  <View className="p-4 items-center">
+                    <Text className="text-[15px] text-[#64748B]">
+                      No vendors found
+                    </Text>
+                  </View>
+                }
+              />
             </View>
           </KeyboardAvoidingView>
         </View>
