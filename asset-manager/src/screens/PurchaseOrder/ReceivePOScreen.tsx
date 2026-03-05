@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -126,10 +127,6 @@ export const ReceivePOScreen: React.FC = () => {
 
   const handleConfirm = useCallback(async () => {
     if (!po || !userId || !userName) return;
-    if (!invoiceFile) {
-      Alert.alert('Error', 'Invoice/Bill attachment is required.');
-      return;
-    }
 
     setSaving(true);
     try {
@@ -141,9 +138,15 @@ export const ReceivePOScreen: React.FC = () => {
               itemId: item.itemId,
               receivedQuantity: item.quantity,
             })),
-            documents: [
-              { type: 'invoice', fileName: invoiceFile.fileName, fileUrl: invoiceFile.fileUrl },
-            ],
+            documents: invoiceFile
+              ? [
+                  {
+                    type: 'invoice' as const,
+                    fileName: invoiceFile.fileName,
+                    fileUrl: invoiceFile.fileUrl,
+                  },
+                ]
+              : [],
             receivedDate: receivedDate.toISOString(),
             receivedNotes: receivedNotes.trim() || undefined,
           },
@@ -314,8 +317,7 @@ export const ReceivePOScreen: React.FC = () => {
             fileUrl={invoiceFile?.fileUrl ?? null}
             onUpload={handleUploadInvoice}
             onRemove={() => setInvoiceFile(null)}
-            label="Invoice/Bill"
-            required
+            label="Invoice/Bill (Optional)"
           />
           {uploadingInvoice && (
             <View className="mt-2">
@@ -341,7 +343,7 @@ export const ReceivePOScreen: React.FC = () => {
             <DateTimePicker
               value={receivedDate}
               mode="date"
-              display="default"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               onChange={(_, d) => {
                 setShowDatePicker(false);
                 if (d) setReceivedDate(d);
@@ -362,9 +364,9 @@ export const ReceivePOScreen: React.FC = () => {
 
         <TouchableOpacity
           onPress={handleConfirm}
-          disabled={saving || !invoiceFile}
+          disabled={saving}
           className={`mt-6 rounded-[10px] h-[50px] items-center justify-center ${
-            saving || !invoiceFile ? 'bg-[#94A3B8]' : 'bg-[#1E40AF]'
+            saving ? 'bg-[#94A3B8]' : 'bg-[#1E40AF]'
           }`}
         >
           {saving ? (

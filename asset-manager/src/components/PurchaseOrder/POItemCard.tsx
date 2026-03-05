@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,16 @@ const formatCurrency = (amount: number): string => {
   return `₹${amount.toLocaleString('en-IN')}`;
 };
 
+/** Sanitize input to allow digits and one decimal point (e.g. "12.50", "12.") */
+const sanitizeDecimalInput = (t: string): string => {
+  const sanitized = t.replace(/[^\d.]/g, '');
+  const parts = sanitized.split('.');
+  if (parts.length > 2) {
+    return parts[0] + '.' + parts.slice(1).join('');
+  }
+  return sanitized;
+};
+
 export const POItemCard: React.FC<POItemCardProps> = ({
   item,
   onRemove,
@@ -30,6 +40,21 @@ export const POItemCard: React.FC<POItemCardProps> = ({
   onUnitPriceChange,
   onGstPercentageChange,
 }) => {
+  const [unitPriceStr, setUnitPriceStr] = useState(
+    item.unitPrice > 0 ? String(item.unitPrice) : ''
+  );
+  const [gstStr, setGstStr] = useState(
+    (item.gstPercentage ?? 0) > 0 ? String(item.gstPercentage) : ''
+  );
+
+  useEffect(() => {
+    setUnitPriceStr(item.unitPrice > 0 ? String(item.unitPrice) : '');
+  }, [item.itemId]);
+
+  useEffect(() => {
+    setGstStr((item.gstPercentage ?? 0) > 0 ? String(item.gstPercentage) : '');
+  }, [item.itemId]);
+
   const gstPct = item.gstPercentage ?? 0;
   const gstAmount =
     item.gstAmount ?? Math.round((item.amount * gstPct) / 100);
@@ -102,13 +127,15 @@ export const POItemCard: React.FC<POItemCardProps> = ({
           <Text className="text-[15px] text-[#0F172A]">Unit Price (₹)</Text>
           {editable && onUnitPriceChange ? (
             <TextInput
-              value={item.unitPrice > 0 ? String(item.unitPrice) : ''}
-              onChangeText={(t) =>
-                onUnitPriceChange(parseInt(t.replace(/\D/g, ''), 10) || 0)
-              }
+              value={unitPriceStr}
+              onChangeText={(t) => {
+                const sanitized = sanitizeDecimalInput(t);
+                setUnitPriceStr(sanitized);
+                onUnitPriceChange(parseFloat(sanitized) || 0);
+              }}
               placeholder="0"
               placeholderTextColor="#94A3B8"
-              keyboardType="number-pad"
+              keyboardType="decimal-pad"
               {...(Platform.OS === 'android' && {
                 includeFontPadding: false,
               })}
@@ -129,9 +156,11 @@ export const POItemCard: React.FC<POItemCardProps> = ({
           <Text className="text-[15px] text-[#0F172A]">GST (%)</Text>
           {editable && onGstPercentageChange ? (
             <TextInput
-              value={gstPct > 0 ? String(gstPct) : ''}
+              value={gstStr}
               onChangeText={(t) => {
-                const parsed = parseFloat(t.replace(/[^\d.]/g, '')) || 0;
+                const sanitized = sanitizeDecimalInput(t);
+                setGstStr(sanitized);
+                const parsed = parseFloat(sanitized) || 0;
                 onGstPercentageChange(Math.min(100, Math.max(0, parsed)));
               }}
               placeholder="0"

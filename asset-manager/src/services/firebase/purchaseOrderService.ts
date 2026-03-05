@@ -160,6 +160,12 @@ export const createPO = async (
       ? Timestamp.fromDate(new Date(data.expectedDeliveryDate))
       : null;
 
+    const isAdminAutoApprove = !isDraft && createdByRole === 'Admin';
+    const status = isDraft ? 'draft' : isAdminAutoApprove ? 'approved' : 'pending_approval';
+    const reviewedBy = isAdminAutoApprove ? userId : null;
+    const reviewedByName = isAdminAutoApprove ? userName : null;
+    const reviewedAt = isAdminAutoApprove ? serverTimestamp() : null;
+
     const newPO = {
       poNumber,
       vendorId: data.vendorId,
@@ -175,14 +181,14 @@ export const createPO = async (
       justification: data.justification.trim(),
       expectedDeliveryDate: expectedDeliveryTimestamp,
       documents: [],
-      status: isDraft ? 'draft' : 'pending_approval',
+      status,
       createdBy: userId,
       createdByName: userName,
       createdByRole: createdByRole ?? null,
       createdAt: serverTimestamp(),
-      reviewedBy: null,
-      reviewedByName: null,
-      reviewedAt: null,
+      reviewedBy,
+      reviewedByName,
+      reviewedAt,
       adminComments: null,
       rejectionReason: null,
       receivedAt: null,
@@ -270,7 +276,9 @@ export const updatePO = async (
   poId: string,
   data: CreatePurchaseOrderData,
   isDraft: boolean = false,
-  createdByRole?: string
+  createdByRole?: string,
+  userId?: string,
+  userName?: string
 ): Promise<PurchaseOrder | null> => {
   try {
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
@@ -294,6 +302,12 @@ export const updatePO = async (
       ? Timestamp.fromDate(new Date(data.expectedDeliveryDate))
       : null;
 
+    const isAdminAutoApprove = !isDraft && createdByRole === 'Admin' && userId && userName;
+    const status = isDraft ? 'draft' : isAdminAutoApprove ? 'approved' : 'pending_approval';
+    const reviewedBy = isAdminAutoApprove ? userId : null;
+    const reviewedByName = isAdminAutoApprove ? userName : null;
+    const reviewedAt = isAdminAutoApprove ? serverTimestamp() : null;
+
     await updateDoc(poRef, {
       vendorId: data.vendorId,
       vendorName: data.vendorName,
@@ -307,8 +321,11 @@ export const updatePO = async (
       totalAmount,
       justification: data.justification.trim(),
       expectedDeliveryDate: expectedDeliveryTimestamp,
-      status: isDraft ? 'draft' : 'pending_approval',
+      status,
       createdByRole: createdByRole ?? null,
+      reviewedBy,
+      reviewedByName,
+      reviewedAt,
       updatedAt: serverTimestamp(),
     });
 

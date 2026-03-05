@@ -42,8 +42,7 @@ export const VendorManagementScreen: React.FC = () => {
     const q = searchQuery.toLowerCase();
     return (
       v.name.toLowerCase().includes(q) ||
-      (v.phone ?? '').toLowerCase().includes(q) ||
-      (v.category ?? '').toLowerCase().includes(q)
+      (v.phone ?? '').toLowerCase().includes(q)
     );
   });
 

@@ -151,8 +151,6 @@ const createMockVendor = (overrides: Partial<Vendor> = {}): Vendor =>
     phone: '9876543210',
     email: 'john@steel.com',
     address: '123 Industrial Ave',
-    gstin: '29ABCDE1234F1Z5',
-    category: 'Steel',
     poCount: 5,
     lastPoDate: '2025-01-15',
     status: 'active',
@@ -220,8 +218,8 @@ describe('VendorManagementScreen', () => {
 
   it('search filters vendors', () => {
     mockVendorsToReturn = null;
-    const vendor1 = createMockVendor({ id: 'v1', name: 'Steel Suppliers Ltd', category: 'Steel', phone: '9876543210' });
-    const vendor2 = createMockVendor({ id: 'v2', name: 'Hardware Plus', category: 'Hardware', phone: '1234567890' });
+    const vendor1 = createMockVendor({ id: 'v1', name: 'Steel Suppliers Ltd', phone: '9876543210' });
+    const vendor2 = createMockVendor({ id: 'v2', name: 'Hardware Plus', phone: '1234567890' });
 
     renderWithStore(<VendorManagementScreen />, {
       purchaseOrders: {

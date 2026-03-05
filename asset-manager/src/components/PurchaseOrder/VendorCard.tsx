@@ -29,9 +29,6 @@ export const VendorCard: React.FC<VendorCardProps> = ({ vendor, onPress }) => {
       <Text className="text-[15px] font-semibold text-[#0F172A] mb-1">
         {vendor.name}
       </Text>
-      {vendor.category ? (
-        <Text className="text-[13px] text-[#64748B] mb-2">{vendor.category}</Text>
-      ) : null}
       <View className="flex-row items-center gap-2 mb-2">
         <Ionicons name="call-outline" size={16} color="#64748B" />
         <Text className="text-[13px] text-[#64748B]">{vendor.phone}</Text>

@@ -60,20 +60,6 @@ export const VendorForm: React.FC<VendorFormProps> = ({
         error={errors.address}
         multiline
       />
-      <FormField
-        label="GSTIN (Optional)"
-        value={data.gstin ?? ''}
-        onChangeText={(v) => handleChange('gstin', v)}
-        placeholder="GST identification number"
-        error={errors.gstin}
-      />
-      <FormField
-        label="Category"
-        value={data.category}
-        onChangeText={(v) => handleChange('category', v)}
-        placeholder="e.g. Building Materials, Tools & Equipment"
-        error={errors.category}
-      />
     </View>
   );
 };

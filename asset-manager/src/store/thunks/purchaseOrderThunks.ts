@@ -13,7 +13,11 @@ import {
   clearError,
   addOrUpdatePO,
 } from '../slices/purchaseOrderSlice';
-import { selectUserRoleType } from '../selectors/authSelectors';
+import {
+  selectUserRoleType,
+  selectUserId,
+  selectUserDisplayName,
+} from '../selectors/authSelectors';
 import type { RootState } from '../index';
 
 /**
@@ -85,12 +89,17 @@ export const updatePO = createAsyncThunk(
       dispatch(setLoading(true));
       dispatch(clearError());
 
-      const userRoleType = selectUserRoleType(getState());
+      const state = getState() as RootState;
+      const userRoleType = selectUserRoleType(state);
+      const userId = selectUserId(state);
+      const userName = selectUserDisplayName(state);
       const updatedPO = await purchaseOrderService.updatePO(
         poId,
         data,
         isDraft ?? false,
-        userRoleType ?? undefined
+        userRoleType ?? undefined,
+        userId ?? undefined,
+        userName ?? undefined
       );
 
       if (updatedPO) {

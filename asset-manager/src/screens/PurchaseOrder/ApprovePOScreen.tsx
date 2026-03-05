@@ -318,35 +318,53 @@ export const ApprovePOScreen: React.FC = () => {
           {po.items.map((item, i) => (
             <View
               key={item.itemId + i}
-              className={`flex-row gap-3 py-3 border-b border-[#E2E8F0] ${
+              className={`flex-row items-start gap-3 py-3 border-b border-[#E2E8F0] ${
                 i === po.items.length - 1 ? 'border-b-0' : ''
               }`}
             >
-              <View className="flex-[2] min-w-0">
+              <View className="flex-1 min-w-0">
                 <Text className="text-[13px] text-[#64748B] mb-0.5">Item</Text>
-                <Text className="text-[15px] font-medium text-[#0F172A]">
+                <Text
+                  className="text-[15px] font-medium text-[#0F172A]"
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
                   {item.itemName}
                 </Text>
               </View>
-              <View className="flex-1 min-w-0">
+              <View className="shrink-0 w-10">
                 <Text className="text-[13px] text-[#64748B] mb-0.5">Qty</Text>
-                <Text className="text-[15px] text-[#0F172A]">{item.quantity}</Text>
+                <Text
+                  className="text-[15px] text-[#0F172A]"
+                  numberOfLines={1}
+                >
+                  {item.quantity}
+                </Text>
               </View>
-              <View className="flex-1 min-w-0">
+              <View className="shrink-0 min-w-[72px] items-end">
                 <Text className="text-[13px] text-[#64748B] mb-0.5">Unit</Text>
-                <Text className="text-[15px] text-[#0F172A]">
+                <Text
+                  className="text-[15px] text-[#0F172A]"
+                  numberOfLines={1}
+                >
                   {formatCurrency(item.unitPrice)}
                 </Text>
               </View>
-              <View className="flex-1 min-w-0">
+              <View className="shrink-0 min-w-[56px] items-end">
                 <Text className="text-[13px] text-[#64748B] mb-0.5">GST %</Text>
-                <Text className="text-[15px] text-[#0F172A]">
+                <Text
+                  className="text-[15px] text-[#0F172A]"
+                  numberOfLines={1}
+                >
                   {item.gstPercentage ?? 18}%
                 </Text>
               </View>
-              <View className="flex-1 min-w-0">
+              <View className="shrink-0 min-w-[72px] items-end">
                 <Text className="text-[13px] text-[#64748B] mb-0.5">Total</Text>
-                <Text className="text-[15px] font-semibold text-[#0F172A]">
+                <Text
+                  className="text-[15px] font-semibold text-[#0F172A]"
+                  numberOfLines={1}
+                >
                   {formatCurrency(
                     item.amount +
                       (item.gstAmount ??

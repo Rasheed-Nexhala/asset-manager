@@ -37,8 +37,6 @@ export const AddVendorScreen: React.FC = () => {
     phone: '',
     email: '',
     address: '',
-    gstin: '',
-    category: '',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof CreateVendorData, string>>>({});
   const [loading, setLoading] = useState(false);
@@ -56,8 +54,6 @@ export const AddVendorScreen: React.FC = () => {
               phone: v.phone,
               email: v.email ?? '',
               address: v.address ?? '',
-              gstin: v.gstin ?? '',
-              category: v.category,
             });
           }
         })
@@ -86,8 +82,6 @@ export const AddVendorScreen: React.FC = () => {
           phone: formData.phone.trim(),
           email: formData.email?.trim() || undefined,
           address: formData.address?.trim() || undefined,
-          gstin: formData.gstin?.trim() || undefined,
-          category: formData.category.trim() || 'other',
         });
         Alert.alert('Success', 'Vendor updated.', [
           { text: 'OK', onPress: () => navigation.goBack() },
@@ -99,8 +93,6 @@ export const AddVendorScreen: React.FC = () => {
           phone: formData.phone.trim(),
           email: formData.email?.trim() || undefined,
           address: formData.address?.trim() || undefined,
-          gstin: formData.gstin?.trim() || undefined,
-          category: formData.category.trim() || 'other',
         });
         Alert.alert('Success', 'Vendor added.', [
           { text: 'OK', onPress: () => navigation.goBack() },
@@ -135,7 +127,7 @@ export const AddVendorScreen: React.FC = () => {
   }
 
   return (
-    <ScreenLayout edges={['top']}>
+    <ScreenLayout edges={['top']} keyboardAware>
       <ScreenHeader
         title={vendorId ? 'Edit Vendor' : 'Add Vendor'}
         showBack
@@ -150,6 +142,7 @@ export const AddVendorScreen: React.FC = () => {
         className="flex-1 bg-[#F8FAFC]"
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <VendorForm
           data={formData}

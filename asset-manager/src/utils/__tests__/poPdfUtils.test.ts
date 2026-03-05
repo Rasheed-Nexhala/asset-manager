@@ -38,7 +38,6 @@ describe('poPdfUtils', () => {
       expect(html).toContain('10');
       expect(html).toContain('₹1,000');
       expect(html).toContain('₹1,180');
-      expect(html).toContain('John');
     });
 
     it('escapes HTML in item names', () => {

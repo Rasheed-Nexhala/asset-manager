@@ -1105,7 +1105,7 @@ export const onVendorUpdated = onDocumentUpdated(
     }
 
     const vendorId = event.params.vendorId;
-    const userEditableFields = ['name', 'contactPerson', 'phone', 'email', 'address', 'gstin', 'category', 'status'];
+    const userEditableFields = ['name', 'contactPerson', 'phone', 'email', 'address', 'status'];
     const changes: Array<{ field: string; fieldLabel: string; oldValue: unknown; newValue: unknown }> = [];
 
     for (const field of userEditableFields) {

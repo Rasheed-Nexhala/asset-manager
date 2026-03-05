@@ -59,10 +59,6 @@ export function generatePOHtml(po: PurchaseOrder): string {
   }).join('');
 
   const footerParts: string[] = [];
-  footerParts.push(`Created by ${escapeHtml(po.createdByName ?? '—')} on ${formatDate(po.createdAt)}`);
-  if (po.reviewedByName) {
-    footerParts.push(`Reviewed by ${escapeHtml(po.reviewedByName)} on ${formatDate(po.reviewedAt)}`);
-  }
   if (po.receivedByName) {
     footerParts.push(`Received by ${escapeHtml(po.receivedByName)} on ${formatDate(po.receivedAt)}`);
   }
@@ -87,6 +83,7 @@ export function generatePOHtml(po: PurchaseOrder): string {
 </head>
 <body>
   <div class="header">
+    <p style="font-size: 16px; font-weight: 600; margin: 0 0 8px; color: #1E40AF;">IBF Engineering Services Pvt Ltd</p>
     <h1 style="font-size: 22px; font-weight: 600; margin: 0; color: #0F172A;">PURCHASE ORDER</h1>
     <p style="font-size: 15px; margin: 8px 0 0; color: #0F172A;">
       ${escapeHtml(po.poNumber)}
@@ -147,9 +144,9 @@ export function generatePOHtml(po: PurchaseOrder): string {
     <p style="margin: 0; font-size: 15px; color: #0F172A;">${formatDate(po.expectedDeliveryDate)}</p>
   </div>
 
-  <div class="footer">
+  ${footerParts.length > 0 ? `<div class="footer">
     ${footerParts.map((p) => `<p style="margin: 0 0 4px;">${p}</p>`).join('')}
-  </div>
+  </div>` : ''}
 </body>
 </html>`;
 }

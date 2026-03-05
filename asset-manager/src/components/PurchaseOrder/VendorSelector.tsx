@@ -6,6 +6,8 @@ import {
   Modal,
   FlatList,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { Vendor } from '../../types/vendor';
@@ -77,7 +79,12 @@ export const VendorSelector: React.FC<VendorSelectorProps> = ({
         onRequestClose={() => setModalVisible(false)}
       >
         <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-2xl max-h-[80%]">
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            className="w-full"
+            keyboardVerticalOffset={0}
+          >
+            <View className="bg-white rounded-t-2xl max-h-[80%]">
             <View className="w-10 h-1 bg-[#E2E8F0] rounded-full self-center mt-2 mb-4" />
             <View className="px-4 pb-3 border-b border-[#E2E8F0]">
               <View className="flex-row justify-between items-center mb-3">
@@ -107,6 +114,7 @@ export const VendorSelector: React.FC<VendorSelectorProps> = ({
             <FlatList
               data={filteredVendors}
               keyExtractor={(item) => item.id}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => (
                 <TouchableOpacity
                   onPress={() => handleSelect(item)}
@@ -126,7 +134,8 @@ export const VendorSelector: React.FC<VendorSelectorProps> = ({
                 </View>
               }
             />
-          </View>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </View>

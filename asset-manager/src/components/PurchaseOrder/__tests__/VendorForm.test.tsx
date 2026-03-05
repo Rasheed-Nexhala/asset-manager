@@ -8,8 +8,6 @@ const initialData = {
   phone: '',
   email: '',
   address: '',
-  gstin: '',
-  category: '',
 };
 
 describe('VendorForm', () => {
@@ -22,8 +20,6 @@ describe('VendorForm', () => {
     expect(screen.getByPlaceholderText('+91-')).toBeTruthy();
     expect(screen.getByPlaceholderText('email@example.com')).toBeTruthy();
     expect(screen.getByPlaceholderText('Full address')).toBeTruthy();
-    expect(screen.getByPlaceholderText('GST identification number')).toBeTruthy();
-    expect(screen.getByPlaceholderText(/e.g. Building Materials/)).toBeTruthy();
   });
 
   it('calls onChange when vendor name changes', () => {

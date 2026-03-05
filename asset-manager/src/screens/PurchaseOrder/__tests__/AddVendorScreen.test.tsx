@@ -41,7 +41,6 @@ const mockVendor: Vendor = {
   phone: '+91 9876543210',
   email: 'abc@test.com',
   address: '123 Vendor St',
-  category: 'other',
   poCount: 0,
   lastPoDate: null,
   status: 'active',
@@ -118,7 +117,6 @@ describe('AddVendorScreen', () => {
         expect.objectContaining({
           name: 'New Vendor',
           phone: '+91 1234567890',
-          category: 'other',
         })
       );
     });

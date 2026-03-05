@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -35,6 +36,7 @@ import { setVendors } from '../../store/slices/purchaseOrderSlice';
 import {
   selectUserId,
   selectUserDisplayName,
+  selectIsAdmin,
 } from '../../store/selectors/authSelectors';
 import {
   selectVendors,
@@ -67,6 +69,7 @@ export const CreatePOScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
+  const isAdmin = useAppSelector(selectIsAdmin);
   const vendors = useAppSelector(selectVendors);
   const poFromStore = useAppSelector((state) =>
     poId ? selectPOById(poId)(state) : null
@@ -176,10 +179,9 @@ export const CreatePOScreen: React.FC = () => {
     if (!vName) e.vendorName = 'Vendor name is required';
     if (!vContact) e.vendorContact = 'Contact number is required';
     if (items.length === 0) e.items = 'At least one item is required';
-    if (!justification.trim()) e.justification = 'Justification is required';
     setErrors(e);
     return Object.keys(e).length === 0;
-  }, [vendorName, vendorContact, items.length, justification]);
+  }, [vendorName, vendorContact, items.length]);
 
   const handleItemsSelected = useCallback((selected: Item[]) => {
     const newItems: PurchaseOrderItem[] = selected.map((item) => ({
@@ -323,7 +325,9 @@ export const CreatePOScreen: React.FC = () => {
         const poForPrint = savedPO ?? (await getPOById(savedPoId));
         const successMsg = asDraft
           ? 'Draft saved.'
-          : 'Purchase order submitted for approval.';
+          : poForPrint?.status === 'approved'
+            ? 'Purchase order approved.'
+            : 'Purchase order submitted for approval.';
 
         Alert.alert('Success', successMsg, [
           {
@@ -475,7 +479,7 @@ export const CreatePOScreen: React.FC = () => {
   }
 
   return (
-    <ScreenLayout edges={['top']}>
+    <ScreenLayout edges={['top']} keyboardAware>
       <ScreenHeader
         title={poId ? 'Edit Purchase Order' : 'New Purchase Order'}
         showBack
@@ -486,6 +490,7 @@ export const CreatePOScreen: React.FC = () => {
         className="flex-1 bg-[#F8FAFC]"
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <View className="px-4 py-4 gap-6">
           {/* Vendor */}
@@ -609,7 +614,6 @@ export const CreatePOScreen: React.FC = () => {
             onChangeText={setJustification}
             placeholder="e.g. Cement stock below minimum"
             error={errors.justification}
-            required
             multiline
           />
 
@@ -639,7 +643,7 @@ export const CreatePOScreen: React.FC = () => {
               <DateTimePicker
                 value={expectedDeliveryDate ?? new Date()}
                 mode="date"
-                display="default"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={(_, d) => {
                   setShowDatePicker(false);
                   if (d) setExpectedDeliveryDate(d);
@@ -683,7 +687,7 @@ export const CreatePOScreen: React.FC = () => {
                 <ActivityIndicator size="small" color="white" />
               ) : (
                 <Text className="text-[15px] font-semibold text-white">
-                  Submit for Approval
+                  {isAdmin ? 'Submit PO' : 'Submit for Approval'}
                 </Text>
               )}
             </TouchableOpacity>
