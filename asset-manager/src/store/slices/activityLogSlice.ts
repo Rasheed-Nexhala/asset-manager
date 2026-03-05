@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { ActivityLog, ActivityLogFiltersStore } from '../../types/activityLog';
 import { dateToIso } from '../../utils/dateSerialization';
+import { sanitizeForDisplay } from '../../utils/sanitizeUtils';
 import {
   fetchMyRecentActivity,
   exportActivityLogsThunk,
@@ -161,7 +162,7 @@ const activityLogSlice = createSlice({
       })
       .addCase('activityLog/fetchLogs/rejected', (state, action) => {
         state.loading = false;
-        state.error = (action.payload as string) ?? 'Failed to fetch activity logs';
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'Failed to fetch activity logs';
         state.errorTimestamp = Date.now();
       })
 
@@ -182,7 +183,7 @@ const activityLogSlice = createSlice({
       })
       .addCase('activityLog/loadMore/rejected', (state, action) => {
         state.loadingMore = false;
-        state.error = (action.payload as string) ?? 'Failed to load more activity logs';
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'Failed to load more activity logs';
         state.errorTimestamp = Date.now();
       })
 
@@ -197,7 +198,7 @@ const activityLogSlice = createSlice({
       })
       .addCase(fetchMyRecentActivity.rejected, (state, action) => {
         state.myActivityLoading = false;
-        state.error = (action.payload as string) ?? 'Failed to fetch recent activity';
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'Failed to fetch recent activity';
         state.errorTimestamp = Date.now();
       })
 
@@ -211,7 +212,7 @@ const activityLogSlice = createSlice({
       })
       .addCase(exportActivityLogsThunk.rejected, (state, action) => {
         state.exportLoading = false;
-        state.error = (action.payload as string) ?? 'Failed to export activity logs';
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'Failed to export activity logs';
         state.errorTimestamp = Date.now();
       });
   },

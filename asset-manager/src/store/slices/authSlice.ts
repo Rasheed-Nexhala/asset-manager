@@ -3,6 +3,7 @@ import { User } from 'firebase/auth';
 import type { AuthState } from '../../types/auth';
 import type { UserRoleData } from '../../types/roles';
 import { signUpUser, signInUser, signOutUser } from '../thunks/authThunks';
+import { sanitizeForDisplay } from '../../utils/sanitizeUtils';
 
 const initialState: AuthState = {
   user: null,
@@ -64,7 +65,7 @@ const authSlice = createSlice({
       })
       .addCase(signUpUser.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload as string;
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'An unexpected error occurred';
         state.user = null;
         state.isAuthenticated = false;
       })
@@ -80,7 +81,7 @@ const authSlice = createSlice({
       })
       .addCase(signInUser.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload as string;
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'An unexpected error occurred';
         state.user = null;
         state.isAuthenticated = false;
       })
@@ -98,7 +99,7 @@ const authSlice = createSlice({
       })
       .addCase(signOutUser.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload as string;
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'An unexpected error occurred';
       });
   },
 });

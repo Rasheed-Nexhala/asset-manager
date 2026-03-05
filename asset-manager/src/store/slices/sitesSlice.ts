@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { Site } from '../../types/sites';
 import { fetchSites, createSite, updateSite } from '../thunks/sitesThunks';
+import { sanitizeForDisplay } from '../../utils/sanitizeUtils';
 import {
   cleanupManagerAssignments,
   validateAllManagerAssignments,
@@ -76,7 +77,7 @@ const sitesSlice = createSlice({
       })
       .addCase(fetchSites.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload as string;
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'An unexpected error occurred';
       })
       // Create site
       .addCase(createSite.pending, (state) => {
@@ -91,7 +92,7 @@ const sitesSlice = createSlice({
       })
       .addCase(createSite.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload as string;
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'An unexpected error occurred';
       })
       // Update site
       .addCase(updateSite.pending, (state) => {
@@ -106,7 +107,7 @@ const sitesSlice = createSlice({
       })
       .addCase(updateSite.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload as string;
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'An unexpected error occurred';
       })
       // Cleanup manager assignments
       .addCase(cleanupManagerAssignments.pending, (state) => {

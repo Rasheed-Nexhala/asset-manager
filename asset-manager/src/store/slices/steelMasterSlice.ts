@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { SteelMaster } from '../../types/steelMaster';
+import { sanitizeForDisplay } from '../../utils/sanitizeUtils';
 import {
   fetchSteelMasters,
   fetchSteelMasterById,
@@ -85,7 +86,7 @@ const steelMasterSlice = createSlice({
       })
       .addCase(fetchSteelMasters.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'An unexpected error occurred';
       })
       // Fetch steel master by ID
       .addCase(fetchSteelMasterById.pending, (state) => {
@@ -100,7 +101,7 @@ const steelMasterSlice = createSlice({
       .addCase(fetchSteelMasterById.rejected, (state, action) => {
         state.loading = false;
         state.selectedSteelMaster = null;
-        state.error = action.payload as string;
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'An unexpected error occurred';
       })
       // Create steel master
       .addCase(createSteelMaster.pending, (state) => {
@@ -121,7 +122,7 @@ const steelMasterSlice = createSlice({
       })
       .addCase(createSteelMaster.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'An unexpected error occurred';
       })
       // Update steel master
       .addCase(updateSteelMaster.pending, (state) => {
@@ -145,7 +146,7 @@ const steelMasterSlice = createSlice({
       })
       .addCase(updateSteelMaster.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'An unexpected error occurred';
       })
       // Delete steel master (soft delete - payload is the id string)
       .addCase(deleteSteelMaster.pending, (state) => {
@@ -167,7 +168,7 @@ const steelMasterSlice = createSlice({
       })
       .addCase(deleteSteelMaster.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'An unexpected error occurred';
       });
   },
 });

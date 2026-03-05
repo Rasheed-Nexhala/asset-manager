@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { PurchaseOrder } from '../../types/purchaseOrder';
 import type { Vendor } from '../../types/vendor';
+import { sanitizeForDisplay } from '../../utils/sanitizeUtils';
 
 interface PurchaseOrderState {
   purchaseOrders: PurchaseOrder[];
@@ -139,7 +140,7 @@ const purchaseOrderSlice = createSlice({
       .addCase('purchaseOrders/fetchPurchaseOrdersPaginated/rejected', (state, action) => {
         state.loading = false;
         const payload = (action as PayloadAction<string | undefined>).payload;
-        state.error = payload ?? 'Failed to load purchase orders';
+        state.error = sanitizeForDisplay(payload) || 'Failed to load purchase orders';
       })
       .addCase('purchaseOrders/loadMorePurchaseOrders/pending', (state) => {
         state.loadingMore = true;

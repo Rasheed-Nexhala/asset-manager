@@ -1,15 +1,19 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { Item, Category, InventoryEntry, ItemFilters } from '../../types/inventory';
 import { isLowStock } from '../../utils/inventoryUtils';
+import { sanitizeForDisplay } from '../../utils/sanitizeUtils';
 
-/** Safely extract error message from thunk rejection payload */
+/** Safely extract error message from thunk rejection payload, then sanitize for XSS */
 const getErrorMessage = (payload: unknown): string => {
-  if (typeof payload === 'string') return payload;
-  if (payload instanceof Error) return payload.message;
-  if (payload && typeof payload === 'object' && 'message' in payload) {
-    return String((payload as { message: unknown }).message);
+  let msg: string;
+  if (typeof payload === 'string') msg = payload;
+  else if (payload instanceof Error) msg = payload.message;
+  else if (payload && typeof payload === 'object' && 'message' in payload) {
+    msg = String((payload as { message: unknown }).message);
+  } else {
+    msg = 'An unexpected error occurred';
   }
-  return 'An unexpected error occurred';
+  return sanitizeForDisplay(msg) || 'An unexpected error occurred';
 };
 import {
   fetchItems,

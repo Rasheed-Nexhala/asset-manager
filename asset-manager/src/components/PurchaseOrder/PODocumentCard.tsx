@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Linking, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { isSafeOpenableUrl } from '../../utils/urlUtils';
 
 interface PODocumentCardProps {
   fileName: string;
@@ -14,6 +15,13 @@ export const PODocumentCard: React.FC<PODocumentCardProps> = ({
   type,
 }) => {
   const handlePress = async () => {
+    if (!isSafeOpenableUrl(fileUrl)) {
+      Alert.alert(
+        'Invalid Link',
+        'This document link cannot be opened for security reasons.',
+      );
+      return;
+    }
     try {
       const canOpen = await Linking.canOpenURL(fileUrl);
       if (canOpen) {

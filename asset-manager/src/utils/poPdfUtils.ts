@@ -43,16 +43,19 @@ export function generatePOHtml(po: PurchaseOrder): string {
   const statusStyle = statusBadgeClass[po.status] ?? statusBadgeClass.draft;
 
   const itemRows = (po.items ?? []).map((item) => {
-    const gstPct = item.gstPercentage ?? DEFAULT_GST_PERCENTAGE;
+    const amount = Number(item.amount) || 0;
+    const gstPct = Number(item.gstPercentage ?? DEFAULT_GST_PERCENTAGE) || DEFAULT_GST_PERCENTAGE;
     const gstAmt =
-      item.gstAmount ?? Math.round((item.amount * gstPct) / 100);
-    const totalWithGst = item.amount + gstAmt;
+      Number(item.gstAmount) || Math.round((amount * gstPct) / 100);
+    const totalWithGst = amount + gstAmt;
+    const quantity = Number(item.quantity) || 0;
+    const unitPrice = Number(item.unitPrice) || 0;
     return `
       <tr>
         <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A;">${escapeHtml(item.itemName)}</td>
         <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 13px; color: #64748B;">${escapeHtml(item.itemSku)}</td>
-        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${item.quantity}</td>
-        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${formatCurrency(item.unitPrice)}</td>
+        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${quantity}</td>
+        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${formatCurrency(unitPrice)}</td>
         <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${gstPct}%</td>
         <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; font-weight: 600; color: #0F172A; text-align: right;">${formatCurrency(totalWithGst)}</td>
       </tr>`;
@@ -122,15 +125,15 @@ export function generatePOHtml(po: PurchaseOrder): string {
     <div class="section-title">SUMMARY</div>
     <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
       <span class="label">Subtotal</span>
-      <span class="value">${formatCurrency(po.subtotal ?? 0)}</span>
+      <span class="value">${formatCurrency(Number(po.subtotal) || 0)}</span>
     </div>
     <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
       <span class="label">Total GST</span>
-      <span class="value">${formatCurrency(po.gstAmount ?? 0)}</span>
+      <span class="value">${formatCurrency(Number(po.gstAmount) || 0)}</span>
     </div>
     <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 1px solid #E2E8F0;">
       <span class="section-title" style="margin: 0;">Total</span>
-      <span style="font-size: 17px; font-weight: 600; color: #0F172A;">${formatCurrency(po.totalAmount ?? 0)}</span>
+      <span style="font-size: 17px; font-weight: 600; color: #0F172A;">${formatCurrency(Number(po.totalAmount) || 0)}</span>
     </div>
   </div>
 
@@ -151,7 +154,12 @@ export function generatePOHtml(po: PurchaseOrder): string {
 </html>`;
 }
 
-function escapeHtml(text: string): string {
+/**
+ * Escapes HTML special characters to prevent XSS when interpolating user-provided
+ * strings into generated HTML. Returns empty string for null/undefined.
+ */
+function escapeHtml(text: string | null | undefined): string {
+  if (text == null) return '';
   const map: Record<string, string> = {
     '&': '&amp;',
     '<': '&lt;',
@@ -159,7 +167,7 @@ function escapeHtml(text: string): string {
     '"': '&quot;',
     "'": '&#039;',
   };
-  return text.replace(/[&<>"']/g, (c) => map[c] ?? c);
+  return String(text).replace(/[&<>"']/g, (c) => map[c] ?? c);
 }
 
 /**
