@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback, useState } from 'react';
+import { useAutoClearError } from '../../hooks/useAutoClearError';
 import {
   View,
   Text,
@@ -97,6 +98,8 @@ export const PurchaseOrderListScreen: React.FC = () => {
     dispatch(clearError());
     setRetryTrigger((t) => t + 1);
   }, [dispatch]);
+
+  useAutoClearError(error, () => dispatch(clearError()));
 
   const handleLoadMore = useCallback(() => {
     if (!hasMore || loadingMore) return;

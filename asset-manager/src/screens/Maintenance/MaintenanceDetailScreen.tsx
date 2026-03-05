@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
+import { useAutoClearError } from '../../hooks/useAutoClearError';
 import {
   View,
   Text,
@@ -20,6 +21,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   setSelectedMaintenance,
   updateMaintenanceInState,
+  clearError,
 } from '../../store/slices/maintenanceSlice';
 import {
   selectMaintenanceById,
@@ -184,6 +186,8 @@ export const MaintenanceDetailScreen: React.FC = () => {
     if (!maintenanceId) return;
     navigation.navigate('WriteOff', { maintenanceId });
   }, [navigation, maintenanceId]);
+
+  useAutoClearError(error, () => dispatch(clearError()));
 
   // Status-based action buttons
   const actionButtons = useMemo(() => {

@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import { useAutoClearError } from '../../hooks/useAutoClearError';
 import {
   View,
   Text,
@@ -48,6 +49,8 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onGoToLogin }) => {
     setErrors((prev) => ({ ...prev, confirmPassword: undefined }));
     if (authError) dispatch(clearError());
   }, [authError, dispatch]);
+
+  useAutoClearError(authError, () => dispatch(clearError()));
 
   const handleSubmit = useCallback(async () => {
     const nextErrors = validateSignupForm(values, confirmPassword);

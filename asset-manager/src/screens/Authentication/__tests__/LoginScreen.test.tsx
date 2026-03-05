@@ -170,7 +170,7 @@ describe('LoginScreen', () => {
     expect(screen.getByText(deactivatedMessage)).toBeTruthy();
   });
 
-  it('does not display other auth errors (e.g. invalid credentials) in UI', () => {
+  it('displays auth errors (e.g. invalid credentials) in UI', () => {
     renderWithStore(<LoginScreen />, {
       auth: {
         user: null,
@@ -183,7 +183,7 @@ describe('LoginScreen', () => {
       },
     });
 
-    expect(screen.queryByText('Invalid email or password')).toBeNull();
+    expect(screen.getByText('Invalid email or password')).toBeTruthy();
   });
 
   it('shows loading state when isLoading', () => {

@@ -53,6 +53,7 @@ import {
   clearError as clearMaintenanceError,
 } from '../store/slices/maintenanceSlice';
 import { useDashboardSubscriptions } from '../hooks/useDashboardSubscriptions';
+import { useAutoClearError } from '../hooks/useAutoClearError';
 import { getUnreadCount } from '../services/firebase/notificationService';
 import { getLocationId } from '../utils/locationUtils';
 import type { DashboardStackParamList } from '../navigation/DashboardStackParamList';
@@ -193,6 +194,9 @@ export const DashboardScreen: React.FC = () => {
     if (purchaseOrderError) dispatch(clearPurchaseOrderError());
     if (maintenanceError) dispatch(clearMaintenanceError());
   }, [dispatch, requestsError, purchaseOrderError, maintenanceError]);
+
+  useAutoClearError(activityLogError, () => dispatch(clearError()));
+  useAutoClearError(dashboardDataError, clearDashboardError);
 
   const pendingRequests = isSiteManager ? myRequests : requests;
   const pendingForWidget = pendingRequests

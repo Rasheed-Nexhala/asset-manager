@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback, useState } from 'react';
+import { useAutoClearError } from '../../hooks/useAutoClearError';
 import {
   View,
   Text,
@@ -15,7 +16,7 @@ import { ScreenHeader } from '../../components/ScreenHeader';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { SiteCard } from '../../components/Sites/SiteCard';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { fetchSites, setSearchQuery, setSites } from '../../store/slices/sitesSlice';
+import { fetchSites, setSearchQuery, setSites, clearError } from '../../store/slices/sitesSlice';
 import {
   selectFilteredActiveSites,
   selectFilteredInactiveSites,
@@ -78,6 +79,8 @@ export const SiteManagementScreen: React.FC = () => {
     },
     [dispatch]
   );
+
+  useAutoClearError(error, () => dispatch(clearError()));
 
   const renderSiteCard = useCallback(
     ({ item }: { item: Site }) => (

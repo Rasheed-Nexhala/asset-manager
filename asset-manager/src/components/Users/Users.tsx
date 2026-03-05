@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useAutoClearError } from '../../hooks/useAutoClearError';
 import {
   View,
   Text,
@@ -78,6 +79,8 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
       unsubscribe();
     };
   }, []);
+
+  useAutoClearError(error, () => setError(null));
 
   /**
    * Handle pull-to-refresh

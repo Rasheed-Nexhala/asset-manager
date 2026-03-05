@@ -1,10 +1,11 @@
 import React, { useEffect, useCallback, useState, useMemo } from 'react';
+import { useAutoClearError } from '../../hooks/useAutoClearError';
 import { View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenHeader, ScreenLayout, SiteForm } from '../../components';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { updateSite, fetchSites } from '../../store/slices/sitesSlice';
+import { updateSite, fetchSites, clearError } from '../../store/slices/sitesSlice';
 import { selectSiteById, selectSitesLoading, selectSitesError } from '../../store/selectors/sitesSelectors';
 import { getSite } from '../../services/firebase/siteService';
 import type { SiteFormData, Site } from '../../types/sites';
@@ -87,6 +88,8 @@ export const EditSiteScreen: React.FC = () => {
     // @ts-ignore - navigation typing varies by navigator
     navigation.goBack();
   }, [navigation]);
+
+  useAutoClearError(error, () => dispatch(clearError()));
 
   // Loading state
   if (loading) {

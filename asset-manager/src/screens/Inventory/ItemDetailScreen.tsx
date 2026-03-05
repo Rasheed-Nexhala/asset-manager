@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
+import { useAutoClearError } from '../../hooks/useAutoClearError';
 import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -17,7 +18,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchItemById, adjustQuantity } from '../../store/thunks/inventoryThunks';
 import { selectItemById, selectItemsLoading, selectItemsError } from '../../store/selectors/inventorySelectors';
 import { selectIsAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
-import { updateItemInState } from '../../store/slices/inventorySlice';
+import { updateItemInState, clearError } from '../../store/slices/inventorySlice';
 import { subscribeItemById, subscribeInventoryByItemId } from '../../services/firebase/inventoryService';
 import type { Item, AdjustmentData, InventoryEntry } from '../../types/inventory';
 
@@ -207,6 +208,8 @@ export const ItemDetailScreen: React.FC = () => {
     },
     [dispatch]
   );
+
+  useAutoClearError(error, () => dispatch(clearError()));
 
   // Loading state
   if (isLoading && !item) {

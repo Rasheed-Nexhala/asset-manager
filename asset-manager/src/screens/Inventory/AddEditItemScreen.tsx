@@ -14,6 +14,7 @@ import {
 } from '../../store/thunks/inventoryThunks';
 import { selectAllCategories, selectItemsLoading } from '../../store/selectors/inventorySelectors';
 import { useInventoryError } from '../../hooks/useInventoryError';
+import { useAutoClearError } from '../../hooks/useAutoClearError';
 import { uploadItemImage, deleteItemImageByUrl } from '../../services/firebase/storageService';
 import type { Item, CreateItemData, UpdateItemData } from '../../types/inventory';
 import type { InventoryStackParamList } from '../../navigation/InventoryStackNavigator';
@@ -57,6 +58,8 @@ export const AddEditItemScreen: React.FC = () => {
       }
     };
   }, []);
+
+  useAutoClearError(error, () => setError(null));
 
   // Load item data for edit mode
   useEffect(() => {

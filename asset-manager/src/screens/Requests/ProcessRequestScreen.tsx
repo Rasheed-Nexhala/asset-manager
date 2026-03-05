@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useAutoClearError } from '../../hooks/useAutoClearError';
 import {
   View,
   Text,
@@ -178,6 +179,8 @@ export const ProcessRequestScreen: React.FC = () => {
     },
     [availability]
   );
+
+  useAutoClearError(subscriptionError, () => setSubscriptionError(null));
 
   const handleApprove = useCallback(async () => {
     if (!request || !userId || !userName || !allSufficient) return;

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { useAutoClearError } from '../../hooks/useAutoClearError';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -7,6 +8,7 @@ import { ScreenHeader, ScreenLayout } from '../../components';
 import { InventoryListItem } from '../../components/Inventory/InventoryListItem';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchInventoryByLocation } from '../../store/thunks/inventoryThunks';
+import { clearError } from '../../store/slices/inventorySlice';
 import { selectInventoryByLocation, selectItemsLoading, selectItemsError, selectAllItems } from '../../store/selectors/inventorySelectors';
 import { getSite } from '../../services/firebase/siteService';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
@@ -133,6 +135,9 @@ export const OtherSiteInventoryScreen: React.FC = () => {
       navigation.goBack();
     }
   }, [navigation]);
+
+  useAutoClearError(siteError, () => setSiteError(null));
+  useAutoClearError(error, () => dispatch(clearError()));
 
   // Loading state
   if (siteLoading || isLoading) {

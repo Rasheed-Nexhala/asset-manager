@@ -1,10 +1,11 @@
 import React, { useCallback } from 'react';
+import { useAutoClearError } from '../../hooks/useAutoClearError';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenHeader, ScreenLayout, SiteForm } from '../../components';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { createSite } from '../../store/slices/sitesSlice';
+import { createSite, clearError } from '../../store/slices/sitesSlice';
 import { selectSitesLoading, selectSitesError } from '../../store/selectors/sitesSelectors';
 import type { SiteFormData } from '../../types/sites';
 
@@ -38,6 +39,8 @@ export const AddSiteScreen: React.FC = () => {
     // @ts-ignore - navigation typing varies by navigator
     navigation.goBack();
   }, [navigation]);
+
+  useAutoClearError(error, () => dispatch(clearError()));
 
   return (
     <ScreenLayout edges={['top']} keyboardAware>

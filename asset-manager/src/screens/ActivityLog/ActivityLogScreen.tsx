@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useAutoClearError } from '../../hooks/useAutoClearError';
 import {
   View,
   Text,
@@ -114,15 +115,7 @@ export const ActivityLogScreen: React.FC = () => {
     setDetailModalVisible(true);
   }, []);
 
-  // Dismiss error after 5 seconds
-  useEffect(() => {
-    if (error) {
-      const timeout = setTimeout(() => {
-        dispatch(clearError());
-      }, 5000);
-      return () => clearTimeout(timeout);
-    }
-  }, [error, dispatch]);
+  useAutoClearError(error, () => dispatch(clearError()));
 
   // Check if filters are applied
   const hasActiveFilters =
