@@ -4,18 +4,16 @@ import type { AppDispatch } from '../index';
 import {
   listActivityLogs,
   getActivityLogsCount,
-  getMyRecentActivity,
+  listMyActivityPaginated,
+  getMyActivityCount,
   exportActivityLogs,
   subscribeToActivityLogs,
-  subscribeToMyRecentActivity,
   ACTIVITY_LOGS_PAGE_SIZE,
 } from '../../services/firebase/activityLogService';
 import { saveCsvAndShare } from '../../utils/csvExport';
 import {
   updateLogsFromSnapshot,
-  updateMyActivityFromSnapshot,
   setLoading,
-  setMyActivityLoading,
   setError,
 } from '../slices/activityLogSlice';
 import type { RootState } from '../index';
@@ -24,15 +22,6 @@ import type { RootState } from '../index';
  * Subscription manager - stores unsubscribe functions
  */
 let activityLogsUnsubscribe: (() => void) | null = null;
-
-/**
- * MyActivity subscription: ref-counted so MyRecentActivityWidget and MyActivityScreen
- * can both subscribe without one unmount killing the other's subscription
- */
-let myActivityUnsubscribe: (() => void) | null = null;
-let myActivityRefCount = 0;
-let myActivitySubscribedUserId: string | null = null;
-let myActivityTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Fetch activity logs with filters and pagination.
@@ -99,18 +88,57 @@ export const loadMoreActivityLogs = createAsyncThunk(
 );
 
 /**
- * Fetch user's own recent activity (last 10 actions)
+ * Fetch user's own activity with pagination (initial load).
+ * Fetches count + first page in parallel.
  */
-export const fetchMyRecentActivity = createAsyncThunk(
-  'activityLog/fetchMyActivity',
+export const fetchMyActivityPaginated = createAsyncThunk(
+  'activityLog/fetchMyActivityPaginated',
   async (userId: string, { rejectWithValue }) => {
     try {
-      const logs = await getMyRecentActivity(userId);
-      return logs;
+      const [totalCount, listResult] = await Promise.all([
+        getMyActivityCount(userId),
+        listMyActivityPaginated(userId, ACTIVITY_LOGS_PAGE_SIZE),
+      ]);
+      return {
+        logs: listResult.logs,
+        totalCount,
+        lastDoc: listResult.lastDoc,
+        pageSize: ACTIVITY_LOGS_PAGE_SIZE,
+      };
     } catch (error: unknown) {
       const err = error as Error;
       return rejectWithValue(
-        err.message ?? 'Failed to fetch recent activity'
+        err.message ?? 'Failed to fetch my activity'
+      );
+    }
+  }
+);
+
+/**
+ * Load more of user's activity (next page).
+ */
+export const loadMoreMyActivity = createAsyncThunk(
+  'activityLog/loadMoreMyActivity',
+  async (userId: string, { getState, rejectWithValue }) => {
+    const { myActivityLastDoc } = (getState() as RootState).activityLog;
+    if (!myActivityLastDoc) {
+      return { logs: [], lastDoc: null, pageSize: ACTIVITY_LOGS_PAGE_SIZE };
+    }
+    try {
+      const { logs, lastDoc } = await listMyActivityPaginated(
+        userId,
+        ACTIVITY_LOGS_PAGE_SIZE,
+        myActivityLastDoc as DocumentSnapshot
+      );
+      return {
+        logs,
+        lastDoc,
+        pageSize: ACTIVITY_LOGS_PAGE_SIZE,
+      };
+    } catch (error: unknown) {
+      const err = error as Error;
+      return rejectWithValue(
+        err.message ?? 'Failed to load more activity'
       );
     }
   }
@@ -144,9 +172,6 @@ export const exportActivityLogsThunk = createAsyncThunk(
 
 /** Minimum time (ms) to show loader so users can see it when Firestore returns from cache instantly */
 const MIN_LOADER_DISPLAY_MS = 400;
-
-/** Max time (ms) to wait for subscription callback before treating as failed (prevents infinite loading) */
-const MY_ACTIVITY_SUBSCRIPTION_TIMEOUT_MS = 15_000;
 
 /**
  * Subscribe to real-time activity logs updates
@@ -191,75 +216,6 @@ export const subscribeToActivityLogsRealtime = () => {
 };
 
 /**
- * Subscribe to user's own recent activity (real-time)
- * Ref-counted: multiple consumers (Widget + Screen) can subscribe; only unsubscribes when all unsubscribe
- */
-export const subscribeToMyRecentActivityRealtime = (userId: string) => {
-  return (dispatch: AppDispatch) => {
-    // Same userId and already subscribed: increment ref count
-    if (myActivitySubscribedUserId === userId && myActivityUnsubscribe) {
-      myActivityRefCount += 1;
-      return;
-    }
-
-    // Different userId or no subscription: unsubscribe existing, then subscribe
-    if (myActivityTimeoutId) {
-      clearTimeout(myActivityTimeoutId);
-      myActivityTimeoutId = null;
-    }
-    if (myActivityUnsubscribe) {
-      myActivityUnsubscribe();
-      myActivityUnsubscribe = null;
-      myActivityRefCount = 0;
-      myActivitySubscribedUserId = null;
-    }
-
-    myActivitySubscribedUserId = userId;
-    myActivityRefCount = 1;
-
-    const startTime = Date.now();
-    dispatch(setMyActivityLoading(true));
-
-    // Fallback: if subscription never fires within timeout, clear loading and show error
-    let timeoutFired = false;
-    myActivityTimeoutId = setTimeout(() => {
-      timeoutFired = true;
-      myActivityTimeoutId = null;
-      dispatch(setError('Loading activity timed out. Please try again.'));
-    }, MY_ACTIVITY_SUBSCRIPTION_TIMEOUT_MS);
-
-    myActivityUnsubscribe = subscribeToMyRecentActivity(
-      userId,
-      (logs) => {
-        if (timeoutFired) return;
-        if (myActivityTimeoutId) {
-          clearTimeout(myActivityTimeoutId);
-          myActivityTimeoutId = null;
-        }
-        // Firestore onSnapshot fires almost immediately (often from cache).
-        // Delay clearing loader so users actually see it.
-        const elapsed = Date.now() - startTime;
-        const dispatchUpdate = () =>
-          dispatch(updateMyActivityFromSnapshot(logs));
-        if (elapsed >= MIN_LOADER_DISPLAY_MS) {
-          dispatchUpdate();
-        } else {
-          setTimeout(dispatchUpdate, MIN_LOADER_DISPLAY_MS - elapsed);
-        }
-      },
-      (error) => {
-        if (timeoutFired) return;
-        if (myActivityTimeoutId) {
-          clearTimeout(myActivityTimeoutId);
-          myActivityTimeoutId = null;
-        }
-        dispatch(setError(error.message ?? 'Failed to subscribe to recent activity'));
-      }
-    );
-  };
-};
-
-/**
  * Unsubscribe from activity logs real-time updates
  */
 export const unsubscribeFromActivityLogs = () => {
@@ -271,24 +227,3 @@ export const unsubscribeFromActivityLogs = () => {
   };
 };
 
-/**
- * Unsubscribe from recent activity real-time updates
- * Ref-counted: only unsubscribes when ref count hits 0
- */
-export const unsubscribeFromMyRecentActivity = () => {
-  return (dispatch: AppDispatch) => {
-    myActivityRefCount = Math.max(0, myActivityRefCount - 1);
-    if (myActivityRefCount === 0) {
-      if (myActivityTimeoutId) {
-        clearTimeout(myActivityTimeoutId);
-        myActivityTimeoutId = null;
-      }
-      if (myActivityUnsubscribe) {
-        myActivityUnsubscribe();
-        myActivityUnsubscribe = null;
-        myActivitySubscribedUserId = null;
-      }
-      dispatch(setMyActivityLoading(false));
-    }
-  };
-};

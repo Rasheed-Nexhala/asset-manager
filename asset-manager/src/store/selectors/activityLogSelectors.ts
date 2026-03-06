@@ -44,6 +44,14 @@ export const selectActivityLogExportLoading = (state: RootState) =>
   state.activityLog.exportLoading;
 export const selectMyActivityLoading = (state: RootState) =>
   state.activityLog.myActivityLoading;
+export const selectMyActivityLoadingMore = (state: RootState) =>
+  state.activityLog.myActivityLoadingMore;
+
+/** My activity pagination */
+export const selectMyActivityTotalCount = (state: RootState) =>
+  state.activityLog.myActivityTotalCount;
+export const selectMyActivityHasMore = (state: RootState) =>
+  state.activityLog.myActivityHasMore;
 
 /** Error state */
 export const selectActivityLogError = (state: RootState) =>

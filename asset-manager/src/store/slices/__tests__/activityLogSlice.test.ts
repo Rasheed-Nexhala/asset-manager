@@ -10,9 +10,18 @@ jest.mock('../../thunks/activityLogThunks', () => {
         pageSize: 20,
       })
     ),
-    fetchMyRecentActivity: createAsyncThunk(
-      'activityLog/fetchMy',
-      async () => []
+    fetchMyActivityPaginated: createAsyncThunk(
+      'activityLog/fetchMyActivityPaginated',
+      async () => ({
+        logs: [],
+        totalCount: 0,
+        lastDoc: null,
+        pageSize: 10,
+      })
+    ),
+    loadMoreMyActivity: createAsyncThunk(
+      'activityLog/loadMoreMyActivity',
+      async () => ({ logs: [], lastDoc: null, pageSize: 10 })
     ),
     loadMoreActivityLogs: createAsyncThunk(
       'activityLog/loadMore',
@@ -34,9 +43,8 @@ import activityLogReducer, {
   clearError,
   clearActivityLogs,
   updateLogsFromSnapshot,
-  updateMyActivityFromSnapshot,
 } from '../activityLogSlice';
-import { fetchActivityLogs, fetchMyRecentActivity } from '../../thunks/activityLogThunks';
+import { fetchActivityLogs, fetchMyActivityPaginated } from '../../thunks/activityLogThunks';
 
 const mockLog = {
   id: 'log1',
@@ -53,6 +61,10 @@ describe('activityLogSlice', () => {
     hasMore: true,
     lastDoc: null,
     myRecentActivity: [],
+    myActivityTotalCount: null,
+    myActivityLastDoc: null,
+    myActivityHasMore: false,
+    myActivityLoadingMore: false,
     filters: {
       startDate: null,
       endDate: null,
@@ -136,15 +148,6 @@ describe('activityLogSlice', () => {
     expect(state.hasMore).toBe(false);
   });
 
-  it('updateMyActivityFromSnapshot sets myRecentActivity', () => {
-    const state = activityLogReducer(
-      initialState,
-      updateMyActivityFromSnapshot([mockLog])
-    );
-    expect(state.myRecentActivity).toEqual([mockLog]);
-    expect(state.myActivityLoading).toBe(false);
-  });
-
   it('fetchActivityLogs.fulfilled sets logs', () => {
     const state = activityLogReducer(
       initialState,
@@ -163,12 +166,23 @@ describe('activityLogSlice', () => {
     expect(state.loading).toBe(false);
   });
 
-  it('fetchMyRecentActivity.fulfilled sets myRecentActivity', () => {
+  it('fetchMyActivityPaginated.fulfilled sets myRecentActivity and pagination', () => {
     const state = activityLogReducer(
       initialState,
-      fetchMyRecentActivity.fulfilled([mockLog], 'req1')
+      fetchMyActivityPaginated.fulfilled(
+        {
+          logs: [mockLog],
+          totalCount: 1,
+          lastDoc: null,
+          pageSize: 10,
+        },
+        'req1'
+      )
     );
     expect(state.myRecentActivity).toEqual([mockLog]);
+    expect(state.myActivityTotalCount).toBe(1);
+    expect(state.myActivityLastDoc).toBe(null);
+    expect(state.myActivityHasMore).toBe(false);
     expect(state.myActivityLoading).toBe(false);
   });
 });

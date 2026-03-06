@@ -114,12 +114,11 @@ jest.mock('../../store/thunks/activityLogThunks', () => {
   return {
     fetchActivityLogs: createAsyncThunk('activityLog/fetch', async () => ({ logs: [], lastDoc: null })),
     loadMoreActivityLogs: createAsyncThunk('activityLog/loadMore', async () => ({ logs: [], lastDoc: null })),
-    fetchMyRecentActivity: createAsyncThunk('activityLog/fetchMy', async () => []),
+    fetchMyActivityPaginated: createAsyncThunk('activityLog/fetchMyActivityPaginated', async () => ({ logs: [], totalCount: 0, lastDoc: null, pageSize: 10 })),
+    loadMoreMyActivity: createAsyncThunk('activityLog/loadMoreMyActivity', async () => ({ logs: [], lastDoc: null, pageSize: 10 })),
     exportActivityLogsThunk: createAsyncThunk('activityLog/export', async () => null),
     subscribeToActivityLogsRealtime: () => () => {},
-    subscribeToMyRecentActivityRealtime: () => () => {},
     unsubscribeFromActivityLogs: () => () => {},
-    unsubscribeFromMyRecentActivity: () => () => {},
   };
 });
 
@@ -253,24 +252,41 @@ describe('DashboardScreen', () => {
   });
 
   it('shows activity log error when present', () => {
+    // Use user: null so MyRecentActivityWidget does not dispatch fetch (which would clear the error)
     renderWithStore(<DashboardScreen />, {
       auth: {
-        user: mockAdminUser,
+        user: null,
         userRole: mockAdminRole,
-        isAuthenticated: true,
+        isAuthenticated: false,
         isLoading: false,
         isRoleLoading: false,
-        authInitialized: false,
+        authInitialized: true,
         error: null,
       },
       activityLog: {
         logs: [],
-        myRecentActivity: [],
-        filters: null,
-        loading: false,
-        error: 'Activity log failed to load',
-        loadMoreLoading: false,
+        totalCount: null,
+        hasMore: true,
         lastDoc: null,
+        myRecentActivity: [],
+        myActivityTotalCount: null,
+        myActivityLastDoc: null,
+        myActivityHasMore: false,
+        myActivityLoadingMore: false,
+        filters: {
+          startDate: null,
+          endDate: null,
+          userId: null,
+          actionCategory: 'all',
+          actionType: 'all',
+          searchQuery: '',
+        },
+        loading: false,
+        loadingMore: false,
+        exportLoading: false,
+        myActivityLoading: false,
+        error: 'Activity log failed to load',
+        errorTimestamp: Date.now(),
       },
     });
 
@@ -301,7 +317,7 @@ describe('DashboardScreen', () => {
     expect(screen.getByText('Some data failed to load')).toBeTruthy();
   });
 
-  it('renders My Recent Activity for unassigned role', () => {
+  it('renders My Recent Activity for unassigned role', async () => {
     renderWithStore(<DashboardScreen />, {
       auth: {
         user: mockAdminUser,
@@ -314,6 +330,6 @@ describe('DashboardScreen', () => {
       },
     });
 
-    expect(screen.getByRole('button', { name: 'View all activity' })).toBeTruthy();
+    await screen.findByRole('button', { name: 'View all activity' });
   });
 });

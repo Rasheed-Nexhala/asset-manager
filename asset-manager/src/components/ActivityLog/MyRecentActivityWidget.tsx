@@ -12,10 +12,7 @@ import {
   selectMyActivityLoading,
 } from '../../store/selectors/activityLogSelectors';
 import { selectUserId } from '../../store/selectors/authSelectors';
-import {
-  subscribeToMyRecentActivityRealtime,
-  unsubscribeFromMyRecentActivity,
-} from '../../store/thunks/activityLogThunks';
+import { fetchMyActivityPaginated } from '../../store/thunks/activityLogThunks';
 import { ACTION_TYPE_CONFIG } from '../../constants/activityLogConfig';
 
 interface MyRecentActivityWidgetProps {
@@ -52,17 +49,11 @@ export default function MyRecentActivityWidget({
   const recentActivity = useAppSelector(selectMyRecentActivitySorted);
   const loading = useAppSelector(selectMyActivityLoading);
 
-  // Subscribe when userId is available. useEffect runs when userId changes (e.g. from null
-  // after auth loads), unlike useFocusEffect which only runs on focus. This fixes the case
-  // where userId loads after the Dashboard mounts and we never subscribed.
+  // Fetch first page when userId is available (widget shows preview of first 5 items)
   useEffect(() => {
     if (userId) {
-      dispatch(subscribeToMyRecentActivityRealtime(userId));
-      return () => {
-        dispatch(unsubscribeFromMyRecentActivity());
-      };
+      dispatch(fetchMyActivityPaginated(userId));
     }
-    return undefined;
   }, [dispatch, userId]);
 
   if (loading) {

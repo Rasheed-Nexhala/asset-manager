@@ -3,7 +3,8 @@ import type { ActivityLog, ActivityLogFiltersStore } from '../../types/activityL
 import { dateToIso } from '../../utils/dateSerialization';
 import { sanitizeForDisplay } from '../../utils/sanitizeUtils';
 import {
-  fetchMyRecentActivity,
+  fetchMyActivityPaginated,
+  loadMoreMyActivity,
   exportActivityLogsThunk,
 } from '../thunks/activityLogThunks';
 
@@ -16,8 +17,12 @@ interface ActivityLogState {
   hasMore: boolean;
   lastDoc: unknown | null;
 
-  /** My recent activity (all users) */
+  /** My activity (paginated, all users) */
   myRecentActivity: ActivityLog[];
+  myActivityTotalCount: number | null;
+  myActivityLastDoc: unknown | null;
+  myActivityHasMore: boolean;
+  myActivityLoadingMore: boolean;
 
   /** Filters */
   filters: ActivityLogFiltersStore;
@@ -39,6 +44,10 @@ const initialState: ActivityLogState = {
   hasMore: true,
   lastDoc: null,
   myRecentActivity: [],
+  myActivityTotalCount: null,
+  myActivityLastDoc: null,
+  myActivityHasMore: false,
+  myActivityLoadingMore: false,
   filters: {
     startDate: null,
     endDate: null,
@@ -107,6 +116,10 @@ const activityLogSlice = createSlice({
       state.logs = [];
       state.totalCount = null;
       state.myRecentActivity = [];
+      state.myActivityTotalCount = null;
+      state.myActivityLastDoc = null;
+      state.myActivityHasMore = false;
+      state.myActivityLoadingMore = false;
       state.hasMore = true;
       state.lastDoc = null;
       state.filters = initialState.filters;
@@ -131,12 +144,6 @@ const activityLogSlice = createSlice({
       state.hasMore = false;
     },
 
-    updateMyActivityFromSnapshot: (state, action: PayloadAction<ActivityLog[]>) => {
-      state.myRecentActivity = action.payload;
-      state.myActivityLoading = false;
-      state.error = null;
-      state.errorTimestamp = null;
-    },
   },
   extraReducers: (builder) => {
     builder
@@ -187,18 +194,47 @@ const activityLogSlice = createSlice({
         state.errorTimestamp = Date.now();
       })
 
-      .addCase(fetchMyRecentActivity.pending, (state) => {
+      .addCase(fetchMyActivityPaginated.pending, (state) => {
         state.myActivityLoading = true;
         state.error = null;
       })
-      .addCase(fetchMyRecentActivity.fulfilled, (state, action) => {
+      .addCase(fetchMyActivityPaginated.fulfilled, (state, action) => {
+        const { logs, totalCount, lastDoc, pageSize } = action.payload as {
+          logs: ActivityLog[];
+          totalCount: number;
+          lastDoc: unknown;
+          pageSize: number;
+        };
         state.myActivityLoading = false;
-        state.myRecentActivity = action.payload;
+        state.myRecentActivity = logs;
+        state.myActivityTotalCount = totalCount;
+        state.myActivityLastDoc = lastDoc;
+        state.myActivityHasMore = logs.length >= pageSize;
         state.error = null;
       })
-      .addCase(fetchMyRecentActivity.rejected, (state, action) => {
+      .addCase(fetchMyActivityPaginated.rejected, (state, action) => {
         state.myActivityLoading = false;
-        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'Failed to fetch recent activity';
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'Failed to fetch my activity';
+        state.errorTimestamp = Date.now();
+      })
+      .addCase(loadMoreMyActivity.pending, (state) => {
+        state.myActivityLoadingMore = true;
+        state.error = null;
+      })
+      .addCase(loadMoreMyActivity.fulfilled, (state, action) => {
+        const { logs, lastDoc, pageSize } = action.payload as {
+          logs: ActivityLog[];
+          lastDoc: unknown;
+          pageSize: number;
+        };
+        state.myActivityLoadingMore = false;
+        state.myRecentActivity = [...state.myRecentActivity, ...logs];
+        state.myActivityLastDoc = lastDoc;
+        state.myActivityHasMore = logs.length >= pageSize;
+      })
+      .addCase(loadMoreMyActivity.rejected, (state, action) => {
+        state.myActivityLoadingMore = false;
+        state.error = sanitizeForDisplay(action.payload as string | undefined) || 'Failed to load more activity';
         state.errorTimestamp = Date.now();
       })
 
@@ -227,7 +263,6 @@ export const {
   clearError,
   clearActivityLogs,
   updateLogsFromSnapshot,
-  updateMyActivityFromSnapshot,
 } = activityLogSlice.actions;
 
 export default activityLogSlice.reducer;

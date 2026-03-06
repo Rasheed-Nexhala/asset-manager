@@ -15,10 +15,7 @@ import { clearMaintenance } from '../slices/maintenanceSlice';
 import { clearPurchaseOrders } from '../slices/purchaseOrderSlice';
 import { clearSteelMasters } from '../slices/steelMasterSlice';
 import { clearSites } from '../slices/sitesSlice';
-import {
-  unsubscribeFromActivityLogs,
-  unsubscribeFromMyRecentActivity,
-} from './activityLogThunks';
+import { unsubscribeFromActivityLogs } from './activityLogThunks';
 import { unsubscribeFromMyActiveAccess } from './inventoryUpdateRequestThunks';
 import type {
   SignUpCredentials,
@@ -73,7 +70,6 @@ export const signOutUser = createAsyncThunk<
     try {
       // 1. Unsubscribe from thunk-managed listeners
       dispatch(unsubscribeFromActivityLogs());
-      dispatch(unsubscribeFromMyRecentActivity());
       dispatch(unsubscribeFromMyActiveAccess());
 
       // 2. Clear user in Redux FIRST so RootNavigator switches to Auth screen.

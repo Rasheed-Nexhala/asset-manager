@@ -100,12 +100,11 @@ jest.mock('../../../store/thunks/activityLogThunks', () => {
       lastDoc: null,
       pageSize: 20,
     })),
-    fetchMyRecentActivity: createAsyncThunk('activityLog/fetchMy', async () => []),
+    fetchMyActivityPaginated: createAsyncThunk('activityLog/fetchMyActivityPaginated', async () => ({ logs: [], totalCount: 0, lastDoc: null, pageSize: 10 })),
+    loadMoreMyActivity: createAsyncThunk('activityLog/loadMoreMyActivity', async () => ({ logs: [], lastDoc: null, pageSize: 10 })),
     exportActivityLogsThunk: createAsyncThunk('activityLog/export', async () => null),
     subscribeToActivityLogsRealtime: () => () => {},
-    subscribeToMyRecentActivityRealtime: () => () => {},
     unsubscribeFromActivityLogs: () => () => {},
-    unsubscribeFromMyRecentActivity: () => () => {},
   };
 });
 jest.mock('../../../store/thunks/purchaseOrderThunks', () => {

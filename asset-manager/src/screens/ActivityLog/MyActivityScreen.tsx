@@ -18,11 +18,14 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   selectMyRecentActivitySorted,
   selectMyActivityLoading,
+  selectMyActivityLoadingMore,
+  selectMyActivityTotalCount,
+  selectMyActivityHasMore,
 } from '../../store/selectors/activityLogSelectors';
 import { selectUserId, selectUserRoleType } from '../../store/selectors/authSelectors';
 import {
-  subscribeToMyRecentActivityRealtime,
-  unsubscribeFromMyRecentActivity,
+  fetchMyActivityPaginated,
+  loadMoreMyActivity,
 } from '../../store/thunks/activityLogThunks';
 import type { ActivityLog } from '../../types/activityLog';
 
@@ -34,6 +37,9 @@ export const MyActivityScreen: React.FC = () => {
   const roleType = useAppSelector(selectUserRoleType);
   const recentActivity = useAppSelector(selectMyRecentActivitySorted);
   const loading = useAppSelector(selectMyActivityLoading);
+  const loadingMore = useAppSelector(selectMyActivityLoadingMore);
+  const totalCount = useAppSelector(selectMyActivityTotalCount);
+  const hasMore = useAppSelector(selectMyActivityHasMore);
 
   const isUnassigned = roleType === 'Unassigned' || !roleType;
 
@@ -41,29 +47,28 @@ export const MyActivityScreen: React.FC = () => {
   const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
 
-  // Subscribe to real-time activity on mount.
-  // Only unsubscribe if we actually subscribed (userId was truthy) to avoid ref-count desync
-  // when Screen unmounts without having subscribed (e.g. userId was null during auth loading).
+  // Fetch initial page on mount
   useEffect(() => {
     if (userId) {
-      dispatch(subscribeToMyRecentActivityRealtime(userId));
-      return () => {
-        dispatch(unsubscribeFromMyRecentActivity());
-      };
+      dispatch(fetchMyActivityPaginated(userId));
     }
-    return undefined;
   }, [dispatch, userId]);
 
-  // Refresh handler (resubscribe to force refresh)
+  // Load more handler
+  const handleLoadMore = useCallback(() => {
+    if (!userId || !hasMore || loadingMore) return;
+    dispatch(loadMoreMyActivity(userId));
+  }, [dispatch, userId, hasMore, loadingMore]);
+
+  // Refresh handler (refetch first page)
   const handleRefresh = useCallback(async () => {
     if (!userId) return;
 
     setRefreshing(true);
     try {
-      dispatch(subscribeToMyRecentActivityRealtime(userId));
+      await dispatch(fetchMyActivityPaginated(userId)).unwrap();
     } finally {
-      // Small delay to show refresh animation
-      setTimeout(() => setRefreshing(false), 500);
+      setRefreshing(false);
     }
   }, [dispatch, userId]);
 
@@ -73,8 +78,11 @@ export const MyActivityScreen: React.FC = () => {
     setDetailModalVisible(true);
   }, []);
 
-  // Full-screen initial loader: show when loading and no data yet (prevents page flash)
-  if (loading && recentActivity.length === 0) {
+  // Full-screen initial loader: show when no data and either loading or no fetch completed yet.
+  // totalCount === null means no fetch has completed (per Firestore pagination skill).
+  const showInitialLoader =
+    recentActivity.length === 0 && (loading || totalCount === null);
+  if (showInitialLoader) {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader title="My Recent Activity" />
@@ -94,17 +102,19 @@ export const MyActivityScreen: React.FC = () => {
     <ScreenLayout edges={['top']}>
       <ScreenHeader title="My Recent Activity" />
 
-      {/* Info Banner */}
-      <View className="bg-[#1E40AF]/10 px-4 py-3 mx-4 mb-3 rounded-lg flex-row items-start gap-2">
-        <Ionicons
-          name="information-circle"
-          size={20}
-          color="#1E40AF"
-        />
-        <Text className="text-[13px] text-[#1E40AF] flex-1">
-          Showing your last 10 actions in the system
-        </Text>
-      </View>
+      {/* Info Banner: Showing X of Y */}
+      {totalCount != null && (
+        <View className="bg-[#1E40AF]/10 px-4 py-3 mx-4 mb-3 rounded-lg flex-row items-start gap-2">
+          <Ionicons
+            name="information-circle"
+            size={20}
+            color="#1E40AF"
+          />
+          <Text className="text-[13px] text-[#1E40AF] flex-1">
+            Showing {recentActivity.length} of {totalCount} actions
+          </Text>
+        </View>
+      )}
 
       {/* Activity List */}
       <FlatList
@@ -122,6 +132,8 @@ export const MyActivityScreen: React.FC = () => {
           flexGrow: 1,
         }}
         showsVerticalScrollIndicator={false}
+        onEndReached={hasMore && !loadingMore ? handleLoadMore : undefined}
+        onEndReachedThreshold={0.5}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -129,6 +141,13 @@ export const MyActivityScreen: React.FC = () => {
             colors={['#1E40AF']}
             tintColor="#1E40AF"
           />
+        }
+        ListFooterComponent={
+          loadingMore ? (
+            <View className="py-4 items-center">
+              <ActivityIndicator size="small" color="#1E40AF" />
+            </View>
+          ) : null
         }
         ListEmptyComponent={
           loading ? (

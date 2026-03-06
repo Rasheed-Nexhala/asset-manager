@@ -14,7 +14,6 @@ import activityLogReducer from '../../../store/slices/activityLogSlice';
 import purchaseOrderReducer from '../../../store/slices/purchaseOrderSlice';
 import type { RootState } from '../../../store';
 import type { ActivityLog } from '../../../types/activityLog';
-import * as activityLogThunks from '../../../store/thunks/activityLogThunks';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn().mockResolvedValue(null),
@@ -143,17 +142,26 @@ jest.mock('../../../store/thunks/maintenanceThunks', () => {
     addMaintenanceUpdateThunk: createAsyncThunk('maintenance/update', async () => null),
   };
 });
+const mockFetchMyActivityPaginated = jest.fn();
 jest.mock('../../../store/thunks/activityLogThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
+  const fetchMyActivityPaginatedThunk = createAsyncThunk(
+    'activityLog/fetchMyActivityPaginated',
+    async () => ({ logs: [], totalCount: 0, lastDoc: null, pageSize: 10 })
+  );
+  const wrapped = (userId: string) => {
+    mockFetchMyActivityPaginated(userId);
+    return fetchMyActivityPaginatedThunk(userId);
+  };
+  Object.assign(wrapped, fetchMyActivityPaginatedThunk);
   return {
     fetchActivityLogs: createAsyncThunk('activityLog/fetch', async () => ({ logs: [], lastDoc: null })),
     loadMoreActivityLogs: createAsyncThunk('activityLog/loadMore', async () => ({ logs: [], lastDoc: null })),
-    fetchMyRecentActivity: createAsyncThunk('activityLog/fetchMy', async () => []),
+    fetchMyActivityPaginated: wrapped,
+    loadMoreMyActivity: createAsyncThunk('activityLog/loadMoreMyActivity', async () => ({ logs: [], lastDoc: null, pageSize: 10 })),
     exportActivityLogsThunk: createAsyncThunk('activityLog/export', async () => null),
     subscribeToActivityLogsRealtime: () => () => {},
-    subscribeToMyRecentActivityRealtime: jest.fn((userId: string) => () => {}),
     unsubscribeFromActivityLogs: () => () => {},
-    unsubscribeFromMyRecentActivity: jest.fn(() => () => {}),
   };
 });
 jest.mock('../../../store/thunks/purchaseOrderThunks', () => {
@@ -192,6 +200,10 @@ const defaultActivityLogState = {
   hasMore: true,
   lastDoc: null,
   myRecentActivity: [] as ActivityLog[],
+  myActivityTotalCount: null as number | null,
+  myActivityLastDoc: null,
+  myActivityHasMore: false,
+  myActivityLoadingMore: false,
   filters: {
     startDate: null,
     endDate: null,
@@ -239,8 +251,7 @@ const createMockLog = (overrides: Partial<ActivityLog> = {}): ActivityLog =>
 describe('MyActivityScreen', () => {
   beforeEach(() => {
     jest.useFakeTimers();
-    (activityLogThunks.subscribeToMyRecentActivityRealtime as jest.Mock).mockClear();
-    (activityLogThunks.unsubscribeFromMyRecentActivity as jest.Mock).mockClear();
+    mockFetchMyActivityPaginated.mockClear();
   });
 
   afterEach(() => {
@@ -277,6 +288,7 @@ describe('MyActivityScreen', () => {
       activityLog: {
         ...defaultActivityLogState,
         myRecentActivity: [mockLog],
+        myActivityTotalCount: 1,
         myActivityLoading: false,
       },
     });
@@ -298,6 +310,7 @@ describe('MyActivityScreen', () => {
       activityLog: {
         ...defaultActivityLogState,
         myRecentActivity: [mockLog],
+        myActivityTotalCount: 1,
         myActivityLoading: false,
       },
     });
@@ -322,6 +335,7 @@ describe('MyActivityScreen', () => {
       activityLog: {
         ...defaultActivityLogState,
         myRecentActivity: [mockLog],
+        myActivityTotalCount: 1,
         myActivityLoading: false,
       },
     });
@@ -337,10 +351,10 @@ describe('MyActivityScreen', () => {
       refreshControl?.props.onRefresh?.();
     });
 
-    expect(activityLogThunks.subscribeToMyRecentActivityRealtime).toHaveBeenCalledWith('user-123');
+    expect(mockFetchMyActivityPaginated).toHaveBeenCalledWith('user-123');
   });
 
-  it('subscribes to real-time activity on mount when userId present', () => {
+  it('fetches activity on mount when userId present', () => {
     renderWithStore(<MyActivityScreen />, {
       auth: {
         ...defaultAuthState,
@@ -354,10 +368,10 @@ describe('MyActivityScreen', () => {
       },
     });
 
-    expect(activityLogThunks.subscribeToMyRecentActivityRealtime).toHaveBeenCalledWith('user-456');
+    expect(mockFetchMyActivityPaginated).toHaveBeenCalledWith('user-456');
   });
 
-  it('does not subscribe when userId is null', () => {
+  it('does not fetch when userId is null', () => {
     renderWithStore(<MyActivityScreen />, {
       auth: {
         ...defaultAuthState,
@@ -367,6 +381,6 @@ describe('MyActivityScreen', () => {
       activityLog: defaultActivityLogState,
     });
 
-    expect(activityLogThunks.subscribeToMyRecentActivityRealtime).not.toHaveBeenCalled();
+    expect(mockFetchMyActivityPaginated).not.toHaveBeenCalled();
   });
 });

@@ -174,29 +174,42 @@ export async function getActivityLogsCount(
 }
 
 /**
- * Get user's own recent activity (last 10 actions)
+ * List user's own activity with pagination (all activities, not just last 10)
  *
  * @param userId - User ID
- * @returns Promise resolving to array of recent activity logs
+ * @param pageSize - Number of records per page
+ * @param lastDoc - Last document for cursor-based pagination (optional)
+ * @returns Promise resolving to logs and lastDoc for next page
  */
-export async function getMyRecentActivity(
-  userId: string
-): Promise<ActivityLog[]> {
+export async function listMyActivityPaginated(
+  userId: string,
+  pageSize: number = ACTIVITY_LOGS_PAGE_SIZE,
+  lastDoc?: DocumentSnapshot
+): Promise<{ logs: ActivityLog[]; lastDoc: DocumentSnapshot | null }> {
   try {
-    const q = query(
-      collection(db, ACTIVITY_LOGS_COLLECTION),
-      where('userId', '==', userId),
-      orderBy('timestamp', 'desc'),
-      limit(10)
-    );
-
-    // Use getDocsFromServer to bypass cache and ensure fresh data
-    const snapshot = await getDocsFromServer(q);
-    return snapshot.docs.map(firestoreToActivityLog);
+    const filters: ActivityLogFiltersStore = { userId };
+    return listActivityLogs(filters, pageSize, lastDoc);
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('❌ Error fetching my recent activity:', err);
-    throw new Error(err.message ?? 'Failed to fetch recent activity');
+    console.error('❌ Error listing my activity:', err);
+    throw new Error(err.message ?? 'Failed to fetch my activity');
+  }
+}
+
+/**
+ * Get total count of user's activity (for "Showing X of Y" display)
+ *
+ * @param userId - User ID
+ * @returns Total count from server
+ */
+export async function getMyActivityCount(userId: string): Promise<number> {
+  try {
+    const filters: ActivityLogFiltersStore = { userId };
+    return getActivityLogsCount(filters);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('❌ Error getting my activity count:', err);
+    throw new Error(err.message ?? 'Failed to get my activity count');
   }
 }
 
@@ -342,53 +355,6 @@ export function subscribeToActivityLogs(
     const err = error as Error;
     console.error('❌ Error setting up activity logs subscription:', err);
     onError(new Error(err.message ?? 'Failed to subscribe to activity logs'));
-    // Return no-op unsubscribe
-    return () => {};
-  }
-}
-
-/**
- * Subscribe to user's own recent activity (real-time, last 10 actions)
- *
- * @param userId - User ID
- * @param onUpdate - Callback when activity is updated
- * @param onError - Callback when an error occurs
- * @returns Unsubscribe function to stop listening
- */
-export function subscribeToMyRecentActivity(
-  userId: string,
-  onUpdate: (logs: ActivityLog[]) => void,
-  onError: (error: Error) => void
-): Unsubscribe {
-  try {
-    const q = query(
-      collection(db, ACTIVITY_LOGS_COLLECTION),
-      where('userId', '==', userId),
-      orderBy('timestamp', 'desc'),
-      limit(10)
-    );
-
-    // Set up real-time listener with includeMetadataChanges to receive server updates
-    const unsubscribe = onSnapshot(
-      q,
-      { includeMetadataChanges: true },
-      (snapshot) => {
-        const logs = snapshot.docs.map(firestoreToActivityLog);
-        onUpdate(logs);
-      },
-      (error) => {
-        console.error('❌ Error in my recent activity snapshot:', error);
-        onError(
-          new Error(error.message ?? 'Failed to listen to recent activity')
-        );
-      }
-    );
-
-    return unsubscribe;
-  } catch (error: unknown) {
-    const err = error as Error;
-    console.error('❌ Error setting up recent activity subscription:', err);
-    onError(new Error(err.message ?? 'Failed to subscribe to recent activity'));
     // Return no-op unsubscribe
     return () => {};
   }

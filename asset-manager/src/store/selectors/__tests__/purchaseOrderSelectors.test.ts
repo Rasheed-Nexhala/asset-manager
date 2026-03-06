@@ -33,7 +33,7 @@ const createMockState = (
     requests: { requests: [], myRequests: [], selectedRequest: null, loading: false, error: null, errorTimestamp: null, filters: { status: 'all', priority: 'all', siteId: 'all' } },
     steelMaster: { steelMasters: [], selectedSteelMaster: null, loading: false, error: null },
     maintenance: { maintenanceRecords: [], selectedMaintenance: null, filters: {}, loading: false, error: null },
-    activityLog: { logs: [], hasMore: true, lastDoc: null, myRecentActivity: [], filters: {}, loading: false, loadingMore: false, exportLoading: false, myActivityLoading: false, error: null, errorTimestamp: null },
+    activityLog: { logs: [], hasMore: true, lastDoc: null, myRecentActivity: [], myActivityTotalCount: null, myActivityLastDoc: null, myActivityHasMore: false, myActivityLoadingMore: false, filters: {}, loading: false, loadingMore: false, exportLoading: false, myActivityLoading: false, error: null, errorTimestamp: null },
     purchaseOrders: {
       purchaseOrders: [],
       selectedPO: null,
