@@ -5,11 +5,20 @@ import { renderHook, act } from '@testing-library/react-native';
 
 jest.mock('firebase/auth', () => ({ User: function User() {} }));
 
+let mockSignOutShouldReject = false;
 jest.mock('../../store/thunks/authThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
     signInUser: createAsyncThunk('auth/signIn', async () => ({ uid: 'mock' })),
-    signOutUser: createAsyncThunk('auth/signOut', async () => null),
+    signOutUser: createAsyncThunk(
+      'auth/signOut',
+      async (_, { rejectWithValue }) => {
+        if (mockSignOutShouldReject) {
+          return rejectWithValue('Network error');
+        }
+        return null;
+      }
+    ),
     signUpUser: createAsyncThunk('auth/signUp', async () => ({ uid: 'mock' })),
   };
 });
@@ -127,6 +136,7 @@ describe('useUserRoleSync', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     roleCallback = null;
+    mockSignOutShouldReject = false;
   });
 
   it('dispatches setUserRole null and setRoleLoading false when userId is null', async () => {
@@ -204,5 +214,36 @@ describe('useUserRoleSync', () => {
     // signOutUser thunk was dispatched; mock resolves to null and clears auth
     expect(store.getState().auth.isAuthenticated).toBe(false);
     expect(store.getState().auth.user).toBeNull();
+  });
+
+  it('clears user and sets error when signOutUser fails after retry', async () => {
+    mockSignOutShouldReject = true;
+    const store = createStore({
+      auth: {
+        user: { uid: 'user-123' } as any,
+        userRole: { role: 'SiteManager', isActive: true, permissions: [] },
+        isAuthenticated: true,
+        isLoading: false,
+        isRoleLoading: false,
+        authInitialized: true,
+        error: null,
+      },
+    });
+    const customWrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(Provider, { store }, children);
+
+    renderHook(() => useUserRoleSync('user-123'), { wrapper: customWrapper });
+
+    await act(async () => {
+      roleCallback?.({ role: 'SiteManager', isActive: false, permissions: [] });
+      // Allow performAutoLogout to run (try, retry, then setUser + setError)
+      await new Promise((r) => setTimeout(r, 50));
+    });
+
+    expect(store.getState().auth.user).toBeNull();
+    expect(store.getState().auth.isAuthenticated).toBe(false);
+    expect(store.getState().auth.error).toBe(
+      'Something went wrong during sign out. Please try again.'
+    );
   });
 });

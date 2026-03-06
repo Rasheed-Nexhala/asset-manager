@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { User } from 'firebase/auth';
 import type { AuthState } from '../../types/auth';
+import { INACTIVE_ACCOUNT_MESSAGE } from '../../services/firebase/authService';
 import type { UserRoleData } from '../../types/roles';
 import { signUpUser, signInUser, signOutUser } from '../thunks/authThunks';
 import { sanitizeForDisplay } from '../../utils/sanitizeUtils';
@@ -23,8 +24,8 @@ const authSlice = createSlice({
       state.user = action.payload;
       state.isAuthenticated = action.payload !== null;
       state.authInitialized = true;
-      // Only clear error on successful login; preserve error when user becomes null
-      // (e.g. signOut due to inactive account - we need to show the deactivated message)
+      // Clear error only on successful login; preserve when user becomes null so
+      // signOutUser({ reason: 'account-deactivated' }) can show the deactivated message on redirect
       if (action.payload !== null) {
         state.error = null;
       }
@@ -46,6 +47,9 @@ const authSlice = createSlice({
     },
     clearError: (state) => {
       state.error = null;
+    },
+    setError: (state, action: PayloadAction<string | null>) => {
+      state.error = action.payload;
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;
@@ -85,25 +89,38 @@ const authSlice = createSlice({
         state.user = null;
         state.isAuthenticated = false;
       })
-      .addCase(signOutUser.pending, (state) => {
+      .addCase(signOutUser.pending, (state, action) => {
         state.isLoading = true;
-        state.error = null;
+        // Set deactivated message for redirect; clear error for normal sign-out
+        if (action.meta.arg?.reason === 'account-deactivated') {
+          state.error = INACTIVE_ACCOUNT_MESSAGE;
+        } else {
+          state.error = null;
+        }
       })
-      .addCase(signOutUser.fulfilled, (state) => {
+      .addCase(signOutUser.fulfilled, (state, action) => {
         state.isLoading = false;
         state.user = null;
         state.userRole = null;
         state.isRoleLoading = false;
         state.isAuthenticated = false;
-        state.error = null;
+        // Preserve error for account-deactivated so Login screen shows the message
+        if (action.meta.arg?.reason !== 'account-deactivated') {
+          state.error = null;
+        }
       })
       .addCase(signOutUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = sanitizeForDisplay(action.payload as string | undefined) || 'An unexpected error occurred';
+        // Safety: ensure user is cleared even if thunk failed before setUser(null)
+        state.user = null;
+        state.userRole = null;
+        state.isRoleLoading = false;
+        state.isAuthenticated = false;
       });
   },
 });
 
-export const { setUser, setUserRole, setRoleLoading, clearError, setLoading } = authSlice.actions;
+export const { setUser, setUserRole, setRoleLoading, clearError, setError, setLoading } = authSlice.actions;
 export { signUpUser, signInUser, signOutUser } from '../thunks/authThunks';
 export default authSlice.reducer;

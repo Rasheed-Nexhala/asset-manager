@@ -12,6 +12,7 @@ export { ItemDetailScreen } from './Inventory/ItemDetailScreen';
 export { SteelMasterScreen } from './Inventory/SteelMasterScreen';
 export { MySiteInventoryScreen } from './Inventory/MySiteInventoryScreen';
 export { OtherSiteInventoryScreen } from './Inventory/OtherSiteInventoryScreen';
+export { InventoryUpdateRequestsScreen } from './Inventory/InventoryUpdateRequestsScreen';
 export { SiteManagementScreen } from './Sites/SiteManagementScreen';
 export { AddSiteScreen } from './Sites/AddSiteScreen';
 export { EditSiteScreen } from './Sites/EditSiteScreen';

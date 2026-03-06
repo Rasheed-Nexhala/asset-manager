@@ -7,6 +7,7 @@ import steelMasterReducer from './slices/steelMasterSlice';
 import maintenanceReducer from './slices/maintenanceSlice';
 import activityLogReducer from './slices/activityLogSlice';
 import purchaseOrderReducer from './slices/purchaseOrderSlice';
+import inventoryUpdateRequestReducer from './slices/inventoryUpdateRequestSlice';
 
 export const store = configureStore({
   reducer: {
@@ -18,6 +19,7 @@ export const store = configureStore({
     maintenance: maintenanceReducer,
     activityLog: activityLogReducer,
     purchaseOrders: purchaseOrderReducer,
+    inventoryUpdateRequest: inventoryUpdateRequestReducer,
   },
   //Todo: Fix serializableCheck
   middleware: (getDefaultMiddleware) =>
@@ -94,6 +96,11 @@ export const store = configureStore({
           'purchaseOrders/receivePO/fulfilled',
           'purchaseOrders/fetchPurchaseOrdersPaginated/fulfilled',
           'purchaseOrders/loadMorePurchaseOrders/fulfilled',
+          'inventoryUpdateRequest/fetchPendingRequests/fulfilled',
+          'inventoryUpdateRequest/fetchMyActiveAccess/fulfilled',
+          'inventoryUpdateRequest/createInventoryUpdateRequest/fulfilled',
+          'inventoryUpdateRequest/approveInventoryUpdateRequest/fulfilled',
+          'inventoryUpdateRequest/rejectInventoryUpdateRequest/fulfilled',
         ],
         ignoredPaths: [
           'auth.user',
@@ -119,6 +126,8 @@ export const store = configureStore({
           'purchaseOrders.selectedPO',
           'purchaseOrders.vendors',
           'purchaseOrders.lastDoc',
+          'inventoryUpdateRequest.pendingRequests',
+          'inventoryUpdateRequest.myAccessGrantedUntil',
         ],
       },
     }),

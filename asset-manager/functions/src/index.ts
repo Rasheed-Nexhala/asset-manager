@@ -1295,20 +1295,28 @@ export const logQuantityAdjusted = onCall(async (request) => {
     );
   }
 
-  if (type !== 'add' && type !== 'remove') {
+  if (type !== 'add' && type !== 'remove' && type !== 'set') {
     throw new HttpsError(
       'invalid-argument',
-      'type must be "add" or "remove"'
+      'type must be "add", "remove", or "set"'
     );
   }
+
+  // For type "set", convert to add/remove for summary display
+  const effectiveType = type === 'set'
+    ? (newQuantity >= oldQuantity ? 'add' : 'remove')
+    : type;
+  const effectiveQty = type === 'set'
+    ? Math.abs(newQuantity - oldQuantity)
+    : quantity;
 
   const displayName =
     request.auth.token.name ??
     request.auth.token.email ??
     'Unknown';
 
-  const sign = type === 'add' ? '+' : '-';
-  const summary = `Adjusted quantity: ${oldQuantity}→${newQuantity} (${sign}${quantity})`;
+  const sign = effectiveType === 'add' ? '+' : '-';
+  const summary = `Adjusted quantity: ${oldQuantity}→${newQuantity} (${sign}${effectiveQty})`;
   const details = `${reason}${notes ? `. ${notes}` : ''}`;
 
   await createActivityLog({
@@ -1330,6 +1338,128 @@ export const logQuantityAdjusted = onCall(async (request) => {
         newValue: newQuantity,
       },
     ],
+  });
+
+  return { success: true };
+});
+
+/**
+ * Callable Function: Log Inventory Update Request Event
+ * Called from client after create/approve/reject of inventory update request.
+ * actionType: inventory_update_request_created | inventory_update_request_approved | inventory_update_request_rejected | inventory_update_request_revoked | inventory_update_request_restored
+ */
+export const logInventoryUpdateRequest = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError(
+      'unauthenticated',
+      'User must be authenticated to log inventory update request event'
+    );
+  }
+
+  const data = request.data ?? {};
+  const { actionType, requestId, targetDisplay, ...rest } = data;
+
+  const validTypes = [
+    'inventory_update_request_created',
+    'inventory_update_request_approved',
+    'inventory_update_request_rejected',
+    'inventory_update_request_revoked',
+    'inventory_update_request_restored',
+  ];
+  if (!actionType || !validTypes.includes(actionType)) {
+    throw new HttpsError(
+      'invalid-argument',
+      'actionType must be one of: inventory_update_request_created, inventory_update_request_approved, inventory_update_request_rejected, inventory_update_request_revoked, inventory_update_request_restored'
+    );
+  }
+
+  if (!requestId || !targetDisplay) {
+    throw new HttpsError(
+      'invalid-argument',
+      'requestId and targetDisplay are required'
+    );
+  }
+
+  const displayName =
+    request.auth.token.name ??
+    request.auth.token.email ??
+    'Unknown';
+
+  let userId: string;
+  let userName: string;
+  let userRole: string;
+  let summary: string;
+  let details: string;
+  const changes: Array<{ field: string; fieldLabel: string; oldValue: unknown; newValue: unknown }> = [];
+
+  if (actionType === 'inventory_update_request_created') {
+    userId = rest.requestedBy ?? request.auth.uid;
+    userName = rest.requestedByName ?? displayName;
+    userRole = rest.requestedByRole ?? 'StoreIncharge';
+    summary = `Requested inventory update access: ${targetDisplay}`;
+    details = rest.reason ?? '';
+  } else if (actionType === 'inventory_update_request_approved') {
+    userId = rest.approvedBy ?? request.auth.uid;
+    userName = rest.approvedByName ?? displayName;
+    userRole = 'Admin';
+    summary = `Approved inventory update request: ${targetDisplay}`;
+    details = rest.expiresInHours != null ? `Access expires in ${rest.expiresInHours} hours` : '';
+    changes.push({
+      field: 'status',
+      fieldLabel: 'Status',
+      oldValue: 'pending',
+      newValue: 'approved',
+    });
+  } else if (actionType === 'inventory_update_request_rejected') {
+    userId = rest.approvedBy ?? request.auth.uid;
+    userName = rest.approvedByName ?? displayName;
+    userRole = 'Admin';
+    summary = `Rejected inventory update request: ${targetDisplay}`;
+    details = rest.rejectionReason ?? '';
+    changes.push({
+      field: 'status',
+      fieldLabel: 'Status',
+      oldValue: 'pending',
+      newValue: 'rejected',
+    });
+  } else if (actionType === 'inventory_update_request_revoked') {
+    userId = request.auth.uid;
+    userName = displayName;
+    userRole = 'Admin';
+    summary = `Revoked inventory update access: ${targetDisplay}`;
+    details = 'Store Incharge access revoked by Admin';
+    changes.push({
+      field: 'accessRevoked',
+      fieldLabel: 'Access Revoked',
+      oldValue: false,
+      newValue: true,
+    });
+  } else {
+    userId = request.auth.uid;
+    userName = displayName;
+    userRole = 'Admin';
+    summary = `Restored inventory update access: ${targetDisplay}`;
+    details = 'Store Incharge access restored by Admin';
+    changes.push({
+      field: 'accessRevoked',
+      fieldLabel: 'Access Revoked',
+      oldValue: true,
+      newValue: false,
+    });
+  }
+
+  await createActivityLog({
+    userId,
+    userName,
+    userRole,
+    actionType,
+    actionCategory: 'inventory',
+    targetType: 'inventory_update_request',
+    targetId: requestId,
+    targetDisplay,
+    summary,
+    details,
+    changes,
   });
 
   return { success: true };

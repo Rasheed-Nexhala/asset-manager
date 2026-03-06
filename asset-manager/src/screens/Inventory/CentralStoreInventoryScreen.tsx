@@ -164,6 +164,10 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     navigation.navigate('Maintenance');
   }, [navigation]);
 
+  const handleInventoryUpdateRequests = useCallback(() => {
+    navigation.navigate('InventoryUpdateRequests');
+  }, [navigation]);
+
   const handleItemPress = useCallback(
     (item: Item) => {
       navigation.navigate('ItemDetail', { itemId: item.id });
@@ -267,6 +271,17 @@ export const CentralStoreInventoryScreen: React.FC = () => {
             color={showFilters ? "#1E40AF" : "#64748B"} 
           />
         </TouchableOpacity>
+        {isAdmin && (
+          <TouchableOpacity
+            className="w-12 h-12 items-center justify-center rounded-[10px]"
+            onPress={handleInventoryUpdateRequests}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Inventory update requests"
+          >
+            <Ionicons name="document-text-outline" size={22} color="#1E40AF" />
+          </TouchableOpacity>
+        )}
         {(isAdmin || isStoreIncharge) && (
           <TouchableOpacity
             className="w-12 h-12 items-center justify-center rounded-[10px]"

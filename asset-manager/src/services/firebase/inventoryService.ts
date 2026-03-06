@@ -634,11 +634,28 @@ export const adjustQuantity = async (
     throw new Error('Location ID is required to adjust quantity');
   }
 
+  // Firestore transaction.get() accepts only DocumentReference, not Query.
+  // Fetch inventory doc ref OUTSIDE the transaction, then use it inside.
   const inventoryQuery = query(
     collection(db, INVENTORY_COLLECTION),
     where('itemId', '==', adjustmentData.itemId),
     where('locationId', '==', adjustmentData.locationId)
   );
+  const inventorySnapshot = await getDocs(inventoryQuery);
+
+  let inventoryDocRef: ReturnType<typeof doc>;
+  let currentQuantity = 0;
+  if (inventorySnapshot.empty) {
+    inventoryDocRef = doc(collection(db, INVENTORY_COLLECTION));
+    currentQuantity = 0;
+  } else {
+    const existingDoc = inventorySnapshot.docs[0];
+    if (!existingDoc?.ref) {
+      throw new Error('Invalid inventory snapshot: missing document reference');
+    }
+    inventoryDocRef = existingDoc.ref;
+    currentQuantity = existingDoc.data()?.quantity || 0;
+  }
 
   const itemRef = doc(db, ITEMS_COLLECTION, adjustmentData.itemId);
 
@@ -646,25 +663,10 @@ export const adjustQuantity = async (
   for (let attempt = 1; attempt <= MAX_TRANSACTION_RETRIES; attempt++) {
     try {
       const result = await runTransaction(db, async (transaction) => {
-      // Read inventory within transaction (atomic with writes)
-      // Note: transaction.get() supports Query at runtime; type assertion needed for TS
-      const inventorySnapshot = (await (
-        transaction as unknown as { get: (ref: unknown) => Promise<QuerySnapshot> }
-      ).get(inventoryQuery)) as QuerySnapshot;
-      let inventoryRef: ReturnType<typeof doc>;
-      let currentQuantity = 0;
-
-      if (inventorySnapshot.empty) {
-        inventoryRef = doc(collection(db, INVENTORY_COLLECTION));
-        currentQuantity = 0;
-      } else {
-        const existingDoc = inventorySnapshot.docs[0];
-        if (!existingDoc?.ref) {
-          throw new Error('Invalid inventory snapshot: missing document reference');
-        }
-        inventoryRef = existingDoc.ref;
-        currentQuantity = existingDoc.data()?.quantity || 0;
-      }
+      // Read inventory doc within transaction (transaction.get accepts DocumentReference only)
+      const inventoryDoc = await transaction.get(inventoryDocRef);
+      const invData = inventoryDoc.exists() ? inventoryDoc.data() : null;
+      const currentQty = invData?.quantity ?? currentQuantity;
 
       // Read item within transaction
       const itemDoc = await transaction.get(itemRef);
@@ -674,16 +676,29 @@ export const adjustQuantity = async (
       const itemData = itemDoc.data() ?? {};
 
       // Calculate new quantity
-      const quantityChange =
-        adjustmentData.type === 'add'
-          ? adjustmentData.quantity
-          : -adjustmentData.quantity;
-      const newQuantity = currentQuantity + quantityChange;
+      let quantityChange: number;
+      let newQuantity: number;
+
+      if (adjustmentData.type === 'set') {
+        newQuantity = adjustmentData.quantity;
+        quantityChange = newQuantity - currentQty;
+        if (newQuantity < 0) {
+          throw new Error(
+            `Target quantity cannot be negative. Requested: ${adjustmentData.quantity}`
+          );
+        }
+      } else {
+        quantityChange =
+          adjustmentData.type === 'add'
+            ? adjustmentData.quantity
+            : -adjustmentData.quantity;
+        newQuantity = currentQty + quantityChange;
+      }
 
       // Prevent negative stock (atomic check)
       if (newQuantity < 0) {
         throw new Error(
-          `Cannot reduce stock below zero. Current quantity: ${currentQuantity}, Attempted change: ${quantityChange}`
+          `Cannot reduce stock below zero. Current quantity: ${currentQty}, Attempted change: ${quantityChange}`
         );
       }
 
@@ -702,10 +717,10 @@ export const adjustQuantity = async (
         inventoryUpdateData.lengthPerPiece = adjustmentData.lengthPerPiece;
       }
 
-      if (inventorySnapshot.empty) {
-        transaction.set(inventoryRef, inventoryUpdateData);
+      if (!inventoryDoc.exists()) {
+        transaction.set(inventoryDocRef, inventoryUpdateData);
       } else {
-        transaction.update(inventoryRef, inventoryUpdateData);
+        transaction.update(inventoryDocRef, inventoryUpdateData);
       }
 
       // Update item's denormalized stock totals
@@ -732,7 +747,7 @@ export const adjustQuantity = async (
       updatedTotals.updatedAt = serverTimestamp();
 
       transaction.update(itemRef, updatedTotals);
-        return { oldQuantity: currentQuantity, newQuantity };
+        return { oldQuantity: currentQty, newQuantity };
       });
       return result;
     } catch (error) {
@@ -753,12 +768,20 @@ export const adjustQuantity = async (
         await new Promise((resolve) => setTimeout(resolve, delay));
       } else {
         console.error('Error adjusting quantity:', error);
-        throw error;
+        const toThrow =
+          error instanceof Error
+            ? error
+            : new Error(String(error ?? 'Failed to adjust quantity'));
+        throw toThrow;
       }
     }
   }
   console.error('Error adjusting quantity:', lastError);
-  throw lastError;
+  const toThrow =
+    lastError instanceof Error
+      ? lastError
+      : new Error(String(lastError ?? 'Failed to adjust quantity'));
+  throw toThrow;
 };
 
 /**

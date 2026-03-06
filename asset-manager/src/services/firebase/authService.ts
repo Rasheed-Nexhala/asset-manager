@@ -176,7 +176,8 @@ export async function logPasswordChanged(): Promise<void> {
   }
 }
 
-const INACTIVE_ACCOUNT_MESSAGE =
+/** Shared message for deactivated account; used by sign-in block and sign-out flow */
+export const INACTIVE_ACCOUNT_MESSAGE =
   'Your account is deactivated, please contact admin.';
 
 export const signIn = async (
@@ -222,6 +223,14 @@ export const signIn = async (
     logLoginFailedToCloud(email, authError.message ?? authError.code ?? 'Unknown error').catch(() => {});
     throw handleAuthError(authError);
   }
+};
+
+/**
+ * Sign out without logging the event.
+ * Used when blocking inactive users - they were never "properly" logged in.
+ */
+export const signOutOnly = async (): Promise<void> => {
+  await signOut(auth);
 };
 
 export const logout = async (): Promise<void> => {
@@ -341,8 +350,7 @@ export const reauthenticateAndUpdatePassword = async (
 
 const handleAuthError = (error: AuthError): Error => {
   const errorMessages: Record<string, string> = {
-    'auth/account-disabled':
-      'Your account is deactivated, please contact admin.',
+    'auth/account-disabled': INACTIVE_ACCOUNT_MESSAGE,
     'auth/email-already-in-use':
       'This email is already registered. Please sign in or use a different email.',
     'auth/invalid-email': 'Please enter a valid email address.',

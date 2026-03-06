@@ -33,13 +33,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onGoToSignup }) => {
   const [values, setValues] = useState<AuthFormValues>(defaultValues);
   const [errors, setErrors] = useState<AuthFormErrors>({});
 
-  // Auto-dismiss auth error after 5 seconds
-  const AUTH_ERROR_DISMISS_MS = 5000;
+  // Auto-dismiss auth error: longer for deactivated-account (15s), 5s for others
+  const dismissMs = (authError?.toLowerCase() ?? '').includes('deactivated') ? 15000 : 5000;
   useEffect(() => {
     if (!authError) return;
-    const timer = setTimeout(() => dispatch(clearError()), AUTH_ERROR_DISMISS_MS);
+    const timer = setTimeout(() => dispatch(clearError()), dismissMs);
     return () => clearTimeout(timer);
-  }, [authError, dispatch]);
+  }, [authError, dismissMs, dispatch]);
 
   const updateField = useCallback((field: keyof AuthFormValues, text: string) => {
     setValues((prev) => ({ ...prev, [field]: text }));

@@ -9,6 +9,7 @@ import { Provider } from 'react-redux';
 import { store } from './src/store';
 import { useAuthStateSync } from './src/hooks/useAuthStateSync';
 import { useUserRoleSync } from './src/hooks/useUserRoleSync';
+import { useInventoryAccessSync } from './src/hooks/useInventoryAccessSync';
 import { useManagerValidationSync } from './src/hooks/useManagerValidationSync';
 import { usePushTokenRegistration } from './src/hooks/usePushTokenRegistration';
 import { useAppSelector } from './src/store/hooks';
@@ -17,6 +18,7 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import { WeightViewPreferenceProvider } from './src/hooks/useWeightViewPreference';
 import { useNetworkStatus } from './src/hooks/useNetworkStatus';
 import { NoInternetScreen } from './src/components/NoInternetScreen';
+import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 
 // Keep splash screen visible until auth state is resolved
 SplashScreen.preventAutoHideAsync();
@@ -32,6 +34,7 @@ function AppContent() {
   const userId = useAppSelector(selectUserId);
   const authInitialized = useAppSelector(selectAuthInitialized);
   useUserRoleSync(userId);
+  useInventoryAccessSync();
   useManagerValidationSync();
   usePushTokenRegistration(userId);
   const { isOffline, retry } = useNetworkStatus();
@@ -68,12 +71,14 @@ const styles = StyleSheet.create({
 
 export default function App() {
   return (
-    <Provider store={store}>
-      <SafeAreaProvider>
-        <WeightViewPreferenceProvider>
-          <AppContent />
-        </WeightViewPreferenceProvider>
-      </SafeAreaProvider>
-    </Provider>
+    <AppErrorBoundary>
+      <Provider store={store}>
+        <SafeAreaProvider>
+          <WeightViewPreferenceProvider>
+            <AppContent />
+          </WeightViewPreferenceProvider>
+        </SafeAreaProvider>
+      </Provider>
+    </AppErrorBoundary>
   );
 }

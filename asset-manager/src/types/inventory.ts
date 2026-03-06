@@ -16,9 +16,12 @@ export type ItemStatus = 'active' | 'discontinued';
 export type LocationType = 'store' | 'site' | 'maintenance';
 
 /**
- * Adjustment type: add (increase stock) or remove (decrease stock)
+ * Adjustment type: add (increase stock), remove (decrease stock), or set (target value)
+ * - add: quantity = amount to add
+ * - remove: quantity = amount to remove
+ * - set: quantity = target value (new quantity becomes exactly this)
  */
-export type AdjustmentType = 'add' | 'remove';
+export type AdjustmentType = 'add' | 'remove' | 'set';
 
 /**
  * Item document structure in Firestore (with Firebase Timestamps)
@@ -190,8 +193,8 @@ export interface AdjustmentData {
   locationId: string;
   locationType: LocationType;
   locationName: string;
-  type: AdjustmentType;            // add or remove
-  quantity: number;                // Amount to add or remove (pieces for weight-based items)
+  type: AdjustmentType;            // add, remove, or set (set: quantity = target value)
+  quantity: number;                // Amount to add/remove, or target value when type='set'
   reason: string;                  // Required reason
   notes: string;                   // Required notes
   entryMode?: 'kg' | 'ton' | 'pieces';    // How user entered the data (for weight-based items)

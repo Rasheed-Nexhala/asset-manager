@@ -36,3 +36,8 @@ export interface SignInCredentials {
   email: string;
   password: string;
 }
+
+/** Optional payload for sign-out; used when sign-out is triggered by account deactivation */
+export interface SignOutPayload {
+  reason?: 'account-deactivated';
+}

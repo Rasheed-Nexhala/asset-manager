@@ -113,6 +113,12 @@ jest.mock('../../services/firebase/authService', () => ({
     authCallback = callback;
     return mockUnsubscribe;
   }),
+  signOutOnly: jest.fn().mockResolvedValue(undefined),
+  INACTIVE_ACCOUNT_MESSAGE: 'Your account is deactivated, please contact admin.',
+}));
+
+jest.mock('../../services/firebase/userRoleService', () => ({
+  getUserRole: jest.fn().mockResolvedValue({ role: 'Admin', isActive: true, permissions: [] }),
 }));
 
 function createStore(preloadedState: Partial<RootState> = {}) {
@@ -142,7 +148,7 @@ describe('useAuthStateSync', () => {
     authCallback = null;
   });
 
-  it('dispatches setUser when auth callback fires with user', async () => {
+  it('dispatches setUser when auth callback fires with active user', async () => {
     const store = createStore();
     const customWrapper = ({ children }: { children: React.ReactNode }) =>
       React.createElement(Provider, { store }, children);
@@ -152,11 +158,30 @@ describe('useAuthStateSync', () => {
     const mockUser = { uid: 'user-123', email: 'test@example.com' };
 
     await act(async () => {
-      authCallback?.(mockUser);
-      await Promise.resolve();
+      await authCallback?.(mockUser);
     });
 
     expect(store.getState().auth.user).toEqual(mockUser);
+  });
+
+  it('dispatches setUser null and setError when auth callback fires with inactive user', async () => {
+    const { getUserRole } = require('../../services/firebase/userRoleService');
+    (getUserRole as jest.Mock).mockResolvedValueOnce({ role: 'Admin', isActive: false, permissions: [] });
+
+    const store = createStore();
+    const customWrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(Provider, { store }, children);
+
+    renderHook(() => useAuthStateSync(), { wrapper: customWrapper });
+
+    const mockUser = { uid: 'user-123', email: 'test@example.com' };
+
+    await act(async () => {
+      await authCallback?.(mockUser);
+    });
+
+    expect(store.getState().auth.user).toBeNull();
+    expect(store.getState().auth.error).toBe('Your account is deactivated, please contact admin.');
   });
 
   it('dispatches setUser null when auth callback fires with null', async () => {
@@ -177,8 +202,7 @@ describe('useAuthStateSync', () => {
     renderHook(() => useAuthStateSync(), { wrapper: customWrapper });
 
     await act(async () => {
-      authCallback?.(null);
-      await Promise.resolve();
+      await authCallback?.(null);
     });
 
     expect(store.getState().auth.user).toBeNull();

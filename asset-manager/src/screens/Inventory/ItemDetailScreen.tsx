@@ -1,13 +1,15 @@
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import { useAutoClearError } from '../../hooks/useAutoClearError';
-import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { StockStatusBadge, type StockStatus } from '../../components/Inventory/StockStatusBadge';
-import { StockEntryModal } from '../../components/Inventory/StockEntryModal';
+import { InventoryAdjustmentModal } from '../../components/Inventory/InventoryAdjustmentModal';
+import { RequestAccessBanner } from '../../components/Inventory/RequestAccessBanner';
+import { RequestInventoryAccessModal } from '../../components/Inventory/RequestInventoryAccessModal';
 import { WeightDisplay } from '../../components/Inventory/WeightDisplay';
 import { ViewModeToggle } from '../../components/Inventory/ViewModeToggle';
 import { useWeightViewPreference, type WeightViewMode } from '../../hooks/useWeightViewPreference';
@@ -16,11 +18,13 @@ import { isLowStock } from '../../utils/inventoryUtils';
 import type { InventoryStackParamList } from '../../navigation/InventoryStackNavigator';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchItemById, adjustQuantity } from '../../store/thunks/inventoryThunks';
+import { createInventoryUpdateRequest } from '../../store/thunks/inventoryUpdateRequestThunks';
 import { selectItemById, selectItemsLoading, selectItemsError } from '../../store/selectors/inventorySelectors';
-import { selectIsAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
+import { selectIsAdmin, selectIsStoreIncharge, selectRoleLoading, selectIsRoleLoaded } from '../../store/selectors/authSelectors';
+import { selectCanStoreInchargeAdjustInventory, selectMyAccessGrantedUntil } from '../../store/selectors/inventoryUpdateRequestSelectors';
 import { updateItemInState, clearError } from '../../store/slices/inventorySlice';
 import { subscribeItemById, subscribeInventoryByItemId } from '../../services/firebase/inventoryService';
-import type { Item, AdjustmentData, InventoryEntry } from '../../types/inventory';
+import type { Item, AdjustmentData, AdjustmentType, InventoryEntry } from '../../types/inventory';
 
 type NavigationProp = StackNavigationProp<InventoryStackParamList, 'ItemDetail'>;
 
@@ -126,10 +130,17 @@ export const ItemDetailScreen: React.FC = () => {
   const error = useAppSelector(selectItemsError);
   const isAdmin = useAppSelector(selectIsAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const isRoleLoading = useAppSelector(selectRoleLoading);
+  const isRoleLoaded = useAppSelector(selectIsRoleLoaded);
   const canEditItem = isAdmin || isStoreIncharge;
+  const canStoreInchargeAdjust = useAppSelector(selectCanStoreInchargeAdjustInventory);
+  const isAdjustmentSectionReady = isRoleLoaded && !isRoleLoading;
+  const myAccessGrantedUntil = useAppSelector(selectMyAccessGrantedUntil);
   const { viewMode, toggleViewMode } = useWeightViewPreference();
-  const [showStockModal, setShowStockModal] = useState(false);
+  const [adjustmentMode, setAdjustmentMode] = useState<AdjustmentType | null>(null);
+  const [showRequestAccessModal, setShowRequestAccessModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRequestingAccess, setIsRequestingAccess] = useState(false);
   const [inventoryByLocation, setInventoryByLocation] = useState<InventoryEntry[]>([]);
   const isSteelItem = item ? isWeightViewSupported(item) : false;
 
@@ -189,8 +200,8 @@ export const ItemDetailScreen: React.FC = () => {
     navigation.goBack();
   }, [navigation]);
 
-  const handleAddStock = useCallback(() => {
-    setShowStockModal(true);
+  const handleAdjustStock = useCallback((mode: AdjustmentType) => {
+    setAdjustmentMode(mode);
   }, []);
 
   const handleStockSubmit = useCallback(
@@ -209,7 +220,33 @@ export const ItemDetailScreen: React.FC = () => {
     [dispatch]
   );
 
+  const handleRequestAccessSubmit = useCallback(
+    async (data: { reason: string; notes?: string }) => {
+      const reason = data.reason.trim() + (data.notes?.trim() ? ` - ${data.notes.trim()}` : '');
+      setIsRequestingAccess(true);
+      try {
+        await dispatch(createInventoryUpdateRequest(reason)).unwrap();
+        setShowRequestAccessModal(false);
+        Alert.alert('Request Submitted', 'Your request has been sent. Admin will review it shortly.');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Failed to submit request';
+        throw new Error(msg);
+      } finally {
+        setIsRequestingAccess(false);
+      }
+    },
+    [dispatch]
+  );
+
   useAutoClearError(error, () => dispatch(clearError()));
+
+  const formatAccessExpiry = useCallback((isoString: string) => {
+    const d = new Date(isoString);
+    return d.toLocaleString(undefined, {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+  }, []);
 
   // Loading state
   if (isLoading && !item) {
@@ -542,40 +579,107 @@ export const ItemDetailScreen: React.FC = () => {
         </View>
         )}
 
-        {/* Action Buttons - Admin/StoreIncharge only; Site Manager has view-only access */}
-        {canEditItem && (
-          <View className="mb-6 mt-2 gap-3">
-            {isAdmin && (
+        {/* Stock Actions card: CIAMS design system — primary (Add), semantic (Reduce), secondary (Enter, Edit) */}
+        {!isAdjustmentSectionReady && canEditItem && (
+          <View className="mb-3 mt-2 py-4 items-center justify-center rounded-[10px] bg-white border border-[#E2E8F0]">
+            <ActivityIndicator size="small" color="#1E40AF" />
+            <Text className="text-[13px] text-[#64748B] mt-2">Loading permissions…</Text>
+          </View>
+        )}
+        {isAdjustmentSectionReady && (isAdmin || (isStoreIncharge && canStoreInchargeAdjust)) && (
+          <View className="mb-3 bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
+            <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">Stock Actions</Text>
+            {myAccessGrantedUntil && (
+              <Text className="text-[13px] text-[#64748B] mb-3">
+                Access expires at {formatAccessExpiry(myAccessGrantedUntil)}
+              </Text>
+            )}
+            <View className="flex-row gap-3">
               <TouchableOpacity
-                className="bg-[#16A34A] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
-                onPress={handleAddStock}
+                className="flex-1 bg-[#1E40AF] rounded-[10px] min-h-[50px] items-center justify-center flex-row gap-2 px-2"
+                onPress={() => handleAdjustStock('add')}
                 activeOpacity={0.7}
                 accessibilityLabel="Add stock"
                 accessibilityRole="button"
               >
                 <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-                <Text className="text-[15px] font-semibold text-white">Add Stock</Text>
+                <Text className="text-[15px] font-semibold text-white">Add</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="flex-1 border-[1.5px] border-[#DC2626] rounded-[10px] min-h-[50px] items-center justify-center flex-row gap-2 px-2 bg-[#DC2626]/5"
+                onPress={() => handleAdjustStock('remove')}
+                activeOpacity={0.7}
+                accessibilityLabel="Reduce stock"
+                accessibilityRole="button"
+              >
+                <Ionicons name="remove-circle" size={20} color="#DC2626" />
+                <Text className="text-[15px] font-semibold text-[#DC2626]">Reduce</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="flex-1 border-[1.5px] border-[#1E40AF] rounded-[10px] min-h-[50px] items-center justify-center flex-row gap-2 px-2"
+                onPress={() => handleAdjustStock('set')}
+                activeOpacity={0.7}
+                accessibilityLabel="Enter stock"
+                accessibilityRole="button"
+              >
+                <Ionicons name="create-outline" size={20} color="#1E40AF" />
+                <Text className="text-[15px] font-semibold text-[#1E40AF]">Enter</Text>
+              </TouchableOpacity>
+            </View>
+            {canEditItem && (
+              <TouchableOpacity
+                className="mt-4 border-[1.5px] border-[#E2E8F0] rounded-[10px] min-h-[50px] items-center justify-center flex-row gap-2"
+                onPress={handleEdit}
+                activeOpacity={0.7}
+                accessibilityLabel="Edit item"
+                accessibilityRole="button"
+              >
+                <Ionicons name="pencil-outline" size={20} color="#64748B" />
+                <Text className="text-[15px] font-semibold text-[#64748B]">Edit Item</Text>
               </TouchableOpacity>
             )}
+          </View>
+        )}
+
+        {/* Store Incharge without access: Request Access banner (only when role is loaded) */}
+        {isAdjustmentSectionReady && isStoreIncharge && !canStoreInchargeAdjust && (
+          <View className="mb-3 mt-2">
+            <RequestAccessBanner onRequestAccess={() => setShowRequestAccessModal(true)} />
+          </View>
+        )}
+
+        {/* Edit Item only when can edit but no stock adjustment access (e.g. Store Incharge without approval) */}
+        {isAdjustmentSectionReady && canEditItem && !(isAdmin || (isStoreIncharge && canStoreInchargeAdjust)) && (
+          <View className="mb-6 bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
             <TouchableOpacity
-              className="border-[1.5px] border-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
+              className="border-[1.5px] border-[#1E40AF] rounded-[10px] min-h-[50px] items-center justify-center flex-row gap-2"
               onPress={handleEdit}
               activeOpacity={0.7}
               accessibilityLabel="Edit item"
               accessibilityRole="button"
             >
-              <Ionicons name="create-outline" size={20} color="#1E40AF" />
+              <Ionicons name="pencil-outline" size={20} color="#1E40AF" />
               <Text className="text-[15px] font-semibold text-[#1E40AF]">Edit Item</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        <StockEntryModal
-          visible={showStockModal}
-          item={item}
-          onSubmit={handleStockSubmit}
-          onCancel={() => setShowStockModal(false)}
-          loading={isSubmitting}
+        {adjustmentMode && (
+          <InventoryAdjustmentModal
+            visible={!!adjustmentMode}
+            mode={adjustmentMode}
+            item={item}
+            onSubmit={handleStockSubmit}
+            onCancel={() => setAdjustmentMode(null)}
+            loading={isSubmitting}
+          />
+        )}
+
+        <RequestInventoryAccessModal
+          visible={showRequestAccessModal}
+          onSubmit={handleRequestAccessSubmit}
+          onCancel={() => setShowRequestAccessModal(false)}
+          loading={isRequestingAccess}
         />
       </ScrollView>
     </ScreenLayout>

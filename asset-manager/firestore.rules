@@ -72,14 +72,15 @@ service cloud.firestore {
     
     /**
      * Check if user is creating their own document for the first time (self-registration on signup).
-     * Document must not exist yet, and payload must have safe defaults (Unassigned, isActive false).
+     * Document must not exist yet, and payload must have safe defaults (Unassigned, isActive true).
+     * New signups are active by default so they can use the app immediately; admins can deactivate if needed.
      */
     function isSelfRegistration(userId) {
       let userPath = /databases/$(database)/documents/users/$(userId);
       return request.auth.uid == userId
         && !exists(userPath)
         && request.resource.data.role == 'Unassigned'
-        && request.resource.data.isActive == false;
+        && request.resource.data.isActive == true;
     }
     
     /**
@@ -100,6 +101,9 @@ service cloud.firestore {
      * Users can read their own data; Admins can read all
      * Admins can create/delete users; Admins can update any field
      * Users can update ONLY their own token-related fields (expoPushTokens, notificationPrefs, tokensUpdatedAt, updatedAt)
+     *
+     * Required for inventory/items write access: document must exist with role in ['Admin','StoreIncharge']
+     * and isActive == true. Missing or inactive user docs cause permission-denied on inventory operations.
      */
     match /users/{userId} {
       // Allow reading individual user documents
@@ -114,9 +118,12 @@ service cloud.firestore {
       // Only Admins can delete users
       allow delete: if isAuthenticated() && isUserActive() && isAdmin();
       // Allow update: Admins can update any field; users can update only their own token-related fields
+      // Block deactivating Admin users (prevents direct Firestore writes from setting isActive=false)
       allow update: if isAuthenticated() && (
         (isUserActive() && isAdmin()) ||
         (request.auth.uid == userId && onlyUpdatingOwnTokenFields())
+      ) && (
+        resource.data.role != 'Admin' || request.resource.data.isActive != false
       );
     }
     
@@ -308,7 +315,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isUserActive() && isAdmin();
 
       // Users can read only their own logs (userId match)
-      // Includes new signup users (Unassigned, isActive: false) for Dashboard My Recent Activity widget
+      // Includes new signup users (Unassigned, isActive: true) for Dashboard My Recent Activity widget
       allow read: if isAuthenticated() &&
         resource.data.userId == request.auth.uid;
 
@@ -398,6 +405,28 @@ service cloud.firestore {
     match /notifications/{userId}/items/{itemId} {
       allow read, update: if isAuthenticated() && request.auth.uid == userId;
       allow create, delete: if false;
+    }
+
+    /**
+     * Inventory Update Requests Collection
+     *
+     * Purpose: Store Incharge requests Admin approval to update (add/reduce/enter) central store inventory.
+     * Admin can approve (with expiry), reject, or revoke/restore access anytime. All changes are logged.
+     *
+     * Access Rules:
+     * - Read: Admin (all) OR Store Incharge (own requests only: resource.data.requestedBy == request.auth.uid)
+     * - Create: Store Incharge only
+     * - Update: Admin only (for approve/reject)
+     * - Delete: false (immutable audit trail)
+     */
+    match /inventoryUpdateRequests/{requestId} {
+      allow read: if isAuthenticated() && isUserActive() && (
+        isAdmin() ||
+        (isStoreIncharge() && resource.data.requestedBy == request.auth.uid)
+      );
+      allow create: if isAuthenticated() && isUserActive() && isStoreIncharge();
+      allow update: if isAuthenticated() && isUserActive() && isAdmin();
+      allow delete: if false;
     }
   }
 }

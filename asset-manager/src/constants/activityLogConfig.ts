@@ -106,6 +106,31 @@ export const ACTION_TYPE_CONFIG: Record<
     icon: 'create-outline',
     category: 'inventory',
   },
+  inventory_update_request_created: {
+    label: 'Inventory Update Request Created',
+    icon: 'document-text-outline',
+    category: 'inventory',
+  },
+  inventory_update_request_approved: {
+    label: 'Inventory Update Request Approved',
+    icon: 'checkmark-circle-outline',
+    category: 'inventory',
+  },
+  inventory_update_request_rejected: {
+    label: 'Inventory Update Request Rejected',
+    icon: 'close-circle-outline',
+    category: 'inventory',
+  },
+  inventory_update_request_revoked: {
+    label: 'Inventory Update Access Revoked',
+    icon: 'lock-closed-outline',
+    category: 'inventory',
+  },
+  inventory_update_request_restored: {
+    label: 'Inventory Update Access Restored',
+    icon: 'lock-open-outline',
+    category: 'inventory',
+  },
 
   // Requests
   request_created: {

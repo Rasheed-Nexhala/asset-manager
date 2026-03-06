@@ -13,6 +13,7 @@ import {
   getInventoryByLocation,
 } from '../../services/firebase/inventoryService';
 import { logQuantityAdjustedToCloud } from '../../services/firebase/activityLogService';
+import { mapFirestoreErrorToUserMessage } from '../../utils/firestoreErrorUtils';
 import type { RootState } from '../index';
 import {
   listCategories,
@@ -234,34 +235,56 @@ export const deleteItem = createAsyncThunk(
   }
 );
 
-/** Error when non-Admin attempts to add stock to central store */
-const ADD_STOCK_ADMIN_ONLY_MESSAGE =
-  'Only Admin can add stock to central store. Store Incharge can receive POs, transfer, or manage maintenance.';
+/** Error when Store Incharge lacks Admin approval to update central store */
+const STORE_INCHARGE_ACCESS_REQUIRED_MESSAGE =
+  'You need Admin approval to update inventory. Request access first.';
+
+/** Error when role is still loading */
+const ROLE_LOADING_MESSAGE =
+  'Loading your role. Please wait a moment and try again.';
+
+/** Error when role could not be loaded */
+const ROLE_NOT_LOADED_MESSAGE =
+  'Your role could not be loaded. Please sign out and sign in again.';
 
 /**
- * Adjust inventory quantity at a specific location
- * Add stock to central store is restricted to Admin only (Store Incharge can receive POs, transfer, maintenance)
+ * Adjust inventory quantity at a specific location.
+ * Admin: can always adjust. Store Incharge: only when myAccessGrantedUntil > now.
  */
 export const adjustQuantity = createAsyncThunk(
   'inventory/adjustQuantity',
   async (adjustmentData: AdjustmentData, { getState, rejectWithValue }) => {
     try {
-      // Add stock to central store: Admin only (enforced at UI + thunk layer)
-      if (
-        adjustmentData.type === 'add' &&
-        adjustmentData.locationType === 'store'
-      ) {
-        const state = getState() as RootState;
-        const userRole = state.auth.userRole?.role;
-        if (userRole !== 'Admin') {
-          return rejectWithValue(ADD_STOCK_ADMIN_ONLY_MESSAGE);
+      const state = getState() as RootState;
+      const { user, userRole, isRoleLoading } = state.auth;
+      const roleType = userRole?.role;
+
+      // Pre-flight: ensure role is loaded before attempting adjustment
+      if (user && isRoleLoading) {
+        return rejectWithValue(ROLE_LOADING_MESSAGE);
+      }
+      if (user && !isRoleLoading && roleType == null) {
+        return rejectWithValue(ROLE_NOT_LOADED_MESSAGE);
+      }
+
+      // Central store update: Admin has full access; Store Incharge needs approved access
+      if (adjustmentData.locationType === 'store') {
+        if (roleType === 'Admin') {
+          // Admin: no access check
+        } else if (roleType === 'StoreIncharge') {
+          const myAccessGrantedUntil =
+            state.inventoryUpdateRequest.myAccessGrantedUntil ?? null;
+          const now = new Date();
+          const expiry = myAccessGrantedUntil ? new Date(myAccessGrantedUntil) : null;
+          if (!expiry || expiry <= now) {
+            return rejectWithValue(STORE_INCHARGE_ACCESS_REQUIRED_MESSAGE);
+          }
         }
+        // Other roles (e.g. SiteManager) cannot update central store - Firestore rules enforce
       }
 
       const { oldQuantity, newQuantity } = await adjustQuantityService(adjustmentData);
 
-      const state = getState() as RootState;
-      const { user, userRole } = state.auth;
       const userName = user?.displayName ?? user?.email ?? 'Unknown';
       const userRoleType = userRole?.role ?? 'Unassigned';
 
@@ -285,8 +308,12 @@ export const adjustQuantity = createAsyncThunk(
         itemId: adjustmentData.itemId,
         locationId: adjustmentData.locationId,
       };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to adjust quantity');
+    } catch (error: unknown) {
+      const userMessage = mapFirestoreErrorToUserMessage(
+        error,
+        'Failed to adjust quantity'
+      );
+      return rejectWithValue(userMessage);
     }
   }
 );

@@ -13,6 +13,7 @@ import {
   MySiteInventoryScreen,
   OtherSiteInventoryScreen,
   SteelMasterScreen,
+  InventoryUpdateRequestsScreen,
 } from '../screens';
 import { MaintenanceStackNavigator } from './MaintenanceStackNavigator';
 
@@ -26,7 +27,8 @@ export type InventoryStackParamList = {
   ItemDetail: { itemId: string };
   SteelMaster: undefined;
   Maintenance: undefined;
-  
+  InventoryUpdateRequests: undefined;
+
   // Site Manager screens
   MySiteInventory: undefined;
   OtherSiteInventory: { siteId: string };
@@ -99,6 +101,14 @@ export const InventoryStackNavigator: React.FC = () => {
           <Stack.Screen
             name="Maintenance"
             component={MaintenanceStackNavigator}
+            options={{
+              presentation: 'card',
+              gestureEnabled: true,
+            }}
+          />
+          <Stack.Screen
+            name="InventoryUpdateRequests"
+            component={InventoryUpdateRequestsScreen}
             options={{
               presentation: 'card',
               gestureEnabled: true,

@@ -16,8 +16,10 @@ import steelMasterReducer from '../../../store/slices/steelMasterSlice';
 import maintenanceReducer from '../../../store/slices/maintenanceSlice';
 import activityLogReducer from '../../../store/slices/activityLogSlice';
 import purchaseOrderReducer from '../../../store/slices/purchaseOrderSlice';
+import inventoryUpdateRequestReducer from '../../../store/slices/inventoryUpdateRequestSlice';
 import type { RootState } from '../../../store';
 import type { Item } from '../../../types/inventory';
+import type { AuthState } from '../../../types/auth';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn().mockResolvedValue(null),
@@ -114,6 +116,16 @@ jest.mock('../../../services/firebase/inventoryService', () => ({
   getItemById: jest.fn(),
   listItems: jest.fn(),
 }));
+jest.mock('../../../store/thunks/inventoryUpdateRequestThunks', () => {
+  const { createAsyncThunk } = require('@reduxjs/toolkit');
+  return {
+    createInventoryUpdateRequest: createAsyncThunk('inventoryUpdateRequest/create', async () => null),
+    approveInventoryUpdateRequest: createAsyncThunk('inventoryUpdateRequest/approve', async () => null),
+    rejectInventoryUpdateRequest: createAsyncThunk('inventoryUpdateRequest/reject', async () => null),
+    fetchPendingRequests: createAsyncThunk('inventoryUpdateRequest/fetchPending', async () => []),
+    fetchMyActiveAccess: createAsyncThunk('inventoryUpdateRequest/fetchMyAccess', async () => null),
+  };
+});
 jest.mock('../../../store/thunks/activityLogThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
@@ -142,28 +154,38 @@ const mockItem: Item = {
   centralStoreQuantity: 30,
   atSitesQuantity: 15,
   inMaintenanceQuantity: 5,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+};
+
+const defaultAuthState: AuthState = {
+  user: { uid: 'user1', email: 'user@test.com', displayName: 'Test User' } as import('firebase/auth').User,
+  userRole: null,
+  isLoading: false,
+  isRoleLoading: false,
+  authInitialized: false,
+  error: null,
+  isAuthenticated: true,
+};
+
+const baseInventoryState: RootState['inventory'] = {
+  items: [],
+  categories: [],
+  inventoryByLocation: {},
+  lowStockItemIds: [],
+  loading: false,
+  error: null,
+  errorTimestamp: null,
+  filters: null,
+  totalCount: null,
+  lastDoc: null,
+  hasMore: false,
+  loadingMore: false,
 };
 
 const defaultPreloadedState: Partial<RootState> = {
-  auth: {
-    user: { uid: 'user1', email: 'user@test.com', displayName: 'Test User' } as import('firebase/auth').User,
-    userRole: null,
-    isLoading: false,
-    isRoleLoading: false,
-    authInitialized: false,
-    error: null,
-    isAuthenticated: true,
-  },
-  inventory: {
-    items: [],
-    categories: [],
-    inventoryByLocation: {},
-    lowStockItemIds: [],
-    loading: false,
-    error: null,
-    errorTimestamp: null,
-    filters: null,
-  },
+  auth: defaultAuthState,
+  inventory: baseInventoryState,
 };
 
 function renderWithStore(ui: React.ReactElement, preloadedState: Partial<RootState> = {}) {
@@ -177,6 +199,7 @@ function renderWithStore(ui: React.ReactElement, preloadedState: Partial<RootSta
       maintenance: maintenanceReducer,
       activityLog: activityLogReducer,
       purchaseOrders: purchaseOrderReducer,
+      inventoryUpdateRequest: inventoryUpdateRequestReducer,
     } as Record<string, React.Reducer<unknown, { type: string }>>,
     preloadedState: { ...defaultPreloadedState, ...preloadedState } as Partial<RootState>,
   });
@@ -199,16 +222,7 @@ describe('ItemDetailScreen', () => {
   it('shows loading when item not in store', () => {
     mockRouteParams = { itemId: 'i1' };
     renderWithStore(<ItemDetailScreen />, {
-      inventory: {
-        items: [],
-        categories: [],
-        inventoryByLocation: {},
-        lowStockItemIds: [],
-        loading: true,
-        error: null,
-        errorTimestamp: null,
-        filters: null,
-      },
+      inventory: { ...baseInventoryState, loading: true },
     });
 
     expect(screen.getByText('Loading item details...')).toBeTruthy();
@@ -218,16 +232,7 @@ describe('ItemDetailScreen', () => {
   it('renders item details when item in store (name, SKU, stock)', () => {
     mockRouteParams = { itemId: 'i1' };
     renderWithStore(<ItemDetailScreen />, {
-      inventory: {
-        items: [mockItem],
-        categories: [],
-        inventoryByLocation: {},
-        lowStockItemIds: [],
-        loading: false,
-        error: null,
-        errorTimestamp: null,
-        filters: null,
-      },
+      inventory: { ...baseInventoryState, items: [mockItem] },
     });
 
     expect(screen.getByText('Steel Bar 12mm')).toBeTruthy();
@@ -240,22 +245,13 @@ describe('ItemDetailScreen', () => {
 
   it('edit button navigates to AddEditItem with itemId when user can edit (Admin/StoreIncharge)', () => {
     mockRouteParams = { itemId: 'i1' };
-    const storeInchargeAuth = {
-      ...defaultPreloadedState.auth,
+    const storeInchargeAuth: AuthState = {
+      ...defaultAuthState,
       userRole: { role: 'StoreIncharge' as const, isActive: true, permissions: [] },
     };
     renderWithStore(<ItemDetailScreen />, {
-      auth: storeInchargeAuth as Partial<RootState['auth']>,
-      inventory: {
-        items: [mockItem],
-        categories: [],
-        inventoryByLocation: {},
-        lowStockItemIds: [],
-        loading: false,
-        error: null,
-        errorTimestamp: null,
-        filters: null,
-      },
+      auth: storeInchargeAuth,
+      inventory: { ...baseInventoryState, items: [mockItem] },
     });
 
     const editButtons = screen.getAllByRole('button', { name: 'Edit item' });
@@ -266,22 +262,13 @@ describe('ItemDetailScreen', () => {
 
   it('add stock opens StockEntryModal when user is Admin', () => {
     mockRouteParams = { itemId: 'i1' };
-    const adminAuth = {
-        ...defaultPreloadedState.auth,
-        userRole: { role: 'Admin' as const, isActive: true, permissions: [] },
-      };
+    const adminAuth: AuthState = {
+      ...defaultAuthState,
+      userRole: { role: 'Admin' as const, isActive: true, permissions: [] },
+    };
     renderWithStore(<ItemDetailScreen />, {
-      auth: adminAuth as Partial<RootState['auth']>,
-      inventory: {
-        items: [mockItem],
-        categories: [],
-        inventoryByLocation: {},
-        lowStockItemIds: [],
-        loading: false,
-        error: null,
-        errorTimestamp: null,
-        filters: null,
-      },
+      auth: adminAuth,
+      inventory: { ...baseInventoryState, items: [mockItem] },
     });
 
     const addStockButtons = screen.getAllByRole('button', { name: 'Add stock' });
@@ -292,22 +279,13 @@ describe('ItemDetailScreen', () => {
 
   it('Add Stock button is hidden when user is StoreIncharge', () => {
     mockRouteParams = { itemId: 'i1' };
-    const storeInchargeAuth = {
-        ...defaultPreloadedState.auth,
-        userRole: { role: 'StoreIncharge' as const, isActive: true, permissions: [] },
-      };
+    const storeInchargeAuth: AuthState = {
+      ...defaultAuthState,
+      userRole: { role: 'StoreIncharge' as const, isActive: true, permissions: [] },
+    };
     renderWithStore(<ItemDetailScreen />, {
-      auth: storeInchargeAuth as Partial<RootState['auth']>,
-      inventory: {
-        items: [mockItem],
-        categories: [],
-        inventoryByLocation: {},
-        lowStockItemIds: [],
-        loading: false,
-        error: null,
-        errorTimestamp: null,
-        filters: null,
-      },
+      auth: storeInchargeAuth,
+      inventory: { ...baseInventoryState, items: [mockItem] },
     });
 
     expect(screen.queryByRole('button', { name: 'Add stock' })).toBeNull();
@@ -316,22 +294,13 @@ describe('ItemDetailScreen', () => {
 
   it('back button calls goBack', () => {
     mockRouteParams = { itemId: 'i1' };
-    const storeInchargeAuth = {
-      ...defaultPreloadedState.auth,
+    const storeInchargeAuth: AuthState = {
+      ...defaultAuthState,
       userRole: { role: 'StoreIncharge' as const, isActive: true, permissions: [] },
     };
     renderWithStore(<ItemDetailScreen />, {
-      auth: storeInchargeAuth as Partial<RootState['auth']>,
-      inventory: {
-        items: [mockItem],
-        categories: [],
-        inventoryByLocation: {},
-        lowStockItemIds: [],
-        loading: false,
-        error: null,
-        errorTimestamp: null,
-        filters: null,
-      },
+      auth: storeInchargeAuth,
+      inventory: { ...baseInventoryState, items: [mockItem] },
     });
 
     fireEvent.press(screen.getByRole('button', { name: 'Go back' }));
@@ -341,22 +310,13 @@ describe('ItemDetailScreen', () => {
 
   it('Edit, Add Stock, and Stock Level section are hidden when user is Site Manager (view-only)', () => {
     mockRouteParams = { itemId: 'i1' };
-    const siteManagerAuth = {
-      ...defaultPreloadedState.auth,
+    const siteManagerAuth: AuthState = {
+      ...defaultAuthState,
       userRole: { role: 'SiteManager' as const, isActive: true, permissions: [] },
     };
     renderWithStore(<ItemDetailScreen />, {
-      auth: siteManagerAuth as Partial<RootState['auth']>,
-      inventory: {
-        items: [mockItem],
-        categories: [],
-        inventoryByLocation: {},
-        lowStockItemIds: [],
-        loading: false,
-        error: null,
-        errorTimestamp: null,
-        filters: null,
-      },
+      auth: siteManagerAuth,
+      inventory: { ...baseInventoryState, items: [mockItem] },
     });
 
     expect(screen.queryByRole('button', { name: 'Edit item' })).toBeNull();

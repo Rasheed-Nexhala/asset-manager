@@ -9,6 +9,7 @@ import { createDefaultUserDocument } from '../../services/firebase/userRoleServi
 import { setUser } from '../slices/authSlice';
 import { clearActivityLogs } from '../slices/activityLogSlice';
 import { clearInventory } from '../slices/inventorySlice';
+import { clearAccess } from '../slices/inventoryUpdateRequestSlice';
 import { clearRequests } from '../slices/requestsSlice';
 import { clearMaintenance } from '../slices/maintenanceSlice';
 import { clearPurchaseOrders } from '../slices/purchaseOrderSlice';
@@ -18,7 +19,12 @@ import {
   unsubscribeFromActivityLogs,
   unsubscribeFromMyRecentActivity,
 } from './activityLogThunks';
-import type { SignUpCredentials, SignInCredentials } from '../../types/auth';
+import { unsubscribeFromMyActiveAccess } from './inventoryUpdateRequestThunks';
+import type {
+  SignUpCredentials,
+  SignInCredentials,
+  SignOutPayload,
+} from '../../types/auth';
 import type { AppDispatch, RootState } from '../index';
 
 export const signUpUser = createAsyncThunk(
@@ -59,15 +65,16 @@ export const signInUser = createAsyncThunk(
 
 export const signOutUser = createAsyncThunk<
   null,
-  void,
+  SignOutPayload | void,
   { state: RootState; dispatch: AppDispatch }
 >(
   'auth/signOut',
-  async (_, { dispatch, rejectWithValue }) => {
+  async (_arg, { dispatch, rejectWithValue }) => {
     try {
       // 1. Unsubscribe from thunk-managed listeners
       dispatch(unsubscribeFromActivityLogs());
       dispatch(unsubscribeFromMyRecentActivity());
+      dispatch(unsubscribeFromMyActiveAccess());
 
       // 2. Clear user in Redux FIRST so RootNavigator switches to Auth screen.
       //    This unmounts MainStackNavigator and all Firestore subscriptions
@@ -81,6 +88,7 @@ export const signOutUser = createAsyncThunk<
       // 4. Clear all feature-domain state
       dispatch(clearActivityLogs());
       dispatch(clearInventory());
+      dispatch(clearAccess());
       dispatch(clearRequests());
       dispatch(clearMaintenance());
       dispatch(clearPurchaseOrders());

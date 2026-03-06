@@ -403,7 +403,7 @@ export interface LogQuantityAdjustedPayload {
   itemSku: string;
   locationId: string;
   locationName: string;
-  type: 'add' | 'remove';
+  type: 'add' | 'remove' | 'set';
   quantity: number;
   reason: string;
   notes: string;
@@ -450,5 +450,67 @@ export async function logQuantityAdjustedToCloud(
       return;
     }
     console.error('Failed to log quantity adjustment:', error);
+  }
+}
+
+/**
+ * Payload for logInventoryUpdateRequest callable
+ */
+export interface LogInventoryUpdateRequestPayload {
+  actionType:
+    | 'inventory_update_request_created'
+    | 'inventory_update_request_approved'
+    | 'inventory_update_request_rejected'
+    | 'inventory_update_request_revoked'
+    | 'inventory_update_request_restored';
+  requestId: string;
+  targetDisplay: string;
+  requestedBy?: string;
+  requestedByName?: string;
+  requestedByRole?: string;
+  reason?: string;
+  approvedBy?: string;
+  approvedByName?: string;
+  expiresInHours?: number;
+  rejectionReason?: string;
+}
+
+/**
+ * Log inventory update request event via Cloud Function (callable)
+ * Called after create/approve/reject of inventory update request.
+ */
+export async function logInventoryUpdateRequestToCloud(
+  payload: LogInventoryUpdateRequestPayload
+): Promise<void> {
+  try {
+    const fn = httpsCallable<
+      LogInventoryUpdateRequestPayload,
+      { success: boolean }
+    >(functions, 'logInventoryUpdateRequest');
+    await fn(payload);
+  } catch (error: unknown) {
+    const code = (error as { code?: string })?.code ?? '';
+    const message = (error as { message?: string })?.message ?? String(error);
+    if (
+      code === 'functions/not-found' ||
+      code === 'functions/unavailable' ||
+      message.includes('not-found')
+    ) {
+      if (__DEV__) {
+        console.info(
+          'Activity log (logInventoryUpdateRequest) unavailable. Deploy Cloud Functions to enable logging.'
+        );
+      }
+      return;
+    }
+    if (code === 'unauthenticated' || message.includes('unauthenticated')) {
+      if (__DEV__) {
+        console.info(
+          'Activity log (logInventoryUpdateRequest): request was unauthenticated; event not logged.'
+        );
+      }
+      return;
+    }
+    console.error('Failed to log inventory update request:', error);
   }
 }

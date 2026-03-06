@@ -72,7 +72,7 @@ export const createDefaultUserDocument = async (
 ): Promise<void> => {
   const defaultRoleData: UserRoleData = {
     role: 'Unassigned', // Default role for new users
-    isActive: false,
+    isActive: true, // New signups can use the app immediately; admins can deactivate if needed
     permissions: [],
   };
   

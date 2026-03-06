@@ -42,6 +42,12 @@ export type ActionType =
   | 'item_transferred'
   | 'steel_master_created'
   | 'steel_master_updated'
+  // Inventory Update Requests (Store Incharge access to central store)
+  | 'inventory_update_request_created'
+  | 'inventory_update_request_approved'
+  | 'inventory_update_request_rejected'
+  | 'inventory_update_request_revoked'
+  | 'inventory_update_request_restored'
   // Requests
   | 'request_created'
   | 'request_edited'
@@ -77,7 +83,8 @@ export type TargetType =
   | 'request'
   | 'purchase_order'
   | 'maintenance'
-  | 'vendor';
+  | 'vendor'
+  | 'inventory_update_request';
 
 /**
  * Change Entry (Before/After Values)
