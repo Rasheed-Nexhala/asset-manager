@@ -11,6 +11,7 @@ import {
   setError,
   clearError,
   addOrUpdatePO,
+  removePO,
 } from '../slices/purchaseOrderSlice';
 import {
   selectUserRoleType,
@@ -61,6 +62,33 @@ export const createPO = createAsyncThunk(
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to create purchase order';
+      dispatch(setError(errorMessage));
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * Delete a draft purchase order (permanently removes from Firestore)
+ */
+export const deletePO = createAsyncThunk(
+  'purchaseOrders/deletePO',
+  async (
+    { poId, userId }: { poId: string; userId: string },
+    { dispatch, rejectWithValue }
+  ) => {
+    try {
+      dispatch(setLoading(true));
+      dispatch(clearError());
+
+      await purchaseOrderService.deletePO(poId, userId);
+      dispatch(removePO(poId));
+
+      dispatch(setLoading(false));
+      return poId;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to delete draft';
       dispatch(setError(errorMessage));
       return rejectWithValue(errorMessage);
     }

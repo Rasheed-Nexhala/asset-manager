@@ -4,6 +4,7 @@ import {
   where,
   orderBy,
   limit,
+  getDocs,
   getDocsFromServer,
   getCountFromServer,
   onSnapshot,
@@ -130,9 +131,17 @@ export async function listActivityLogs(
       collection(db, ACTIVITY_LOGS_COLLECTION),
       ...constraints
     );
-    // Use getDocsFromServer to bypass cache and ensure fresh data when Firestore
-    // has been updated (e.g. by Cloud Functions) but client cache is stale
-    const snapshot = await getDocsFromServer(q);
+    // Try server first for fresh data; fall back to cache when server is unreachable
+    let snapshot;
+    try {
+      snapshot = await getDocsFromServer(q);
+    } catch (serverErr) {
+      try {
+        snapshot = await getDocs(q);
+      } catch {
+        throw serverErr;
+      }
+    }
 
     const logs = snapshot.docs.map(firestoreToActivityLog);
     const newLastDoc =
@@ -164,8 +173,17 @@ export async function getActivityLogsCount(
       collection(db, ACTIVITY_LOGS_COLLECTION),
       ...constraints
     );
-    const snapshot = await getCountFromServer(q);
-    return snapshot.data().count;
+    try {
+      const snapshot = await getCountFromServer(q);
+      return snapshot.data().count;
+    } catch (serverErr) {
+      try {
+        const docsSnapshot = await getDocs(q);
+        return docsSnapshot.size;
+      } catch {
+        throw serverErr;
+      }
+    }
   } catch (error: unknown) {
     const err = error as Error;
     console.error('❌ Error getting activity logs count:', err);
@@ -286,7 +304,16 @@ export async function searchActivityLogs(
       limit(100)
     );
 
-    const snapshot = await getDocsFromServer(q);
+    let snapshot;
+    try {
+      snapshot = await getDocsFromServer(q);
+    } catch (serverErr) {
+      try {
+        snapshot = await getDocs(q);
+      } catch {
+        throw serverErr;
+      }
+    }
     const allLogs = snapshot.docs.map(firestoreToActivityLog);
 
     // Client-side filtering

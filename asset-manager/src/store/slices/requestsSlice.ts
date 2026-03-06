@@ -96,7 +96,7 @@ const requestsSlice = createSlice({
       // Non-drafts: add to both requests (queue) and myRequests.
       const isDraft = action.payload.status === 'draft';
       const existsInMyRequests = state.myRequests.some((r) => r.id === action.payload.id);
-      
+
       if (!existsInMyRequests) {
         state.myRequests.unshift(action.payload);
       }
@@ -105,6 +105,15 @@ const requestsSlice = createSlice({
         if (!existsInRequests) {
           state.requests.unshift(action.payload);
         }
+      }
+    },
+
+    removeRequest: (state, action: PayloadAction<string>) => {
+      const id = action.payload;
+      state.requests = state.requests.filter((r) => r.id !== id);
+      state.myRequests = state.myRequests.filter((r) => r.id !== id);
+      if (state.selectedRequest?.id === id) {
+        state.selectedRequest = null;
       }
     },
 
@@ -256,6 +265,7 @@ export const {
   setSelectedRequest,
   addRequest,
   updateRequestInState,
+  removeRequest,
   setFilters,
   clearFilters,
   setLoading,

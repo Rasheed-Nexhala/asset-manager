@@ -140,10 +140,12 @@ service cloud.firestore {
     /**
      * Purchase Orders collection
      * Admin and Store Incharge can read and write (create, update) purchase orders
+     * Delete: Creator can delete own draft POs only
      */
     match /purchaseOrders/{poId} {
       allow read, create, update: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge();
-      allow delete: if false; // Soft delete via status preferred
+      allow delete: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge() &&
+        resource.data.status == 'draft' && resource.data.createdBy == request.auth.uid;
     }
     
     /**
@@ -361,7 +363,8 @@ service cloud.firestore {
      *   - Store Incharge/Admin: can update for approval/rejection/transfer
      *     CRITICAL: Store Incharge CANNOT edit items/priority (enforced in service layer)
      * - Delete:
-     *   - Admin only (soft delete via status is preferred)
+     *   - Admin: can delete any request
+     *   - Site Manager: can delete own DRAFT requests only
      * 
      * Business Rules Enforced:
      * - No partial fulfillment (enforced in service)
@@ -393,8 +396,11 @@ service cloud.firestore {
         canManageRequests()
       );
       
-      // Delete: Admin only (soft delete preferred)
-      allow delete: if isAuthenticated() && isUserActive() && isAdmin();
+      // Delete: Admin (any) or Site Manager (own draft only)
+      allow delete: if isAuthenticated() && isUserActive() && (
+        isAdmin() ||
+        (isSiteManager() && resource.data.requestedBy == request.auth.uid && resource.data.status == 'draft')
+      );
     }
 
     /**

@@ -8,6 +8,7 @@ import {
   getCountFromServer,
   addDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -264,6 +265,36 @@ export const getPOById = async (poId: string): Promise<PurchaseOrder | null> => 
     return firestorePOToPO(firestorePO);
   } catch (error) {
     console.error('Error getting PO by ID:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a draft purchase order (permanently removes from Firestore).
+ * Only the PO creator can delete, and only when status is draft.
+ */
+export const deletePO = async (poId: string, userId: string): Promise<void> => {
+  try {
+    const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
+    const poSnap = await getDoc(poRef);
+
+    if (!poSnap.exists()) {
+      throw new Error('Purchase order not found');
+    }
+
+    const poData = poSnap.data();
+
+    if (poData.status !== 'draft') {
+      throw new Error('Only draft purchase orders can be deleted');
+    }
+
+    if (poData.createdBy !== userId) {
+      throw new Error('Only the creator can delete this draft');
+    }
+
+    await deleteDoc(poRef);
+  } catch (error) {
+    console.error('Error deleting purchase order:', error);
     throw error;
   }
 };

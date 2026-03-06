@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import {
@@ -41,6 +42,12 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 export async function getExpoPushToken(): Promise<string | null> {
   if (!Device.isDevice) return null;
   if (!(await requestNotificationPermissions())) return null;
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Default',
+      importance: Notifications.AndroidImportance.DEFAULT,
+    });
+  }
   const { data } = await Notifications.getExpoPushTokenAsync({ projectId: EAS_PROJECT_ID });
   return data;
 }

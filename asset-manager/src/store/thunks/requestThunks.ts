@@ -21,6 +21,7 @@ import {
   clearError,
   addRequest,
   updateRequestInState,
+  removeRequest,
 } from '../slices/requestsSlice';
 
 /**
@@ -327,6 +328,33 @@ export const returnItems = createAsyncThunk(
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to return items';
+      dispatch(setError(errorMessage));
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * Delete a draft request (permanently removes from Firestore)
+ */
+export const deleteRequest = createAsyncThunk(
+  'requests/deleteRequest',
+  async (
+    { requestId, userId }: { requestId: string; userId: string },
+    { dispatch, rejectWithValue }
+  ) => {
+    try {
+      dispatch(setLoading(true));
+      dispatch(clearError());
+
+      await requestService.deleteRequest(requestId, userId);
+      dispatch(removeRequest(requestId));
+
+      dispatch(setLoading(false));
+      return requestId;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to delete draft';
       dispatch(setError(errorMessage));
       return rejectWithValue(errorMessage);
     }

@@ -10,6 +10,8 @@ jest.mock('expo-notifications', () => ({
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
   getExpoPushTokenAsync: jest.fn(),
   setNotificationHandler: jest.fn(),
+  getLastNotificationResponseAsync: jest.fn().mockResolvedValue(null),
+  clearLastNotificationResponseAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('firebase/auth', () => ({ User: function User() {} }));

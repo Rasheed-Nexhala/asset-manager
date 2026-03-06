@@ -162,10 +162,13 @@ jest.mock('../../../store/thunks/purchaseOrderThunks', () => {
           mockUpdatePOResolve = resolve;
         })
     ),
+    deletePO: createAsyncThunk('purchaseOrders/deletePO', async () => 'po1'),
     approvePO: createAsyncThunk('purchaseOrders/approve', async () => {}),
     rejectPO: createAsyncThunk('purchaseOrders/reject', async () => {}),
     markPOOrdered: createAsyncThunk('purchaseOrders/markOrdered', async () => {}),
     receivePO: createAsyncThunk('purchaseOrders/receive', async () => {}),
+    fetchPurchaseOrdersPaginated: createAsyncThunk('purchaseOrders/fetchPaginated', async () => ({ orders: [], totalCount: 0, lastDoc: null, pageSize: 15 })),
+    loadMorePurchaseOrders: createAsyncThunk('purchaseOrders/loadMore', async () => ({ orders: [], lastDoc: null, pageSize: 15 })),
   };
 });
 

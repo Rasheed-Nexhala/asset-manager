@@ -8,6 +8,7 @@ import {
   getCountFromServer,
   addDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -828,6 +829,39 @@ const returnItemsBatch = async (
 };
 
 /**
+ * Delete a draft request (permanently removes from Firestore).
+ * Only the request creator can delete, and only when status is draft.
+ */
+export const deleteRequest = async (
+  requestId: string,
+  userId: string
+): Promise<void> => {
+  try {
+    const requestRef = doc(db, REQUESTS_COLLECTION, requestId);
+    const requestSnap = await getDoc(requestRef);
+
+    if (!requestSnap.exists()) {
+      throw new Error('Request not found');
+    }
+
+    const requestData = requestSnap.data();
+
+    if (requestData.status !== 'draft') {
+      throw new Error('Only draft requests can be deleted');
+    }
+
+    if (requestData.requestedBy !== userId) {
+      throw new Error('Only the request creator can delete this draft');
+    }
+
+    await deleteDoc(requestRef);
+  } catch (error) {
+    console.error('Error deleting request:', error);
+    throw error;
+  }
+};
+
+/**
  * Cancel a draft or pending request
  */
 export const cancelRequest = async (requestId: string): Promise<void> => {
@@ -1100,6 +1134,7 @@ export const requestService = {
   rejectRequest,
   transferRequest,
   returnItems,
+  deleteRequest,
   cancelRequest,
   getRequestById,
   listRequestsPaginated,

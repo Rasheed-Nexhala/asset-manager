@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import { FormField } from '../../components/FormField';
 import { PrioritySelector } from '../../components/Requests/PrioritySelector';
 import { RequestItemCard } from '../../components/Requests/RequestItemCard';
 import { ItemSelectorModal } from '../../components/Requests/ItemSelectorModal';
-import { editRequest, submitDraftRequest } from '../../store/thunks/requestThunks';
+import { editRequest, submitDraftRequest, deleteRequest } from '../../store/thunks/requestThunks';
 import { requestService } from '../../services/firebase/requestService';
 import {
   selectUserId,
@@ -66,7 +66,8 @@ export const EditRequestScreen: React.FC = () => {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
-  const isBusy = isSavingDraft || isSubmittingRequest;
+  const [isDeleting, setIsDeleting] = useState(false);
+  const isBusy = isSavingDraft || isSubmittingRequest || isDeleting;
   const [isLoading, setIsLoading] = useState(true);
   const [itemSelectorVisible, setItemSelectorVisible] = useState(false);
 
@@ -143,6 +144,39 @@ export const EditRequestScreen: React.FC = () => {
   const handleRemoveItem = (itemId: string) => {
     setItems((prev) => prev.filter((item) => item.itemId !== itemId));
   };
+
+  const handleDeleteDraft = useCallback(() => {
+    Alert.alert(
+      'Delete Draft',
+      'Are you sure you want to delete this draft? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            if (!userId) return;
+            setIsDeleting(true);
+            try {
+              await dispatch(
+                deleteRequest({ requestId, userId })
+              ).unwrap();
+              Alert.alert('Success', 'Draft deleted', [
+                { text: 'OK', onPress: () => navigation.goBack() },
+              ]);
+            } catch (error: unknown) {
+              Alert.alert(
+                'Error',
+                error instanceof Error ? error.message : 'Failed to delete draft'
+              );
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  }, [requestId, userId, dispatch, navigation]);
 
   const handleSubmit = async (isDraft: boolean = true) => {
     // Validate only when submitting (not when saving draft)
@@ -357,6 +391,24 @@ export const EditRequestScreen: React.FC = () => {
             )}
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          onPress={handleDeleteDraft}
+          disabled={isDeleting}
+          className="mt-3 pt-3 border-t border-[#E2E8F0] flex-row items-center justify-center gap-2"
+          accessibilityRole="button"
+          accessibilityLabel={isDeleting ? 'Deleting draft' : 'Delete draft'}
+          accessibilityState={{ disabled: isDeleting, busy: isDeleting }}
+        >
+          {isDeleting ? (
+            <ActivityIndicator size="small" color="#DC2626" />
+          ) : (
+            <Ionicons name="trash-outline" size={20} color="#DC2626" />
+          )}
+          <Text className="text-[15px] font-medium text-[#DC2626]">
+            Delete Draft
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <ItemSelectorModal

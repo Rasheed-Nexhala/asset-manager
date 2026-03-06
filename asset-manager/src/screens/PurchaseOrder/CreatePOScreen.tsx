@@ -24,7 +24,7 @@ import {
   printPurchaseOrder,
   buildDraftPOForPrint,
 } from '../../utils/poPdfUtils';
-import { createPO, updatePO } from '../../store/thunks/purchaseOrderThunks';
+import { createPO, updatePO, deletePO } from '../../store/thunks/purchaseOrderThunks';
 import {
   subscribeToVendors,
   createVendor,
@@ -93,6 +93,7 @@ export const CreatePOScreen: React.FC = () => {
   const [loadPOError, setLoadPOError] = useState<string | null>(null);
   const [loadPORetryTrigger, setLoadPORetryTrigger] = useState(0);
   const [editingPOStatus, setEditingPOStatus] = useState<'draft' | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -383,6 +384,38 @@ export const CreatePOScreen: React.FC = () => {
   );
 
   const handleBack = useCallback(() => navigation.goBack(), [navigation]);
+
+  const handleDeleteDraft = useCallback(() => {
+    if (!poId || editingPOStatus !== 'draft' || !userId) return;
+
+    Alert.alert(
+      'Delete Draft',
+      'Are you sure you want to delete this draft? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setIsDeleting(true);
+            try {
+              await dispatch(deletePO({ poId, userId })).unwrap();
+              Alert.alert('Success', 'Draft deleted', [
+                { text: 'OK', onPress: () => navigation.goBack() },
+              ]);
+            } catch (err: unknown) {
+              Alert.alert(
+                'Error',
+                err instanceof Error ? err.message : 'Failed to delete draft'
+              );
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  }, [poId, editingPOStatus, userId, dispatch, navigation]);
 
   const handlePrintDraft = useCallback(async () => {
     if (!vendorName.trim() || !vendorContact.trim()) {
@@ -677,7 +710,7 @@ export const CreatePOScreen: React.FC = () => {
           <View className="flex-row gap-3 mt-4">
             <TouchableOpacity
               onPress={() => handleSubmit(true)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isDeleting}
               className="flex-1 border-[1.5px] border-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center"
             >
               {isSubmitting && isDraft ? (
@@ -690,7 +723,7 @@ export const CreatePOScreen: React.FC = () => {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleSubmit(false)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isDeleting}
               className="flex-1 bg-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center"
             >
               {isSubmitting && !isDraft ? (
@@ -702,6 +735,27 @@ export const CreatePOScreen: React.FC = () => {
               )}
             </TouchableOpacity>
           </View>
+
+          {/* Delete Draft - only when editing a draft */}
+          {poId && editingPOStatus === 'draft' && (
+            <TouchableOpacity
+              onPress={handleDeleteDraft}
+              disabled={isDeleting}
+              className="mt-3 pt-3 border-t border-[#E2E8F0] flex-row items-center justify-center gap-2"
+              accessibilityRole="button"
+              accessibilityLabel={isDeleting ? 'Deleting draft' : 'Delete draft'}
+              accessibilityState={{ disabled: isDeleting, busy: isDeleting }}
+            >
+              {isDeleting ? (
+                <ActivityIndicator size="small" color="#DC2626" />
+              ) : (
+                <Ionicons name="trash-outline" size={20} color="#DC2626" />
+              )}
+              <Text className="text-[15px] font-medium text-[#DC2626]">
+                Delete Draft
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 

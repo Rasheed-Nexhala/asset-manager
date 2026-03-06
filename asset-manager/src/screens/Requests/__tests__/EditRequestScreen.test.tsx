@@ -95,12 +95,14 @@ jest.mock('../../../store/thunks/inventoryThunks', () => {
 });
 const mockEditRequest = jest.fn().mockResolvedValue(undefined);
 const mockSubmitDraftRequest = jest.fn().mockResolvedValue(undefined);
+const mockDeleteRequest = jest.fn().mockResolvedValue('req1');
 
 jest.mock('../../../store/thunks/requestThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
     createRequest: createAsyncThunk('requests/createRequest', async () => null),
     editRequest: createAsyncThunk('requests/editRequest', async (arg: unknown) => mockEditRequest(arg)),
+    deleteRequest: createAsyncThunk('requests/deleteRequest', async (arg: unknown) => mockDeleteRequest(arg)),
     rejectRequest: createAsyncThunk('requests/rejectRequest', async () => null),
     processRequest: createAsyncThunk('requests/processRequest', async () => null),
     confirmTransfer: createAsyncThunk('requests/confirmTransfer', async () => null),
@@ -267,6 +269,7 @@ describe('EditRequestScreen', () => {
     expect(screen.getByPlaceholderText('Describe the purpose of this request...')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Save as draft' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Submit request' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Delete draft' })).toBeTruthy();
   });
 
   it('non-draft request shows Alert and goBack', async () => {
@@ -350,6 +353,46 @@ describe('EditRequestScreen', () => {
         'Request submitted successfully',
         expect.any(Array)
       );
+    });
+
+    expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  it('Delete Draft shows confirmation and dispatches deleteRequest on confirm', async () => {
+    let deleteButtonOnPress: (() => void) | undefined;
+    jest.spyOn(Alert, 'alert').mockImplementation((title: string, _message?: string, buttons?: Array<{ text?: string; style?: string; onPress?: () => void }>) => {
+      if (title === 'Delete Draft') {
+        deleteButtonOnPress = buttons?.find((b) => b.text === 'Delete')?.onPress;
+      } else {
+        buttons?.find((b) => b.text === 'OK')?.onPress?.();
+      }
+    });
+
+    renderWithStore(<EditRequestScreen />, defaultPreloadedState);
+    mockGetRequestByIdResolve!(mockDraftRequest);
+
+    await waitFor(() => {
+      expect(screen.getByText('Editing draft request')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByRole('button', { name: 'Delete draft' }));
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Delete Draft',
+        'Are you sure you want to delete this draft? This cannot be undone.',
+        expect.any(Array)
+      );
+    });
+
+    deleteButtonOnPress?.();
+
+    await waitFor(() => {
+      expect(mockDeleteRequest).toHaveBeenCalledWith({ requestId: 'req1', userId: 'user1' });
+    });
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith('Success', 'Draft deleted', expect.any(Array));
     });
 
     expect(mockGoBack).toHaveBeenCalled();

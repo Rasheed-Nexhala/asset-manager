@@ -41,6 +41,7 @@ export async function sendExpoPushNotification(
     title,
     body,
     data: data ?? {},
+    channelId: 'default', // Android notification channel; ignored on iOS
   }));
 
   const chunks = expo.chunkPushNotifications(messages);

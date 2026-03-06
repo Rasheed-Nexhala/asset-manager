@@ -85,6 +85,14 @@ const purchaseOrderSlice = createSlice({
       }
     },
 
+    removePO: (state, action: PayloadAction<string>) => {
+      const id = action.payload;
+      state.purchaseOrders = state.purchaseOrders.filter((p) => p.id !== id);
+      if (state.selectedPO?.id === id) {
+        state.selectedPO = null;
+      }
+    },
+
     setFilters: (state, action: PayloadAction<Partial<PurchaseOrderState['filters']>>) => {
       state.filters = { ...state.filters, ...action.payload };
       // Reset pagination when filters change
@@ -168,6 +176,7 @@ export const {
   setSelectedPO,
   setVendors,
   addOrUpdatePO,
+  removePO,
   setFilters,
   setLoading,
   setError,
