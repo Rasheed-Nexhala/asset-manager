@@ -11,12 +11,12 @@ import {
   ACTIVITY_LOGS_PAGE_SIZE,
 } from '../../services/firebase/activityLogService';
 import { saveCsvAndShare } from '../../utils/csvExport';
-import {
-  updateLogsFromSnapshot,
-  setLoading,
-  setError,
-} from '../slices/activityLogSlice';
 import type { RootState } from '../index';
+
+// Use plain action types to avoid require cycle: activityLogSlice <-> activityLogThunks
+const ACTIVITY_LOG_UPDATE_LOGS = 'activityLog/updateLogsFromSnapshot';
+const ACTIVITY_LOG_SET_LOADING = 'activityLog/setLoading';
+const ACTIVITY_LOG_SET_ERROR = 'activityLog/setError';
 
 /**
  * Subscription manager - stores unsubscribe functions
@@ -189,7 +189,7 @@ export const subscribeToActivityLogsRealtime = () => {
     const { filters } = state.activityLog;
 
     const startTime = Date.now();
-    dispatch(setLoading(true));
+    dispatch({ type: ACTIVITY_LOG_SET_LOADING, payload: true });
 
     // Set up new subscription
     activityLogsUnsubscribe = subscribeToActivityLogs(
@@ -200,7 +200,7 @@ export const subscribeToActivityLogsRealtime = () => {
         // Delay clearing loader so users actually see it.
         const elapsed = Date.now() - startTime;
         const dispatchUpdate = () =>
-          dispatch(updateLogsFromSnapshot(logs));
+          dispatch({ type: ACTIVITY_LOG_UPDATE_LOGS, payload: logs });
         if (elapsed >= MIN_LOADER_DISPLAY_MS) {
           dispatchUpdate();
         } else {
@@ -209,7 +209,7 @@ export const subscribeToActivityLogsRealtime = () => {
       },
       (error) => {
         // Handle error
-        dispatch(setError(error.message ?? 'Failed to subscribe to activity logs'));
+        dispatch({ type: ACTIVITY_LOG_SET_ERROR, payload: error.message ?? 'Failed to subscribe to activity logs' });
       }
     );
   };

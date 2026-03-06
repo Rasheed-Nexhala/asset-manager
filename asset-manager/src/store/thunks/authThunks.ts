@@ -6,7 +6,6 @@ import {
   updateUserProfile,
 } from '../../services/firebase/authService';
 import { createDefaultUserDocument } from '../../services/firebase/userRoleService';
-import { setUser } from '../slices/authSlice';
 import { clearActivityLogs } from '../slices/activityLogSlice';
 import { clearInventory } from '../slices/inventorySlice';
 import { clearAccess } from '../slices/inventoryUpdateRequestSlice';
@@ -76,7 +75,8 @@ export const signOutUser = createAsyncThunk<
       //    This unmounts MainStackNavigator and all Firestore subscriptions
       //    BEFORE we invalidate auth. Prevents "Missing or insufficient permissions"
       //    errors from subscriptions firing with null auth.
-      dispatch(setUser(null));
+      // Use plain action to avoid require cycle: authSlice <-> authThunks
+      dispatch({ type: 'auth/setUser', payload: null });
 
       // 3. Let React flush the unmount so subscriptions clean up
       await new Promise((resolve) => setTimeout(resolve, 0));
