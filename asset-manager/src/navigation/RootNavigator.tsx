@@ -7,8 +7,13 @@ import {
 } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useAppSelector } from '../store/hooks';
-import { selectIsAuthenticated, selectRoleLoading } from '../store/selectors/authSelectors';
+import {
+  selectIsAuthenticated,
+  selectRoleLoading,
+  selectAuthInitialized,
+} from '../store/selectors/authSelectors';
 import { AuthFlowScreen } from '../screens/Authentication/AuthFlowScreen';
+import { AuthCheckingScreen } from '../screens/Authentication/AuthCheckingScreen';
 import { LoadingScreen } from '../screens/LoadingScreen';
 import { BottomTabNavigator } from './BottomTabNavigator';
 import { UpdatePasswordScreen } from '../screens/Users/UpdatePasswordScreen';
@@ -205,6 +210,7 @@ function useNotificationResponseHandler(
 }
 
 export const RootNavigator: React.FC = () => {
+  const authInitialized = useAppSelector(selectAuthInitialized);
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const isRoleLoading = useAppSelector(selectRoleLoading);
 
@@ -213,7 +219,9 @@ export const RootNavigator: React.FC = () => {
   return (
     <NavigationContainer ref={navigationRef}>
       <AuthStack.Navigator screenOptions={{ headerShown: false }}>
-        {!isAuthenticated ? (
+        {!authInitialized ? (
+          <AuthStack.Screen name="AuthChecking" component={AuthCheckingScreen} />
+        ) : !isAuthenticated ? (
           <AuthStack.Screen name="Auth" component={AuthFlowScreen} />
         ) : isRoleLoading ? (
           <AuthStack.Screen name="Loading" component={LoadingScreen} />

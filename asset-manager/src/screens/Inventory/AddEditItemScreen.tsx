@@ -23,6 +23,7 @@ type NavigationProp = StackNavigationProp<InventoryStackParamList, 'AddEditItem'
 
 interface RouteParams {
   itemId?: string;
+  selectedCategoryId?: string;
 }
 
 /**
@@ -34,7 +35,7 @@ export const AddEditItemScreen: React.FC = () => {
   const route = useRoute();
   const dispatch = useAppDispatch();
   
-  const { itemId } = (route.params as RouteParams) || {};
+  const { itemId, selectedCategoryId } = (route.params as RouteParams) || {};
   const mode: 'create' | 'edit' = itemId ? 'edit' : 'create';
   
   // Redux state
@@ -359,6 +360,14 @@ export const AddEditItemScreen: React.FC = () => {
         onCancel={handleCancel}
         loading={isSubmitting || isLoading}
         onManageSteelMaster={() => navigation.navigate('SteelMaster')}
+        onSelectCategoryPress={(currentCategoryId) =>
+          navigation.navigate('CategorySelect', {
+            returnRoute: 'AddEditItem',
+            itemId,
+            initialCategoryId: currentCategoryId ?? null,
+          })
+        }
+        returnedCategoryId={selectedCategoryId ?? null}
       />
     </ScreenLayout>
   );

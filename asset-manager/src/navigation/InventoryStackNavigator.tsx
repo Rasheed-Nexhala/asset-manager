@@ -14,6 +14,8 @@ import {
   OtherSiteInventoryScreen,
   SteelMasterScreen,
   InventoryUpdateRequestsScreen,
+  CategorySelectScreen,
+  CategoryManagementScreen,
 } from '../screens';
 import { MaintenanceStackNavigator } from './MaintenanceStackNavigator';
 
@@ -23,11 +25,17 @@ import { MaintenanceStackNavigator } from './MaintenanceStackNavigator';
 export type InventoryStackParamList = {
   // Central Store screens (Admin/StoreIncharge)
   CentralStoreInventory: undefined;
-  AddEditItem: { itemId?: string } | undefined;
+  AddEditItem: { itemId?: string; selectedCategoryId?: string } | undefined;
   ItemDetail: { itemId: string };
   SteelMaster: undefined;
   Maintenance: undefined;
   InventoryUpdateRequests: undefined;
+  CategorySelect: {
+    returnRoute?: string;
+    itemId?: string;
+    initialCategoryId?: string | null;
+  };
+  CategoryManagement: undefined;
 
   // Site Manager screens
   MySiteInventory: undefined;
@@ -83,6 +91,14 @@ export const InventoryStackNavigator: React.FC = () => {
             }}
           />
           <Stack.Screen
+            name="CategorySelect"
+            component={CategorySelectScreen}
+            options={{
+              presentation: 'card',
+              gestureEnabled: true,
+            }}
+          />
+          <Stack.Screen
             name="ItemDetail"
             component={ItemDetailScreen}
             options={{
@@ -109,6 +125,14 @@ export const InventoryStackNavigator: React.FC = () => {
           <Stack.Screen
             name="InventoryUpdateRequests"
             component={InventoryUpdateRequestsScreen}
+            options={{
+              presentation: 'card',
+              gestureEnabled: true,
+            }}
+          />
+          <Stack.Screen
+            name="CategoryManagement"
+            component={CategoryManagementScreen}
             options={{
               presentation: 'card',
               gestureEnabled: true,

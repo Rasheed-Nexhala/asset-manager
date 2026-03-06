@@ -1,9 +1,9 @@
 /**
  * Category Management Screen
  *
- * Full CRUD interface for managing item categories.
+ * Create, list, and delete categories. Edit is not supported.
  * Access: Admin & Store Incharge only.
- * CIAMS: ScreenLayout, ScreenHeader, list with edit/delete, FAB for add, real-time updates.
+ * CIAMS: ScreenLayout, ScreenHeader, list with delete, FAB for add, real-time updates.
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -21,12 +21,10 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenHeader, ScreenLayout } from '../../components';
 import { CategoryListItem } from '../../components/Inventory/CategoryListItem';
-import { CategoryEditModal } from '../../components/Inventory/CategoryEditModal';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   fetchCategories,
   createCategory,
-  updateCategory,
   deleteCategory,
 } from '../../store/thunks/inventoryThunks';
 import { clearError } from '../../store/slices/inventorySlice';
@@ -36,7 +34,10 @@ import {
   selectItemsLoading,
 } from '../../store/selectors/inventorySelectors';
 import { useInventoryError } from '../../hooks/useInventoryError';
-import { subscribeCategories } from '../../services/firebase/categoryService';
+import {
+  subscribeCategories,
+  checkItemsUsingCategory,
+} from '../../services/firebase/categoryService';
 import { setCategories } from '../../store/slices/inventorySlice';
 import type { Category, Item } from '../../types/inventory';
 
@@ -44,7 +45,6 @@ export const CategoryManagementScreen: React.FC = () => {
   const navigation = useNavigation();
   const dispatch = useAppDispatch();
   const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [newCategoryName, setNewCategoryName] = useState<string>('');
   const [isCreating, setIsCreating] = useState<boolean>(false);
@@ -91,63 +91,48 @@ export const CategoryManagementScreen: React.FC = () => {
     (navigation as any).goBack();
   }, [dispatch, navigation]);
 
-  const handleEdit = useCallback((category: Category) => {
-    setEditingCategory(category);
-  }, []);
-
   const handleDelete = useCallback(
     async (category: Category) => {
-      const itemCount = itemsByCategory[category.id]?.length || 0;
-
-      if (itemCount > 0) {
-        Alert.alert(
-          'Cannot Delete Category',
-          `This category has ${itemCount} item${itemCount > 1 ? 's' : ''} associated with it. Please reassign these items to another category before deleting.`,
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      Alert.alert(
-        'Delete Category',
-        `Are you sure you want to delete "${category.name}"? This action cannot be undone.`,
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Delete',
-            style: 'destructive',
-              onPress: async () => {
-              try {
-                await dispatch(deleteCategory(category.id)).unwrap();
-              } catch (err: any) {
-                const message =
-                  typeof err === 'string' ? err : err?.message || 'Failed to delete category';
-                Alert.alert('Cannot Delete Category', message);
-              }
-            },
-          },
-        ]
-      );
-    },
-    [dispatch, itemsByCategory]
-  );
-
-  const handleSaveEdit = useCallback(
-    async (name: string) => {
-      if (!editingCategory) return;
-
       try {
-        await dispatch(updateCategory({ categoryId: editingCategory.id, name })).unwrap();
-        setEditingCategory(null);
-      } catch (err: any) {
-        // Error is displayed in the modal via Redux state
-        throw err;
+        // Use authoritative Firestore check — Redux items may be filtered or stale
+        const itemCount = await checkItemsUsingCategory(category.id);
+
+        if (itemCount > 0) {
+          Alert.alert(
+            'Cannot Delete Category',
+            `This category has ${itemCount} item${itemCount > 1 ? 's' : ''} associated with it. Please reassign these items to another category before deleting.`,
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+
+        Alert.alert(
+          'Delete Category',
+          `Are you sure you want to delete "${category.name}"? This action cannot be undone.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete',
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  await dispatch(deleteCategory(category.id)).unwrap();
+                } catch (err: unknown) {
+                  const message =
+                    typeof err === 'string' ? err : (err as Error)?.message || 'Failed to delete category';
+                  Alert.alert('Cannot Delete Category', message);
+                }
+              },
+            },
+          ]
+        );
+      } catch (err: unknown) {
+        const message =
+          typeof err === 'string' ? err : (err as Error)?.message || 'Failed to check category usage';
+        Alert.alert('Error', message);
       }
     },
-    [dispatch, editingCategory]
+    [dispatch]
   );
 
   const handleCreateCategory = useCallback(async () => {
@@ -194,11 +179,10 @@ export const CategoryManagementScreen: React.FC = () => {
       <CategoryListItem
         category={item}
         itemCount={getItemCount(item.id)}
-        onEdit={() => handleEdit(item)}
         onDelete={() => handleDelete(item)}
       />
     ),
-    [getItemCount, handleEdit, handleDelete]
+    [getItemCount, handleDelete]
   );
 
   const keyExtractor = useCallback((item: Category) => item.id, []);
@@ -407,16 +391,6 @@ export const CategoryManagementScreen: React.FC = () => {
           </View>
         </View>
       )}
-
-      {/* Edit Category Modal */}
-      <CategoryEditModal
-        visible={editingCategory !== null}
-        category={editingCategory}
-        onSave={handleSaveEdit}
-        onCancel={() => setEditingCategory(null)}
-        isLoading={isLoading}
-        error={error}
-      />
     </ScreenLayout>
   );
 };

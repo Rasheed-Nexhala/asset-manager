@@ -17,6 +17,7 @@ import { SteelMasterSelector } from './SteelMasterSelector';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchSteelMasters } from '../../store/thunks/steelMasterThunks';
 import { selectActiveSteelMasters } from '../../store/selectors/steelMasterSelectors';
+import { selectAllCategories } from '../../store/selectors/inventorySelectors';
 import {
   kgToPieces,
   piecesToKg,
@@ -46,6 +47,10 @@ export interface ItemFormProps {
   loading?: boolean;
   /** Optional callback when user taps "Manage Steel Masters" */
   onManageSteelMaster?: () => void;
+  /** Optional: navigate to CategorySelectScreen instead of modal. Receives current categoryId for pre-selection. */
+  onSelectCategoryPress?: (currentCategoryId: string | null) => void;
+  /** Optional: category ID returned from CategorySelectScreen (parent clears after applying) */
+  returnedCategoryId?: string | null;
 }
 
 /**
@@ -88,9 +93,12 @@ export const ItemForm: React.FC<ItemFormProps> = ({
   onCancel,
   loading = false,
   onManageSteelMaster,
+  onSelectCategoryPress,
+  returnedCategoryId,
 }) => {
   const dispatch = useAppDispatch();
   const steelMasters = useAppSelector(selectActiveSteelMasters);
+  const categories = useAppSelector(selectAllCategories);
 
   /**
    * In edit mode with Kg/Ton unit, minStockLevel is stored as pieces in the backend.
@@ -175,6 +183,13 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       if (sm) setSelectedSteelMaster(sm);
     }
   }, [mode, initialData?.steelMasterId, steelMasters]);
+
+  // Sync category returned from CategorySelectScreen
+  useEffect(() => {
+    if (returnedCategoryId != null && mode === 'create') {
+      setFormData((prev) => ({ ...prev, categoryId: returnedCategoryId }));
+    }
+  }, [returnedCategoryId, mode]);
 
   /** Live validation for weight-based Kg/Ton conversion */
   useEffect(() => {
@@ -817,16 +832,53 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         </View>
 
         {/* Category - Only show in create mode (not editable in edit) */}
-        {mode === 'create' && (
-          <View className="gap-1.5">
-            <CategorySelector
-              selectedCategoryId={formData.categoryId}
-              onSelect={(categoryId) => updateField('categoryId', categoryId)}
-              error={errors.categoryId}
-              disabled={loading}
-            />
-          </View>
-        )}
+        {mode === 'create' &&
+          (onSelectCategoryPress ? (
+            <View className="gap-1.5">
+              <Text className="text-[15px] text-[#0F172A]" accessibilityRole="text">
+                Category <Text className="text-[#DC2626]">*</Text>
+              </Text>
+              <TouchableOpacity
+                className={`border rounded-lg h-12 px-4 bg-white flex-row items-center justify-between min-h-[48px] ${
+                  errors.categoryId ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
+                } ${loading ? 'opacity-60' : ''}`}
+                onPress={() => !loading && onSelectCategoryPress(formData.categoryId)}
+                activeOpacity={0.7}
+                disabled={loading}
+                accessibilityRole="button"
+                accessibilityLabel={`Select category. Current: ${
+                  formData.categoryId
+                    ? categories.find((c) => c.id === formData.categoryId)?.name ?? 'Unknown'
+                    : 'Select Category'
+                }`}
+              >
+                <Text
+                  className={`text-[15px] ${
+                    formData.categoryId ? 'text-[#0F172A]' : 'text-[#94A3B8]'
+                  }`}
+                >
+                  {formData.categoryId
+                    ? categories.find((c) => c.id === formData.categoryId)?.name ?? 'Unknown'
+                    : 'Select Category'}
+                </Text>
+                <Ionicons name="chevron-forward" size={20} color="#64748B" />
+              </TouchableOpacity>
+              {errors.categoryId && (
+                <Text className="text-[13px] text-[#DC2626]" accessibilityLiveRegion="polite">
+                  {errors.categoryId}
+                </Text>
+              )}
+            </View>
+          ) : (
+            <View className="gap-1.5">
+              <CategorySelector
+                selectedCategoryId={formData.categoryId}
+                onSelect={(categoryId) => updateField('categoryId', categoryId)}
+                error={errors.categoryId}
+                disabled={loading}
+              />
+            </View>
+          ))}
 
         {/* Unit of Measurement - Only show in create mode (not editable in edit) */}
         {mode === 'create' && (

@@ -160,6 +160,10 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     navigation.navigate('SteelMaster');
   }, [navigation]);
 
+  const handleCategoryManagement = useCallback(() => {
+    navigation.navigate('CategoryManagement');
+  }, [navigation]);
+
   const handleMaintenance = useCallback(() => {
     navigation.navigate('Maintenance');
   }, [navigation]);
@@ -301,6 +305,15 @@ export const CentralStoreInventoryScreen: React.FC = () => {
           accessibilityLabel="Steel Master"
         >
           <Ionicons name="analytics-outline" size={22} color="#1E40AF" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          className="w-12 h-12 items-center justify-center rounded-[10px]"
+          onPress={handleCategoryManagement}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Manage categories"
+        >
+          <Ionicons name="pricetags-outline" size={22} color="#1E40AF" />
         </TouchableOpacity>
         <TouchableOpacity
           className="w-12 h-12 items-center justify-center rounded-[10px]"

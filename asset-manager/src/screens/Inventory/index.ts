@@ -6,3 +6,4 @@ export { SteelMasterScreen } from './SteelMasterScreen';
 export { MySiteInventoryScreen } from './MySiteInventoryScreen';
 export { OtherSiteInventoryScreen } from './OtherSiteInventoryScreen';
 export { CategoryManagementScreen } from './CategoryManagementScreen';
+export { CategorySelectScreen } from './CategorySelectScreen';

@@ -1,7 +1,7 @@
 /**
  * Category List Item Component
  * 
- * Displays a category in a list format with name, item count, and edit/delete actions.
+ * Displays a category in a list format with name, item count, and delete action.
  * Follows CIAMS design system.
  */
 
@@ -13,14 +13,12 @@ import type { Category } from '../../types/inventory';
 export interface CategoryListItemProps {
   category: Category;
   itemCount: number;
-  onEdit: () => void;
   onDelete: () => void;
 }
 
 export function CategoryListItem({
   category,
   itemCount,
-  onEdit,
   onDelete,
 }: CategoryListItemProps) {
   return (
@@ -41,17 +39,6 @@ export function CategoryListItem({
 
         {/* Action Buttons */}
         <View className="flex-row items-center gap-2">
-          {/* Edit Button */}
-          <TouchableOpacity
-            className="min-w-[48px] min-h-[48px] w-12 h-12 rounded-lg border border-[#E2E8F0] bg-white items-center justify-center"
-            onPress={onEdit}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={`Edit category ${category.name}`}
-          >
-            <Ionicons name="pencil" size={20} color="#1E40AF" />
-          </TouchableOpacity>
-
           {/* Delete Button */}
           <TouchableOpacity
             className="min-w-[48px] min-h-[48px] w-12 h-12 rounded-lg border border-[#DC2626]/30 bg-[#DC2626]/10 items-center justify-center"

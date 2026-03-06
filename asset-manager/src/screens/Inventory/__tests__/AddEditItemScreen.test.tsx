@@ -66,7 +66,7 @@ const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
 
 // Route params - tests set this before render
-let mockRouteParams: { itemId?: string } = {};
+let mockRouteParams: { itemId?: string; selectedCategoryId?: string } = {};
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack }),
   useRoute: () => ({ params: mockRouteParams }),
@@ -267,9 +267,12 @@ function renderWithStore(ui: React.ReactElement, preloadedState: Partial<RootSta
 
 /**
  * Fill create form with valid data (enables submit button).
- * Uses fireEvent.changeText for inputs and fireEvent.press for selectors.
+ * Category is pre-filled via route params (simulates return from CategorySelectScreen).
+ * @param renderResult - Result from renderWithStore; used to rerender with category selection
  */
-function fillCreateFormValid() {
+function fillCreateFormValid(
+  renderResult?: { rerender: (ui: React.ReactElement) => void; store: unknown }
+) {
   // Item name
   const nameInput = screen.getByLabelText('Item name input');
   fireEvent.changeText(nameInput, 'Test Item');
@@ -278,9 +281,19 @@ function fillCreateFormValid() {
   const skuInput = screen.getByLabelText('SKU input');
   fireEvent.changeText(skuInput, 'SKU-TEST');
 
-  // Category - open modal and select
-  fireEvent.press(screen.getByText('Select Category'));
-  fireEvent.press(screen.getByText('Steel'));
+  // Category - pre-fill via route params and rerender (simulates return from CategorySelectScreen)
+  mockRouteParams = { ...mockRouteParams, selectedCategoryId: 'cat1' };
+  if (renderResult?.rerender && renderResult?.store) {
+    const { Provider } = require('react-redux');
+    const { WeightViewPreferenceProvider } = require('../../../hooks/useWeightViewPreference');
+    renderResult.rerender(
+      <Provider store={renderResult.store}>
+        <WeightViewPreferenceProvider>
+          <AddEditItemScreen />
+        </WeightViewPreferenceProvider>
+      </Provider>
+    );
+  }
 
   // Unit - open and select Pcs
   fireEvent.press(screen.getByText('Select unit'));
@@ -347,7 +360,7 @@ describe('AddEditItemScreen', () => {
   });
 
   it('validation: submit without required fields shows error', async () => {
-    mockRouteParams = {};
+    mockRouteParams = { selectedCategoryId: 'cat1' };
     renderWithStore(<AddEditItemScreen />);
 
     // Fill all required fields but set minStockLevel to invalid value (-1)
@@ -356,9 +369,6 @@ describe('AddEditItemScreen', () => {
 
     const skuInput = screen.getByLabelText('SKU input');
     fireEvent.changeText(skuInput, 'SKU-TEST');
-
-    fireEvent.press(screen.getByText('Select Category'));
-    fireEvent.press(screen.getByText('Steel'));
 
     fireEvent.press(screen.getByText('Select unit'));
     fireEvent.press(screen.getByText('Pcs'));
@@ -379,9 +389,9 @@ describe('AddEditItemScreen', () => {
 
   it('submit create dispatches createItem', async () => {
     mockRouteParams = {};
-    renderWithStore(<AddEditItemScreen />);
+    const renderResult = renderWithStore(<AddEditItemScreen />);
 
-    fillCreateFormValid();
+    fillCreateFormValid(renderResult);
 
     fireEvent.press(screen.getByRole('button', { name: 'Submit new item' }));
 
@@ -417,9 +427,9 @@ describe('AddEditItemScreen', () => {
   it('shows SKU already exists message when createItem rejects with duplicate SKU', async () => {
     const skuExistsMessage = 'This SKU already exists. Please use a different SKU.';
     mockRouteParams = {};
-    renderWithStore(<AddEditItemScreen />);
+    const renderResult = renderWithStore(<AddEditItemScreen />);
 
-    fillCreateFormValid();
+    fillCreateFormValid(renderResult);
     fireEvent.press(screen.getByRole('button', { name: 'Submit new item' }));
 
     await waitFor(() => {

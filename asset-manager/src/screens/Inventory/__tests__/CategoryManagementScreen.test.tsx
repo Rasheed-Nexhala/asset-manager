@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -62,6 +63,7 @@ jest.mock('../../../services/firebase/categoryService', () => ({
     }
     return mockUnsubscribe;
   }),
+  checkItemsUsingCategory: jest.fn().mockResolvedValue(0),
 }));
 
 jest.mock('../../../store/thunks/authThunks', () => {
@@ -285,27 +287,6 @@ describe('CategoryManagementScreen', () => {
     );
   });
 
-  it('Edit category opens modal', async () => {
-    mockCategoriesToReturn = null;
-    const cat1 = createMockCategory({ id: 'cat-1', name: 'Steel' });
-
-    renderWithStore(<CategoryManagementScreen />, {
-      inventory: {
-        ...defaultInventoryState,
-        categories: [cat1],
-        loading: false,
-      },
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Edit category Steel' })).toBeTruthy();
-    });
-    fireEvent.press(screen.getByRole('button', { name: 'Edit category Steel' }));
-
-    expect(screen.getByText('Edit Category')).toBeTruthy();
-    expect(screen.getByDisplayValue('Steel')).toBeTruthy();
-  });
-
   it('Back button calls goBack', async () => {
     renderWithStore(<CategoryManagementScreen />, {
       inventory: {
@@ -321,5 +302,65 @@ describe('CategoryManagementScreen', () => {
 
     fireEvent.press(screen.getByRole('button', { name: 'Cancel' }));
     expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  it('Delete category with no items shows confirmation dialog', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const { checkItemsUsingCategory } = require('../../../services/firebase/categoryService');
+    (checkItemsUsingCategory as jest.Mock).mockResolvedValue(0);
+
+    const cat1 = createMockCategory({ id: 'cat-1', name: 'Steel' });
+    renderWithStore(<CategoryManagementScreen />, {
+      inventory: {
+        ...defaultInventoryState,
+        categories: [cat1],
+        loading: false,
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Delete category Steel' })).toBeTruthy();
+    });
+    fireEvent.press(screen.getByRole('button', { name: 'Delete category Steel' }));
+
+    await waitFor(() => {
+      expect(checkItemsUsingCategory).toHaveBeenCalledWith('cat-1');
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Delete Category',
+        'Are you sure you want to delete "Steel"? This action cannot be undone.',
+        expect.any(Array)
+      );
+    });
+    alertSpy.mockRestore();
+  });
+
+  it('Delete category with items shows cannot delete alert', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const { checkItemsUsingCategory } = require('../../../services/firebase/categoryService');
+    (checkItemsUsingCategory as jest.Mock).mockResolvedValue(3);
+
+    const cat1 = createMockCategory({ id: 'cat-1', name: 'Steel' });
+    renderWithStore(<CategoryManagementScreen />, {
+      inventory: {
+        ...defaultInventoryState,
+        categories: [cat1],
+        loading: false,
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Delete category Steel' })).toBeTruthy();
+    });
+    fireEvent.press(screen.getByRole('button', { name: 'Delete category Steel' }));
+
+    await waitFor(() => {
+      expect(checkItemsUsingCategory).toHaveBeenCalledWith('cat-1');
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Cannot Delete Category',
+        'This category has 3 items associated with it. Please reassign these items to another category before deleting.',
+        [{ text: 'OK' }]
+      );
+    });
+    alertSpy.mockRestore();
   });
 });
