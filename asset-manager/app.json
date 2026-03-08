@@ -12,6 +12,11 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "androidMode": "default",
+      "androidCollapsedTitle": "Asset Manager"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ibf.assetmanager",
@@ -37,7 +42,13 @@
       "bundler": "metro"
     },
     "plugins": [
-      ["expo-notifications", { "defaultChannel": "default" }]
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "extra": {
       "eas": {

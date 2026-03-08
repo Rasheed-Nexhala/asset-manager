@@ -1464,3 +1464,6 @@ export const logInventoryUpdateRequest = onCall(async (request) => {
 
   return { success: true };
 });
+
+/** Scheduled Firestore backup — exports daily to GCS. See docs/FIREBASE_BACKUP_IMPLEMENTATION.md */
+export { scheduledFirestoreBackup } from './scheduledBackup';
