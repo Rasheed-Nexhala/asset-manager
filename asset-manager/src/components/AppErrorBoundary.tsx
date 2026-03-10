@@ -6,6 +6,7 @@
  */
 
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
+import * as Sentry from '@sentry/react-native';
 import { ErrorBoundaryFallback } from './ErrorBoundaryFallback';
 
 interface Props {
@@ -31,6 +32,7 @@ export class AppErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
     if (__DEV__) {
       console.error('AppErrorBoundary caught error:', error, errorInfo);
     }

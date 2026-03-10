@@ -174,14 +174,15 @@ function useNotificationResponseHandler(
   const [coldStartData, setColdStartData] = useState<NotificationData | null>(null);
   const canNavigateToMain = isAuthenticated && !isRoleLoading;
 
-  // Cold start: check for notification that launched the app from killed state
   useEffect(() => {
-    Notifications.getLastNotificationResponseAsync().then((response) => {
-      const data = response?.notification?.request?.content?.data as NotificationData | undefined;
-      if (data?.screen) {
-        setColdStartData(data);
-      }
-    });
+    Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        const data = response?.notification?.request?.content?.data as NotificationData | undefined;
+        if (data?.screen) {
+          setColdStartData(data);
+        }
+      })
+      .catch(() => {});
 
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as NotificationData | undefined;

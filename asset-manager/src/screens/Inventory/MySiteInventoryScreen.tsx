@@ -103,9 +103,11 @@ export const MySiteInventoryScreen: React.FC = () => {
       if (!siteId) return;
 
       const locationId = getLocationId('site', siteId);
-      getInventoryByLocation(locationId).then((inventory) => {
-        dispatch(setInventoryForLocation({ locationId, inventory }));
-      });
+      getInventoryByLocation(locationId)
+        .then((inventory) => {
+          dispatch(setInventoryForLocation({ locationId, inventory }));
+        })
+        .catch(() => {});
     }, [siteId, dispatch])
   );
   

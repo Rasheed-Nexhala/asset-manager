@@ -61,12 +61,17 @@ export const RejectRequestScreen: React.FC = () => {
 
   React.useEffect(() => {
     let cancelled = false;
-    requestService.getRequestById(requestId).then((r) => {
-      if (!cancelled && r) {
-        setRequest(r);
-      }
-      setIsLoading(false);
-    });
+    requestService
+      .getRequestById(requestId)
+      .then((r) => {
+        if (!cancelled && r) {
+          setRequest(r);
+        }
+        if (!cancelled) setIsLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) setIsLoading(false);
+      });
     return () => {
       cancelled = true;
     };

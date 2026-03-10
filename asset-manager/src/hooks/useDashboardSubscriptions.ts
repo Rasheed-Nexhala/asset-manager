@@ -181,11 +181,12 @@ export function useDashboardSubscriptions({
         );
         unsubscribes.push(unsubInventory);
 
-        // Also fetch once for initial load (subscribe may have delay)
-        getInventoryByLocation(locationId).then((inventory) => {
-          dispatch(setInventoryForLocation({ locationId, inventory }));
-          markReceived();
-        });
+        getInventoryByLocation(locationId)
+          .then((inventory) => {
+            dispatch(setInventoryForLocation({ locationId, inventory }));
+            markReceived();
+          })
+          .catch(() => {});
       }
     }
 

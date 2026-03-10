@@ -161,16 +161,16 @@ export const DashboardScreen: React.FC = () => {
 
   useEffect(() => {
     if (!userId) return;
-    getUnreadCount(userId).then(setUnreadCount);
+    getUnreadCount(userId).then(setUnreadCount).catch(() => {});
     const interval = setInterval(() => {
-      getUnreadCount(userId).then(setUnreadCount);
+      getUnreadCount(userId).then(setUnreadCount).catch(() => {});
     }, 30000);
     return () => clearInterval(interval);
   }, [userId]);
 
   useFocusEffect(
     useCallback(() => {
-      if (userId) getUnreadCount(userId).then(setUnreadCount);
+      if (userId) getUnreadCount(userId).then(setUnreadCount).catch(() => {});
     }, [userId])
   );
 

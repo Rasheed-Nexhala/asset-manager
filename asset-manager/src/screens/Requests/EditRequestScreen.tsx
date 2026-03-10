@@ -76,19 +76,29 @@ export const EditRequestScreen: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
-    requestService.getRequestById(requestId).then((r) => {
-      if (!cancelled && r && r.status === 'draft') {
-        setRequest(r);
-        setPriority(r.priority);
-        setPurpose(r.purpose);
-        setItems(r.items);
-      } else if (!cancelled) {
-        Alert.alert('Error', 'Only draft requests can be edited', [
-          { text: 'OK', onPress: () => navigation.goBack() },
-        ]);
-      }
-      setIsLoading(false);
-    });
+    requestService
+      .getRequestById(requestId)
+      .then((r) => {
+        if (!cancelled && r && r.status === 'draft') {
+          setRequest(r);
+          setPriority(r.priority);
+          setPurpose(r.purpose);
+          setItems(r.items);
+        } else if (!cancelled) {
+          Alert.alert('Error', 'Only draft requests can be edited', [
+            { text: 'OK', onPress: () => navigation.goBack() },
+          ]);
+        }
+        setIsLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIsLoading(false);
+          Alert.alert('Error', 'Failed to load request', [
+            { text: 'OK', onPress: () => navigation.goBack() },
+          ]);
+        }
+      });
     return () => {
       cancelled = true;
     };

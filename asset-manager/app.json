@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "asset-manager",
+    "name": "Asset Manager",
     "slug": "asset-manager",
-    "version": "5.0.1",
+    "version": "5.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -20,7 +20,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ibf.assetmanager",
-      "buildNumber": "6",
+      "buildNumber": "7",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -28,7 +28,7 @@
     "android": {
       "package": "com.ibf.assetmanager",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -47,6 +47,13 @@
         {
           "icon": "./assets/icon.png",
           "defaultChannel": "default"
+        }
+      ],
+      [
+        "@sentry/react-native",
+        {
+          "organization": "nexhala",
+          "project": "react-native"
         }
       ]
     ],

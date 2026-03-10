@@ -1,5 +1,6 @@
 import './global.css';
 import './config/firebase';
+import * as Sentry from '@sentry/react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
@@ -19,6 +20,15 @@ import { WeightViewPreferenceProvider } from './src/hooks/useWeightViewPreferenc
 import { useNetworkStatus } from './src/hooks/useNetworkStatus';
 import { NoInternetScreen } from './src/components/NoInternetScreen';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
+
+Sentry.init({
+  // Replace this with your DSN from sentry.io → Project Settings → Client Keys
+  dsn: 'https://80a5aafc133c0fd1dea255dc128179e0@o4511017429041152.ingest.de.sentry.io/4511017435660368',
+  // Only send crash reports in production — keeps dev logs clean
+  enabled: !__DEV__,
+  // Attach breadcrumbs (recent actions) to each crash report for context
+  attachStacktrace: true,
+});
 
 // Keep splash screen visible until auth state is resolved
 SplashScreen.preventAutoHideAsync();
@@ -69,7 +79,7 @@ const styles = StyleSheet.create({
   },
 });
 
-export default function App() {
+function App() {
   return (
     <AppErrorBoundary>
       <Provider store={store}>
@@ -82,3 +92,5 @@ export default function App() {
     </AppErrorBoundary>
   );
 }
+
+export default Sentry.wrap(App);

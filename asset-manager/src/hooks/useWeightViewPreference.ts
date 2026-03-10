@@ -37,23 +37,25 @@ export function WeightViewPreferenceProvider({
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((stored) => {
-      if (stored === 'pieces' || stored === 'kg') {
-        setViewModeState(stored);
-      }
-      setLoaded(true);
-    });
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((stored) => {
+        if (stored === 'pieces' || stored === 'kg') {
+          setViewModeState(stored);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
   }, []);
 
   const setViewMode = useCallback((mode: WeightViewMode) => {
     setViewModeState(mode);
-    AsyncStorage.setItem(STORAGE_KEY, mode);
+    AsyncStorage.setItem(STORAGE_KEY, mode).catch(() => {});
   }, []);
 
   const toggleViewMode = useCallback(() => {
     setViewModeState((prev) => {
       const next = prev === 'pieces' ? 'kg' : 'pieces';
-      AsyncStorage.setItem(STORAGE_KEY, next);
+      AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {});
       return next;
     });
   }, []);
