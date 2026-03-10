@@ -241,7 +241,6 @@ export const subscribeToAllUsers = (
     },
     (error) => {
       console.error('Error in all users subscription:', error);
-      callback([]);
     }
   );
 };

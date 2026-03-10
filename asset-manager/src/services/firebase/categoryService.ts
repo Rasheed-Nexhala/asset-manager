@@ -255,7 +255,6 @@ export const subscribeCategories = (
     },
     (error) => {
       console.error('Error in categories subscription:', error);
-      callback([]);
     }
   );
 };

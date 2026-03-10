@@ -237,7 +237,6 @@ export const subscribeToVendors = (
     },
     (error) => {
       console.error('Error in vendors subscription:', error);
-      callback([]);
     }
   );
 

@@ -850,7 +850,6 @@ export const subscribeItems = (
     },
     (error) => {
       console.error('Error in items subscription:', error);
-      callback([]);
     }
   );
 };
@@ -909,7 +908,6 @@ export const subscribeInventoryByLocation = (
     },
     (error) => {
       console.error('Error in inventory subscription:', error);
-      callback([]);
     }
   );
 };
@@ -1060,7 +1058,6 @@ export const subscribeInventoryByItemId = (
     },
     (error) => {
       console.error('Error in inventory-by-item subscription:', error);
-      callback([]);
     }
   );
 };

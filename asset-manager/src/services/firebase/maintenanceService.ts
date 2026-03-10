@@ -106,6 +106,18 @@ export async function addToMaintenance(
   userName: string
 ): Promise<string> {
   try {
+    const inventoryQuery = query(
+      collection(db, INVENTORY_COLLECTION),
+      where('itemId', '==', data.itemId),
+      where('locationId', '==', 'store')
+    );
+    const inventorySnapOuter = await getDocs(inventoryQuery);
+    
+    if (inventorySnapOuter.empty) {
+      throw new Error('Item not found in central store inventory');
+    }
+    const inventoryDocRef = inventorySnapOuter.docs[0].ref;
+
     const maintenanceId = await runTransaction(db, async (transaction) => {
       // 1. Read item document
       const itemRef = doc(db, ITEMS_COLLECTION, data.itemId);
@@ -123,18 +135,10 @@ export async function addToMaintenance(
       }
       
       // 2. Read central store inventory
-      const inventoryQuery = query(
-        collection(db, INVENTORY_COLLECTION),
-        where('itemId', '==', data.itemId),
-        where('locationId', '==', 'store')
-      );
-      const inventorySnap = await getDocs(inventoryQuery);
-      
-      if (inventorySnap.empty) {
+      const inventoryDoc = await transaction.get(inventoryDocRef);
+      if (!inventoryDoc.exists()) {
         throw new Error('Item not found in central store inventory');
       }
-      
-      const inventoryDoc = inventorySnap.docs[0];
       const inventoryData = inventoryDoc.data();
       
       // Validate sufficient quantity
@@ -177,7 +181,7 @@ export async function addToMaintenance(
       transaction.set(maintenanceRef, maintenanceData);
       
       // 4. Update inventory (reduce central store quantity)
-      transaction.update(doc(db, INVENTORY_COLLECTION, inventoryDoc.id), {
+      transaction.update(inventoryDocRef, {
         quantity: inventoryData.quantity - data.quantity,
         updatedAt: Timestamp.now(),
       });
@@ -230,9 +234,30 @@ export async function returnFromMaintenance(
   userName: string
 ): Promise<void> {
   try {
+    const maintenanceRef = doc(db, MAINTENANCE_COLLECTION, maintenanceId);
+    const maintenanceSnapOuter = await getDoc(maintenanceRef);
+    
+    if (!maintenanceSnapOuter.exists()) {
+      throw new Error('Maintenance record not found');
+    }
+    
+    const maintenanceDataOuter = maintenanceSnapOuter.data() as MaintenanceFirestore;
+
+    const inventoryQuery = query(
+      collection(db, INVENTORY_COLLECTION),
+      where('itemId', '==', maintenanceDataOuter.itemId),
+      where('locationId', '==', 'store')
+    );
+    const inventorySnapOuter = await getDocs(inventoryQuery);
+    
+    if (inventorySnapOuter.empty) {
+      throw new Error('Central store inventory not found');
+    }
+    
+    const inventoryDocRef = inventorySnapOuter.docs[0].ref;
+
     await runTransaction(db, async (transaction) => {
       // 1. Read maintenance record
-      const maintenanceRef = doc(db, MAINTENANCE_COLLECTION, maintenanceId);
       const maintenanceSnap = await transaction.get(maintenanceRef);
       
       if (!maintenanceSnap.exists()) {
@@ -259,22 +284,16 @@ export async function returnFromMaintenance(
       const itemData = itemSnap.data();
       
       // 3. Read central store inventory
-      const inventoryQuery = query(
-        collection(db, INVENTORY_COLLECTION),
-        where('itemId', '==', maintenanceData.itemId),
-        where('locationId', '==', 'store')
-      );
-      const inventorySnap = await getDocs(inventoryQuery);
+      const inventoryDoc = await transaction.get(inventoryDocRef);
       
-      if (inventorySnap.empty) {
+      if (!inventoryDoc.exists()) {
         throw new Error('Central store inventory not found');
       }
       
-      const inventoryDoc = inventorySnap.docs[0];
       const inventoryData = inventoryDoc.data();
       
       // 4. Update inventory (add back to central store)
-      transaction.update(doc(db, INVENTORY_COLLECTION, inventoryDoc.id), {
+      transaction.update(inventoryDocRef, {
         quantity: inventoryData.quantity + returnData.returnQuantity,
         updatedAt: Timestamp.now(),
       });
@@ -657,7 +676,6 @@ export function subscribeToMaintenance(
       },
       (error) => {
         console.error('❌ Maintenance subscription error:', error);
-        callback([]);
       }
     );
     

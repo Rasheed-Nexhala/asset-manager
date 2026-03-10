@@ -31,9 +31,11 @@ export const useAuthStateSync = (): void => {
         } else {
           dispatch(setUser(user));
         }
-      } catch {
-        // Fail open: allow user if role fetch fails (e.g. network error)
-        dispatch(setUser(user));
+      } catch (error) {
+        // Fail closed: do not allow user if role fetch fails
+        await signOutOnly();
+        dispatch(setUser(null));
+        dispatch(setError('Failed to verify user permissions. Please try again.'));
       }
     });
 

@@ -71,6 +71,14 @@ service cloud.firestore {
     }
     
     /**
+     * Check if user is the assigned Site Manager for a site
+     */
+    function isAssignedSite(siteId) {
+      let sitePath = /databases/$(database)/documents/sites/$(siteId);
+      return exists(sitePath) && get(sitePath).data.managerId == request.auth.uid;
+    }
+    
+    /**
      * Check if user is creating their own document for the first time (self-registration on signup).
      * Document must not exist yet, and payload must have safe defaults (Unassigned, isActive true).
      * New signups are active by default so they can use the app immediately; admins can deactivate if needed.
@@ -192,7 +200,8 @@ service cloud.firestore {
       allow create: if hasInventoryAccess() &&
         !exists(/databases/$(database)/documents/items/$(request.resource.data.sku));
       allow update: if hasInventoryAccess() ||
-        (isSiteManager() && isUserActive());
+        (isSiteManager() && isUserActive() && 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['centralStoreQuantity', 'atSitesQuantity', 'updatedAt']));
       allow delete: if hasInventoryAccess();
     }
     
@@ -219,10 +228,14 @@ service cloud.firestore {
       allow read, list: if isAuthenticated() && isUserActive() &&
         (isAdminOrStoreIncharge() || isSiteManager());
       allow create: if hasInventoryAccess() ||
-        (isSiteManager() && isUserActive() && request.resource.data.locationId == 'store');
+        (isSiteManager() && isUserActive() && request.resource.data.locationId == 'store' &&
+         request.resource.data.keys().hasOnly(['itemId', 'itemName', 'itemSku', 'locationId', 'locationType', 'locationName', 'quantity', 'updatedAt', 'lengthPerPiece']));
       allow update: if hasInventoryAccess() ||
         (isSiteManager() && isUserActive() &&
-         (resource.data.locationType == 'site' || resource.data.locationId == 'store'));
+         (
+           (resource.data.locationType == 'site' && isAssignedSite(resource.data.locationId.replace('site_', '')) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantity', 'updatedAt'])) ||
+           (resource.data.locationId == 'store' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantity', 'updatedAt']))
+         ));
       allow delete: if hasInventoryAccess();
     }
     
@@ -390,10 +403,19 @@ service cloud.firestore {
       // Store Incharge/Admin (approve/reject/transfer only - NO edit)
       // Store Incharge can update status, processedBy, rejectionReason etc. but NOT items/priority (enforced in service)
       allow update: if isAuthenticated() && isUserActive() && (
+        isAdmin() ||
         (isSiteManager() && 
-         resource.data.requestedBy == request.auth.uid && 
-         resource.data.status in ['draft', 'transferred', 'partially_returned']) ||
-        canManageRequests()
+         resource.data.requestedBy == request.auth.uid && (
+           (resource.data.status == 'draft' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['priority', 'purpose', 'items', 'status', 'updatedAt'])) ||
+           (resource.data.status == 'pending' && request.resource.data.status == 'cancelled' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+           (resource.data.status in ['transferred', 'partially_returned'] && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['items', 'status', 'returnHistory', 'updatedAt']))
+         )
+        ) ||
+        (isStoreIncharge() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'processedBy', 'processedByName', 'processedAt', 'storeNotes', 
+          'rejectionReason', 'rejectionComments', 'items', 'transferredAt', 'transferredBy', 
+          'transferredByName', 'receivedBy', 'receivedByName', 'updatedAt'
+        ]))
       );
       
       // Delete: Admin (any) or Site Manager (own draft only)

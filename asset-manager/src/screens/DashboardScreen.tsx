@@ -182,19 +182,15 @@ export const DashboardScreen: React.FC = () => {
       });
   }, [userId]);
 
-  useEffect(() => {
-    if (!userId) return;
-    refreshUnreadCount();
-    const interval = setInterval(() => {
-      refreshUnreadCount();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [userId, refreshUnreadCount]);
-
   useFocusEffect(
     useCallback(() => {
+      if (!userId) return;
       refreshUnreadCount();
-    }, [refreshUnreadCount])
+      const interval = setInterval(() => {
+        refreshUnreadCount();
+      }, 30000);
+      return () => clearInterval(interval);
+    }, [userId, refreshUnreadCount])
   );
 
   const navToNotificationCenter = useCallback(() => {

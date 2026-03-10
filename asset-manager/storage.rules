@@ -80,7 +80,7 @@ service firebase.storage {
       allow read: if isAuthenticated() && isUserActive();
       allow write: if hasItemImageAccess() 
         && request.resource.size < 5 * 1024 * 1024 // Max 5MB
-        && request.resource.contentType.matches('image/.*'); // Images only
+        && request.resource.contentType.matches('image/(jpeg|jpg|png|webp|gif)'); // Specific images only
       allow delete: if hasItemImageAccess();
     }
     
@@ -98,7 +98,7 @@ service firebase.storage {
       allow read: if isAuthenticated() && isUserActive();
       allow write: if hasItemImageAccess()
         && request.resource.size < 5 * 1024 * 1024 // Max 5MB
-        && request.resource.contentType.matches('image/.*'); // Images only
+        && request.resource.contentType.matches('image/(jpeg|jpg|png|webp|gif)'); // Specific images only
       allow delete: if hasItemImageAccess();
     }
     
@@ -117,7 +117,7 @@ service firebase.storage {
       allow write: if hasItemImageAccess()
         && request.resource.size < 5 * 1024 * 1024 // Max 5MB
         && (request.resource.contentType == 'application/pdf'
-            || request.resource.contentType.matches('image/.*'));
+            || request.resource.contentType.matches('image/(jpeg|jpg|png|webp|gif)')); // Specific files only
       allow delete: if hasItemImageAccess();
     }
     

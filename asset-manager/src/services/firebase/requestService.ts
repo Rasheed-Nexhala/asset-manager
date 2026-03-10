@@ -579,16 +579,7 @@ const generateReturnId = (): string =>
  * non-consumable items are fully returned, then 'returned'.
  * ALL returns go to central store first, regardless of condition.
  *
- * Uses writeBatch() + increment() instead of runTransaction() because the
- * Firestore REST transport (used by React Native) has a known issue where
- * transaction.get() inside runTransaction() can read stale cached document
- * versions, producing incorrect `currentDocument.updateTime` preconditions
- * that Firestore rejects as "permission-denied".
- *
- * writeBatch() avoids this because:
- *  - batch.update() only checks document existence (no updateTime precondition)
- *  - increment() applies quantity deltas atomically on the server, so even
- *    concurrent returns calculate correct totals without needing a read-inside-tx
+ * Uses runTransaction to guarantee stock integrity.
  */
 export const returnItems = async (
   requestId: string,
@@ -633,15 +624,16 @@ export const returnItems = async (
 };
 
 /**
- * Internal: Execute return items as an atomic batch write.
+ * Internal: Execute return items as an atomic transaction.
  *
  * Flow:
- *  1. Fresh-read request from server (getDocFromServer) → validate status & quantities
+ *  1. Fresh-read request from server (getDocFromServer) → validate status
  *  2. Query inventory docs (getDocs goes to server for queries) → get document refs
- *  3. Build a writeBatch with:
- *       - increment() for inventory & item quantity fields (atomic, no read needed)
- *       - Full replacement for request.items / returnHistory / status
- *  4. batch.commit() → all writes succeed or all fail, no updateTime preconditions
+ *  3. Run transaction:
+ *       - Re-read request and validate quantities
+ *       - Read all item and inventory documents
+ *       - Update all quantities atomically
+ *       - Update request document
  */
 const returnItemsBatch = async (
   requestId: string,
@@ -652,42 +644,28 @@ const returnItemsBatch = async (
   try {
     // ─── Step 1: Fresh-read request from Firestore server ───
     const requestRef = doc(db, REQUESTS_COLLECTION, requestId);
-    const requestSnap = await getDocFromServer(requestRef);
+    const requestSnapOuter = await getDocFromServer(requestRef);
 
-    if (!requestSnap.exists()) {
+    if (!requestSnapOuter.exists()) {
       throw new Error('Request not found');
     }
 
-    const requestData = requestSnap.data();
+    const requestDataOuter = requestSnapOuter.data();
 
     // Allow returns when transferred or partially_returned
-    if (requestData.status !== 'transferred' && requestData.status !== 'partially_returned') {
+    if (requestDataOuter.status !== 'transferred' && requestDataOuter.status !== 'partially_returned') {
       throw new Error('Only transferred or partially returned requests can have items returned');
     }
 
-    // Validate quantities: each return must not exceed remaining
-    for (const returnItem of returnData.items) {
-      const item = requestData.items.find((i: any) => i.itemId === returnItem.itemId);
-      if (!item || item.itemType === 'consumable') continue;
-      const currentReturned = item.quantityReturned ?? 0;
-      const remaining = item.quantityApproved - currentReturned;
-      if (returnItem.quantityReturned > remaining || returnItem.quantityReturned < 1) {
-        throw new Error(
-          `Invalid quantity for ${item.itemName}: cannot return ${returnItem.quantityReturned}, remaining is ${remaining}`
-        );
-      }
-    }
-
     // ─── Step 2: Query inventory document refs ───
-    // getDocs() always fetches from the server for queries, so data is fresh.
     const inventoryRefs: Map<string, { siteRef: any; storeRef: any; hasStore: boolean }> = new Map();
 
     for (const returnItem of returnData.items) {
-      const item = requestData.items.find((i: any) => i.itemId === returnItem.itemId);
+      const item = requestDataOuter.items.find((i: any) => i.itemId === returnItem.itemId);
       if (!item || item.itemType === 'consumable') continue;
 
       // Site inventory
-      const siteLocationId = `site_${requestData.siteId}`;
+      const siteLocationId = `site_${requestDataOuter.siteId}`;
       const siteInventoryQuery = query(
         collection(db, INVENTORY_COLLECTION),
         where('itemId', '==', returnItem.itemId),
@@ -714,114 +692,171 @@ const returnItemsBatch = async (
       });
     }
 
-    // ─── Step 3: Build atomic batch write ───
-    const batch = writeBatch(db);
+    // ─── Step 3: Run Atomic Transaction ───
+    await runTransaction(db, async (transaction) => {
+      // 1. Re-read request
+      const requestSnap = await transaction.get(requestRef);
+      if (!requestSnap.exists()) {
+        throw new Error('Request not found');
+      }
+      const requestData = requestSnap.data();
 
-    for (const returnItem of returnData.items) {
-      const item = requestData.items.find((i: any) => i.itemId === returnItem.itemId);
-      if (!item || item.itemType === 'consumable') continue;
+      if (requestData.status !== 'transferred' && requestData.status !== 'partially_returned') {
+        throw new Error('Only transferred or partially returned requests can have items returned');
+      }
 
-      const refs = inventoryRefs.get(returnItem.itemId);
-      if (!refs) continue;
+      for (const returnItem of returnData.items) {
+        const item = requestData.items.find((i: any) => i.itemId === returnItem.itemId);
+        if (!item || item.itemType === 'consumable') continue;
+        const currentReturned = item.quantityReturned ?? 0;
+        const remaining = item.quantityApproved - currentReturned;
+        if (returnItem.quantityReturned > remaining || returnItem.quantityReturned < 1) {
+          throw new Error(
+            `Invalid quantity for ${item.itemName}: cannot return ${returnItem.quantityReturned}, remaining is ${remaining}`
+          );
+        }
+      }
 
-      // Decrement site inventory (increment is atomic on the server)
-      if (refs.siteRef) {
-        batch.update(refs.siteRef, {
-          quantity: increment(-returnItem.quantityReturned),
-          updatedAt: serverTimestamp(),
+      // 2. Read all item and inventory documents
+      const readsData: any[] = [];
+
+      for (const returnItem of returnData.items) {
+        const item = requestData.items.find((i: any) => i.itemId === returnItem.itemId);
+        if (!item || item.itemType === 'consumable') continue;
+
+        const refs = inventoryRefs.get(returnItem.itemId);
+        if (!refs) continue;
+
+        // Read item doc
+        const itemRef = doc(db, ITEMS_COLLECTION, returnItem.itemId);
+        const itemSnap = await transaction.get(itemRef);
+
+        let siteDoc = null;
+        if (refs.siteRef) {
+          siteDoc = await transaction.get(refs.siteRef);
+        }
+
+        let storeDoc = null;
+        if (refs.hasStore && refs.storeRef) {
+          storeDoc = await transaction.get(refs.storeRef);
+        }
+
+        readsData.push({
+          returnItem,
+          item,
+          refs,
+          itemRef,
+          itemData: itemSnap.exists() ? itemSnap.data() : null,
+          siteDoc,
+          storeDoc,
         });
       }
 
-      // Increment or create central store inventory
-      if (refs.hasStore && refs.storeRef) {
-        batch.update(refs.storeRef, {
-          quantity: increment(returnItem.quantityReturned),
-          updatedAt: serverTimestamp(),
-        });
-      } else {
-        // Store entry doesn't exist yet – create it
-        const newInventoryRef = doc(collection(db, INVENTORY_COLLECTION));
-        batch.set(newInventoryRef, {
-          itemId: returnItem.itemId,
-          itemName: item.itemName,
-          itemSku: item.itemSku,
-          locationId: 'store',
-          locationType: 'store',
-          locationName: 'Central Store',
-          quantity: returnItem.quantityReturned,
-          updatedAt: serverTimestamp(),
-        });
+      // 3. Perform writes
+      const now = serverTimestamp();
+
+      for (const data of readsData) {
+        const { returnItem, item, refs, itemRef, itemData, siteDoc, storeDoc } = data;
+        const qty = returnItem.quantityReturned;
+
+        // Update site inventory
+        if (siteDoc && siteDoc.exists()) {
+          const currentSiteQty = siteDoc.data().quantity;
+          transaction.update(refs.siteRef, {
+            quantity: currentSiteQty - qty,
+            updatedAt: now,
+          });
+        }
+
+        // Update central store inventory
+        if (refs.hasStore && storeDoc && storeDoc.exists()) {
+          const currentStoreQty = storeDoc.data().quantity;
+          transaction.update(refs.storeRef, {
+            quantity: currentStoreQty + qty,
+            updatedAt: now,
+          });
+        } else {
+          // Store entry doesn't exist yet – create it
+          const newInventoryRef = doc(collection(db, INVENTORY_COLLECTION));
+          transaction.set(newInventoryRef, {
+            itemId: returnItem.itemId,
+            itemName: item.itemName,
+            itemSku: item.itemSku,
+            locationId: 'store',
+            locationType: 'store',
+            locationName: 'Central Store',
+            quantity: qty,
+            updatedAt: now,
+          });
+        }
+
+        // Update item denormalized stock totals
+        if (itemData) {
+          transaction.update(itemRef, {
+            centralStoreQuantity: (itemData.centralStoreQuantity || 0) + qty,
+            atSitesQuantity: (itemData.atSitesQuantity || 0) - qty,
+            updatedAt: now,
+          });
+        }
       }
 
-      // Update item's denormalized stock totals (atomic increments)
-      const itemRef = doc(db, ITEMS_COLLECTION, returnItem.itemId);
-      batch.update(itemRef, {
-        centralStoreQuantity: increment(returnItem.quantityReturned),
-        atSitesQuantity: increment(-returnItem.quantityReturned),
-        updatedAt: serverTimestamp(),
-      });
-    }
-
-    // ─── Build updated items array for the request document ───
-    const currentItems = requestData.items as any[];
-    const quantityReturnedMap = new Map<string, number>();
-    for (const ri of returnData.items) {
-      const item = currentItems.find((i: any) => i.itemId === ri.itemId);
-      if (!item || item.itemType === 'consumable') continue;
-      const prev = item.quantityReturned ?? 0;
-      quantityReturnedMap.set(ri.itemId, prev + ri.quantityReturned);
-    }
-
-    const updatedItems = currentItems.map((item: any) => {
-      const newQtyReturned = quantityReturnedMap.get(item.itemId) ?? item.quantityReturned ?? 0;
-      const isFullyReturned = item.itemType === 'consumable' || newQtyReturned >= item.quantityApproved;
-      return {
-        ...item,
-        quantityReturned: newQtyReturned,
-        status: isFullyReturned ? 'returned' : 'partially_returned',
-      };
-    });
-
-    // ─── Build new return history event ───
-    const returnId = generateReturnId();
-    const newReturnEvent = {
-      returnId,
-      returnedAt: Timestamp.now(),
-      returnedBy: userId,
-      returnedByName: userName,
-      items: returnData.items.map((ri) => {
+      // Build updated items array
+      const currentItems = requestData.items as any[];
+      const quantityReturnedMap = new Map<string, number>();
+      for (const ri of returnData.items) {
         const item = currentItems.find((i: any) => i.itemId === ri.itemId);
-        const prevReturned = item?.quantityReturned ?? 0;
+        if (!item || item.itemType === 'consumable') continue;
+        const prev = item.quantityReturned ?? 0;
+        quantityReturnedMap.set(ri.itemId, prev + ri.quantityReturned);
+      }
+
+      const updatedItems = currentItems.map((item: any) => {
+        const newQtyReturned = quantityReturnedMap.get(item.itemId) ?? item.quantityReturned ?? 0;
+        const isFullyReturned = item.itemType === 'consumable' || newQtyReturned >= item.quantityApproved;
         return {
-          itemId: ri.itemId,
-          itemName: item?.itemName ?? ri.itemId,
-          quantityReturned: ri.quantityReturned,
-          condition: ri.condition,
-          cumulativeReturned: prevReturned + ri.quantityReturned,
+          ...item,
+          quantityReturned: newQtyReturned,
+          status: isFullyReturned ? 'returned' : 'partially_returned',
         };
-      }),
-      returnNotes: returnData.returnNotes || null,
-    };
+      });
 
-    const existingHistory = requestData.returnHistory ?? [];
+      // Build new return history event
+      const returnId = generateReturnId();
+      const newReturnEvent = {
+        returnId,
+        returnedAt: Timestamp.now(),
+        returnedBy: userId,
+        returnedByName: userName,
+        items: returnData.items.map((ri) => {
+          const item = currentItems.find((i: any) => i.itemId === ri.itemId);
+          const prevReturned = item?.quantityReturned ?? 0;
+          return {
+            itemId: ri.itemId,
+            itemName: item?.itemName ?? ri.itemId,
+            quantityReturned: ri.quantityReturned,
+            condition: ri.condition,
+            cumulativeReturned: prevReturned + ri.quantityReturned,
+          };
+        }),
+        returnNotes: returnData.returnNotes || null,
+      };
 
-    // ─── Determine new request status ───
-    const allNonConsumables = updatedItems.filter((i: any) => i.itemType === 'non_consumable');
-    const allFullyReturned =
-      allNonConsumables.length === 0 ||
-      allNonConsumables.every((i: any) => (i.quantityReturned ?? 0) >= i.quantityApproved);
-    const newStatus = allFullyReturned ? 'returned' : 'partially_returned';
+      const existingHistory = requestData.returnHistory ?? [];
 
-    // Update request document
-    batch.update(requestRef, {
-      items: updatedItems,
-      status: newStatus,
-      returnHistory: [...existingHistory, newReturnEvent],
-      updatedAt: serverTimestamp(),
+      // Determine new request status
+      const allNonConsumables = updatedItems.filter((i: any) => i.itemType === 'non_consumable');
+      const allFullyReturned =
+        allNonConsumables.length === 0 ||
+        allNonConsumables.every((i: any) => (i.quantityReturned ?? 0) >= i.quantityApproved);
+      const newStatus = allFullyReturned ? 'returned' : 'partially_returned';
+
+      transaction.update(requestRef, {
+        items: updatedItems,
+        status: newStatus,
+        returnHistory: [...existingHistory, newReturnEvent],
+        updatedAt: now,
+      });
     });
-
-    // ─── Commit all writes atomically ───
-    await batch.commit();
   } catch (error) {
     console.error('Error in return items batch:', error);
     throw error;
@@ -1077,7 +1112,6 @@ export const subscribeToRequests = (
       },
       (error) => {
         console.error('Error in requests subscription:', error);
-        callback([]);
       }
     );
     

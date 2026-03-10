@@ -145,18 +145,10 @@ export const uploadItemImage = async (
 
     const blob = await response.blob();
 
-    // Validate file size
-    if (blob.size > MAX_FILE_SIZE) {
-      throw new Error(
-        `File size (${(blob.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum allowed size (5MB)`
-      );
-    }
-
     const contentType = resolveImageContentType(blob, fileUri);
-    if (!ALLOWED_IMAGE_TYPES.includes(contentType)) {
-      throw new Error(
-        `File type is not allowed. Allowed types: ${ALLOWED_IMAGE_TYPES.join(', ')}`
-      );
+    const validation = validateImageFile(blob, contentType);
+    if (!validation.isValid) {
+      throw new Error(validation.error);
     }
 
     const extension = contentType.split('/')[1] || 'jpg';
@@ -213,17 +205,10 @@ export const uploadMaintenancePhoto = async (
 
     const blob = await response.blob();
 
-    if (blob.size > MAX_FILE_SIZE) {
-      throw new Error(
-        `File size (${(blob.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum allowed size (5MB)`
-      );
-    }
-
     const contentType = resolveImageContentType(blob, fileUri);
-    if (!ALLOWED_IMAGE_TYPES.includes(contentType)) {
-      throw new Error(
-        `File type is not allowed. Allowed types: ${ALLOWED_IMAGE_TYPES.join(', ')}`
-      );
+    const validation = validateImageFile(blob, contentType);
+    if (!validation.isValid) {
+      throw new Error(validation.error);
     }
 
     const extension = contentType.split('/')[1] || 'jpg';
@@ -275,17 +260,10 @@ export const uploadPOInvoice = async (
 
     const blob = await response.blob();
 
-    if (blob.size > MAX_FILE_SIZE) {
-      throw new Error(
-        `File size (${(blob.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum allowed size (5MB)`
-      );
-    }
-
     const contentType = resolveInvoiceContentType(blob, fileUri);
-    if (!ALLOWED_PO_INVOICE_TYPES.includes(contentType)) {
-      throw new Error(
-        `File type is not allowed. Allowed types: PDF, images (jpg, png, webp, gif)`
-      );
+    const validation = validateInvoiceFile(blob, contentType);
+    if (!validation.isValid) {
+      throw new Error(validation.error);
     }
 
     const extension = contentType === 'application/pdf' ? 'pdf' : contentType.split('/')[1] || 'jpg';
@@ -318,18 +296,9 @@ export const uploadItemImageFromBlob = async (
   fileName: string
 ): Promise<string> => {
   try {
-    // Validate file size
-    if (blob.size > MAX_FILE_SIZE) {
-      throw new Error(
-        `File size (${(blob.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum allowed size (5MB)`
-      );
-    }
-
-    // Validate file type
-    if (!ALLOWED_IMAGE_TYPES.includes(blob.type)) {
-      throw new Error(
-        `File type "${blob.type}" is not allowed. Allowed types: ${ALLOWED_IMAGE_TYPES.join(', ')}`
-      );
+    const validation = validateImageFile(blob);
+    if (!validation.isValid) {
+      throw new Error(validation.error);
     }
 
     // Create storage reference
@@ -483,7 +452,7 @@ export const deleteAllItemImages = async (
  * @param blob - Blob to validate
  * @returns Object with isValid flag and error message if invalid
  */
-export const validateImageFile = (blob: Blob): { isValid: boolean; error?: string } => {
+export const validateImageFile = (blob: Blob, resolvedContentType?: string): { isValid: boolean; error?: string } => {
   // Check file size
   if (blob.size > MAX_FILE_SIZE) {
     return {
@@ -493,10 +462,11 @@ export const validateImageFile = (blob: Blob): { isValid: boolean; error?: strin
   }
 
   // Check file type
-  if (!ALLOWED_IMAGE_TYPES.includes(blob.type)) {
+  const typeToCheck = resolvedContentType || blob.type;
+  if (!ALLOWED_IMAGE_TYPES.includes(typeToCheck)) {
     return {
       isValid: false,
-      error: `File type "${blob.type}" is not allowed. Allowed types: ${ALLOWED_IMAGE_TYPES.join(', ')}`,
+      error: `File type "${typeToCheck}" is not allowed. Allowed types: ${ALLOWED_IMAGE_TYPES.join(', ')}`,
     };
   }
 
@@ -509,7 +479,7 @@ export const validateImageFile = (blob: Blob): { isValid: boolean; error?: strin
  * @param blob - Blob to validate
  * @returns Object with isValid flag and error message if invalid
  */
-export const validateInvoiceFile = (blob: Blob): { isValid: boolean; error?: string } => {
+export const validateInvoiceFile = (blob: Blob, resolvedContentType?: string): { isValid: boolean; error?: string } => {
   if (blob.size > MAX_FILE_SIZE) {
     return {
       isValid: false,
@@ -518,10 +488,11 @@ export const validateInvoiceFile = (blob: Blob): { isValid: boolean; error?: str
   }
 
   const allowedTypes = ALLOWED_PO_INVOICE_TYPES;
-  if (blob.type && !allowedTypes.includes(blob.type)) {
+  const typeToCheck = resolvedContentType || blob.type;
+  if (typeToCheck && !allowedTypes.includes(typeToCheck)) {
     return {
       isValid: false,
-      error: `File type "${blob.type}" is not allowed. Allowed types: PDF, images (jpg, png, webp, gif)`,
+      error: `File type "${typeToCheck}" is not allowed. Allowed types: PDF, images (jpg, png, webp, gif)`,
     };
   }
 

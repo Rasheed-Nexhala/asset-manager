@@ -487,21 +487,23 @@ export const receivePO = async (
   userId: string,
   userName: string
 ): Promise<void> => {
+  const storeLocationId = getLocationId('store');
   const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
-  const poSnap = await getDocFromServer(poRef);
 
-  if (!poSnap.exists()) {
+  // Pre-fetch PO to know which items to look up
+  const initialPoSnap = await getDocFromServer(poRef);
+  if (!initialPoSnap.exists()) {
     throw new Error('Purchase order not found');
   }
 
-  const poData = poSnap.data();
-  if (poData.status !== 'approved' && poData.status !== 'ordered') {
+  const initialPoData = initialPoSnap.data();
+  if (initialPoData.status !== 'approved' && initialPoData.status !== 'ordered') {
     throw new Error(
-      `Cannot receive PO with status "${poData.status}". Only approved or ordered POs can be received.`
+      `Cannot receive PO with status "${initialPoData.status}". Only approved or ordered POs can be received.`
     );
   }
 
-  if (!Array.isArray(poData.items) || poData.items.length === 0) {
+  if (!Array.isArray(initialPoData.items) || initialPoData.items.length === 0) {
     throw new Error('PO has no valid items');
   }
 
@@ -509,30 +511,9 @@ export const receivePO = async (
     receiveData.receivedQuantities.map((r) => [r.itemId, r.receivedQuantity])
   );
 
-  for (const item of poData.items) {
-    const qty = receivedByQty.get(item.itemId) ?? 0;
-    if (qty < 0 || qty > item.quantity) {
-      throw new Error(
-        `Invalid received quantity for ${item.itemName}: ${qty}. Must be between 0 and ${item.quantity}`
-      );
-    }
-  }
-
-  const hasAtLeastOneReceived = poData.items.some(
-    (item: PurchaseOrderFirestore['items'][0]) =>
-      (receivedByQty.get(item.itemId) ?? 0) > 0
-  );
-  if (!hasAtLeastOneReceived) {
-    throw new Error(
-      'At least one item must have a received quantity greater than zero'
-    );
-  }
-
-  const storeLocationId = getLocationId('store');
-
-  const batch = writeBatch(db);
-
-  for (const item of poData.items) {
+  // Query inventory refs before transaction
+  const inventoryRefs = new Map<string, { ref: any; hasStore: boolean }>();
+  for (const item of initialPoData.items) {
     const receivedQty = receivedByQty.get(item.itemId) ?? 0;
     if (receivedQty === 0) continue;
 
@@ -543,72 +524,133 @@ export const receivePO = async (
       limit(1)
     );
     const storeSnap = await getDocs(storeInventoryQuery);
-    const itemDoc = await getDoc(doc(db, ITEMS_COLLECTION, item.itemId));
-
-    if (!itemDoc.exists()) {
-      throw new Error(`Item ${item.itemName} (${item.itemId}) not found`);
-    }
-    const itemData = itemDoc.data();
-
-    const now = serverTimestamp();
     if (storeSnap.empty) {
-      const newInvRef = doc(collection(db, INVENTORY_COLLECTION));
-      batch.set(newInvRef, {
-        itemId: item.itemId,
-        itemName: item.itemName,
-        itemSku: item.itemSku,
-        locationId: storeLocationId,
-        locationType: 'store',
-        locationName: 'Central Store',
-        quantity: receivedQty,
-        updatedAt: now,
-      });
+      inventoryRefs.set(item.itemId, { ref: doc(collection(db, INVENTORY_COLLECTION)), hasStore: false });
     } else {
-      const invRef = storeSnap.docs[0].ref;
-      batch.update(invRef, {
-        quantity: increment(receivedQty),
-        updatedAt: now,
-      });
+      inventoryRefs.set(item.itemId, { ref: storeSnap.docs[0].ref, hasStore: true });
     }
-
-    const itemRef = doc(db, ITEMS_COLLECTION, item.itemId);
-    batch.update(itemRef, {
-      centralStoreQuantity: increment(receivedQty),
-      totalQuantity: increment(receivedQty),
-      updatedAt: now,
-    });
   }
 
-  const documents = receiveData.documents.map((d) => ({
-    type: d.type,
-    fileName: d.fileName,
-    fileUrl: d.fileUrl,
-    uploadedAt: Timestamp.now(),
-  }));
+  await runTransaction(db, async (transaction) => {
+    // 1. Re-read PO document
+    const poSnap = await transaction.get(poRef);
+    if (!poSnap.exists()) {
+      throw new Error('Purchase order not found');
+    }
 
-  const receivedAtTimestamp = Timestamp.fromDate(
-    new Date(receiveData.receivedDate)
-  );
+    const poData = poSnap.data();
+    if (poData.status !== 'approved' && poData.status !== 'ordered') {
+      throw new Error(
+        `Cannot receive PO with status "${poData.status}". Only approved or ordered POs can be received.`
+      );
+    }
 
-  const updatedItems = poData.items.map((item: PurchaseOrderFirestore['items'][0]) => ({
-    ...item,
-    receivedQuantity: receivedByQty.get(item.itemId) ?? 0,
-  }));
+    for (const item of poData.items) {
+      const qty = receivedByQty.get(item.itemId) ?? 0;
+      if (qty < 0 || qty > item.quantity) {
+        throw new Error(
+          `Invalid received quantity for ${item.itemName}: ${qty}. Must be between 0 and ${item.quantity}`
+        );
+      }
+    }
 
-  batch.update(poRef, {
-    status: 'received',
-    receivedAt: receivedAtTimestamp,
-    receivedBy: userId,
-    receivedByName: userName,
-    receivedNotes: receiveData.receivedNotes?.trim() ?? null,
-    documents: [...(poData.documents ?? []), ...documents],
-    items: updatedItems,
-    updatedAt: serverTimestamp(),
+    const hasAtLeastOneReceived = poData.items.some(
+      (item: any) => (receivedByQty.get(item.itemId) ?? 0) > 0
+    );
+    if (!hasAtLeastOneReceived) {
+      throw new Error(
+        'At least one item must have a received quantity greater than zero'
+      );
+    }
+
+    // 2. Re-read all item and inventory documents
+    const readsData: any[] = [];
+    for (const item of poData.items) {
+      const receivedQty = receivedByQty.get(item.itemId) ?? 0;
+      if (receivedQty === 0) continue;
+
+      const itemRef = doc(db, ITEMS_COLLECTION, item.itemId);
+      const itemSnap = await transaction.get(itemRef);
+      if (!itemSnap.exists()) {
+        throw new Error(`Item ${item.itemName} (${item.itemId}) not found`);
+      }
+
+      const invInfo = inventoryRefs.get(item.itemId);
+      let invSnap = null;
+      if (invInfo && invInfo.hasStore) {
+        invSnap = await transaction.get(invInfo.ref);
+      }
+
+      readsData.push({
+        item,
+        receivedQty,
+        itemRef,
+        itemData: itemSnap.data(),
+        invInfo,
+        invSnap,
+      });
+    }
+
+    // 3. Perform all writes
+    const now = serverTimestamp();
+    for (const data of readsData) {
+      const { item, receivedQty, itemRef, itemData, invInfo, invSnap } = data;
+
+      if (invInfo.hasStore && invSnap && invSnap.exists()) {
+        transaction.update(invInfo.ref, {
+          quantity: invSnap.data().quantity + receivedQty,
+          updatedAt: now,
+        });
+      } else {
+        transaction.set(invInfo.ref, {
+          itemId: item.itemId,
+          itemName: item.itemName,
+          itemSku: item.itemSku,
+          locationId: storeLocationId,
+          locationType: 'store',
+          locationName: 'Central Store',
+          quantity: receivedQty,
+          updatedAt: now,
+        });
+      }
+
+      transaction.update(itemRef, {
+        centralStoreQuantity: (itemData.centralStoreQuantity || 0) + receivedQty,
+        totalQuantity: (itemData.totalQuantity || 0) + receivedQty,
+        updatedAt: now,
+      });
+    }
+
+    const documents = receiveData.documents.map((d) => ({
+      type: d.type,
+      fileName: d.fileName,
+      fileUrl: d.fileUrl,
+      uploadedAt: Timestamp.now(),
+    }));
+
+    const receivedAtTimestamp = Timestamp.fromDate(
+      new Date(receiveData.receivedDate)
+    );
+
+    const updatedItems = poData.items.map((item: any) => ({
+      ...item,
+      receivedQuantity: receivedByQty.get(item.itemId) ?? 0,
+    }));
+
+    transaction.update(poRef, {
+      status: 'received',
+      receivedAt: receivedAtTimestamp,
+      receivedBy: userId,
+      receivedByName: userName,
+      receivedNotes: receiveData.receivedNotes?.trim() ?? null,
+      documents: [...(poData.documents ?? []), ...documents],
+      items: updatedItems,
+      updatedAt: serverTimestamp(),
+    });
   });
 
-  await batch.commit();
-
-  await updateVendorLastPoDate(poData.vendorId, receivedAtTimestamp);
+  const receivedAtTs = Timestamp.fromDate(new Date(receiveData.receivedDate));
+  await updateVendorLastPoDate(initialPoData.vendorId, receivedAtTs);
 };
 
 /**

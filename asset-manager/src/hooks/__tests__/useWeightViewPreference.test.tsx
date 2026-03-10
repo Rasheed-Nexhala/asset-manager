@@ -8,7 +8,7 @@ import {
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(),
-  setItem: jest.fn(),
+  setItem: jest.fn().mockResolvedValue(undefined),
 }));
 
 const AsyncStorage = require('@react-native-async-storage/async-storage');
@@ -35,6 +35,7 @@ describe('useWeightViewPreference', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
+    (AsyncStorage.setItem as jest.Mock).mockResolvedValue(undefined);
   });
 
   it('throws when used outside WeightViewPreferenceProvider', () => {

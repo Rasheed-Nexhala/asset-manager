@@ -216,7 +216,6 @@ export const subscribeToSites = (
     },
     (error) => {
       console.error('Error in sites subscription:', error);
-      callback([]);
     }
   );
 };

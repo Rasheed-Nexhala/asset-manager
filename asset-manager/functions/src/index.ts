@@ -1145,14 +1145,35 @@ export const onVendorUpdated = onDocumentUpdated(
  * login_failed does not require auth (user failed to authenticate)
  */
 export const logAuthEvent = onCall(async (request) => {
-  const { actionType, userName, userRole, details, email, deviceInfo, appVersion } =
-    request.data ?? {};
+  // Extract and strictly sanitize only expected fields to prevent log poisoning
+  const rawData = request.data ?? {};
+  
+  const sanitizeStr = (val: unknown, maxLength: number): string | undefined => {
+    if (typeof val !== 'string') return undefined;
+    return val.substring(0, maxLength);
+  };
+
+  const actionType = sanitizeStr(rawData.actionType, 50);
+  const userName = sanitizeStr(rawData.userName, 100);
+  const userRole = sanitizeStr(rawData.userRole, 50);
+  const details = sanitizeStr(rawData.details, 1000);
+  const email = sanitizeStr(rawData.email, 255);
+  const deviceInfo = sanitizeStr(rawData.deviceInfo, 500);
+  const appVersion = sanitizeStr(rawData.appVersion, 50);
 
   const validTypes = ['user_login', 'user_logout', 'login_failed'];
   if (!actionType || !validTypes.includes(actionType)) {
     throw new HttpsError(
       'invalid-argument',
       'actionType must be user_login, user_logout, or login_failed'
+    );
+  }
+
+  // Ensure unauthenticated users can only log 'login_failed'
+  if (!request.auth && actionType !== 'login_failed') {
+    throw new HttpsError(
+      'unauthenticated',
+      'Unauthenticated users can only log login_failed events'
     );
   }
 

@@ -214,7 +214,6 @@ export const subscribeSteelMasters = (
     },
     (error) => {
       console.error('Error in steel masters subscription:', error);
-      callback([]);
     }
   );
 };
