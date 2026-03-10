@@ -55,6 +55,27 @@ function AppContent() {
     }
   }, [authInitialized]);
 
+  useEffect(() => {
+    if (!authInitialized) return;
+    Sentry.addBreadcrumb({
+      category: 'auth_lifecycle',
+      message: 'auth_initialized',
+      level: 'info',
+    });
+  }, [authInitialized]);
+
+  useEffect(() => {
+    if (!authInitialized) return;
+    Sentry.addBreadcrumb({
+      category: 'auth_lifecycle',
+      message: userId ? 'user_session_active' : 'user_session_cleared',
+      level: 'info',
+      data: {
+        hasUserId: Boolean(userId),
+      },
+    });
+  }, [authInitialized, userId]);
+
   return (
     <>
       <StatusBar style="dark" />

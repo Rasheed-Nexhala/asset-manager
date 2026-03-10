@@ -56,6 +56,7 @@ import { useDashboardSubscriptions } from '../hooks/useDashboardSubscriptions';
 import { useAutoClearError } from '../hooks/useAutoClearError';
 import { getUnreadCount } from '../services/firebase/notificationService';
 import { getLocationId } from '../utils/locationUtils';
+import { runNonCriticalTask } from '../utils/nonCriticalTask';
 import type { DashboardStackParamList } from '../navigation/DashboardStackParamList';
 import type { Request } from '../types/request';
 
@@ -159,19 +160,41 @@ export const DashboardScreen: React.FC = () => {
     return () => sub.remove();
   }, [triggerRefresh]);
 
+  const refreshUnreadCount = useCallback(() => {
+    if (!userId) return;
+    runNonCriticalTask(
+      'dashboard_unread_count',
+      () => getUnreadCount(userId),
+      {
+        feature: 'notifications',
+        tags: {
+          screen: 'dashboard',
+        },
+      }
+    )
+      .then((count) => {
+        if (typeof count === 'number') {
+          setUnreadCount(count);
+        }
+      })
+      .catch(() => {
+        // runNonCriticalTask handles capture internally; this guard prevents unhandled rejections.
+      });
+  }, [userId]);
+
   useEffect(() => {
     if (!userId) return;
-    getUnreadCount(userId).then(setUnreadCount).catch(() => {});
+    refreshUnreadCount();
     const interval = setInterval(() => {
-      getUnreadCount(userId).then(setUnreadCount).catch(() => {});
+      refreshUnreadCount();
     }, 30000);
     return () => clearInterval(interval);
-  }, [userId]);
+  }, [userId, refreshUnreadCount]);
 
   useFocusEffect(
     useCallback(() => {
-      if (userId) getUnreadCount(userId).then(setUnreadCount).catch(() => {});
-    }, [userId])
+      refreshUnreadCount();
+    }, [refreshUnreadCount])
   );
 
   const navToNotificationCenter = useCallback(() => {

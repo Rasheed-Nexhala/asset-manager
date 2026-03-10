@@ -23,6 +23,7 @@ import { subscribeInventoryByLocation, getInventoryByLocation } from '../../serv
 import { ScreenLayout, ScreenHeader } from '../../components';
 import { InventoryListItem } from '../../components/Inventory';
 import { getLocationId } from '../../utils/locationUtils';
+import { runNonCriticalTask } from '../../utils/nonCriticalTask';
 import type { InventoryEntry, ItemType } from '../../types/inventory';
 import type { Site } from '../../types/sites';
 import type { InventoryStackParamList } from '../../navigation/InventoryStackNavigator';
@@ -103,11 +104,23 @@ export const MySiteInventoryScreen: React.FC = () => {
       if (!siteId) return;
 
       const locationId = getLocationId('site', siteId);
-      getInventoryByLocation(locationId)
+      runNonCriticalTask(
+        'my_site_inventory_focus_refresh',
+        () => getInventoryByLocation(locationId),
+        {
+          feature: 'inventory',
+          tags: {
+            screen: 'my_site_inventory',
+          },
+        }
+      )
         .then((inventory) => {
+          if (!inventory) return;
           dispatch(setInventoryForLocation({ locationId, inventory }));
         })
-        .catch(() => {});
+        .catch(() => {
+          // runNonCriticalTask handles capture internally; this guard prevents unhandled rejections.
+        });
     }, [siteId, dispatch])
   );
   

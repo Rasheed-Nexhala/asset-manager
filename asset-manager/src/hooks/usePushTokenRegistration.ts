@@ -1,10 +1,32 @@
 import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { registerPushToken } from '../services/firebase/notificationService';
+import {
+  isTransientPushTokenError,
+  registerPushToken,
+} from '../services/firebase/notificationService';
+import { runNonCriticalTask } from '../utils/nonCriticalTask';
 
 function safeRegisterPushToken(userId: string): void {
-  registerPushToken(userId).catch((error) => {
-    console.warn('Push token registration failed:', error);
+  runNonCriticalTask(
+    'register_push_token',
+    () => registerPushToken(userId),
+    {
+      feature: 'notifications',
+      retry: {
+        retries: 2,
+        baseDelayMs: 2000,
+        maxDelayMs: 10000,
+        shouldRetry: (error) => isTransientPushTokenError(error),
+      },
+      tags: {
+        trigger: 'session_active',
+      },
+      onFailure: (error) => {
+        console.warn('Push token registration failed:', error);
+      },
+    }
+  ).catch(() => {
+    // runNonCriticalTask handles capture internally; this guard prevents unhandled rejections.
   });
 }
 

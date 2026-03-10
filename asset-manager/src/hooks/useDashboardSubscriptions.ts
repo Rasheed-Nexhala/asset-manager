@@ -12,6 +12,7 @@ import { subscribeItems, subscribeInventoryByLocation, getInventoryByLocation } 
 import { subscribeToSites } from '../services/firebase/siteService';
 import { subscribeCategories } from '../services/firebase/categoryService';
 import { getLocationId } from '../utils/locationUtils';
+import { runNonCriticalTask } from '../utils/nonCriticalTask';
 import type { UserRole } from '../types/roles';
 
 interface UseDashboardSubscriptionsParams {
@@ -181,12 +182,25 @@ export function useDashboardSubscriptions({
         );
         unsubscribes.push(unsubInventory);
 
-        getInventoryByLocation(locationId)
+        runNonCriticalTask(
+          'dashboard_site_inventory_prefetch',
+          () => getInventoryByLocation(locationId),
+          {
+            feature: 'inventory',
+            tags: {
+              screen: 'dashboard',
+              role: 'SiteManager',
+            },
+          }
+        )
           .then((inventory) => {
+            if (!inventory) return;
             dispatch(setInventoryForLocation({ locationId, inventory }));
             markReceived();
           })
-          .catch(() => {});
+          .catch(() => {
+            // runNonCriticalTask handles capture internally; this guard prevents unhandled rejections.
+          });
       }
     }
 
