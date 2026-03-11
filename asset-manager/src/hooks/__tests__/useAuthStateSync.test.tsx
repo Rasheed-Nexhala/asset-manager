@@ -214,4 +214,41 @@ describe('useAuthStateSync', () => {
 
     expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
   });
+
+  it('does not dispatch setUser after unmount (cancellation guard)', async () => {
+    const { getUserRole } = require('../../services/firebase/userRoleService');
+
+    // getUserRole resolves only after we manually trigger it — simulates slow network
+    let resolveGetUserRole!: (value: unknown) => void;
+    (getUserRole as jest.Mock).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveGetUserRole = resolve;
+      })
+    );
+
+    const store = createStore();
+    const customWrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(Provider, { store }, children);
+
+    const { unmount } = renderHook(() => useAuthStateSync(), { wrapper: customWrapper });
+
+    const mockUser = { uid: 'user-123', email: 'test@example.com' };
+
+    // Trigger auth callback — getUserRole is now in-flight
+    act(() => {
+      authCallback?.(mockUser);
+    });
+
+    // Unmount while getUserRole is still pending — sets cancelled = true
+    unmount();
+
+    // Now resolve the slow getUserRole — should be ignored due to cancellation
+    await act(async () => {
+      resolveGetUserRole({ role: 'Admin', isActive: true, permissions: [] });
+      await Promise.resolve();
+    });
+
+    // State must remain at initial (no setUser dispatched after unmount)
+    expect(store.getState().auth.user).toBeNull();
+  });
 });

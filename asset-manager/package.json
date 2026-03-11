@@ -63,6 +63,7 @@
     "preset": "jest-expo",
     "moduleNameMapper": {
       "^@expo/vector-icons$": "<rootDir>/jest/mocks/@expo-vector-icons.js",
+      "^@sentry/react-native$": "<rootDir>/jest/mocks/@sentry-react-native.js",
       "^.*config/firebase$": "<rootDir>/config/__mocks__/firebase.ts"
     },
     "setupFiles": [

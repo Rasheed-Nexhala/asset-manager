@@ -200,9 +200,9 @@ export const subscribeToSites = (
         const data = doc.data();
         sites.push({
           id: doc.id,
-          name: data.name,
+          name: data.name ?? '',
           description: data.description,
-          address: data.address,
+          address: data.address ?? '',
           contactNumber: data.contactNumber,
           managerId: data.managerId || null,
           managerName: data.managerName || null,

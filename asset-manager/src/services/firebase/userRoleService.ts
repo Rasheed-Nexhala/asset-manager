@@ -31,7 +31,7 @@ export const getUserRole = async (userId: string): Promise<UserRoleData | null> 
     return {
       role: data.role as UserRole,
       isActive: data.isActive ?? false,
-      permissions: data.permissions || [],
+      permissions: Array.isArray(data.permissions) ? data.permissions : [],
     };
   } catch (error) {
     console.error('Error getting user role:', error);
@@ -161,7 +161,7 @@ export const getAllUsers = async (): Promise<UserListItem[]> => {
         displayName: data.displayName || null,
         role: data.role as UserRole,
         isActive: data.isActive ?? false,
-        permissions: data.permissions || [],
+        permissions: Array.isArray(data.permissions) ? data.permissions : [],
       });
     });
     
@@ -198,7 +198,7 @@ export const subscribeToUserRole = (
       callback({
         role: data.role as UserRole,
         isActive: data.isActive ?? false,
-        permissions: data.permissions || [],
+        permissions: Array.isArray(data.permissions) ? data.permissions : [],
       });
     },
     (error) => {
@@ -233,7 +233,7 @@ export const subscribeToAllUsers = (
           displayName: data.displayName || null,
           role: data.role as UserRole,
           isActive: data.isActive ?? false,
-          permissions: data.permissions || [],
+          permissions: Array.isArray(data.permissions) ? data.permissions : [],
         });
       });
 

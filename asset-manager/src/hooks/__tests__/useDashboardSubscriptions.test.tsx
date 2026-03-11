@@ -5,6 +5,10 @@ import { renderHook, act } from '@testing-library/react-native';
 
 jest.mock('firebase/auth', () => ({ User: function User() {} }));
 
+jest.mock('../../utils/nonCriticalTask', () => ({
+  runNonCriticalTask: jest.fn().mockResolvedValue(undefined),
+}));
+
 const mockUnsubRequests = jest.fn();
 const mockUnsubPOs = jest.fn();
 const mockUnsubMaintenance = jest.fn();

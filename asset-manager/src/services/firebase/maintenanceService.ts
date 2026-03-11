@@ -67,8 +67,8 @@ function serializePhoto(photo: { url: string; fileName: string; uploadedAt: unkn
 
 function firestoreToMaintenance(doc: any): Maintenance {
   const data = doc.data() as MaintenanceFirestore;
-  const updates = (data.updates || []).map(serializeUpdate);
-  const photos = (data.photos || []).map(serializePhoto);
+  const updates = (data.updates || []).filter(Boolean).map(serializeUpdate);
+  const photos = (data.photos || []).filter(Boolean).map(serializePhoto);
   return {
     ...data,
     id: doc.id,

@@ -65,6 +65,7 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.user = action.payload;
         state.isAuthenticated = true;
+        state.isRoleLoading = true;
         state.error = null;
       })
       .addCase(signUpUser.rejected, (state, action) => {
@@ -81,6 +82,7 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.user = action.payload;
         state.isAuthenticated = true;
+        state.isRoleLoading = true;
         state.error = null;
       })
       .addCase(signInUser.rejected, (state, action) => {

@@ -93,7 +93,7 @@ describe('authSlice', () => {
     expect(state.error).toBe(null);
   });
 
-  it('signInUser.fulfilled sets user and isAuthenticated', () => {
+  it('signInUser.fulfilled sets user, isAuthenticated, and isRoleLoading', () => {
     const state = authReducer(
       initialState,
       signInUser.fulfilled(mockUser, 'req1', { email: 'a@b.com', password: 'pwd' })
@@ -102,6 +102,22 @@ describe('authSlice', () => {
     expect(state.isAuthenticated).toBe(true);
     expect(state.isLoading).toBe(false);
     expect(state.error).toBe(null);
+    // Role must still be loaded by useUserRoleSync before Main is shown
+    expect(state.isRoleLoading).toBe(true);
+  });
+
+  it('signUpUser.fulfilled sets user, isAuthenticated, and isRoleLoading', () => {
+    const { signUpUser } = require('../../thunks/authThunks');
+    const state = authReducer(
+      initialState,
+      signUpUser.fulfilled(mockUser, 'req1', { email: 'a@b.com', password: 'pwd' })
+    );
+    expect(state.user).toEqual(mockUser);
+    expect(state.isAuthenticated).toBe(true);
+    expect(state.isLoading).toBe(false);
+    expect(state.error).toBe(null);
+    // Role must still be loaded by useUserRoleSync before Main is shown
+    expect(state.isRoleLoading).toBe(true);
   });
 
   it('signInUser.rejected clears user and isAuthenticated', () => {

@@ -16,6 +16,10 @@ export const useAuthStateSync = (): void => {
   const dispatch = useAppDispatch();
 
   useEffect(() => {
+    // Prevents stale dispatches if auth state changes while getUserRole is in-flight
+    // (e.g. user logs out before the Firestore read resolves)
+    let cancelled = false;
+
     const unsubscribe = subscribeToAuthState(async (user) => {
       if (user === null) {
         dispatch(setUser(null));
@@ -24,22 +28,27 @@ export const useAuthStateSync = (): void => {
 
       try {
         const userRole = await getUserRole(user.uid);
+        if (cancelled) return;
         if (userRole?.isActive === false) {
           await signOutOnly();
+          if (cancelled) return;
           dispatch(setUser(null));
           dispatch(setError(INACTIVE_ACCOUNT_MESSAGE));
         } else {
           dispatch(setUser(user));
         }
       } catch (error) {
+        if (cancelled) return;
         // Fail closed: do not allow user if role fetch fails
         await signOutOnly();
+        if (cancelled) return;
         dispatch(setUser(null));
         dispatch(setError('Failed to verify user permissions. Please try again.'));
       }
     });
 
     return () => {
+      cancelled = true;
       unsubscribe();
     };
   }, [dispatch]);

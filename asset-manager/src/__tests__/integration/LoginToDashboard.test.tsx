@@ -6,6 +6,18 @@
  * - Loading when authenticated but role still loading
  * - Main/Dashboard when authenticated and role loaded
  */
+jest.mock('@sentry/react-native', () => ({
+  init: jest.fn(),
+  wrap: (Component: unknown) => Component,
+  addBreadcrumb: jest.fn(),
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+  setUser: jest.fn(),
+  setContext: jest.fn(),
+  setTag: jest.fn(),
+  setExtra: jest.fn(),
+}));
+
 jest.mock('expo-notifications', () => ({
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
   getExpoPushTokenAsync: jest.fn(),
@@ -65,6 +77,8 @@ import maintenanceReducer from '../../store/slices/maintenanceSlice';
 import activityLogReducer from '../../store/slices/activityLogSlice';
 import purchaseOrderReducer from '../../store/slices/purchaseOrderSlice';
 import type { RootState } from '../../store';
+import type { Permission } from '../../types/roles';
+import type { User } from 'firebase/auth';
 
 jest.mock('react-native-safe-area-context', () =>
   jest.requireActual('react-native-safe-area-context/jest/mock').default
@@ -193,12 +207,12 @@ const mockAdminUser = {
   uid: 'admin-1',
   email: 'admin@example.com',
   displayName: 'Admin User',
-};
+} as User;
 
 const mockAdminRole = {
   role: 'Admin' as const,
   isActive: true,
-  permissions: ['manage_users', 'approve_requests'],
+  permissions: ['canCreateUser', 'canApproveOrders'] as Permission[],
 };
 
 function renderWithProviders(

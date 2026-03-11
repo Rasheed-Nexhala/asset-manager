@@ -50,8 +50,8 @@ export const selectFilteredSites = createSelector(
     const query = searchQuery.toLowerCase().trim();
     return sites.filter(
       (site) =>
-        site.name.toLowerCase().includes(query) ||
-        site.address.toLowerCase().includes(query) ||
+        (site.name ?? '').toLowerCase().includes(query) ||
+        (site.address ?? '').toLowerCase().includes(query) ||
         (site.managerName && site.managerName.toLowerCase().includes(query)) ||
         (site.description && site.description.toLowerCase().includes(query))
     );

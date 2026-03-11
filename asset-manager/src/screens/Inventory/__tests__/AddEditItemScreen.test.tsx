@@ -126,7 +126,7 @@ jest.mock('../../../store/thunks/inventoryThunks', () => {
     ),
     createItem: createAsyncThunk(
       'inventory/createItem',
-      async (_, { rejectWithValue }) => {
+      async (_arg: unknown, { rejectWithValue }: { rejectWithValue: (value: string) => unknown }) => {
         try {
           return await new Promise<Item>((resolve, reject) => {
             mockCreateItemResolve = resolve;
@@ -217,6 +217,8 @@ const mockItem: Item = {
   centralStoreQuantity: 30,
   atSitesQuantity: 15,
   inMaintenanceQuantity: 5,
+  createdAt: '2025-01-01',
+  updatedAt: '2025-01-01',
 };
 
 const defaultPreloadedState: Partial<RootState> = {
@@ -238,6 +240,10 @@ const defaultPreloadedState: Partial<RootState> = {
     error: null,
     errorTimestamp: null,
     filters: null,
+    totalCount: null,
+    lastDoc: null,
+    hasMore: false,
+    loadingMore: false,
   },
 };
 
@@ -317,6 +323,8 @@ describe('AddEditItemScreen', () => {
   });
 
   afterEach(() => {
+    jest.advanceTimersByTime(10000);
+    jest.runOnlyPendingTimers();
     jest.useRealTimers();
   });
 
@@ -426,6 +434,8 @@ describe('AddEditItemScreen', () => {
 
   it('shows SKU already exists message when createItem rejects with duplicate SKU', async () => {
     const skuExistsMessage = 'This SKU already exists. Please use a different SKU.';
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
     mockRouteParams = {};
     const renderResult = renderWithStore(<AddEditItemScreen />);
 
@@ -448,5 +458,7 @@ describe('AddEditItemScreen', () => {
       skuExistsMessage,
       [{ text: 'OK' }]
     );
+
+    consoleErrorSpy.mockRestore();
   });
 });

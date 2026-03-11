@@ -177,11 +177,16 @@ export function subscribeToNotifications(
 ): () => void {
   const ref = collection(db, NOTIFICATIONS_COLLECTION, userId, 'items');
   const q = query(ref, orderBy('createdAt', 'desc'), limit(50));
-  return onSnapshot(q, (snap) => {
-    cb(
-      snap.docs.map((d) => ({ id: d.id, ...d.data() } as NotificationItem))
-    );
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as NotificationItem)));
+    },
+    (error) => {
+      console.error('Notification subscription error:', error);
+      cb([]);
+    }
+  );
 }
 
 export async function markNotificationRead(
