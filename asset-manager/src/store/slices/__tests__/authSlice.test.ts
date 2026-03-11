@@ -49,6 +49,19 @@ describe('authSlice', () => {
     expect(state.isRoleLoading).toBe(false);
   });
 
+  it('setUser does not reset isRoleLoading when user is already authenticated', () => {
+    const alreadyAuthenticated = {
+      ...initialState,
+      user: mockUser,
+      isAuthenticated: true,
+      isRoleLoading: false,
+      userRole: { role: 'Admin' as const, isActive: true, permissions: [] },
+    };
+    const state = authReducer(alreadyAuthenticated, setUser(mockUser));
+    expect(state.isRoleLoading).toBe(false);
+    expect(state.isAuthenticated).toBe(true);
+  });
+
   it('setUser preserves error when user becomes null (e.g. signOut for account-deactivated)', () => {
     const withUserAndError = authReducer(
       { ...initialState, user: mockUser, error: 'Your account is deactivated, please contact admin.' },
@@ -93,37 +106,49 @@ describe('authSlice', () => {
     expect(state.error).toBe(null);
   });
 
-  it('signInUser.fulfilled sets user, isAuthenticated, and isRoleLoading', () => {
-    const state = authReducer(
+  it('signInUser.fulfilled clears isLoading but does not set auth state', () => {
+    const pendingState = authReducer(
       initialState,
+      signInUser.pending('req1', { email: 'a@b.com', password: 'pwd' })
+    );
+    expect(pendingState.isLoading).toBe(true);
+
+    const state = authReducer(
+      pendingState,
       signInUser.fulfilled(mockUser, 'req1', { email: 'a@b.com', password: 'pwd' })
     );
-    expect(state.user).toEqual(mockUser);
-    expect(state.isAuthenticated).toBe(true);
     expect(state.isLoading).toBe(false);
     expect(state.error).toBe(null);
-    // Role must still be loaded by useUserRoleSync before Main is shown
-    expect(state.isRoleLoading).toBe(true);
+    // Auth state (user, isAuthenticated, isRoleLoading) is NOT set here —
+    // it is managed exclusively by useAuthStateSync → setUser
+    expect(state.user).toBe(null);
+    expect(state.isAuthenticated).toBe(false);
+    expect(state.isRoleLoading).toBe(false);
   });
 
-  it('signUpUser.fulfilled sets user, isAuthenticated, and isRoleLoading', () => {
+  it('signUpUser.fulfilled clears isLoading but does not set auth state', () => {
     const { signUpUser } = require('../../thunks/authThunks');
-    const state = authReducer(
+    const pendingState = authReducer(
       initialState,
+      signUpUser.pending('req1', { email: 'a@b.com', password: 'pwd' })
+    );
+    expect(pendingState.isLoading).toBe(true);
+
+    const state = authReducer(
+      pendingState,
       signUpUser.fulfilled(mockUser, 'req1', { email: 'a@b.com', password: 'pwd' })
     );
-    expect(state.user).toEqual(mockUser);
-    expect(state.isAuthenticated).toBe(true);
     expect(state.isLoading).toBe(false);
     expect(state.error).toBe(null);
-    // Role must still be loaded by useUserRoleSync before Main is shown
-    expect(state.isRoleLoading).toBe(true);
+    // Auth state is NOT set here — managed by useAuthStateSync → setUser
+    expect(state.user).toBe(null);
+    expect(state.isAuthenticated).toBe(false);
+    expect(state.isRoleLoading).toBe(false);
   });
 
   it('signInUser.rejected clears user and isAuthenticated', () => {
-    const withUser = authReducer(initialState, signInUser.fulfilled(mockUser, 'req1', { email: 'a@b.com', password: 'pwd' }));
     const state = authReducer(
-      withUser,
+      initialState,
       signInUser.rejected(
         'Invalid credentials' as never,
         'req1',

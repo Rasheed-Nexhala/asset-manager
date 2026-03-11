@@ -21,6 +21,7 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     setUser: (state, action: PayloadAction<User | null>) => {
+      const wasAuthenticated = state.isAuthenticated;
       state.user = action.payload;
       state.isAuthenticated = action.payload !== null;
       state.authInitialized = true;
@@ -29,12 +30,14 @@ const authSlice = createSlice({
       if (action.payload !== null) {
         state.error = null;
       }
-      // Clear userRole when user logs out
       if (action.payload === null) {
         state.userRole = null;
         state.isRoleLoading = false;
-      } else {
-        // When user logs in, start loading role
+      } else if (!wasAuthenticated) {
+        // Only start role loading on a fresh login (null → user), not when
+        // re-dispatched for an already-authenticated user (e.g. useAuthStateSync
+        // confirming the session). This avoids resetting isRoleLoading to true
+        // after useUserRoleSync has already resolved it.
         state.isRoleLoading = true;
       }
     },
@@ -61,11 +64,11 @@ const authSlice = createSlice({
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(signUpUser.fulfilled, (state, action) => {
+      .addCase(signUpUser.fulfilled, (state) => {
+        // Auth state (user, isAuthenticated, isRoleLoading) is managed
+        // exclusively by useAuthStateSync → setUser to avoid race
+        // conditions with the delayed thunk resolution.
         state.isLoading = false;
-        state.user = action.payload;
-        state.isAuthenticated = true;
-        state.isRoleLoading = true;
         state.error = null;
       })
       .addCase(signUpUser.rejected, (state, action) => {
@@ -78,11 +81,11 @@ const authSlice = createSlice({
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(signInUser.fulfilled, (state, action) => {
+      .addCase(signInUser.fulfilled, (state) => {
+        // Auth state (user, isAuthenticated, isRoleLoading) is managed
+        // exclusively by useAuthStateSync → setUser to avoid race
+        // conditions with the delayed thunk resolution.
         state.isLoading = false;
-        state.user = action.payload;
-        state.isAuthenticated = true;
-        state.isRoleLoading = true;
         state.error = null;
       })
       .addCase(signInUser.rejected, (state, action) => {
