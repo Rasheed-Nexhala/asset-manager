@@ -19,8 +19,6 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSelector } from 'react-redux';
-import { selectIsStoreIncharge } from '../../store/selectors/authSelectors';
 import { isLowStock } from '../../utils/inventoryUtils';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
@@ -59,12 +57,12 @@ export const SelectItemsScreen: React.FC = () => {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastDocRef = useRef<DocumentSnapshot | null>(null);
 
-  const isStoreIncharge = useSelector(selectIsStoreIncharge);
   const isForPO = returnScreen === 'CreatePO';
-  const shouldRestrictStock = isForPO && isStoreIncharge;
 
   const hasMore = items.length < (totalCount ?? 0) && lastDoc != null;
-  const filteredItems = items.filter((item) => !excludeItemIds.includes(item.id));
+  const filteredItems = items
+    .filter((item) => !excludeItemIds.includes(item.id))
+    .filter((item) => (isForPO ? isLowStock(item) : true));
 
   // Debounce search input
   useEffect(() => {
@@ -163,32 +161,23 @@ export const SelectItemsScreen: React.FC = () => {
   const renderItem = useCallback(
     ({ item }: { item: Item }) => {
       const isSelected = selectedIds.has(item.id);
-      const isRestricted = shouldRestrictStock && !isLowStock(item);
 
       return (
         <TouchableOpacity
           className={`bg-white rounded-[10px] p-4 border mb-3 min-h-[48px] ${
             isSelected ? 'border-[#1E40AF] bg-[#1E40AF]/5' : 'border-[#E2E8F0]'
-          } ${isRestricted ? 'opacity-50' : ''}`}
-          onPress={() => {
-            if (!isRestricted) {
-              toggleItem(item.id);
-            }
-          }}
-          activeOpacity={isRestricted ? 1 : 0.7}
+          }`}
+          onPress={() => toggleItem(item.id)}
+          activeOpacity={0.7}
           accessibilityRole="checkbox"
           accessibilityLabel={`${item.name}, ${isSelected ? 'selected' : 'not selected'}`}
-          accessibilityState={{ checked: isSelected, disabled: isRestricted }}
+          accessibilityState={{ checked: isSelected }}
         >
           <View className="flex-row items-center">
             {/* Checkbox */}
             <View
               className={`w-6 h-6 rounded border-2 mr-3 items-center justify-center ${
-                isSelected
-                  ? 'bg-[#1E40AF] border-[#1E40AF]'
-                  : isRestricted
-                  ? 'bg-gray-100 border-[#CBD5E1]'
-                  : 'bg-white border-[#E2E8F0]'
+                isSelected ? 'bg-[#1E40AF] border-[#1E40AF]' : 'bg-white border-[#E2E8F0]'
               }`}
             >
               {isSelected && (
@@ -201,7 +190,6 @@ export const SelectItemsScreen: React.FC = () => {
                 source={{ uri: item.imageUrl }}
                 className="w-12 h-12 rounded-lg"
                 resizeMode="cover"
-                style={isRestricted ? { opacity: 0.5 } : undefined}
               />
             ) : (
               <View className="w-12 h-12 bg-[#F8FAFC] rounded-lg items-center justify-center">
@@ -209,19 +197,18 @@ export const SelectItemsScreen: React.FC = () => {
               </View>
             )}
             <View className="flex-1 ml-3">
-              <Text className={`text-[15px] font-semibold ${isRestricted ? 'text-[#94A3B8]' : 'text-[#0F172A]'}`}>
+              <Text className="text-[15px] font-semibold text-[#0F172A]">
                 {item.name}
               </Text>
               <Text className="text-[13px] text-[#64748B]">
                 SKU: {item.sku} • {item.categoryName ?? '—'}
-                {isRestricted && '\n(Sufficient Stock - Cannot Order)'}
               </Text>
             </View>
           </View>
         </TouchableOpacity>
       );
     },
-    [selectedIds, toggleItem, shouldRestrictStock]
+    [selectedIds, toggleItem]
   );
 
   const ListFooterComponent = useCallback(() => {
@@ -239,16 +226,26 @@ export const SelectItemsScreen: React.FC = () => {
       <View className="flex-1 items-center justify-center py-16 px-4">
         <Ionicons name="cube-outline" size={64} color="#94A3B8" />
         <Text className="text-[22px] font-semibold text-[#0F172A] mt-4 text-center">
-          {debouncedSearch ? 'No items match your search' : 'No items available'}
+          {isForPO
+            ? debouncedSearch
+              ? 'No low-stock items match your search'
+              : 'No items below minimum stock'
+            : debouncedSearch
+              ? 'No items match your search'
+              : 'No items available'}
         </Text>
         <Text className="text-[15px] text-[#64748B] mt-2 text-center">
-          {debouncedSearch
-            ? 'Try a different search term. Only active items are shown.'
-            : 'No active items in inventory.'}
+          {isForPO
+            ? debouncedSearch
+              ? 'Try a different search term. Only items below minimum stock are shown for purchase orders.'
+              : 'All items are above their minimum stock level. No purchase order needed.'
+            : debouncedSearch
+              ? 'Try a different search term. Only active items are shown.'
+              : 'No active items in inventory.'}
         </Text>
       </View>
     );
-  }, [loading, items.length, debouncedSearch]);
+  }, [loading, items.length, debouncedSearch, isForPO]);
 
   const isInitialLoad = loading && items.length === 0 && totalCount === null;
   const selectedCount = filteredItems.filter((i) => selectedIds.has(i.id)).length;
@@ -305,7 +302,9 @@ export const SelectItemsScreen: React.FC = () => {
         </View>
         {totalCount != null && (
           <Text className="text-[13px] text-[#64748B] mt-2">
-            Showing {filteredItems.length} of {totalCount} items
+            {isForPO
+              ? `${filteredItems.length} item${filteredItems.length === 1 ? '' : 's'} below minimum stock`
+              : `Showing ${filteredItems.length} of ${totalCount} items`}
           </Text>
         )}
       </View>

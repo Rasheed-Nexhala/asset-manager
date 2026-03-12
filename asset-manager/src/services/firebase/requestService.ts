@@ -106,6 +106,7 @@ export const createRequest = async (
         itemId: item.itemId,
         itemName: item.itemName,
         itemSku: item.itemSku,
+        ...(item.unit ? { unit: item.unit } : {}),
         itemType: item.itemType,
         categoryId: item.categoryId,
         categoryName: item.categoryName,

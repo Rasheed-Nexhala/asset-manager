@@ -15,6 +15,10 @@ import type { RootState } from '../../../store';
 import type { Request } from '../../../types/request';
 
 const mockNavigate = jest.fn();
+const mockNavigateToProcessRequest = jest.fn();
+jest.mock('../../../navigation/navigationUtils', () => ({
+  navigateToProcessRequest: (...args: unknown[]) => mockNavigateToProcessRequest(...args),
+}));
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: mockNavigate, goBack: jest.fn() }),
   useFocusEffect: (cb: () => void | (() => void)) => cb(),
@@ -202,6 +206,7 @@ const defaultRequestsState = {
 describe('RequestQueueScreen', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
+    mockNavigateToProcessRequest.mockClear();
     mockUnsubscribe.mockClear();
     mockRequestsToReturn = [];
     mockListRequestsPaginated.mockResolvedValue({ requests: [], lastDoc: null });
@@ -362,7 +367,7 @@ describe('RequestQueueScreen', () => {
     });
 
     fireEvent.press(await findByText('REQ-2025-0001'));
-    expect(mockNavigate).toHaveBeenCalledWith('ProcessRequest', { requestId: 'req-1' });
+    expect(mockNavigateToProcessRequest).toHaveBeenCalledWith('req-1');
   });
 
   it('renders flat list of requests sorted by date (latest first)', async () => {

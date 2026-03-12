@@ -154,6 +154,7 @@ export async function addToMaintenance(
         itemId: data.itemId,
         itemName: data.itemName,
         itemSku: data.itemSku,
+        ...(data.unit ? { unit: data.unit } : {}),
         quantity: data.quantity,
         issueType: data.issueType,
         issueDescription: data.issueDescription ?? '',

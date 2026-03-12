@@ -246,7 +246,7 @@ describe('ReturnFromMaintenanceScreen', () => {
     expect(screen.getByText('Steel Bar')).toBeTruthy();
     expect(screen.getByText('SKU: SKU-001')).toBeTruthy();
     expect(screen.getByText('Available Quantity')).toBeTruthy();
-    expect(screen.getByText('5')).toBeTruthy();
+    expect(screen.getByText('5 Pcs')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Return to inventory' })).toBeTruthy();
   });
 
@@ -290,7 +290,7 @@ describe('ReturnFromMaintenanceScreen', () => {
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Success',
-        '5 items returned to inventory successfully',
+        '5 Pcs returned to inventory successfully',
         expect.any(Array)
       );
     });
@@ -308,7 +308,7 @@ describe('ReturnFromMaintenanceScreen', () => {
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Success',
-        '5 items returned to inventory successfully',
+        '5 Pcs returned to inventory successfully',
         expect.any(Array)
       );
     });

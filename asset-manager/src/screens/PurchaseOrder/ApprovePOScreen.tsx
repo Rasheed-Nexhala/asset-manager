@@ -346,9 +346,13 @@ export const ApprovePOScreen: React.FC = () => {
                   className="text-[15px] text-[#0F172A]"
                   numberOfLines={1}
                 >
+                  {/*
+                    orderedUnit/orderedQuantity represent user-entered ordering unit.
+                    Fallback to item's base inventory unit for consistency across modules.
+                  */}
                   {item.orderedQuantity != null && item.orderedUnit
                     ? `${item.orderedQuantity} ${item.orderedUnit}`
-                    : `${item.quantity} Pcs`}
+                    : `${item.quantity} ${item.unit || 'Pcs'}`}
                 </Text>
               </View>
               <View className="shrink-0 min-w-[72px] items-end">

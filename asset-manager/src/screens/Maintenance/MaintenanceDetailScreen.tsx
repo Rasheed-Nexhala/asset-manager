@@ -297,6 +297,7 @@ export const MaintenanceDetailScreen: React.FC = () => {
     text: 'text-[#475569]',
     label: 'Unknown',
   };
+  const displayUnit = maintenance.unit || 'Pcs';
 
   return (
     <ScreenLayout edges={['top']}>
@@ -327,7 +328,7 @@ export const MaintenanceDetailScreen: React.FC = () => {
           <View className="flex-row justify-between items-center">
             <Text className="text-[13px] text-[#64748B]">Quantity in Maintenance</Text>
             <Text className="text-[15px] font-semibold text-[#0F172A]">
-              {maintenance.quantity} Pcs
+              {maintenance.quantity} {displayUnit}
             </Text>
           </View>
         </View>
@@ -448,7 +449,7 @@ export const MaintenanceDetailScreen: React.FC = () => {
                 <View className="flex-row justify-between items-center">
                   <Text className="text-[13px] text-[#64748B]">Returned Quantity</Text>
                   <Text className="text-[15px] text-[#0F172A]">
-                    {maintenance.returnedQuantity} Pcs
+                    {maintenance.returnedQuantity} {displayUnit}
                   </Text>
                 </View>
               )}

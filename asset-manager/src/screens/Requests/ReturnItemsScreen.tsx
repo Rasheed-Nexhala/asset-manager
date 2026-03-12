@@ -27,6 +27,8 @@ import {
   selectIsAdmin,
   selectIsStoreIncharge,
 } from '../../store/selectors/authSelectors';
+import { selectAllItems } from '../../store/selectors/inventorySelectors';
+import { fetchItems } from '../../store/thunks/inventoryThunks';
 import type {
   Request,
   RequestItem,
@@ -67,7 +69,15 @@ export const ReturnItemsScreen: React.FC = () => {
   const userName = useAppSelector(selectUserDisplayName);
   const isAdmin = useAppSelector(selectIsAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const inventoryItems = useAppSelector(selectAllItems);
   const { viewMode, toggleViewMode } = useWeightViewPreference();
+
+  // Ensure inventory items are loaded so unit fallback works for old requests
+  useEffect(() => {
+    if (inventoryItems.length === 0) {
+      dispatch(fetchItems({}));
+    }
+  }, [dispatch, inventoryItems.length]);
 
   const [request, setRequest] = useState<Request | null>(null);
   const [returnItemsState, setReturnItemsState] = useState<ReturnItemState[]>(
@@ -374,6 +384,10 @@ export const ReturnItemsScreen: React.FC = () => {
             {returnItemsState.map((item) => {
               const requestItem = request.items.find((i) => i.itemId === item.itemId) as RequestItem | undefined;
               const isSteelItem = requestItem ? isWeightBasedItem({ weightPerMeter: requestItem.weightPerMeter }) : false;
+              const displayUnit =
+                requestItem?.unit ||
+                inventoryItems.find((inventoryItem) => inventoryItem.id === item.itemId)?.unit ||
+                'units';
               return (
               <View
                 key={item.itemId}
@@ -413,11 +427,11 @@ export const ReturnItemsScreen: React.FC = () => {
                         weightPerMeter={requestItem.weightPerMeter}
                         lengthPerPiece={requestItem.lengthPerPiece}
                         viewMode={viewMode}
-                        unit="Pcs"
+                        unit={requestItem.unit || 'Pcs'}
                       />
                     ) : (
                       <Text className="text-[13px] text-[#64748B]">
-                        {item.remainingQuantity} {requestItem?.unit ?? ''}
+                        {item.remainingQuantity} {displayUnit}
                       </Text>
                     )}
                   </View>
@@ -474,7 +488,7 @@ export const ReturnItemsScreen: React.FC = () => {
                               weightPerMeter={requestItem.weightPerMeter}
                               lengthPerPiece={requestItem.lengthPerPiece}
                               viewMode={viewMode}
-                              unit="Pcs"
+                              unit={requestItem.unit || 'Pcs'}
                             />
                           </View>
                         )}

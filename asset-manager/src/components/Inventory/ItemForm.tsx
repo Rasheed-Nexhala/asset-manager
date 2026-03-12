@@ -188,10 +188,10 @@ export const ItemForm: React.FC<ItemFormProps> = ({
 
   // Sync category returned from CategorySelectScreen
   useEffect(() => {
-    if (returnedCategoryId != null && mode === 'create') {
+    if (returnedCategoryId != null) {
       setFormData((prev) => ({ ...prev, categoryId: returnedCategoryId }));
     }
-  }, [returnedCategoryId, mode]);
+  }, [returnedCategoryId]);
 
   /** Live validation for weight-based Kg/Ton conversion */
   useEffect(() => {

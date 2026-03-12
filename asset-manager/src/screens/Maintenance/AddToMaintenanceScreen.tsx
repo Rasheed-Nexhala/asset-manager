@@ -279,6 +279,7 @@ export const AddToMaintenanceScreen: React.FC = () => {
       itemId: selectedItem.id,
       itemName: selectedItem.name,
       itemSku: selectedItem.sku,
+      unit: selectedItem.unit,
       quantity, // Submitting the perfectly exact integer pieces
       issueType,
       issueDescription: description.trim() || '',

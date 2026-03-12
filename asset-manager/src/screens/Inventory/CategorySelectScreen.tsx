@@ -16,7 +16,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { CommonActions, useNavigation, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
@@ -91,10 +91,26 @@ export const CategorySelectScreen: React.FC = () => {
 
   const handleSelect = useCallback(
     (categoryId: string) => {
-      navigation.navigate(returnRoute as 'AddEditItem', {
-        itemId,
-        selectedCategoryId: categoryId,
-      });
+      // Find the previous route in the stack
+      const state = navigation.getState();
+      const previousRoute = state.routes[state.routes.length - 2];
+      
+      if (previousRoute && previousRoute.name === returnRoute) {
+        // Update the params of the previous route directly
+        navigation.dispatch({
+          ...CommonActions.setParams({ selectedCategoryId: categoryId }),
+          source: previousRoute.key,
+        });
+        // Now safely go back without pushing a new screen
+        navigation.goBack();
+      } else {
+        // Fallback if we can't find the route in history
+        navigation.navigate({
+          name: returnRoute as 'AddEditItem',
+          params: { itemId, selectedCategoryId: categoryId },
+          merge: true,
+        });
+      }
     },
     [navigation, returnRoute, itemId]
   );

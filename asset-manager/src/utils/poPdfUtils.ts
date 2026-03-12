@@ -81,10 +81,11 @@ export function generatePOHtml(po: PurchaseOrder, logoBase64?: string): string {
     const quantity = Number(item.quantity) || 0;
     const orderedQty = item.orderedQuantity != null ? Number(item.orderedQuantity) : null;
     const orderedUnit = item.orderedUnit?.trim();
+    const baseUnit = item.unit?.trim() || 'Pcs';
     const displayQty = orderedQty != null && orderedUnit
-      ? `${orderedQty} ${orderedUnit} (${quantity} Pcs stock)`
-      : `${quantity} Pcs`;
-    const priceBasis = orderedUnit ? `per ${orderedUnit}` : 'per Piece';
+      ? `${orderedQty} ${orderedUnit} (${quantity} ${baseUnit} stock)`
+      : `${quantity} ${baseUnit}`;
+    const priceBasis = orderedUnit ? `per ${orderedUnit}` : `per ${baseUnit}`;
     return `
       <tr>
         <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A;">${escapeHtml(item.itemName)}</td>

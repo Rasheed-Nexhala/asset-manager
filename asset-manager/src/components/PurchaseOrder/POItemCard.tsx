@@ -43,6 +43,7 @@ export const POItemCard: React.FC<POItemCardProps> = ({
   onUnitPriceChange,
   onGstPercentageChange,
 }) => {
+  const baseUnit = inventoryItem?.unit || item.unit || 'Pieces';
   const isSteel = inventoryItem ? isWeightBasedItem(inventoryItem) : false;
   const hasFullWeightConfig = isSteel && inventoryItem?.weightPerMeter != null && inventoryItem?.lengthPerPiece != null;
 
@@ -77,7 +78,11 @@ export const POItemCard: React.FC<POItemCardProps> = ({
     setQuantityStr(text);
     if (!text.trim()) {
       setQtyError(null);
-      onQuantityChange?.(0, entryMode === 'pieces' ? undefined : entryMode === 'kg' ? 'Kg' : 'Ton', 0);
+      onQuantityChange?.(
+        0,
+        entryMode === 'pieces' ? (hasFullWeightConfig ? undefined : baseUnit) : entryMode === 'kg' ? 'Kg' : 'Ton',
+        0
+      );
       return;
     }
 
@@ -99,7 +104,11 @@ export const POItemCard: React.FC<POItemCardProps> = ({
         return;
       }
       setQtyError(null);
-      onQuantityChange?.(num, undefined, undefined);
+      onQuantityChange?.(
+        num,
+        hasFullWeightConfig ? undefined : baseUnit,
+        hasFullWeightConfig ? undefined : num
+      );
     } else {
       const kg = entryMode === 'ton' ? tonToKg(num) : num;
       const res = kgToPieces(kg, inventoryItem!.weightPerMeter!, inventoryItem!.lengthPerPiece!);
@@ -186,15 +195,15 @@ export const POItemCard: React.FC<POItemCardProps> = ({
             </View>
           ) : (
             <View className="h-12 justify-center">
-              <Text className="text-[15px] text-[#0F172A]">
-                {item.orderedQuantity ? `${item.orderedQuantity} ${item.orderedUnit}` : `${item.quantity} Pieces`}
+                <Text className="text-[15px] text-[#0F172A]">
+                {item.orderedQuantity ? `${item.orderedQuantity} ${item.orderedUnit || baseUnit}` : `${item.quantity} ${baseUnit}`}
               </Text>
             </View>
           )}
         </View>
 
         <View className="gap-1.5">
-          <Text className="text-[15px] text-[#0F172A]">Unit Price (₹) {entryMode !== 'pieces' ? `per ${entryMode === 'kg' ? 'Kg' : 'Ton'}` : 'per Piece'}</Text>
+          <Text className="text-[15px] text-[#0F172A]">Unit Price (₹) {entryMode !== 'pieces' ? `per ${entryMode === 'kg' ? 'Kg' : 'Ton'}` : `per ${baseUnit}`}</Text>
           {editable && onUnitPriceChange ? (
             <TextInput
               value={unitPriceStr}

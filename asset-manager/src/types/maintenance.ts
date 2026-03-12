@@ -72,6 +72,7 @@ export interface MaintenanceFirestore {
   itemId: string;
   itemName: string;
   itemSku: string;
+  unit?: string;
   quantity: number;
   
   // Issue details
@@ -131,6 +132,7 @@ export interface AddToMaintenanceData {
   itemId: string;
   itemName: string;
   itemSku: string;
+  unit?: string;
   quantity: number;
   issueType: IssueType;
   issueDescription?: string;

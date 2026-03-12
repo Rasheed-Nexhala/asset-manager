@@ -15,6 +15,9 @@ import type { RootState } from '../../store';
 
 const mockNavigate = jest.fn();
 const mockGetParentNavigate = jest.fn();
+jest.mock('../../navigation/navigationUtils', () => ({
+  navigateToProcessRequest: jest.fn(),
+}));
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
     navigate: mockNavigate,

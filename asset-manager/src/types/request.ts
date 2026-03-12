@@ -30,6 +30,7 @@ export interface RequestItem {
   itemId: string;
   itemName: string;
   itemSku: string;
+  unit?: string;
   itemType: 'consumable' | 'non_consumable';
   categoryId: string;
   categoryName: string;
@@ -130,6 +131,7 @@ export interface CreateRequestData {
     itemId: string;
     itemName: string;
     itemSku: string;
+    unit?: string;
     itemType: 'consumable' | 'non_consumable' | 'fuel';
     categoryId: string;
     categoryName: string;

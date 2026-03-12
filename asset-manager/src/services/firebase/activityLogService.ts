@@ -442,7 +442,18 @@ export async function logQuantityAdjustedToCloud(
       }
       return;
     }
-    console.error('Failed to log quantity adjustment:', error);
+    // functions/internal: Cloud Function crashed - main adjustment succeeded, log failed
+    if (code === 'functions/internal') {
+      if (__DEV__) {
+        console.warn(
+          'Activity log (logQuantityAdjusted): Cloud Function error. Quantity adjustment succeeded; audit log may be missing.'
+        );
+      }
+      return;
+    }
+    if (__DEV__) {
+      console.warn('Failed to log quantity adjustment:', error);
+    }
   }
 }
 

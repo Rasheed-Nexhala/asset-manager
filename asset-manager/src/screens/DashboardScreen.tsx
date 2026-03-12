@@ -58,6 +58,7 @@ import { getUnreadCount } from '../services/firebase/notificationService';
 import { getLocationId } from '../utils/locationUtils';
 import { runNonCriticalTask } from '../utils/nonCriticalTask';
 import type { DashboardStackParamList } from '../navigation/DashboardStackParamList';
+import { navigateToProcessRequest } from '../navigation/navigationUtils';
 import type { Request } from '../types/request';
 
 /** Fallback when authSelectors fails to load (e.g. circular deps, hot reload) */
@@ -350,12 +351,8 @@ export const DashboardScreen: React.FC = () => {
                 <PendingRequestsWidget
                   requests={pendingForWidget}
                   onViewAll={() => tabNav?.navigate('Requests', { screen: 'RequestQueue' })}
-                  onViewRequest={(id) =>
-                    tabNav?.navigate('Requests', { screen: 'ProcessRequest', params: { requestId: id } })
-                  }
-                  onApprove={(id) =>
-                    tabNav?.navigate('Requests', { screen: 'ProcessRequest', params: { requestId: id } })
-                  }
+                  onViewRequest={(id) => navigateToProcessRequest(id)}
+                  onApprove={(id) => navigateToProcessRequest(id)}
                   loading={isInitialLoad || requestsLoading}
                 />
               )}
@@ -386,12 +383,8 @@ export const DashboardScreen: React.FC = () => {
                 <PendingRequestsWidget
                   requests={pendingForWidget}
                   onViewAll={() => tabNav?.navigate('Requests', { screen: 'RequestQueue' })}
-                  onViewRequest={(id) =>
-                    tabNav?.navigate('Requests', { screen: 'ProcessRequest', params: { requestId: id } })
-                  }
-                  onApprove={(id) =>
-                    tabNav?.navigate('Requests', { screen: 'ProcessRequest', params: { requestId: id } })
-                  }
+                  onViewRequest={(id) => navigateToProcessRequest(id)}
+                  onApprove={(id) => navigateToProcessRequest(id)}
                   loading={isInitialLoad || requestsLoading}
                 />
               )}
@@ -424,9 +417,7 @@ export const DashboardScreen: React.FC = () => {
                 <PendingRequestsWidget
                   requests={pendingForWidget}
                   onViewAll={() => tabNav?.navigate('Requests', { screen: 'MyRequests' })}
-                  onViewRequest={(id) =>
-                    tabNav?.navigate('Requests', { screen: 'ProcessRequest', params: { requestId: id } })
-                  }
+                  onViewRequest={(id) => navigateToProcessRequest(id)}
                   loading={isInitialLoad || requestsLoading}
                 />
               )}

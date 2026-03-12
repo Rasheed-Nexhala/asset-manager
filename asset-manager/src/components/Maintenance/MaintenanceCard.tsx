@@ -29,6 +29,7 @@ function formatDate(dateString: string): string {
 }
 
 export default function MaintenanceCard({ maintenance, onPress }: MaintenanceCardProps) {
+  const displayUnit = maintenance.unit || 'Pcs';
   return (
     <TouchableOpacity
       className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-3"
@@ -54,7 +55,7 @@ export default function MaintenanceCard({ maintenance, onPress }: MaintenanceCar
           </View>
           <View className="flex-1">
             <Text className="text-[13px] text-[#64748B]">Quantity</Text>
-            <Text className="text-[15px] text-[#0F172A]">{maintenance.quantity} Pcs</Text>
+            <Text className="text-[15px] text-[#0F172A]">{maintenance.quantity} {displayUnit}</Text>
           </View>
         </View>
         

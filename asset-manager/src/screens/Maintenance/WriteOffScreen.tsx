@@ -50,6 +50,7 @@ export const WriteOffScreen: React.FC = () => {
 
   // Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const displayUnit = maintenance?.unit || 'Pcs';
 
   // Fetch maintenance record if not in store
   useEffect(() => {
@@ -108,7 +109,7 @@ export const WriteOffScreen: React.FC = () => {
     // Double confirmation dialog
     Alert.alert(
       'Confirm Write Off',
-      `Are you sure you want to write off ${writeOffQuantity} ${writeOffQuantity === 1 ? 'Pc' : 'Pcs'}?\n\nThis action is PERMANENT and cannot be undone. The items will be permanently removed from total inventory.`,
+      `Are you sure you want to write off ${writeOffQuantity} ${displayUnit}?\n\nThis action is PERMANENT and cannot be undone. The items will be permanently removed from total inventory.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -118,7 +119,7 @@ export const WriteOffScreen: React.FC = () => {
         },
       ]
     );
-  }, [validateForm, writeOffQuantity]);
+  }, [validateForm, writeOffQuantity, displayUnit]);
 
   const submitWriteOff = useCallback(async () => {
     if (!maintenance || !userId || !userName || !reason) return;
@@ -196,7 +197,7 @@ export const WriteOffScreen: React.FC = () => {
             <View className="flex-row justify-between items-center mt-2">
               <Text className="text-[13px] text-[#64748B]">Available Quantity</Text>
               <Text className="text-[15px] font-semibold text-[#0F172A]">
-                {maintenance.quantity} Pcs
+                {maintenance.quantity} {displayUnit}
               </Text>
             </View>
           </View>

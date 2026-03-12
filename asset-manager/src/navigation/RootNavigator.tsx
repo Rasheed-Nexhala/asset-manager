@@ -49,16 +49,8 @@ function handleNotificationNavigation(
   const canReviewPo = isAdmin;
 
   if (data.screen === 'ProcessRequest' && data.requestId && canManageRequests) {
-    navigationRef.navigate('Main', {
-      screen: 'Tabs',
-      params: {
-        screen: 'Requests',
-        params: {
-          screen: 'ProcessRequest',
-          params: { requestId: data.requestId },
-        },
-      },
-    });
+    const { navigateToProcessRequest } = require('./navigationUtils');
+    navigateToProcessRequest(data.requestId);
   } else if (data.screen === 'RequestQueue' && canManageRequests) {
     navigationRef.navigate('Main', {
       screen: 'Tabs',

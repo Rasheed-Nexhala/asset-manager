@@ -25,6 +25,8 @@ import {
   selectIsAdmin,
   selectIsStoreIncharge,
 } from '../../store/selectors/authSelectors';
+import { selectAllItems } from '../../store/selectors/inventorySelectors';
+import { fetchItems } from '../../store/thunks/inventoryThunks';
 import type { Request } from '../../types/request';
 import type { RequestStackParamList } from '../../navigation/RequestStackParamList';
 
@@ -48,7 +50,15 @@ export const ConfirmTransferScreen: React.FC = () => {
   const userName = useAppSelector(selectUserDisplayName);
   const isAdmin = useAppSelector(selectIsAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const inventoryItems = useAppSelector(selectAllItems);
   const { viewMode } = useWeightViewPreference();
+
+  // Ensure inventory items are loaded so unit fallback works for old requests
+  useEffect(() => {
+    if (inventoryItems.length === 0) {
+      dispatch(fetchItems({}));
+    }
+  }, [dispatch, inventoryItems.length]);
 
   const [request, setRequest] = useState<Request | null>(null);
   const [receivedBy, setReceivedBy] = useState('');
@@ -175,6 +185,10 @@ export const ConfirmTransferScreen: React.FC = () => {
             </Text>
             {(Array.isArray(request.items) ? request.items : []).map((item) => {
               const isSteelItem = isWeightBasedItem({ weightPerMeter: item.weightPerMeter });
+              const displayUnit =
+                item.unit ||
+                inventoryItems.find((inventoryItem) => inventoryItem.id === item.itemId)?.unit ||
+                'units';
               return (
                 <View
                   key={item.itemId}
@@ -192,11 +206,11 @@ export const ConfirmTransferScreen: React.FC = () => {
                           weightPerMeter={item.weightPerMeter}
                           lengthPerPiece={item.lengthPerPiece}
                           viewMode={viewMode}
-                          unit="Pcs"
+                          unit={item.unit || 'Pcs'}
                         />
                       ) : (
                         <Text className="text-[13px] text-[#64748B]">
-                          {item.quantityApproved} {item.unit}
+                          {item.quantityApproved} {displayUnit}
                         </Text>
                       )}
                     </View>

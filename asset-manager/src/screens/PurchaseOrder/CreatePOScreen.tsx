@@ -41,6 +41,7 @@ import {
   selectVendors,
   selectPOById,
 } from '../../store/selectors/purchaseOrderSelectors';
+import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import type {
   CreatePurchaseOrderData,
   PurchaseOrder,
@@ -73,6 +74,7 @@ export const CreatePOScreen: React.FC = () => {
   const userName = useAppSelector(selectUserDisplayName);
   const isAdmin = useAppSelector(selectIsAdmin);
   const vendors = useAppSelector(selectVendors);
+  const allItems = useAppSelector(selectAllItems);
   const poFromStore = useAppSelector((state) =>
     poId ? selectPOById(poId)(state) : null
   );
@@ -196,12 +198,15 @@ export const CreatePOScreen: React.FC = () => {
           itemId: item.id,
           itemName: item.name,
           itemSku: item.sku,
+          unit: item.unit,
           isExistingItem: true,
           quantity: 1,
           unitPrice: 0,
           amount: 0,
           gstPercentage: undefined,
           receivedQuantity: null,
+          orderedUnit: item.unit,
+          orderedQuantity: 1,
         }));
         setItems((prev) => {
           const byId = new Map(prev.map((p) => [p.itemId, p]));
@@ -327,6 +332,7 @@ export const CreatePOScreen: React.FC = () => {
             itemId: i.itemId,
             itemName: i.itemName,
             itemSku: i.itemSku,
+            unit: i.unit,
             isExistingItem: i.isExistingItem,
             quantity: i.quantity,
             unitPrice: i.unitPrice,

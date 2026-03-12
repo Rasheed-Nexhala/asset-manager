@@ -47,10 +47,11 @@ export const RequestStackNavigator: React.FC = () => {
       <Stack.Screen name="EditRequest" component={EditRequestScreen} />
       <Stack.Screen name="ReturnItems" component={ReturnItemsScreen} />
       <Stack.Screen name="SelectItems" component={SelectItemsScreen} />
+      {/* ProcessRequest: always available so SiteManagers can view their requests (read-only) */}
+      <Stack.Screen name="ProcessRequest" component={ProcessRequestScreen} />
       {(isAdmin || isStoreIncharge) && (
         <>
           <Stack.Screen name="RequestQueue" component={RequestQueueScreen} />
-          <Stack.Screen name="ProcessRequest" component={ProcessRequestScreen} />
           <Stack.Screen name="RejectRequest" component={RejectRequestScreen} />
           <Stack.Screen name="ConfirmTransfer" component={ConfirmTransferScreen} />
         </>

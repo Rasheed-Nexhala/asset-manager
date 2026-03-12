@@ -1269,99 +1269,125 @@ export const logPasswordChanged = onCall(async (request) => {
 });
 
 /**
+ * Sanitize a value for Firestore - rejects NaN and Infinity.
+ * Firestore throws "internal" when given NaN/Infinity.
+ */
+function sanitizeNumberForFirestore(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    return 0;
+  }
+  return n;
+}
+
+/**
  * Callable Function: Log Quantity Adjustment
  * Called from client after successful manual inventory adjustment
  */
 export const logQuantityAdjusted = onCall(async (request) => {
-  if (!request.auth) {
-    throw new HttpsError(
-      'unauthenticated',
-      'User must be authenticated to log quantity adjustment'
-    );
+  try {
+    if (!request.auth) {
+      throw new HttpsError(
+        'unauthenticated',
+        'User must be authenticated to log quantity adjustment'
+      );
+    }
+
+    const data = request.data ?? {};
+    const {
+      itemId,
+      itemName,
+      itemSku,
+      locationId,
+      locationName,
+      type,
+      quantity,
+      reason,
+      notes,
+      oldQuantity,
+      newQuantity,
+      userName,
+      userRole,
+    } = data;
+
+    if (
+      !itemId ||
+      itemName == null ||
+      itemSku == null ||
+      !locationId ||
+      !locationName ||
+      !type ||
+      quantity == null ||
+      reason == null ||
+      notes == null ||
+      oldQuantity == null ||
+      newQuantity == null
+    ) {
+      throw new HttpsError(
+        'invalid-argument',
+        'Missing required fields: itemId, itemName, itemSku, locationId, locationName, type, quantity, reason, notes, oldQuantity, newQuantity'
+      );
+    }
+
+    if (type !== 'add' && type !== 'remove' && type !== 'set') {
+      throw new HttpsError(
+        'invalid-argument',
+        'type must be "add", "remove", or "set"'
+      );
+    }
+
+    // Sanitize numbers - Firestore rejects NaN/Infinity and throws "internal"
+    const safeOldQty = sanitizeNumberForFirestore(oldQuantity);
+    const safeNewQty = sanitizeNumberForFirestore(newQuantity);
+    const safeQty = sanitizeNumberForFirestore(quantity);
+
+    // For type "set", convert to add/remove for summary display
+    const effectiveType = type === 'set'
+      ? (safeNewQty >= safeOldQty ? 'add' : 'remove')
+      : type;
+    const effectiveQty = type === 'set'
+      ? Math.abs(safeNewQty - safeOldQty)
+      : safeQty;
+
+    const displayName =
+      request.auth.token.name ??
+      request.auth.token.email ??
+      'Unknown';
+
+    const sign = effectiveType === 'add' ? '+' : '-';
+    const summary = `Adjusted quantity: ${safeOldQty}→${safeNewQty} (${sign}${effectiveQty})`;
+    const details = `${String(reason)}${notes ? `. ${String(notes)}` : ''}`;
+
+    await createActivityLog({
+      userId: request.auth.uid,
+      userName: (userName as string) ?? displayName,
+      userRole: (userRole as string) ?? 'Unassigned',
+      actionType: 'quantity_adjusted',
+      actionCategory: 'inventory',
+      targetType: 'item',
+      targetId: String(itemId),
+      targetDisplay: `${String(itemName)} (${String(itemSku)})`,
+      summary,
+      details,
+      changes: [
+        {
+          field: 'quantity',
+          fieldLabel: 'Quantity',
+          oldValue: safeOldQty,
+          newValue: safeNewQty,
+        },
+      ],
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    logger.error('logQuantityAdjusted failed', { error });
+    // Return success so client does not surface error - main adjustment already succeeded
+    return { success: true };
   }
-
-  const data = request.data ?? {};
-  const {
-    itemId,
-    itemName,
-    itemSku,
-    locationId,
-    locationName,
-    type,
-    quantity,
-    reason,
-    notes,
-    oldQuantity,
-    newQuantity,
-    userName,
-    userRole,
-  } = data;
-
-  if (
-    !itemId ||
-    itemName == null ||
-    itemSku == null ||
-    !locationId ||
-    !locationName ||
-    !type ||
-    quantity == null ||
-    reason == null ||
-    notes == null ||
-    oldQuantity == null ||
-    newQuantity == null
-  ) {
-    throw new HttpsError(
-      'invalid-argument',
-      'Missing required fields: itemId, itemName, itemSku, locationId, locationName, type, quantity, reason, notes, oldQuantity, newQuantity'
-    );
-  }
-
-  if (type !== 'add' && type !== 'remove' && type !== 'set') {
-    throw new HttpsError(
-      'invalid-argument',
-      'type must be "add", "remove", or "set"'
-    );
-  }
-
-  // For type "set", convert to add/remove for summary display
-  const effectiveType = type === 'set'
-    ? (newQuantity >= oldQuantity ? 'add' : 'remove')
-    : type;
-  const effectiveQty = type === 'set'
-    ? Math.abs(newQuantity - oldQuantity)
-    : quantity;
-
-  const displayName =
-    request.auth.token.name ??
-    request.auth.token.email ??
-    'Unknown';
-
-  const sign = effectiveType === 'add' ? '+' : '-';
-  const summary = `Adjusted quantity: ${oldQuantity}→${newQuantity} (${sign}${effectiveQty})`;
-  const details = `${reason}${notes ? `. ${notes}` : ''}`;
-
-  await createActivityLog({
-    userId: request.auth.uid,
-    userName: (userName as string) ?? displayName,
-    userRole: (userRole as string) ?? 'Unassigned',
-    actionType: 'quantity_adjusted',
-    actionCategory: 'inventory',
-    targetType: 'item',
-    targetId: itemId,
-    targetDisplay: `${itemName} (${itemSku})`,
-    summary,
-    details,
-    changes: [
-      {
-        field: 'quantity',
-        fieldLabel: 'Quantity',
-        oldValue: oldQuantity,
-        newValue: newQuantity,
-      },
-    ],
-  });
-
-  return { success: true };
 });
 
 /**

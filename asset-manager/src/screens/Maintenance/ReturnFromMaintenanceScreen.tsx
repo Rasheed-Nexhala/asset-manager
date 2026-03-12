@@ -50,6 +50,7 @@ export const ReturnFromMaintenanceScreen: React.FC = () => {
 
   // Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const displayUnit = maintenance?.unit || 'Pcs';
 
   // Fetch maintenance record if not in store
   useEffect(() => {
@@ -128,7 +129,7 @@ export const ReturnFromMaintenanceScreen: React.FC = () => {
 
       Alert.alert(
         'Success',
-        `${returnQuantity} items returned to inventory successfully`,
+        `${returnQuantity} ${displayUnit} returned to inventory successfully`,
         [
           {
             text: 'OK',
@@ -185,6 +186,8 @@ export const ReturnFromMaintenanceScreen: React.FC = () => {
               <Text className="text-[13px] text-[#64748B]">Available Quantity</Text>
               <Text className="text-[15px] font-semibold text-[#0F172A]">
                 {maintenance.quantity}
+                {' '}
+                {displayUnit}
               </Text>
             </View>
           </View>
@@ -195,8 +198,8 @@ export const ReturnFromMaintenanceScreen: React.FC = () => {
               <Ionicons name="warning" size={20} color="#D97706" />
               <Text className="text-[13px] text-[#D97706] flex-1">
                 {maintenance.quantity - returnQuantity > 0
-                  ? `Returning ${returnQuantity} of ${maintenance.quantity}. ${maintenance.quantity - returnQuantity} will remain in maintenance with 'Partial Return' status.`
-                  : `Returning all ${returnQuantity} items. This record will be marked as 'Returned'.`}
+                  ? `Returning ${returnQuantity} of ${maintenance.quantity} ${displayUnit}. ${maintenance.quantity - returnQuantity} ${displayUnit} will remain in maintenance with 'Partial Return' status.`
+                  : `Returning all ${returnQuantity} ${displayUnit}. This record will be marked as 'Returned'.`}
               </Text>
             </View>
           </View>

@@ -35,6 +35,7 @@ import {
 } from '../../store/selectors/authSelectors';
 import { selectAllSites } from '../../store/selectors/sitesSelectors';
 import { fetchSites } from '../../store/slices/sitesSlice';
+import { navigateToProcessRequest } from '../../navigation/navigationUtils';
 import type { Request } from '../../types/request';
 import type { RequestStackParamList } from '../../navigation/RequestStackParamList';
 
@@ -131,7 +132,7 @@ export const MyRequestsScreen: React.FC = () => {
       if (request.status === 'draft') {
         navigation.navigate('EditRequest', { requestId: request.id });
       } else {
-        navigation.navigate('ProcessRequest', { requestId: request.id });
+        navigateToProcessRequest(request.id);
       }
     },
     [navigation]

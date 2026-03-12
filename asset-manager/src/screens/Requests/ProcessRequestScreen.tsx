@@ -30,6 +30,8 @@ import {
   selectIsStoreIncharge,
   selectIsAdmin,
 } from '../../store/selectors/authSelectors';
+import { selectAllItems } from '../../store/selectors/inventorySelectors';
+import { fetchItems } from '../../store/thunks/inventoryThunks';
 import { selectRequestById } from '../../store/selectors/requestSelectors';
 import type { Request, ItemAvailability, ItemCondition } from '../../types/request';
 import type { RequestStackParamList } from '../../navigation/RequestStackParamList';
@@ -79,7 +81,15 @@ export const ProcessRequestScreen: React.FC = () => {
   const userName = useAppSelector(selectUserDisplayName);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const isAdmin = useAppSelector(selectIsAdmin);
+  const inventoryItems = useAppSelector(selectAllItems);
   const requestFromStore = useAppSelector(selectRequestById(requestId));
+
+  // Ensure inventory items are loaded so unit fallback works for old requests
+  useEffect(() => {
+    if (inventoryItems.length === 0) {
+      dispatch(fetchItems({}));
+    }
+  }, [dispatch, inventoryItems.length]);
   const { viewMode, toggleViewMode } = useWeightViewPreference();
   const [request, setRequest] = useState<Request | null>(requestFromStore ?? null);
   const [availability, setAvailability] = useState<ItemAvailability[]>([]);
@@ -349,7 +359,12 @@ export const ProcessRequestScreen: React.FC = () => {
             {(Array.isArray(request.items) ? request.items : []).map((item) => (
               <RequestItemCard
                 key={item.itemId}
-                item={item}
+                item={{
+                  ...item,
+                  unit:
+                    item.unit ||
+                    inventoryItems.find((inventoryItem) => inventoryItem.id === item.itemId)?.unit,
+                }}
                 mode="view"
                 availability={
                   canProcess && isPending

@@ -24,6 +24,7 @@ export interface PurchaseOrderItem {
   itemId: string;
   itemName: string;
   itemSku: string;
+  unit?: string;
   isExistingItem: boolean;
   quantity: number;
   unitPrice: number;
@@ -170,6 +171,7 @@ export interface CreatePurchaseOrderData {
     itemId: string;
     itemName: string;
     itemSku: string;
+    unit?: string;
     isExistingItem: boolean;
     quantity: number;
     unitPrice?: number;

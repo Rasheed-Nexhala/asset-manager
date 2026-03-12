@@ -298,12 +298,12 @@ export const ReceivePOScreen: React.FC = () => {
                     {item.itemName}
                   </Text>
                   <Text className="text-[13px] text-[#64748B] mt-0.5">
-                    Order: {item.orderedQuantity ? `${item.orderedQuantity} ${item.orderedUnit}` : `${item.quantity} Pieces`}
+                    Order: {item.orderedQuantity ? `${item.orderedQuantity} ${item.orderedUnit}` : `${item.quantity} ${item.unit || 'Pcs'}`}
                   </Text>
                 </View>
                 <View className="items-end">
                   <Text className="text-[15px] font-semibold text-[#16A34A]">
-                    + {item.quantity} Pcs
+                    + {item.quantity} {item.unit || 'Pcs'}
                   </Text>
                 </View>
               </View>

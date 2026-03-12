@@ -34,6 +34,7 @@ export const RequestItemCard: React.FC<RequestItemCardProps> = ({
   const { viewMode } = useWeightViewPreference();
   const isSteelItem = isWeightBasedItem({ weightPerMeter: item.weightPerMeter });
   const hasFullWeightConfig = isSteelItem && item.weightPerMeter != null && item.lengthPerPiece != null;
+  const displayUnit = item.unit || 'units';
 
   const [entryMode, setEntryMode] = useState<'pieces' | 'kg' | 'ton'>('pieces');
   const [amountStr, setAmountStr] = useState(String(item.quantityRequested || ''));
@@ -87,7 +88,7 @@ export const RequestItemCard: React.FC<RequestItemCardProps> = ({
         setErrorMsg('Pieces must be a whole number');
         return;
       }
-      if (!hasFullWeightConfig && isDiscreteUnit(item.unit) && !Number.isInteger(num)) {
+      if (!hasFullWeightConfig && isDiscreteUnit(item.unit || '') && !Number.isInteger(num)) {
         setErrorMsg('Must be a whole number for this unit');
         return;
       }
@@ -183,7 +184,9 @@ export const RequestItemCard: React.FC<RequestItemCardProps> = ({
 
               <View className="flex-row items-center gap-3">
                 <Text className="text-[13px] text-[#64748B]">
-                  {entryMode === 'pieces' ? 'Quantity:' : entryMode === 'kg' ? 'Weight (Kg):' : 'Weight (Ton):'}
+                  {hasFullWeightConfig
+                    ? entryMode === 'pieces' ? 'Quantity (Pcs):' : entryMode === 'kg' ? 'Weight (Kg):' : 'Weight (Ton):'
+                    : `Quantity (${displayUnit}):`}
                 </Text>
                 <View className="flex-row items-center gap-2">
                   {(!hasFullWeightConfig || entryMode === 'pieces') && (
@@ -225,7 +228,7 @@ export const RequestItemCard: React.FC<RequestItemCardProps> = ({
               
               {hasFullWeightConfig && !errorMsg && quantity > 0 && entryMode !== 'pieces' && (
                  <Text className="text-[13px] text-[#16A34A] mt-2 font-medium">
-                   = {quantity} pieces
+                   = {quantity} Pcs
                  </Text>
               )}
               {hasFullWeightConfig && !errorMsg && quantity > 0 && entryMode === 'pieces' && (
@@ -249,11 +252,11 @@ export const RequestItemCard: React.FC<RequestItemCardProps> = ({
                   weightPerMeter={item.weightPerMeter}
                   lengthPerPiece={item.lengthPerPiece}
                   viewMode={viewMode}
-                  unit="Pcs"
+                  unit={item.unit || 'Pcs'}
                 />
               ) : (
                 <Text className="text-[15px] text-[#0F172A]">
-                  {item.quantityRequested} {item.unit}
+                  {item.quantityRequested} {displayUnit}
                 </Text>
               )}
             </View>
@@ -278,11 +281,11 @@ export const RequestItemCard: React.FC<RequestItemCardProps> = ({
                       weightPerMeter={item.weightPerMeter}
                       lengthPerPiece={item.lengthPerPiece}
                       viewMode={viewMode}
-                      unit="Pcs"
+                      unit={item.unit || 'Pcs'}
                     />
                   ) : (
                     <Text className="text-[13px] text-[#64748B]">
-                      {availability.available} {item.unit}
+                      {availability.available} {displayUnit}
                     </Text>
                   )}
                 </View>

@@ -7,6 +7,7 @@ import {
   ListRenderItem,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { navigateToProcessRequest } from '../../navigation/navigationUtils';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import {
@@ -43,13 +44,7 @@ export const NotificationCenterScreen: React.FC = () => {
         navigate: (name: string, params?: object) => void;
       };
       if (data?.requestId && data?.screen === 'ProcessRequest') {
-        nav.navigate('Tabs', {
-          screen: 'Requests',
-          params: {
-            screen: 'ProcessRequest',
-            params: { requestId: data.requestId },
-          },
-        });
+        navigateToProcessRequest(data.requestId);
       } else if (
         (data?.screen === 'ApprovePO' || data?.screen === 'ReceivePO') &&
         data?.poId

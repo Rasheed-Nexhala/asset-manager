@@ -81,6 +81,7 @@ export const EditRequestScreen: React.FC = () => {
           itemId: item.id,
           itemName: item.name,
           itemSku: item.sku,
+          unit: item.unit,
           itemType: item.type,
           categoryId: item.categoryId,
           categoryName: item.categoryName,

@@ -34,6 +34,7 @@ import { selectAllSites } from '../../store/selectors/sitesSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
 import { fetchSites } from '../../store/slices/sitesSlice';
+import { navigateToProcessRequest } from '../../navigation/navigationUtils';
 import type { Request } from '../../types/request';
 import type { RequestStackParamList } from '../../navigation/RequestStackParamList';
 
@@ -96,7 +97,7 @@ export const RequestQueueScreen: React.FC = () => {
 
   const handleRequestPress = useCallback(
     (request: Request) => {
-      navigation.navigate('ProcessRequest', { requestId: request.id });
+      navigateToProcessRequest(request.id);
     },
     [navigation]
   );
