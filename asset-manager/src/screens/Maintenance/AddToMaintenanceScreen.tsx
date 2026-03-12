@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,9 @@ import {
   Image,
   Platform,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import type { RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
@@ -29,6 +30,7 @@ import type { IssueType, AddToMaintenanceData } from '../../types/maintenance';
 import type { MaintenanceStackParamList } from '../../navigation/MaintenanceStackParamList';
 
 type NavigationProp = StackNavigationProp<MaintenanceStackParamList, 'AddToMaintenance'>;
+type RouteParamsProp = RouteProp<MaintenanceStackParamList, 'AddToMaintenance'>;
 
 const MAX_PHOTOS = 5;
 
@@ -41,6 +43,7 @@ interface FormErrors {
 
 export const AddToMaintenanceScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteParamsProp>();
   const dispatch = useAppDispatch();
   
   const userId = useAppSelector(selectUserId);
@@ -66,6 +69,24 @@ export const AddToMaintenanceScreen: React.FC = () => {
       });
     }
   }, []);
+
+  // When returning from SelectItemForMaintenance, apply the selected item (once per param)
+  const appliedSelectionRef = useRef<string | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      const params = route.params;
+      const item = params?.selectedItem;
+      if (item && appliedSelectionRef.current !== item.id) {
+        appliedSelectionRef.current = item.id;
+        setSelectedItem(item);
+        setQuantity(1);
+        setErrors((prev) => (prev.item ? { ...prev, item: undefined } : prev));
+      }
+      if (!item) {
+        appliedSelectionRef.current = null;
+      }
+    }, [route.params])
+  );
 
   const handleBack = useCallback(() => {
     navigation.goBack();
@@ -124,15 +145,6 @@ export const AddToMaintenanceScreen: React.FC = () => {
       }
     } else if (text === '') {
       setQuantity(0);
-    }
-  };
-  
-  // Handle item selection
-  const handleItemSelect = (item: Item) => {
-    setSelectedItem(item);
-    setQuantity(1);
-    if (errors.item) {
-      setErrors({ ...errors, item: undefined });
     }
   };
   
@@ -214,7 +226,7 @@ export const AddToMaintenanceScreen: React.FC = () => {
         [
           {
             text: 'OK',
-            onPress: () => navigation.goBack(),
+            onPress: () => navigation.navigate('MaintenanceDashboard'),
           },
         ]
       );
@@ -246,8 +258,8 @@ export const AddToMaintenanceScreen: React.FC = () => {
               Item <Text className="text-[#DC2626]">*</Text>
             </Text>
             <ItemSelectorForMaintenance
-              onSelect={handleItemSelect}
               selectedItemId={selectedItem?.id}
+              selectedItem={selectedItem}
             />
             {errors.item && (
               <Text className="text-[13px] text-[#DC2626]">{errors.item}</Text>

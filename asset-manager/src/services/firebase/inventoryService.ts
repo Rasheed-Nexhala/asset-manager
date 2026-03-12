@@ -155,6 +155,28 @@ const buildItemsQueryConstraints = (filters?: ItemFilters): QueryConstraint[] =>
   return constraints;
 };
 
+/**
+ * Build query constraints for maintenance item selection.
+ * Filters: type=non_consumable, optional name prefix search.
+ * centralStoreQuantity > 0 is applied client-side.
+ *
+ * @param searchTerm - Optional prefix to filter by item name (case-sensitive in Firestore)
+ */
+const buildMaintenanceItemsQueryConstraints = (
+  searchTerm?: string
+): QueryConstraint[] => {
+  const constraints: QueryConstraint[] = [
+    where('type', '==', 'non_consumable'),
+  ];
+  const trimmed = searchTerm?.trim();
+  if (trimmed) {
+    constraints.push(where('name', '>=', trimmed));
+    constraints.push(where('name', '<=', trimmed + '\uf8ff'));
+  }
+  constraints.push(orderBy('name', 'asc'));
+  return constraints;
+};
+
 /** Default page size for paginated item lists */
 export const ITEMS_PAGE_SIZE = 10;
 
@@ -239,6 +261,96 @@ export const getItemsCount = async (
     return snapshot.data().count;
   } catch (error) {
     console.error('Error getting items count:', error);
+    throw error;
+  }
+};
+
+/** Page size for maintenance item selection */
+export const MAINTENANCE_ITEMS_PAGE_SIZE = 15;
+
+/**
+ * List items available for maintenance (non-consumable, central store quantity > 0
+ * filtered client-side). Paginated with optional name prefix search.
+ *
+ * @param searchTerm - Optional prefix to filter by item name
+ * @param pageSize - Items per page
+ * @param lastDoc - Cursor for next page
+ * @returns Items and cursor for next page (items with centralStoreQuantity <= 0 filtered out)
+ */
+export const listItemsForMaintenancePaginated = async (
+  searchTerm: string | undefined,
+  pageSize: number,
+  lastDoc?: DocumentSnapshot
+): Promise<{ items: Item[]; lastDoc: DocumentSnapshot | null }> => {
+  try {
+    const constraints = buildMaintenanceItemsQueryConstraints(searchTerm);
+    if (lastDoc) {
+      constraints.push(startAfter(lastDoc));
+    }
+    constraints.push(limit(pageSize));
+
+    const q = query(collection(db, ITEMS_COLLECTION), ...constraints);
+    const snapshot = await getDocsFromServer(q);
+
+    const items: Item[] = snapshot.docs
+      .map((docSnap) => {
+        const data = docSnap.data();
+        const firestoreItem: FirestoreItem = {
+          id: docSnap.id,
+          name: data.name,
+          sku: data.sku,
+          description: data.description,
+          categoryId: data.categoryId,
+          categoryName: data.categoryName,
+          type: data.type,
+          unit: data.unit,
+          imageUrl: data.imageUrl,
+          minStockLevel: data.minStockLevel ?? 0,
+          status: data.status,
+          totalQuantity: data.totalQuantity || 0,
+          centralStoreQuantity: data.centralStoreQuantity || 0,
+          atSitesQuantity: data.atSitesQuantity || 0,
+          inMaintenanceQuantity: data.inMaintenanceQuantity || 0,
+          weightPerMeter: data.weightPerMeter,
+          lengthPerPiece: data.lengthPerPiece,
+          steelMasterId: data.steelMasterId,
+          steelMasterName: data.steelMasterName,
+          isWeightBased: data.isWeightBased,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        };
+        return firestoreItemToItem(firestoreItem);
+      })
+      .filter((item) => (item.centralStoreQuantity || 0) > 0);
+
+    const newLastDoc =
+      snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
+
+    return { items, lastDoc: newLastDoc };
+  } catch (error) {
+    console.error('Error listing items for maintenance:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get total count of non-consumable items (for maintenance selection).
+ * Uses same constraints as listItemsForMaintenancePaginated.
+ * centralStoreQuantity > 0 is not applied — total reflects Firestore filters only.
+ *
+ * @param searchTerm - Optional prefix to filter by item name
+ * @returns Total count from server
+ */
+export const getItemsForMaintenanceCount = async (
+  searchTerm: string | undefined
+): Promise<number> => {
+  try {
+    const constraints = buildMaintenanceItemsQueryConstraints(searchTerm);
+    const q = query(collection(db, ITEMS_COLLECTION), ...constraints);
+    const snapshot = await getCountFromServer(q);
+    return snapshot.data().count;
+  } catch (error) {
+    console.error('Error getting items for maintenance count:', error);
     throw error;
   }
 };

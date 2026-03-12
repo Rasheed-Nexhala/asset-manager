@@ -20,10 +20,16 @@ import type { RootState } from '../../../store';
 import type { Item } from '../../../types/inventory';
 
 const mockGoBack = jest.fn();
+const mockNavigate = jest.fn();
+let mockRouteParams: object = {};
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: jest.fn(), goBack: mockGoBack }),
-  useRoute: () => ({ params: {} }),
+  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack }),
+  useRoute: () => ({ params: mockRouteParams }),
   useIsFocused: () => true,
+  useFocusEffect: (cb: () => void) => {
+    cb();
+    return () => {};
+  },
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -206,6 +212,7 @@ const defaultPreloadedState: Partial<RootState> = {
 describe('AddToMaintenanceScreen — Add to Maintenance flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockRouteParams = {};
     jest.spyOn(Alert, 'alert').mockImplementation((_title: string, _message?: string, buttons?: Array<{ text?: string; onPress?: () => void }>) => {
       buttons?.find((b) => b.text === 'OK')?.onPress?.();
     });
@@ -227,16 +234,22 @@ describe('AddToMaintenanceScreen — Add to Maintenance flow', () => {
     expect(screen.getByText('Please select an item')).toBeTruthy();
   });
 
-  it('selects item, sets issue type and description, submits successfully', async () => {
+  it('navigates to SelectItemForMaintenance when item selector is pressed', () => {
     renderWithStore(<AddToMaintenanceScreen />, defaultPreloadedState);
 
     fireEvent.press(screen.getByRole('button', { name: 'Item selector' }));
 
-    await waitFor(() => {
-      expect(screen.getByText('Steel Bar')).toBeTruthy();
+    expect(mockNavigate).toHaveBeenCalledWith('SelectItemForMaintenance', {
+      selectedItemId: undefined,
+      excludeItemIds: [],
     });
+  });
 
-    fireEvent.press(screen.getByText('Steel Bar'));
+  it('selects item, sets issue type and description, submits successfully', async () => {
+    mockRouteParams = { selectedItem: mockItem };
+    renderWithStore(<AddToMaintenanceScreen />, defaultPreloadedState);
+
+    expect(screen.getByText('Steel Bar')).toBeTruthy();
 
     fireEvent.press(screen.getByText('Select Issue Type'));
     fireEvent.press(screen.getByText('Physical Damage'));
@@ -258,10 +271,9 @@ describe('AddToMaintenanceScreen — Add to Maintenance flow', () => {
   });
 
   it('submits successfully without description (description is optional)', async () => {
+    mockRouteParams = { selectedItem: mockItem };
     renderWithStore(<AddToMaintenanceScreen />, defaultPreloadedState);
 
-    fireEvent.press(screen.getByRole('button', { name: 'Item selector' }));
-    fireEvent.press(screen.getByText('Steel Bar'));
     fireEvent.press(screen.getByText('Select Issue Type'));
     fireEvent.press(screen.getByText('Physical Damage'));
     // No description entered - field is optional

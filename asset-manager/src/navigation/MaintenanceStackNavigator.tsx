@@ -4,6 +4,7 @@ import type { MaintenanceStackParamList } from './MaintenanceStackParamList';
 import {
   MaintenanceDashboardScreen,
   AddToMaintenanceScreen,
+  SelectItemForMaintenanceScreen,
   MaintenanceDetailScreen,
   ReturnFromMaintenanceScreen,
   WriteOffScreen,
@@ -40,6 +41,11 @@ export const MaintenanceStackNavigator: React.FC = () => {
       <Stack.Screen
         name="AddToMaintenance"
         component={AddToMaintenanceScreen}
+        options={{ presentation: 'card' }}
+      />
+      <Stack.Screen
+        name="SelectItemForMaintenance"
+        component={SelectItemForMaintenanceScreen}
         options={{ presentation: 'card' }}
       />
       <Stack.Screen

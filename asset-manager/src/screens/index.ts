@@ -32,6 +32,7 @@ export {
 // Maintenance screens
 export { MaintenanceDashboardScreen } from './Maintenance/MaintenanceDashboardScreen';
 export { AddToMaintenanceScreen } from './Maintenance/AddToMaintenanceScreen';
+export { SelectItemForMaintenanceScreen } from './Maintenance/SelectItemForMaintenanceScreen';
 export { MaintenanceDetailScreen } from './Maintenance/MaintenanceDetailScreen';
 export { ReturnFromMaintenanceScreen } from './Maintenance/ReturnFromMaintenanceScreen';
 export { WriteOffScreen } from './Maintenance/WriteOffScreen';
