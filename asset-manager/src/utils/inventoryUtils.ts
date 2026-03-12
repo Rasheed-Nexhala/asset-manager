@@ -11,6 +11,23 @@ export interface LowStockCheckable {
   minStockLevel?: number;
 }
 
+import type { ItemType } from '../types/inventory';
+
+/**
+ * Returns formatted label and UI color details for a given item type.
+ */
+export function getItemTypeDetails(type: ItemType | string | undefined): { label: string, color: string, bgClass: string, textClass: string } {
+  switch (type) {
+    case 'non_consumable':
+      return { label: 'Non-Consumable', color: '#0D9488', bgClass: 'bg-[#0D9488]/15', textClass: 'text-[#0D9488]' };
+    case 'fuel':
+      return { label: 'Fuel', color: '#B45309', bgClass: 'bg-[#B45309]/15', textClass: 'text-[#B45309]' };
+    case 'consumable':
+    default:
+      return { label: 'Consumable', color: '#475569', bgClass: 'bg-[#475569]/15', textClass: 'text-[#475569]' };
+  }
+}
+
 /**
  * Determines if an item is in low stock at the central store.
  * Low stock = centralStoreQuantity <= minStockLevel

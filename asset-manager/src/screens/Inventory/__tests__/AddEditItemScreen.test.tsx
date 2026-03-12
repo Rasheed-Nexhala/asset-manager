@@ -415,11 +415,11 @@ describe('AddEditItemScreen', () => {
       expect(screen.getByText('Item created successfully')).toBeTruthy();
     });
 
-    // Advance timers for goBack timeout (1000ms)
+    // Advance timers for navigation timeout (1000ms) - create navigates to Inventory list
     jest.advanceTimersByTime(1000);
 
     await waitFor(() => {
-      expect(mockGoBack).toHaveBeenCalled();
+      expect(mockNavigate).toHaveBeenCalledWith('CentralStoreInventory');
     });
   });
 

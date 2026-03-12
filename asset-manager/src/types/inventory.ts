@@ -3,7 +3,7 @@ import { Timestamp } from 'firebase/firestore';
 /**
  * Item type: consumable (single-use, no return) or non-consumable (returnable)
  */
-export type ItemType = 'consumable' | 'non_consumable';
+export type ItemType = 'consumable' | 'non_consumable' | 'fuel';
 
 /**
  * Item status: active or discontinued

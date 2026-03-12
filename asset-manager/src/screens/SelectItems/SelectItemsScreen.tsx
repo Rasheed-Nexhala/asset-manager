@@ -33,6 +33,7 @@ export type SelectItemsScreenParams = {
   returnScreen: string;
   returnParams: Record<string, unknown>;
   excludeItemIds?: string[];
+  allowedItemTypes?: string[];
 };
 
 const SEARCH_DEBOUNCE_MS = 400;
@@ -41,7 +42,7 @@ export const SelectItemsScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const params = (route.params ?? {}) as SelectItemsScreenParams;
-  const { returnScreen, returnParams = {}, excludeItemIds = [] } = params;
+  const { returnScreen, returnParams = {}, excludeItemIds = [], allowedItemTypes } = params;
 
   const [items, setItems] = useState<Item[]>([]);
   const [totalCount, setTotalCount] = useState<number | null>(null);
@@ -74,10 +75,12 @@ export const SelectItemsScreen: React.FC = () => {
     setLoading(true);
     try {
       const [countResult, listResult] = await Promise.all([
-        getItemsForSelectionCount(debouncedSearch || undefined),
+        getItemsForSelectionCount(debouncedSearch || undefined, allowedItemTypes),
         listItemsForSelectionPaginated(
           debouncedSearch || undefined,
-          SELECTION_ITEMS_PAGE_SIZE
+          SELECTION_ITEMS_PAGE_SIZE,
+          undefined,
+          allowedItemTypes
         ),
       ]);
       setTotalCount(countResult);
@@ -111,7 +114,8 @@ export const SelectItemsScreen: React.FC = () => {
       const result = await listItemsForSelectionPaginated(
         debouncedSearch || undefined,
         SELECTION_ITEMS_PAGE_SIZE,
-        lastDocRef.current
+        lastDocRef.current,
+        allowedItemTypes
       );
       setItems((prev) => [...prev, ...result.items]);
       lastDocRef.current = result.lastDoc;

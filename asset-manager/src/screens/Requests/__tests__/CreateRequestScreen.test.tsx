@@ -273,6 +273,7 @@ describe('CreateRequestScreen — Create Request → Item Selector → Submit fl
       returnScreen: 'CreateRequest',
       returnParams: { siteId: 'site1' },
       excludeItemIds: [],
+      allowedItemTypes: ['consumable', 'non_consumable'],
     });
   });
 

@@ -362,9 +362,15 @@ export const getItemsForMaintenanceCount = async (
  * @param searchTerm - Optional prefix to filter by item name (case-sensitive in Firestore)
  */
 const buildSelectionItemsQueryConstraints = (
-  searchTerm?: string
+  searchTerm?: string,
+  allowedItemTypes?: string[]
 ): QueryConstraint[] => {
   const constraints: QueryConstraint[] = [where('status', '==', 'active')];
+  
+  if (allowedItemTypes && allowedItemTypes.length > 0) {
+    constraints.push(where('type', 'in', allowedItemTypes));
+  }
+  
   const trimmed = searchTerm?.trim();
   if (trimmed) {
     constraints.push(where('name', '>=', trimmed));
@@ -388,10 +394,11 @@ export const SELECTION_ITEMS_PAGE_SIZE = 15;
 export const listItemsForSelectionPaginated = async (
   searchTerm: string | undefined,
   pageSize: number,
-  lastDoc?: DocumentSnapshot
+  lastDoc?: DocumentSnapshot,
+  allowedItemTypes?: string[]
 ): Promise<{ items: Item[]; lastDoc: DocumentSnapshot | null }> => {
   try {
-    const constraints = buildSelectionItemsQueryConstraints(searchTerm);
+    const constraints = buildSelectionItemsQueryConstraints(searchTerm, allowedItemTypes);
     if (lastDoc) {
       constraints.push(startAfter(lastDoc));
     }
@@ -447,10 +454,11 @@ export const listItemsForSelectionPaginated = async (
  * @returns Total count from server
  */
 export const getItemsForSelectionCount = async (
-  searchTerm: string | undefined
+  searchTerm: string | undefined,
+  allowedItemTypes?: string[]
 ): Promise<number> => {
   try {
-    const constraints = buildSelectionItemsQueryConstraints(searchTerm);
+    const constraints = buildSelectionItemsQueryConstraints(searchTerm, allowedItemTypes);
     const q = query(collection(db, ITEMS_COLLECTION), ...constraints);
     const snapshot = await getCountFromServer(q);
     return snapshot.data().count;

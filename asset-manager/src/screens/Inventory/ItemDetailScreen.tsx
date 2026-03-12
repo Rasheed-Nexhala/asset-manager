@@ -14,7 +14,7 @@ import { WeightDisplay } from '../../components/Inventory/WeightDisplay';
 import { ViewModeToggle } from '../../components/Inventory/ViewModeToggle';
 import { useWeightViewPreference, type WeightViewMode } from '../../hooks/useWeightViewPreference';
 import { isWeightViewSupported } from '../../utils/weightConversionUtils';
-import { isLowStock } from '../../utils/inventoryUtils';
+import { isLowStock, getItemTypeDetails } from '../../utils/inventoryUtils';
 import type { InventoryStackParamList } from '../../navigation/InventoryStackNavigator';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchItemById, adjustQuantity } from '../../store/thunks/inventoryThunks';
@@ -133,7 +133,8 @@ export const ItemDetailScreen: React.FC = () => {
   const isRoleLoading = useAppSelector(selectRoleLoading);
   const isRoleLoaded = useAppSelector(selectIsRoleLoaded);
   const canEditItem = isAdmin || isStoreIncharge;
-  const canStoreInchargeAdjust = useAppSelector(selectCanStoreInchargeAdjustInventory);
+  const canStoreInchargeAdjustBase = useAppSelector(selectCanStoreInchargeAdjustInventory);
+  const canStoreInchargeAdjust = canStoreInchargeAdjustBase || item?.type === 'fuel';
   const isAdjustmentSectionReady = isRoleLoaded && !isRoleLoading;
   const myAccessGrantedUntil = useAppSelector(selectMyAccessGrantedUntil);
   const { viewMode, toggleViewMode } = useWeightViewPreference();
@@ -184,9 +185,8 @@ export const ItemDetailScreen: React.FC = () => {
   }, [item]);
 
   // Format item type label
-  const itemTypeLabel = useMemo(() => {
-    if (!item) return '';
-    return item.type === 'consumable' ? 'Consumable' : 'Non-Consumable';
+  const typeDetails = useMemo(() => {
+    return getItemTypeDetails(item?.type);
   }, [item]);
 
   // Handle edit navigation
@@ -367,7 +367,7 @@ export const ItemDetailScreen: React.FC = () => {
             {/* Type */}
             <View className="flex-row justify-between items-center">
               <Text className="text-[13px] text-[#64748B]">Type</Text>
-              <Text className="text-[15px] text-[#0F172A]">{itemTypeLabel}</Text>
+              <Text className="text-[15px] text-[#0F172A]">{typeDetails.label}</Text>
             </View>
 
             {/* Category */}
@@ -392,91 +392,96 @@ export const ItemDetailScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Stock Distribution Section */}
+        {/* Stock Distribution Section - hidden for Fuel; By Location remains for all */}
         <View className="mb-3">
-          <View className="flex-row items-center justify-between mb-3 px-1">
-            <Text className="text-[17px] font-semibold text-[#0F172A]">Stock Distribution</Text>
-            {isSteelItem && (
-              <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} />
-            )}
-          </View>
-          
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            className="flex-row"
-            contentContainerStyle={{ paddingHorizontal: 0 }}
-          >
-            <View className="flex-row gap-3">
-              {/* Total Quantity KPI */}
-              <View className="bg-white rounded-xl p-4 shadow-sm min-w-[45%]">
-                <View className="mb-2">
-                  <Ionicons name="cube-outline" size={32} color="#1E40AF" />
-                </View>
-                <WeightDisplay
-                  quantity={item.totalQuantity}
-                  weightPerMeter={item.weightPerMeter}
-                  lengthPerPiece={item.lengthPerPiece}
-                  viewMode={viewMode}
-                  unit={item.unit}
-                  size="large"
-                />
-                <Text className="text-[13px] text-[#64748B] mt-1">Total Stock</Text>
+          {/* Stock Distribution KPI cards - hidden for Fuel */}
+          {item.type !== 'fuel' && (
+            <>
+              <View className="flex-row items-center justify-between mb-3 px-1">
+                <Text className="text-[17px] font-semibold text-[#0F172A]">Stock Distribution</Text>
+                {isSteelItem && (
+                  <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} />
+                )}
               </View>
+              
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="flex-row"
+                contentContainerStyle={{ paddingHorizontal: 0 }}
+              >
+                <View className="flex-row gap-3">
+                  {/* Total Quantity KPI */}
+                  <View className="bg-white rounded-xl p-4 shadow-sm min-w-[45%]">
+                    <View className="mb-2">
+                      <Ionicons name="cube-outline" size={32} color="#1E40AF" />
+                    </View>
+                    <WeightDisplay
+                      quantity={item.totalQuantity}
+                      weightPerMeter={item.weightPerMeter}
+                      lengthPerPiece={item.lengthPerPiece}
+                      viewMode={viewMode}
+                      unit={item.unit}
+                      size="large"
+                    />
+                    <Text className="text-[13px] text-[#64748B] mt-1">Total Stock</Text>
+                  </View>
 
-              {/* Central Store KPI */}
-              <View className="bg-white rounded-xl p-4 shadow-sm min-w-[45%]">
-                <View className="mb-2">
-                  <Ionicons name="business-outline" size={32} color="#1E40AF" />
+                  {/* Central Store KPI */}
+                  <View className="bg-white rounded-xl p-4 shadow-sm min-w-[45%]">
+                    <View className="mb-2">
+                      <Ionicons name="business-outline" size={32} color="#1E40AF" />
+                    </View>
+                    <WeightDisplay
+                      quantity={item.centralStoreQuantity}
+                      weightPerMeter={item.weightPerMeter}
+                      lengthPerPiece={item.lengthPerPiece}
+                      viewMode={viewMode}
+                      unit={item.unit}
+                      size="large"
+                    />
+                    <Text className="text-[13px] text-[#64748B] mt-1">Central Store</Text>
+                  </View>
+
+                  {/* At Sites KPI */}
+                  <View className="bg-white rounded-xl p-4 shadow-sm min-w-[45%]">
+                    <View className="mb-2">
+                      <Ionicons name="construct-outline" size={32} color="#1E40AF" />
+                    </View>
+                    <WeightDisplay
+                      quantity={item.atSitesQuantity}
+                      weightPerMeter={item.weightPerMeter}
+                      lengthPerPiece={item.lengthPerPiece}
+                      viewMode={viewMode}
+                      unit={item.unit}
+                      size="large"
+                    />
+                    <Text className="text-[13px] text-[#64748B] mt-1">At Sites</Text>
+                  </View>
+
+                  {/* Maintenance KPI */}
+                  <View className="bg-white rounded-xl p-4 shadow-sm min-w-[45%]">
+                    <View className="mb-2">
+                      <Ionicons name="build-outline" size={32} color="#1E40AF" />
+                    </View>
+                    <WeightDisplay
+                      quantity={item.inMaintenanceQuantity}
+                      weightPerMeter={item.weightPerMeter}
+                      lengthPerPiece={item.lengthPerPiece}
+                      viewMode={viewMode}
+                      unit={item.unit}
+                      size="large"
+                    />
+                    <Text className="text-[13px] text-[#64748B] mt-1">Maintenance</Text>
+                  </View>
                 </View>
-                <WeightDisplay
-                  quantity={item.centralStoreQuantity}
-                  weightPerMeter={item.weightPerMeter}
-                  lengthPerPiece={item.lengthPerPiece}
-                  viewMode={viewMode}
-                  unit={item.unit}
-                  size="large"
-                />
-                <Text className="text-[13px] text-[#64748B] mt-1">Central Store</Text>
-              </View>
+              </ScrollView>
+            </>
+          )}
 
-              {/* At Sites KPI */}
-              <View className="bg-white rounded-xl p-4 shadow-sm min-w-[45%]">
-                <View className="mb-2">
-                  <Ionicons name="construct-outline" size={32} color="#1E40AF" />
-                </View>
-                <WeightDisplay
-                  quantity={item.atSitesQuantity}
-                  weightPerMeter={item.weightPerMeter}
-                  lengthPerPiece={item.lengthPerPiece}
-                  viewMode={viewMode}
-                  unit={item.unit}
-                  size="large"
-                />
-                <Text className="text-[13px] text-[#64748B] mt-1">At Sites</Text>
-              </View>
-
-              {/* Maintenance KPI */}
-              <View className="bg-white rounded-xl p-4 shadow-sm min-w-[45%]">
-                <View className="mb-2">
-                  <Ionicons name="build-outline" size={32} color="#1E40AF" />
-                </View>
-                <WeightDisplay
-                  quantity={item.inMaintenanceQuantity}
-                  weightPerMeter={item.weightPerMeter}
-                  lengthPerPiece={item.lengthPerPiece}
-                  viewMode={viewMode}
-                  unit={item.unit}
-                  size="large"
-                />
-                <Text className="text-[13px] text-[#64748B] mt-1">Maintenance</Text>
-              </View>
-            </View>
-          </ScrollView>
-
-          {/* Per-location breakdown: Central Store, each site, Maintenance */}
+          {/* By Location - shown for all item types (store-only for Fuel) */}
           <StockDistributionBreakdown
-            entries={inventoryByLocation}
+            entries={item.type === 'fuel' ? inventoryByLocation.filter((e) => e.locationType === 'store') : inventoryByLocation}
             item={item}
             viewMode={viewMode}
           />

@@ -470,6 +470,13 @@ export const CentralStoreInventoryScreen: React.FC = () => {
                     'Filter by non-consumable items',
                     'type-non-consumable'
                   )}
+                  {renderFilterChip(
+                    'Fuel',
+                    filters.type === 'fuel',
+                    () => handleTypeFilter('fuel'),
+                    'Filter by fuel items',
+                    'type-fuel'
+                  )}
                 </View>
               </ScrollView>
             </View>

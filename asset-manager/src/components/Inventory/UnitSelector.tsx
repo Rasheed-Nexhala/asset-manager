@@ -16,6 +16,7 @@ const COMMON_UNITS = [
   'Kg',
   'Ton (MT)',
   'Meter',
+  'Liters',
 ];
 
 /**

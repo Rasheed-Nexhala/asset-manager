@@ -130,7 +130,7 @@ export interface CreateRequestData {
     itemId: string;
     itemName: string;
     itemSku: string;
-    itemType: 'consumable' | 'non_consumable';
+    itemType: 'consumable' | 'non_consumable' | 'fuel';
     categoryId: string;
     categoryName: string;
     imageUrl?: string;

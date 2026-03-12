@@ -5,6 +5,7 @@ import { WeightDisplay } from './WeightDisplay';
 import { ViewModeToggle } from './ViewModeToggle';
 import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
 import { isWeightViewSupported } from '../../utils/weightConversionUtils';
+import { getItemTypeDetails } from '../../utils/inventoryUtils';
 import type { WeightViewMode } from '../../hooks/useWeightViewPreference';
 import type { InventoryEntry, ItemType } from '../../types/inventory';
 
@@ -58,8 +59,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
   const toggleViewMode = useCallback(() => {
     setLocalViewMode((prev) => (prev === 'pieces' ? 'kg' : 'pieces'));
   }, []);
-  const itemTypeLabel = type === 'consumable' ? 'Consumable' : 'Non-Consumable';
-  const itemTypeColor = type === 'consumable' ? '#475569' : '#0D9488';
+  const typeDetails = getItemTypeDetails(type);
   const formattedDate = formatTimestamp(entry.updatedAt);
   const effectiveLength = lengthPerPiece ?? entry.lengthPerPiece;
   const isSteelItem = isWeightViewSupported({
@@ -111,15 +111,9 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
             {isSteelItem && (
               <ViewModeToggle viewMode={localViewMode} onToggle={toggleViewMode} compact />
             )}
-            <View
-              className="px-2 py-1 rounded-full"
-              style={{ backgroundColor: `${itemTypeColor}15` }}
-            >
-              <Text
-                className="text-[12px] font-medium"
-                style={{ color: itemTypeColor }}
-              >
-                {itemTypeLabel}
+            <View className={`px-2 py-1 rounded-full ${typeDetails.bgClass}`}>
+              <Text className={`text-[12px] font-medium ${typeDetails.textClass}`}>
+                {typeDetails.label}
               </Text>
             </View>
           </View>
@@ -127,7 +121,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
       </View>
   );
 
-  const accessibilityLabel = `Item: ${entry.itemName}. SKU: ${entry.itemSku}. Type: ${itemTypeLabel}. Quantity: ${entry.quantity} ${unit}`;
+  const accessibilityLabel = `Item: ${entry.itemName}. SKU: ${entry.itemSku}. Type: ${typeDetails.label}. Quantity: ${entry.quantity} ${unit}`;
 
   if (onPress) {
     return (

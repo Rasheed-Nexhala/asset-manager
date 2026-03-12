@@ -181,12 +181,11 @@ export const AddEditItemScreen: React.FC = () => {
 
           setSuccess(true);
 
-          // Navigate back after a short delay to show success message (cleaned up on unmount)
+          // Navigate to Inventory list after a short delay to show success message (cleaned up on unmount)
           if (navigateTimeoutRef.current) clearTimeout(navigateTimeoutRef.current);
           navigateTimeoutRef.current = setTimeout(() => {
             navigateTimeoutRef.current = null;
-            // @ts-ignore - navigation typing varies by navigator
-            navigation.goBack();
+            navigation.navigate('CentralStoreInventory');
           }, 1000);
         } else {
           // Edit mode

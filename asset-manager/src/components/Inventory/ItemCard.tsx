@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { isLowStock } from '../../utils/inventoryUtils';
+import { isLowStock, getItemTypeDetails } from '../../utils/inventoryUtils';
 import { WeightDisplay } from './WeightDisplay';
 import { ViewModeToggle } from './ViewModeToggle';
 import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
@@ -22,8 +22,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
     setLocalViewMode((prev) => (prev === 'pieces' ? 'kg' : 'pieces'));
   }, []);
   const showLowStockBadge = isLowStock(item);
-  const itemTypeLabel = item.type === 'consumable' ? 'Consumable' : 'Non-Consumable';
-  const isConsumable = item.type === 'consumable';
+  const typeDetails = getItemTypeDetails(item.type);
   const isSteelItem = isWeightViewSupported(item);
 
   return (
@@ -32,7 +31,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
       onPress={onPress}
       activeOpacity={0.7}
       accessibilityRole="button"
-      accessibilityLabel={`Item: ${item.name}. SKU: ${item.sku}. Type: ${itemTypeLabel}. Total quantity: ${item.totalQuantity} ${item.unit}`}
+      accessibilityLabel={`Item: ${item.name}. SKU: ${item.sku}. Type: ${typeDetails.label}. Total quantity: ${item.totalQuantity} ${item.unit}`}
     >
       {/* Top Row: Image + Name/SKU + Badges + View Toggle */}
       <View className="flex-row gap-3 mb-3">
@@ -64,17 +63,9 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
             <ViewModeToggle viewMode={localViewMode} onToggle={toggleViewMode} compact />
           )}
           {/* Item Type Badge */}
-          <View
-            className={`px-2 py-1 rounded-full ${
-              isConsumable ? 'bg-[#475569]/15' : 'bg-[#0D9488]/15'
-            }`}
-          >
-            <Text
-              className={`text-[12px] font-medium ${
-                isConsumable ? 'text-[#475569]' : 'text-[#0D9488]'
-              }`}
-            >
-              {itemTypeLabel}
+          <View className={`px-2 py-1 rounded-full ${typeDetails.bgClass}`}>
+            <Text className={`text-[12px] font-medium ${typeDetails.textClass}`}>
+              {typeDetails.label}
             </Text>
           </View>
 
@@ -113,28 +104,31 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onPress }) => {
         </View>
       </View>
 
-      <View className="flex-row gap-4">
-        <View className="flex-1">
-          <Text className="text-[13px] text-[#64748B] mb-1">At Sites</Text>
-          <WeightDisplay
-            quantity={item.atSitesQuantity}
-            weightPerMeter={item.weightPerMeter}
-            lengthPerPiece={item.lengthPerPiece}
-            viewMode={localViewMode}
-            unit={item.unit}
-          />
+      {/* At Sites and Maintenance - hidden for Fuel (fuel is not at sites or in maintenance) */}
+      {item.type !== 'fuel' && (
+        <View className="flex-row gap-4">
+          <View className="flex-1">
+            <Text className="text-[13px] text-[#64748B] mb-1">At Sites</Text>
+            <WeightDisplay
+              quantity={item.atSitesQuantity}
+              weightPerMeter={item.weightPerMeter}
+              lengthPerPiece={item.lengthPerPiece}
+              viewMode={localViewMode}
+              unit={item.unit}
+            />
+          </View>
+          <View className="flex-1">
+            <Text className="text-[13px] text-[#64748B] mb-1">Maintenance</Text>
+            <WeightDisplay
+              quantity={item.inMaintenanceQuantity}
+              weightPerMeter={item.weightPerMeter}
+              lengthPerPiece={item.lengthPerPiece}
+              viewMode={localViewMode}
+              unit={item.unit}
+            />
+          </View>
         </View>
-        <View className="flex-1">
-          <Text className="text-[13px] text-[#64748B] mb-1">Maintenance</Text>
-          <WeightDisplay
-            quantity={item.inMaintenanceQuantity}
-            weightPerMeter={item.weightPerMeter}
-            lengthPerPiece={item.lengthPerPiece}
-            viewMode={localViewMode}
-            unit={item.unit}
-          />
-        </View>
-      </View>
+      )}
     </TouchableOpacity>
   );
 };
