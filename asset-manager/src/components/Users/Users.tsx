@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAutoClearError } from '../../hooks/useAutoClearError';
 import {
   View,
@@ -15,6 +15,8 @@ import {
   updateUserRole,
   updateUserActiveStatus,
 } from '../../services/firebase/userRoleService';
+import { useAppSelector } from '../../store/hooks';
+import { selectIsSuperAdmin, selectUserId } from '../../store/selectors/authSelectors';
 import type { UserListItem, UserRole } from '../../types/roles';
 
 /**
@@ -46,6 +48,8 @@ interface UsersProps {
  * Changes are saved only when the Save button is clicked.
  */
 export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
+  const currentUserId = useAppSelector(selectUserId);
+  const isCurrentUserSuperAdmin = useAppSelector(selectIsSuperAdmin);
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +85,23 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
   }, []);
 
   useAutoClearError(error, () => setError(null));
+
+  /**
+   * Sort users: active first, then inactive, then deleted
+   */
+  const sortedUsers = useMemo(() => {
+    return [...users].sort((a, b) => {
+      const aActive = a.isActive && !a.isDeleted;
+      const bActive = b.isActive && !b.isDeleted;
+      if (aActive && !bActive) return -1;
+      if (!aActive && bActive) return 1;
+      const aDeleted = a.isDeleted ?? false;
+      const bDeleted = b.isDeleted ?? false;
+      if (!aDeleted && bDeleted) return -1;
+      if (aDeleted && !bDeleted) return 1;
+      return 0;
+    });
+  }, [users]);
 
   /**
    * Handle pull-to-refresh
@@ -124,7 +145,7 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
   );
 
   /**
-   * Check if the target user is an Admin (admins cannot be updated by other admins)
+   * Check if the target user is an Admin (regular admins cannot update other admins; super admins can)
    */
   const isTargetUserAdmin = useCallback(
     (user: UserListItem) => user.role === 'Admin',
@@ -132,18 +153,44 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
   );
 
   /**
+   * Check if the target user has deleted their account (no actions allowed)
+   */
+  const isTargetUserDeleted = useCallback(
+    (user: UserListItem) => user.isDeleted === true,
+    []
+  );
+
+  /**
+   * Check if target is the current user (super admins cannot modify themselves)
+   */
+  const isTargetSelf = useCallback(
+    (user: UserListItem) => user.id === currentUserId,
+    [currentUserId]
+  );
+
+  /**
+   * User is read-only: deleted, or (Admin and not super admin), or (self and super admin)
+   */
+  const isUserReadOnly = useCallback(
+    (user: UserListItem) =>
+      isTargetUserDeleted(user) ||
+      (isTargetUserAdmin(user) && !isCurrentUserSuperAdmin) ||
+      (isTargetSelf(user) && isCurrentUserSuperAdmin),
+    [isTargetUserDeleted, isTargetUserAdmin, isTargetSelf, isCurrentUserSuperAdmin]
+  );
+
+  /**
    * Open role selection modal for a user
-   * Does not open for Admin users (admins cannot update other admins)
    */
   const handleRoleSelectPress = useCallback(
     (user: UserListItem) => {
-      if (isTargetUserAdmin(user)) return;
+      if (isUserReadOnly(user)) return;
       const currentRole = getCurrentUserValue(user.id, 'role') as UserRole;
       setSelectedUserId(user.id);
       setSelectedUserCurrentRole(currentRole);
       setRoleModalVisible(true);
     },
-    [getCurrentUserValue, isTargetUserAdmin]
+    [getCurrentUserValue, isUserReadOnly]
   );
 
   /**
@@ -170,11 +217,10 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
 
   /**
    * Update pending active status change (does not save to Firestore)
-   * Does not apply for Admin users (admins cannot update other admins)
    */
   const handleActiveStatusChange = useCallback(
     (user: UserListItem, newIsActive: boolean) => {
-      if (isTargetUserAdmin(user)) return;
+      if (isUserReadOnly(user)) return;
       setPendingChanges((prev) => ({
         ...prev,
         [user.id]: {
@@ -183,16 +229,15 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
         },
       }));
     },
-    [isTargetUserAdmin]
+    [isUserReadOnly]
   );
 
   /**
    * Save changes for a user to Firestore
-   * Does not save for Admin users (admins cannot update other admins)
    */
   const handleSaveChanges = useCallback(
     async (user: UserListItem) => {
-      if (isTargetUserAdmin(user)) return;
+      if (isUserReadOnly(user)) return;
       const changes = pendingChanges[user.id];
       if (!changes || Object.keys(changes).length === 0) return;
 
@@ -231,7 +276,7 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
         setSavingUserId(null);
       }
     },
-    [pendingChanges, isTargetUserAdmin]
+    [pendingChanges, isUserReadOnly]
   );
 
   /**
@@ -250,14 +295,15 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
    */
   const renderUserCard = useCallback(
     ({ item }: { item: UserListItem }) => {
-      const isTargetAdmin = isTargetUserAdmin(item);
+      const isReadOnly = isUserReadOnly(item);
+      const isTargetDeleted = isTargetUserDeleted(item);
       const isSaving = savingUserId === item.id;
       const hasChanges = hasPendingChanges(item.id);
       const currentRole = getCurrentUserValue(item.id, 'role') as UserRole;
       const currentIsActive = getCurrentUserValue(item.id, 'isActive') as boolean;
+      const effectiveIsActive = isTargetDeleted ? false : currentIsActive;
       const displayName = item.displayName || item.email || 'Unknown User';
       const email = item.email && item.displayName ? item.email : null;
-      const isReadOnly = isTargetAdmin;
 
       return (
         <View className={`bg-white rounded-[10px] p-4 border mb-3 ${hasChanges ? 'border-[#1E40AF]' : 'border-[#E2E8F0]'} ${isReadOnly ? 'opacity-90' : ''}`}>
@@ -273,9 +319,9 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
                 </Text>
               )}
             </View>
-            <View className={`px-2 py-1 rounded-full ${currentIsActive ? 'bg-[#16A34A]/15' : 'bg-[#DC2626]/15'}`}>
-              <Text className={`text-[12px] font-medium ${currentIsActive ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
-                {currentIsActive ? 'Active' : 'Inactive'}
+            <View className={`px-2 py-1 rounded-full ${item.isDeleted ? 'bg-[#64748B]/15' : effectiveIsActive ? 'bg-[#16A34A]/15' : 'bg-[#DC2626]/15'}`}>
+              <Text className={`text-[12px] font-medium ${item.isDeleted ? 'text-[#64748B]' : effectiveIsActive ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
+                {item.isDeleted ? 'Deleted' : effectiveIsActive ? 'Active' : 'Inactive'}
               </Text>
             </View>
           </View>
@@ -292,7 +338,9 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
               activeOpacity={0.7}
               accessibilityLabel={
                 isReadOnly
-                  ? `${displayName} is an Admin. Admin users cannot be modified.`
+                  ? isTargetDeleted
+                    ? `${displayName} - deleted users cannot be modified`
+                    : `${displayName} is an Admin. Admin users cannot be modified.`
                   : `Change role for ${displayName}. Current role: ${currentRole}`
               }
               accessibilityRole="button"
@@ -302,7 +350,11 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
             </TouchableOpacity>
             {isReadOnly && (
               <Text className="text-[12px] text-[#64748B] mt-1.5">
-                Admin users cannot be modified
+                {isTargetDeleted
+                  ? 'Deleted users cannot be modified'
+                  : isTargetSelf(item)
+                    ? 'You cannot modify your own account'
+                    : 'Admin users cannot be modified'}
               </Text>
             )}
           </View>
@@ -311,19 +363,19 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
           <View className="flex-row items-center justify-between border-t border-[#E2E8F0] pt-3 mb-3">
             <View className="flex-1">
               <Text className="text-[13px] text-[#64748B] mb-1">Active Status</Text>
-              <Text className={`text-[15px] ${currentIsActive ? 'text-[#10B981]' : 'text-[#DC2626]'}`}>
-                {currentIsActive ? 'Active' : 'Inactive'}
+              <Text className={`text-[15px] ${effectiveIsActive ? 'text-[#10B981]' : 'text-[#DC2626]'}`}>
+                {effectiveIsActive ? 'Active' : 'Inactive'}
               </Text>
             </View>
             <Switch
-              value={currentIsActive}
+              value={effectiveIsActive}
               onValueChange={(value) => handleActiveStatusChange(item, value)}
               disabled={isSaving || isReadOnly}
               trackColor={{ false: '#E2E8F0', true: '#1E40AF' }}
-              thumbColor={currentIsActive ? '#FFFFFF' : '#94A3B8'}
+              thumbColor={effectiveIsActive ? '#FFFFFF' : '#94A3B8'}
               accessibilityLabel={
                 isReadOnly
-                  ? `Active status for ${displayName} cannot be changed. Admin users cannot be modified.`
+                  ? `Active status for ${displayName} cannot be changed.`
                   : `Toggle active status for ${displayName}`
               }
             />
@@ -373,7 +425,9 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
       savingUserId,
       hasPendingChanges,
       getCurrentUserValue,
-      isTargetUserAdmin,
+      isUserReadOnly,
+      isTargetUserDeleted,
+      isTargetSelf,
       handleRoleSelectPress,
       handleActiveStatusChange,
       handleSaveChanges,
@@ -497,7 +551,7 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
       )}
 
       <FlatList
-        data={users}
+        data={sortedUsers}
         renderItem={renderUserCard}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 16 }}

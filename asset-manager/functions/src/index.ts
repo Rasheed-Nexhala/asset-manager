@@ -621,20 +621,20 @@ export const onItemUpdated = onDocumentUpdated(
 
     // Low stock alert: notify when item JUST crossed into low stock
     try {
-      const totalQtyBefore = (before.totalQuantity ?? 0) as number;
-      const totalQtyAfter = (after.totalQuantity ?? 0) as number;
+      const centralStoreQtyBefore = (before.centralStoreQuantity ?? 0) as number;
+      const centralStoreQtyAfter = (after.centralStoreQuantity ?? 0) as number;
       const minStockBefore = (before.minStockLevel ?? 0) as number;
       const minStockAfter = (after.minStockLevel ?? 0) as number;
 
-      const totalQuantityChanged = totalQtyBefore !== totalQtyAfter;
-      const isNowLowStock = totalQtyAfter <= minStockAfter;
-      const wasAboveThreshold = totalQtyBefore > minStockBefore;
+      const centralStoreQuantityChanged = centralStoreQtyBefore !== centralStoreQtyAfter;
+      const isNowLowStock = centralStoreQtyAfter <= minStockAfter;
+      const wasAboveThreshold = centralStoreQtyBefore > minStockBefore;
 
-      if (totalQuantityChanged && isNowLowStock && wasAboveThreshold) {
+      if (centralStoreQuantityChanged && isNowLowStock && wasAboveThreshold) {
         const itemName = after.name ?? 'Item';
         const itemSku = after.sku ?? itemId;
         const title = 'Low Stock Alert';
-        const body = `${itemName} (${itemSku}) is below minimum level (${totalQtyAfter}/${minStockAfter})`;
+        const body = `${itemName} (${itemSku}) is below minimum level (${centralStoreQtyAfter}/${minStockAfter})`;
         const pushData = { screen: 'ItemDetail', itemId };
 
         const tokens = await getAdminAndStoreInchargeTokens('stockAlerts');

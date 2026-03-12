@@ -72,10 +72,14 @@ export const validateAllManagerAssignments = createAsyncThunk(
       // Get all users to determine valid SiteManagers
       const allUsers = await getAllUsers();
 
-      // Build set of valid manager IDs (active SiteManagers only)
+      // Build set of valid manager IDs (active SiteManagers only; exclude deleted users)
       const validManagerIds = new Set<string>();
       allUsers.forEach((user) => {
-        if (user.role === 'SiteManager' && user.isActive) {
+        if (
+          user.role === 'SiteManager' &&
+          user.isActive &&
+          !user.isDeleted
+        ) {
           validManagerIds.add(user.id);
         }
       });

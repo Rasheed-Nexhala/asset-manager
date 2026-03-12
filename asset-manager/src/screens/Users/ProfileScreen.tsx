@@ -69,6 +69,7 @@ export const ProfileScreen: React.FC = () => {
               isActive={isActive}
               permissions={permissions}
               showPasswordUpdate={true}
+              showDeleteAccount={true}
             />
           </View>
         </View>

@@ -531,7 +531,7 @@ export const ItemDetailScreen: React.FC = () => {
                 {isSteelItem ? (
                   <View className="flex-row items-center gap-1">
                     <WeightDisplay
-                      quantity={item.totalQuantity}
+                      quantity={item.centralStoreQuantity ?? item.totalQuantity ?? 0}
                       weightPerMeter={item.weightPerMeter}
                       lengthPerPiece={item.lengthPerPiece}
                       viewMode={viewMode}
@@ -548,7 +548,7 @@ export const ItemDetailScreen: React.FC = () => {
                   </View>
                 ) : (
                   <Text className="text-[13px] text-[#64748B]">
-                    {item.totalQuantity} / {item.minStockLevel} {item.unit}
+                    {item.centralStoreQuantity ?? item.totalQuantity ?? 0} / {item.minStockLevel} {item.unit}
                   </Text>
                 )}
               </View>

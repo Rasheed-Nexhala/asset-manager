@@ -23,6 +23,8 @@ export interface UserProfileProps {
   sectionTitle?: string;
   /** Whether to show the password update section */
   showPasswordUpdate?: boolean;
+  /** Whether to show the delete account section */
+  showDeleteAccount?: boolean;
   /** Called when password is successfully updated */
   onPasswordUpdated?: () => void;
 }
@@ -41,6 +43,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   permissions = [],
   sectionTitle = 'User Information',
   showPasswordUpdate = false,
+  showDeleteAccount = false,
   onPasswordUpdated,
 }) => {
   const navigation = useNavigation();
@@ -54,6 +57,15 @@ export const UserProfile: React.FC<UserProfileProps> = ({
       navigation.navigate('UpdatePasswordScreen');
     } else {
       console.log('Navigation not available - Update Password screen requested');
+    }
+  }, [navigation]);
+
+  const handleDeleteAccount = useCallback(() => {
+    if (navigation && navigation.navigate) {
+      // @ts-ignore - navigation typing varies by navigator
+      navigation.navigate('DeleteAccountScreen');
+    } else {
+      console.log('Navigation not available - Delete Account screen requested');
     }
   }, [navigation]);
   return (
@@ -138,6 +150,23 @@ export const UserProfile: React.FC<UserProfileProps> = ({
           >
             <Text className="text-[15px] font-semibold text-[#1E40AF]">
               Update Password
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      {/* Delete Account Section */}
+      {showDeleteAccount ? (
+        <View className="mt-4 pt-4 border-t border-[#E2E8F0]">
+          <TouchableOpacity
+            className="border-[1.5px] border-[#DC2626] rounded-[10px] h-[50px] items-center justify-center"
+            onPress={handleDeleteAccount}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Delete account"
+          >
+            <Text className="text-[15px] font-semibold text-[#DC2626]">
+              Delete Account
             </Text>
           </TouchableOpacity>
         </View>

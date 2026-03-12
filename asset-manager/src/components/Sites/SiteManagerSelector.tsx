@@ -34,7 +34,10 @@ export const SiteManagerSelector: React.FC<SiteManagerSelectorProps> = ({
     const unsubscribe = subscribeToAllUsers((allUsers) => {
       try {
         const siteManagers = allUsers.filter(
-          (user) => user.role === 'SiteManager' && user.isActive
+          (user) =>
+            user.role === 'SiteManager' &&
+            user.isActive &&
+            !user.isDeleted
         );
         setManagers(siteManagers);
         setLoading(false);

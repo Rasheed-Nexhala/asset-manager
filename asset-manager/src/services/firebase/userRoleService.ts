@@ -32,6 +32,7 @@ export const getUserRole = async (userId: string): Promise<UserRoleData | null> 
       role: data.role as UserRole,
       isActive: data.isActive ?? false,
       permissions: Array.isArray(data.permissions) ? data.permissions : [],
+      isSuperadmin: data.isSuperadmin ?? false,
     };
   } catch (error) {
     console.error('Error getting user role:', error);
@@ -74,6 +75,7 @@ export const createDefaultUserDocument = async (
     role: 'Unassigned', // Default role for new users
     isActive: true, // New signups can use the app immediately; admins can deactivate if needed
     permissions: [],
+    isSuperadmin: false, // Set manually in Firestore for designated super admins
   };
   
   try {
@@ -127,6 +129,26 @@ export const updateUserActiveStatus = async (
 };
 
 /**
+ * Mark a user as deleted (soft delete).
+ * Used for account deletion (Guideline 5.1.1(v)).
+ * Sets soft-delete fields and isActive: false; preserves name, email, userId. Firebase Auth is deleted separately.
+ * Firestore rules must allow self soft-delete.
+ */
+export const markUserAsDeleted = async (userId: string): Promise<void> => {
+  try {
+    await updateDoc(doc(db, USERS_COLLECTION, userId), {
+      isDeleted: true,
+      isActive: false,
+      deletedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error marking user as deleted:', error);
+    throw error;
+  }
+};
+
+/**
  * Update user permissions
  */
 export const updateUserPermissions = async (
@@ -162,6 +184,8 @@ export const getAllUsers = async (): Promise<UserListItem[]> => {
         role: data.role as UserRole,
         isActive: data.isActive ?? false,
         permissions: Array.isArray(data.permissions) ? data.permissions : [],
+        isDeleted: data.isDeleted ?? false,
+        isSuperadmin: data.isSuperadmin ?? false,
       });
     });
     
@@ -199,6 +223,7 @@ export const subscribeToUserRole = (
         role: data.role as UserRole,
         isActive: data.isActive ?? false,
         permissions: Array.isArray(data.permissions) ? data.permissions : [],
+        isSuperadmin: data.isSuperadmin ?? false,
       });
     },
     (error) => {
@@ -234,6 +259,8 @@ export const subscribeToAllUsers = (
           role: data.role as UserRole,
           isActive: data.isActive ?? false,
           permissions: Array.isArray(data.permissions) ? data.permissions : [],
+          isDeleted: data.isDeleted ?? false,
+          isSuperadmin: data.isSuperadmin ?? false,
         });
       });
 

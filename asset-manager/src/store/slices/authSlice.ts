@@ -3,7 +3,12 @@ import { User } from 'firebase/auth';
 import type { AuthState } from '../../types/auth';
 import { INACTIVE_ACCOUNT_MESSAGE } from '../../services/firebase/authService';
 import type { UserRoleData } from '../../types/roles';
-import { signUpUser, signInUser, signOutUser } from '../thunks/authThunks';
+import {
+  signUpUser,
+  signInUser,
+  signOutUser,
+  deleteAccountUser,
+} from '../thunks/authThunks';
 import { sanitizeForDisplay } from '../../utils/sanitizeUtils';
 
 const initialState: AuthState = {
@@ -122,10 +127,33 @@ const authSlice = createSlice({
         state.userRole = null;
         state.isRoleLoading = false;
         state.isAuthenticated = false;
+      })
+      .addCase(deleteAccountUser.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(deleteAccountUser.fulfilled, (state) => {
+        state.isLoading = false;
+        state.user = null;
+        state.userRole = null;
+        state.isRoleLoading = false;
+        state.isAuthenticated = false;
+        state.error = null;
+      })
+      .addCase(deleteAccountUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error =
+          sanitizeForDisplay(action.payload as string | undefined) ||
+          'Account deletion failed. Please try again.';
       });
   },
 });
 
 export const { setUser, setUserRole, setRoleLoading, clearError, setError, setLoading } = authSlice.actions;
-export { signUpUser, signInUser, signOutUser } from '../thunks/authThunks';
+export {
+  signUpUser,
+  signInUser,
+  signOutUser,
+  deleteAccountUser,
+} from '../thunks/authThunks';
 export default authSlice.reducer;

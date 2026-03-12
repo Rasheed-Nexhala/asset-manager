@@ -20,6 +20,7 @@ jest.mock('../../../store/thunks/authThunks', () => {
     signInUser: createAsyncThunk('auth/signIn', async () => ({ uid: 'mock' })),
     signOutUser: createAsyncThunk('auth/signOut', async () => null),
     signUpUser: createAsyncThunk('auth/signUp', async () => ({ uid: 'mock' })),
+    deleteAccountUser: createAsyncThunk('auth/deleteAccount', async () => null),
   };
 });
 jest.mock('../../../store/thunks/sitesThunks', () => {

@@ -244,38 +244,40 @@ export const selectMyRequestsByStatus = (status: string) =>
     );
   });
 
+/** Pass-through for status in my requests selector */
+const selectStatusArg = (_state: RootState, status: string) => status;
+
 /** Pass-through for search in my requests selector */
-const selectMySearchQueryArg = (_state: RootState, searchQuery: string) => searchQuery;
+const selectMySearchQueryArg = (_state: RootState, _status: string, searchQuery: string) => searchQuery;
 
 /**
  * Filter my requests by status and search query, sorted by createdAt descending.
- * Use: useAppSelector((state) => selectMyRequestsByStatusAndSearch(activeTab)(state, searchQuery))
+ * Memoized selector - use: useAppSelector((state) => selectMyRequestsByStatusAndSearch(state, status, searchQuery))
  */
-export const selectMyRequestsByStatusAndSearch = (status: string) =>
-  createSelector(
-    [selectMyRequests, selectMySearchQueryArg],
-    (requests, searchQuery) => {
-      let filtered = requests.filter((r) => status === 'all' || r.status === status);
-      const trimmedQuery = searchQuery?.trim() || '';
-      if (trimmedQuery) {
-        const lowerQuery = trimmedQuery.toLowerCase();
-        filtered = filtered.filter((r) => {
-          const matchesRequestNumber = (r.requestNumber ?? '').toLowerCase().includes(lowerQuery);
-          const matchesSiteName = (r.siteName ?? '').toLowerCase().includes(lowerQuery);
-          const matchesPurpose = (r.purpose ?? '').toLowerCase().includes(lowerQuery);
-          const matchesItem = Array.isArray(r.items)
-            ? r.items.some(
-                (item) =>
-                  (item.itemName ?? '').toLowerCase().includes(lowerQuery) ||
-                  (item.itemSku ?? '').toLowerCase().includes(lowerQuery) ||
-                  (item.categoryName ?? '').toLowerCase().includes(lowerQuery)
-              )
-            : false;
-          return matchesRequestNumber || matchesSiteName || matchesPurpose || matchesItem;
-        });
-      }
-      return [...filtered].sort(
-        (a, b) => getCreatedAtMs(b) - getCreatedAtMs(a)
-      );
+export const selectMyRequestsByStatusAndSearch = createSelector(
+  [selectMyRequests, selectStatusArg, selectMySearchQueryArg],
+  (requests, status, searchQuery) => {
+    let filtered = requests.filter((r) => status === 'all' || r.status === status);
+    const trimmedQuery = searchQuery?.trim() || '';
+    if (trimmedQuery) {
+      const lowerQuery = trimmedQuery.toLowerCase();
+      filtered = filtered.filter((r) => {
+        const matchesRequestNumber = (r.requestNumber ?? '').toLowerCase().includes(lowerQuery);
+        const matchesSiteName = (r.siteName ?? '').toLowerCase().includes(lowerQuery);
+        const matchesPurpose = (r.purpose ?? '').toLowerCase().includes(lowerQuery);
+        const matchesItem = Array.isArray(r.items)
+          ? r.items.some(
+              (item) =>
+                (item.itemName ?? '').toLowerCase().includes(lowerQuery) ||
+                (item.itemSku ?? '').toLowerCase().includes(lowerQuery) ||
+                (item.categoryName ?? '').toLowerCase().includes(lowerQuery)
+            )
+          : false;
+        return matchesRequestNumber || matchesSiteName || matchesPurpose || matchesItem;
+      });
     }
-  );
+    return [...filtered].sort(
+      (a, b) => getCreatedAtMs(b) - getCreatedAtMs(a)
+    );
+  }
+);

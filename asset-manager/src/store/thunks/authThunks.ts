@@ -4,8 +4,14 @@ import {
   signIn,
   logout,
   updateUserProfile,
+  reauthenticate,
+  deleteAuthUser,
 } from '../../services/firebase/authService';
-import { createDefaultUserDocument } from '../../services/firebase/userRoleService';
+import {
+  createDefaultUserDocument,
+  markUserAsDeleted,
+} from '../../services/firebase/userRoleService';
+import { cleanupManagerAssignments } from './managerValidationThunks';
 import { clearActivityLogs } from '../slices/activityLogSlice';
 import { clearInventory } from '../slices/inventorySlice';
 import { clearAccess } from '../slices/inventoryUpdateRequestSlice';
@@ -55,6 +61,60 @@ export const signInUser = createAsyncThunk(
       return userCredential.user;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Sign in failed. Please try again.');
+    }
+  }
+);
+
+export const deleteAccountUser = createAsyncThunk<
+  null,
+  string,
+  { state: RootState; dispatch: AppDispatch }
+>(
+  'auth/deleteAccount',
+  async (currentPassword, { dispatch, getState, rejectWithValue }) => {
+    try {
+      const { user } = getState().auth;
+      if (!user) {
+        return rejectWithValue('No user is signed in');
+      }
+
+      // 1. Re-authenticate (required by Firebase before deleteUser)
+      await reauthenticate(currentPassword);
+
+      // 2. Unsubscribe from thunk-managed listeners before auth is invalidated
+      dispatch(unsubscribeFromActivityLogs());
+      dispatch(unsubscribeFromMyActiveAccess());
+
+      // 3. Let React flush the unmount so subscriptions clean up
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // 4. Remove user from any sites they manage (Site Manager)
+      await dispatch(cleanupManagerAssignments(user.uid)).unwrap();
+
+      // 5. Soft-delete Firestore user (mark as deleted; keeps doc for Users list)
+      await markUserAsDeleted(user.uid);
+
+      // 6. Delete Firebase Auth user (signs out automatically)
+      await deleteAuthUser();
+
+      // 7. Clear user in Redux so RootNavigator switches to Auth screen
+      dispatch({ type: 'auth/setUser', payload: null });
+
+      // 8. Clear all feature-domain state
+      dispatch(clearActivityLogs());
+      dispatch(clearInventory());
+      dispatch(clearAccess());
+      dispatch(clearRequests());
+      dispatch(clearMaintenance());
+      dispatch(clearPurchaseOrders());
+      dispatch(clearSteelMasters());
+      dispatch(clearSites());
+
+      return null;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.message || 'Account deletion failed. Please try again.'
+      );
     }
   }
 );

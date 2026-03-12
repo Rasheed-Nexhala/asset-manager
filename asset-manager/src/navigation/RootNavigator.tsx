@@ -17,6 +17,7 @@ import { AuthCheckingScreen } from '../screens/Authentication/AuthCheckingScreen
 import { LoadingScreen } from '../screens/LoadingScreen';
 import { BottomTabNavigator } from './BottomTabNavigator';
 import { UpdatePasswordScreen } from '../screens/Users/UpdatePasswordScreen';
+import { DeleteAccountScreen } from '../screens/Users/DeleteAccountScreen';
 import { NotificationCenterScreen } from '../screens/Notifications/NotificationCenterScreen';
 
 export const navigationRef = createNavigationContainerRef<ParamListBase>();
@@ -149,6 +150,14 @@ const MainStackNavigator: React.FC = () => {
       <MainStack.Screen 
         name="UpdatePasswordScreen" 
         component={UpdatePasswordScreen}
+        options={{
+          presentation: 'card',
+          gestureEnabled: true,
+        }}
+      />
+      <MainStack.Screen 
+        name="DeleteAccountScreen" 
+        component={DeleteAccountScreen}
         options={{
           presentation: 'card',
           gestureEnabled: true,

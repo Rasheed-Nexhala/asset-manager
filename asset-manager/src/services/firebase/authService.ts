@@ -2,6 +2,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  deleteUser,
   sendPasswordResetEmail,
   updateProfile,
   updatePassword,
@@ -344,6 +345,52 @@ export const reauthenticateAndUpdatePassword = async (
       (reauthError as any).code = authError.code;
       throw reauthError;
     }
+    throw handleAuthError(authError);
+  }
+};
+
+/**
+ * Re-authenticate the current user with their password.
+ * Required before sensitive operations like account deletion.
+ */
+export const reauthenticate = async (currentPassword: string): Promise<void> => {
+  try {
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+      throw new Error('No user is currently signed in or user email is missing');
+    }
+
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+  } catch (error) {
+    const authError = error as AuthError;
+    console.error('Re-authentication error:', authError.code, authError.message);
+    if (
+      authError.code === 'auth/wrong-password' ||
+      authError.code === 'auth/invalid-credential'
+    ) {
+      const reauthError = new Error('Current password is incorrect.');
+      (reauthError as any).code = authError.code;
+      throw reauthError;
+    }
+    throw handleAuthError(authError);
+  }
+};
+
+/**
+ * Delete the current Firebase Auth user.
+ * Must be called after reauthenticate() to satisfy Firebase's recent-login requirement.
+ */
+export const deleteAuthUser = async (): Promise<void> => {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('No user is currently signed in');
+  }
+  try {
+    await deleteUser(user);
+  } catch (error) {
+    const authError = error as AuthError;
+    console.error('Account deletion error:', authError.code, authError.message);
     throw handleAuthError(authError);
   }
 };

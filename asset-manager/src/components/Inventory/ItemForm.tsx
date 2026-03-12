@@ -257,17 +257,17 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       if (!isNaN(initialQty) && minStock > initialQty) {
         newError = 'Minimum stock level cannot exceed initial quantity';
       }
-    } else if (mode === 'edit' && initialData?.totalQuantity != null) {
-      const totalQtyPieces = Number(initialData.totalQuantity);
-      let totalQtyDisplay: number;
+    } else if (mode === 'edit' && initialData) {
+      const centralStockPieces = Number(initialData.centralStoreQuantity ?? initialData.totalQuantity ?? 0);
+      let centralQtyDisplay: number;
       if (isWeightBased && weightConfig && isWeightUnit(formData.unit)) {
-        const kg = piecesToKg(totalQtyPieces, weightConfig.weightPerMeter, weightConfig.lengthPerPiece);
-        totalQtyDisplay = formData.unit === 'Ton (MT)' ? kg / TON_TO_KG : kg;
+        const kg = piecesToKg(centralStockPieces, weightConfig.weightPerMeter, weightConfig.lengthPerPiece);
+        centralQtyDisplay = formData.unit === 'Ton (MT)' ? kg / TON_TO_KG : kg;
       } else {
-        totalQtyDisplay = totalQtyPieces;
+        centralQtyDisplay = centralStockPieces;
       }
-      if (!isNaN(totalQtyDisplay) && minStock > totalQtyDisplay) {
-        newError = 'Minimum stock level cannot exceed current total quantity';
+      if (!isNaN(centralQtyDisplay) && minStock > centralQtyDisplay) {
+        newError = 'Minimum stock level cannot exceed current central store quantity';
       }
     }
 
@@ -282,6 +282,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     formData.minStockLevel,
     formData.unit,
     mode,
+    initialData?.centralStoreQuantity,
     initialData?.totalQuantity,
     isWeightBased,
     weightConfig,
@@ -504,17 +505,17 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       if (!isNaN(initialQty) && minStock > initialQty) {
         newErrors.minStockLevel = 'Minimum stock level cannot exceed initial quantity';
       }
-    } else if (mode === 'edit' && initialData?.totalQuantity != null) {
-      const totalQtyPieces = Number(initialData.totalQuantity);
-      let totalQtyDisplay: number;
+    } else if (mode === 'edit' && initialData) {
+      const centralStockPieces = Number(initialData.centralStoreQuantity ?? initialData.totalQuantity ?? 0);
+      let centralQtyDisplay: number;
       if (isWeightBased && weightConfig && isWeightUnit(formData.unit)) {
-        const kg = piecesToKg(totalQtyPieces, weightConfig.weightPerMeter, weightConfig.lengthPerPiece);
-        totalQtyDisplay = formData.unit === 'Ton (MT)' ? kg / TON_TO_KG : kg;
+        const kg = piecesToKg(centralStockPieces, weightConfig.weightPerMeter, weightConfig.lengthPerPiece);
+        centralQtyDisplay = formData.unit === 'Ton (MT)' ? kg / TON_TO_KG : kg;
       } else {
-        totalQtyDisplay = totalQtyPieces;
+        centralQtyDisplay = centralStockPieces;
       }
-      if (!isNaN(totalQtyDisplay) && minStock > totalQtyDisplay) {
-        newErrors.minStockLevel = 'Minimum stock level cannot exceed current total quantity';
+      if (!isNaN(centralQtyDisplay) && minStock > centralQtyDisplay) {
+        newErrors.minStockLevel = 'Minimum stock level cannot exceed current central store quantity';
       }
     } else if (
       isWeightBased &&
@@ -534,7 +535,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, mode, isWeightBased, weightConfig, initialData?.totalQuantity]);
+  }, [formData, mode, isWeightBased, weightConfig, initialData]);
 
   /**
    * Check if form is valid (no weight conversion errors)

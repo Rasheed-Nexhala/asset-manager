@@ -79,6 +79,11 @@ export const selectIsAdmin = createSelector(
   (role) => role === 'Admin'
 );
 
+export const selectIsSuperAdmin = createSelector(
+  [selectAuthState],
+  (auth) => auth.userRole?.isSuperadmin === true
+);
+
 export const selectIsStoreIncharge = createSelector(
   [selectUserRoleType],
   (role) => role === 'StoreIncharge'

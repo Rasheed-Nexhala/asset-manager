@@ -64,8 +64,9 @@ export const MyRequestsScreen: React.FC = () => {
   const authInitialized = useAppSelector(selectAuthInitialized);
   const isSiteManager = useAppSelector(selectIsSiteManager);
   const sites = useAppSelector(selectAllSites);
+  const status = activeTab === 'all' ? 'all' : activeTab;
   const filteredRequests = useAppSelector((state) =>
-    selectMyRequestsByStatusAndSearch(activeTab === 'all' ? 'all' : activeTab)(state, searchQuery)
+    selectMyRequestsByStatusAndSearch(state, status, searchQuery)
   );
   const isLoading = useAppSelector(selectRequestsLoading);
   const totalCount = useAppSelector(selectMyRequestsTotalCount);

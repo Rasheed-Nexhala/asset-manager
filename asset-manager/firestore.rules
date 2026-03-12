@@ -33,6 +33,15 @@ service cloud.firestore {
     }
     
     /**
+     * Check if user is Super Admin (can manage all users including Admins, except themselves)
+     * Set manually in Firestore: isSuperadmin: true
+     */
+    function isSuperAdmin() {
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return isAuthenticated() && exists(userPath) && get(userPath).data.isSuperadmin == true;
+    }
+    
+    /**
      * Check if user is Store Incharge
      */
     function isStoreIncharge() {
@@ -100,6 +109,15 @@ service cloud.firestore {
         .hasOnly(['expoPushTokens', 'notificationPrefs', 'tokensUpdatedAt', 'updatedAt']);
     }
     
+    /**
+     * Check if the update is a self soft-delete (account deletion).
+     * Only isDeleted, isActive, deletedAt, updatedAt are set; name, email, userId are preserved.
+     */
+    function onlySoftDeleteFields() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['isDeleted', 'isActive', 'deletedAt', 'updatedAt']);
+    }
+    
     // ============================================
     // Existing Collections (preserve existing rules)
     // ============================================
@@ -123,26 +141,45 @@ service cloud.firestore {
         (isUserActive() && isAdmin()) ||
         isSelfRegistration(userId)
       );
-      // Only Admins can delete users
-      allow delete: if isAuthenticated() && isUserActive() && isAdmin();
-      // Allow update: Admins can update any field; users can update only their own token-related fields
-      // Block deactivating Admin users (prevents direct Firestore writes from setting isActive=false)
-      allow update: if isAuthenticated() && (
+      // Admins can delete any user; users can delete their own account (Guideline 5.1.1(v))
+      allow delete: if isAuthenticated() && (
         (isUserActive() && isAdmin()) ||
-        (request.auth.uid == userId && onlyUpdatingOwnTokenFields())
-      ) && (
-        resource.data.role != 'Admin' || request.resource.data.isActive != false
+        request.auth.uid == userId
       );
+      // Allow update: Admins and Super Admins can update other users; users can update own token fields or soft-delete
+      // Super Admins can deactivate Admins; regular Admins cannot. Super Admins cannot update themselves.
+      allow update: if isAuthenticated() && (
+        (isUserActive() && (isAdmin() || isSuperAdmin()) && request.auth.uid != userId) ||
+        (request.auth.uid == userId && (onlyUpdatingOwnTokenFields() || onlySoftDeleteFields()))
+      ) && (
+        resource.data.role != 'Admin' || request.resource.data.isActive != false || isSuperAdmin()
+      );
+    }
+    
+    /**
+     * Check if the site update only clears the current user as manager (self-removal on account deletion)
+     */
+    function isRemovingSelfAsManager() {
+      return resource.data.managerId == request.auth.uid
+        && request.resource.data.managerId == null
+        && request.resource.data.managerName == null
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['managerId', 'managerName', 'updatedAt']);
     }
     
     /**
      * Sites collection
      * All authenticated users can read sites
      * Only Admins can create, update, or delete sites
+     * Exception: Users can update a site to remove themselves as manager (account deletion)
      */
     match /sites/{siteId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated() && isUserActive() && isAdmin();
+      allow create, delete: if isAuthenticated() && isUserActive() && isAdmin();
+      allow update: if isAuthenticated() && (
+        (isUserActive() && isAdmin()) ||
+        isRemovingSelfAsManager()
+      );
     }
     
     /**
