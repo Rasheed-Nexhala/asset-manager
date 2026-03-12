@@ -31,6 +31,8 @@ export interface PurchaseOrderItem {
   gstPercentage?: number;
   gstAmount?: number;
   receivedQuantity: number | null;
+  orderedUnit?: string;
+  orderedQuantity?: number;
 }
 
 /**
@@ -172,6 +174,8 @@ export interface CreatePurchaseOrderData {
     quantity: number;
     unitPrice?: number;
     gstPercentage?: number;
+    orderedUnit?: string;
+    orderedQuantity?: number;
   }>;
   justification: string;
   expectedDeliveryDate: string | null;

@@ -187,6 +187,25 @@ export const ProcessRequestScreen: React.FC = () => {
 
     setIsLoading(true);
     try {
+      // Final re-check availability before approving
+      const itemsToCheck = Array.isArray(request.items) ? request.items.map((item) => ({
+        itemId: item.itemId,
+        itemName: item.itemName,
+        quantityRequested: item.quantityRequested,
+      })) : [];
+      
+      const currentAvailability = await requestService.checkItemsAvailability(itemsToCheck);
+      const isStillSufficient = currentAvailability.length > 0 && currentAvailability.every((a) => a.sufficient);
+      
+      if (!isStillSufficient) {
+        setAvailability(currentAvailability);
+        Alert.alert(
+          'Error', 
+          'Insufficient stock. Another transaction may have reduced the available quantity.'
+        );
+        return;
+      }
+
       await dispatch(
         approveRequest({
           requestId: request.id,

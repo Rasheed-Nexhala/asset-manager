@@ -25,6 +25,14 @@ import {
   selectUserDisplayName,
 } from '../../store/selectors/authSelectors';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import {
+  isWeightBasedItem,
+  kgToPieces,
+  tonToKg,
+  getConversionErrorMessage,
+  piecesToKg,
+  formatWeight,
+} from '../../utils/weightConversionUtils';
 import type { Item } from '../../types/inventory';
 import type { IssueType, AddToMaintenanceData } from '../../types/maintenance';
 import type { MaintenanceStackParamList } from '../../navigation/MaintenanceStackParamList';
@@ -51,7 +59,18 @@ export const AddToMaintenanceScreen: React.FC = () => {
   
   // Form state
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  
+  // Weight & Quantity state
+  const isSteelItem = selectedItem ? isWeightBasedItem(selectedItem) : false;
+  const hasFullWeightConfig =
+    isSteelItem &&
+    selectedItem?.weightPerMeter != null &&
+    selectedItem?.lengthPerPiece != null;
+
+  const [entryMode, setEntryMode] = useState<'pieces' | 'kg' | 'ton'>('pieces');
+  const [amountStr, setAmountStr] = useState('1');
   const [quantity, setQuantity] = useState(1);
+
   const [issueType, setIssueType] = useState<IssueType | null>(null);
   const [description, setDescription] = useState('');
   const [reportedBy, setReportedBy] = useState('');
@@ -70,7 +89,6 @@ export const AddToMaintenanceScreen: React.FC = () => {
     }
   }, []);
 
-  // When returning from SelectItemForMaintenance, apply the selected item (once per param)
   const appliedSelectionRef = useRef<string | null>(null);
   useFocusEffect(
     useCallback(() => {
@@ -79,7 +97,9 @@ export const AddToMaintenanceScreen: React.FC = () => {
       if (item && appliedSelectionRef.current !== item.id) {
         appliedSelectionRef.current = item.id;
         setSelectedItem(item);
+        setAmountStr('1');
         setQuantity(1);
+        setEntryMode('pieces');
         setErrors((prev) => (prev.item ? { ...prev, item: undefined } : prev));
       }
       if (!item) {
@@ -92,7 +112,6 @@ export const AddToMaintenanceScreen: React.FC = () => {
     navigation.goBack();
   }, [navigation]);
   
-  // Validate form
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
     
@@ -100,12 +119,29 @@ export const AddToMaintenanceScreen: React.FC = () => {
       newErrors.item = 'Please select an item';
     }
     
-    if (quantity <= 0) {
-      newErrors.quantity = 'Quantity must be greater than 0';
-    }
-    
-    if (selectedItem && quantity > (selectedItem.centralStoreQuantity || 0)) {
-      newErrors.quantity = `Cannot exceed available quantity (${selectedItem.centralStoreQuantity})`;
+    const num = parseFloat(amountStr);
+    if (isNaN(num) || num <= 0) {
+      newErrors.quantity = 'Please enter a valid positive amount';
+    } else {
+      const isDiscreteUnit = (unit: string) => ['Pieces', 'Bags', 'Sets', 'Boxes', 'Rolls'].includes(unit);
+      if (entryMode === 'pieces' || !hasFullWeightConfig) {
+        if (entryMode === 'pieces' && hasFullWeightConfig && !Number.isInteger(num)) {
+          newErrors.quantity = 'Pieces must be a whole number';
+        } else if (!hasFullWeightConfig && isDiscreteUnit(selectedItem?.unit || '') && !Number.isInteger(num)) {
+          newErrors.quantity = `Quantity in ${selectedItem?.unit} must be a whole number`;
+        } else if (num > (selectedItem?.centralStoreQuantity || 0)) {
+          newErrors.quantity = `Cannot exceed available quantity (${selectedItem?.centralStoreQuantity})`;
+        }
+      } else {
+        // Weight mode validation
+        const kg = entryMode === 'ton' ? tonToKg(num) : num;
+        const res = kgToPieces(kg, selectedItem!.weightPerMeter!, selectedItem!.lengthPerPiece!);
+        if (!res.isExact) {
+          newErrors.quantity = getConversionErrorMessage(kg, selectedItem!.weightPerMeter!, selectedItem!.lengthPerPiece!);
+        } else if (res.pieces > (selectedItem?.centralStoreQuantity || 0)) {
+          newErrors.quantity = `Cannot exceed available quantity (${selectedItem?.centralStoreQuantity} pieces)`;
+        }
+      }
     }
     
     if (!issueType) {
@@ -115,40 +151,84 @@ export const AddToMaintenanceScreen: React.FC = () => {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-  
-  // Handle quantity changes
-  const handleDecrement = () => {
-    if (quantity > 1) {
-      setQuantity(quantity - 1);
-      if (errors.quantity) {
-        setErrors({ ...errors, quantity: undefined });
+
+  const handleModeChange = useCallback((m: 'pieces' | 'kg' | 'ton') => {
+    setEntryMode(m);
+    setErrors((prev) => ({ ...prev, quantity: undefined }));
+    if (quantity > 0 && hasFullWeightConfig) {
+      if (m === 'pieces') {
+        setAmountStr(String(quantity));
+      } else if (m === 'kg') {
+        setAmountStr(String(piecesToKg(quantity, selectedItem!.weightPerMeter!, selectedItem!.lengthPerPiece!)));
+      } else if (m === 'ton') {
+        setAmountStr(String(piecesToKg(quantity, selectedItem!.weightPerMeter!, selectedItem!.lengthPerPiece!) / 1000));
       }
+    } else if (quantity > 0) {
+      setAmountStr(String(quantity));
+    } else {
+      setAmountStr('');
+    }
+  }, [quantity, hasFullWeightConfig, selectedItem]);
+  
+  const handleAmountChange = (text: string) => {
+    setAmountStr(text);
+    if (!text.trim()) {
+      setQuantity(0);
+      setErrors((prev) => ({ ...prev, quantity: undefined }));
+      return;
+    }
+
+    const num = parseFloat(text);
+    if (isNaN(num) || num < 0) {
+      setErrors((prev) => ({ ...prev, quantity: 'Invalid amount' }));
+      return;
+    }
+
+    const isDiscreteUnit = (unit: string) => ['Pieces', 'Bags', 'Sets', 'Boxes', 'Rolls'].includes(unit);
+    if (entryMode === 'pieces' || !hasFullWeightConfig) {
+      if (entryMode === 'pieces' && hasFullWeightConfig && !Number.isInteger(num)) {
+        setErrors((prev) => ({ ...prev, quantity: 'Pieces must be a whole number' }));
+        return;
+      }
+      if (!hasFullWeightConfig && isDiscreteUnit(selectedItem?.unit || '') && !Number.isInteger(num)) {
+        setErrors((prev) => ({ ...prev, quantity: `Quantity in ${selectedItem?.unit} must be a whole number` }));
+        return;
+      }
+      setErrors((prev) => ({ ...prev, quantity: undefined }));
+      setQuantity(num);
+    } else {
+      const kg = entryMode === 'ton' ? tonToKg(num) : num;
+      const res = kgToPieces(kg, selectedItem!.weightPerMeter!, selectedItem!.lengthPerPiece!);
+      if (!res.isExact) {
+        setErrors((prev) => ({ ...prev, quantity: getConversionErrorMessage(kg, selectedItem!.weightPerMeter!, selectedItem!.lengthPerPiece!) }));
+      } else {
+        setErrors((prev) => ({ ...prev, quantity: undefined }));
+        setQuantity(res.pieces);
+      }
+    }
+  };
+
+  const handleDecrement = () => {
+    if (entryMode !== 'pieces' && hasFullWeightConfig) return;
+    if (quantity > 1) {
+      const newQty = quantity - 1;
+      setAmountStr(String(newQty));
+      setQuantity(newQty);
+      setErrors((prev) => ({ ...prev, quantity: undefined }));
     }
   };
   
   const handleIncrement = () => {
+    if (entryMode !== 'pieces' && hasFullWeightConfig) return;
     const maxQuantity = selectedItem?.centralStoreQuantity || 0;
     if (quantity < maxQuantity) {
-      setQuantity(quantity + 1);
-      if (errors.quantity) {
-        setErrors({ ...errors, quantity: undefined });
-      }
+      const newQty = quantity + 1;
+      setAmountStr(String(newQty));
+      setQuantity(newQty);
+      setErrors((prev) => ({ ...prev, quantity: undefined }));
     }
   };
   
-  const handleQuantityChange = (text: string) => {
-    const value = parseInt(text, 10);
-    if (!isNaN(value) && value > 0) {
-      setQuantity(value);
-      if (errors.quantity) {
-        setErrors({ ...errors, quantity: undefined });
-      }
-    } else if (text === '') {
-      setQuantity(0);
-    }
-  };
-  
-  // Handle issue type selection
   const handleIssueTypeSelect = (type: IssueType) => {
     setIssueType(type);
     if (errors.issueType) {
@@ -185,11 +265,8 @@ export const AddToMaintenanceScreen: React.FC = () => {
     setPhotoUris((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  // Handle form submission
   const handleSubmit = async () => {
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
     
     if (!selectedItem || !issueType || !userId || !userName) {
       Alert.alert('Error', 'Missing required information');
@@ -202,7 +279,7 @@ export const AddToMaintenanceScreen: React.FC = () => {
       itemId: selectedItem.id,
       itemName: selectedItem.name,
       itemSku: selectedItem.sku,
-      quantity,
+      quantity, // Submitting the perfectly exact integer pieces
       issueType,
       issueDescription: description.trim() || '',
       reportedBy: reportedBy.trim() || undefined,
@@ -233,7 +310,9 @@ export const AddToMaintenanceScreen: React.FC = () => {
 
       // Reset form
       setSelectedItem(null);
+      setAmountStr('1');
       setQuantity(1);
+      setEntryMode('pieces');
       setIssueType(null);
       setDescription('');
       setReportedBy('');
@@ -252,7 +331,6 @@ export const AddToMaintenanceScreen: React.FC = () => {
       
       <ScrollView className="flex-1 px-4">
         <View className="gap-4 py-4">
-          {/* Item Selector */}
           <View className="gap-1.5">
             <Text className="text-[15px] text-[#0F172A]">
               Item <Text className="text-[#DC2626]">*</Text>
@@ -266,50 +344,91 @@ export const AddToMaintenanceScreen: React.FC = () => {
             )}
           </View>
           
-          {/* Quantity Input */}
           <View className="gap-1.5">
             <Text className="text-[15px] text-[#0F172A]">
               Quantity <Text className="text-[#DC2626]">*</Text>
             </Text>
+
+            {hasFullWeightConfig && (
+              <View className="flex-row gap-3 mb-2">
+                {(['pieces', 'kg', 'ton'] as const).map((m) => (
+                  <TouchableOpacity
+                    key={m}
+                    className={`flex-1 h-10 rounded-lg border items-center justify-center ${
+                      entryMode === m
+                        ? 'bg-[#1E40AF] border-[#1E40AF]'
+                        : 'bg-white border-[#E2E8F0]'
+                    }`}
+                    onPress={() => handleModeChange(m)}
+                    disabled={isSubmitting}
+                  >
+                    <Text
+                      className={`text-[13px] font-semibold ${
+                        entryMode === m ? 'text-white' : 'text-[#0F172A]'
+                      }`}
+                    >
+                      {m === 'pieces' ? 'Pcs' : m === 'kg' ? 'Kg' : 'Ton'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             <View className="flex-row items-center gap-3">
-              <TouchableOpacity
-                className="w-12 h-12 border border-[#E2E8F0] rounded-full items-center justify-center bg-white"
-                onPress={handleDecrement}
-                disabled={quantity <= 1 || isSubmitting}
-                accessibilityLabel="Decrease quantity"
-                accessibilityRole="button"
-              >
-                <Text className="text-[#1E40AF] text-xl font-semibold">−</Text>
-              </TouchableOpacity>
+              {(!hasFullWeightConfig || entryMode === 'pieces') && (
+                <TouchableOpacity
+                  className="w-12 h-12 border border-[#E2E8F0] rounded-full items-center justify-center bg-white"
+                  onPress={handleDecrement}
+                  disabled={quantity <= 1 || isSubmitting}
+                  accessibilityLabel="Decrease quantity"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-[#1E40AF] text-xl font-semibold">−</Text>
+                </TouchableOpacity>
+              )}
               
               <TextInput
-                className="border border-[#E2E8F0] rounded-lg h-12 px-4 bg-white flex-1 text-center text-xl font-bold text-[#0F172A]"
-                value={quantity.toString()}
-                onChangeText={handleQuantityChange}
-                keyboardType="numeric"
+                className={`border rounded-lg h-12 px-4 bg-white flex-1 text-center text-xl font-bold text-[#0F172A] ${errors.quantity ? 'border-[#DC2626]' : 'border-[#E2E8F0]'}`}
+                value={amountStr}
+                onChangeText={handleAmountChange}
+                keyboardType="decimal-pad"
                 editable={!isSubmitting}
+                accessibilityLabel="Quantity amount"
               />
               
-              <TouchableOpacity
-                className="w-12 h-12 border border-[#1E40AF] rounded-full items-center justify-center bg-[#1E40AF]"
-                onPress={handleIncrement}
-                disabled={
-                  !selectedItem ||
-                  quantity >= (selectedItem.centralStoreQuantity || 0) ||
-                  isSubmitting
-                }
-                accessibilityLabel="Increase quantity"
-                accessibilityRole="button"
-              >
-                <Text className="text-white text-xl font-semibold">+</Text>
-              </TouchableOpacity>
+              {(!hasFullWeightConfig || entryMode === 'pieces') && (
+                <TouchableOpacity
+                  className="w-12 h-12 border border-[#1E40AF] rounded-full items-center justify-center bg-[#1E40AF]"
+                  onPress={handleIncrement}
+                  disabled={
+                    !selectedItem ||
+                    quantity >= (selectedItem.centralStoreQuantity || 0) ||
+                    isSubmitting
+                  }
+                  accessibilityLabel="Increase quantity"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-white text-xl font-semibold">+</Text>
+                </TouchableOpacity>
+              )}
             </View>
+
+            {hasFullWeightConfig && !errors.quantity && quantity > 0 && entryMode !== 'pieces' && (
+               <Text className="text-[13px] text-[#16A34A] mt-1 font-medium">
+                 = {quantity} pieces
+               </Text>
+            )}
+            {hasFullWeightConfig && !errors.quantity && quantity > 0 && entryMode === 'pieces' && (
+               <Text className="text-[13px] text-[#64748B] mt-1">
+                 ≈ {formatWeight(piecesToKg(quantity, selectedItem!.weightPerMeter!, selectedItem!.lengthPerPiece!), 'Kg')}
+               </Text>
+            )}
+
             {errors.quantity && (
               <Text className="text-[13px] text-[#DC2626]">{errors.quantity}</Text>
             )}
           </View>
           
-          {/* Issue Type Selector */}
           <View className="gap-1.5">
             <Text className="text-[15px] text-[#0F172A]">
               Issue Type <Text className="text-[#DC2626]">*</Text>
@@ -322,7 +441,6 @@ export const AddToMaintenanceScreen: React.FC = () => {
             />
           </View>
           
-          {/* Description Input (Optional) */}
           <View className="gap-1.5">
             <Text className="text-[15px] text-[#0F172A]">Description</Text>
             <TextInput
@@ -342,7 +460,6 @@ export const AddToMaintenanceScreen: React.FC = () => {
             </Text>
           </View>
           
-          {/* Reported By Input (Optional) */}
           <View className="gap-1.5">
             <Text className="text-[15px] text-[#0F172A]">Reported By</Text>
             <TextInput
@@ -355,7 +472,6 @@ export const AddToMaintenanceScreen: React.FC = () => {
             />
           </View>
           
-          {/* Photos (Optional) */}
           <View className="gap-1.5">
             <Text className="text-[15px] text-[#0F172A]">Photos (Optional)</Text>
             <View className="flex-row flex-wrap gap-2">
@@ -368,14 +484,11 @@ export const AddToMaintenanceScreen: React.FC = () => {
                     source={{ uri }}
                     className="w-full h-full"
                     resizeMode="cover"
-                    accessibilityLabel={`Photo ${index + 1}`}
                   />
                   <TouchableOpacity
                     className="absolute top-1 right-1 w-6 h-6 rounded-full bg-[#DC2626] items-center justify-center"
                     onPress={() => handleRemovePhoto(index)}
                     disabled={isSubmitting}
-                    accessibilityLabel={`Remove photo ${index + 1}`}
-                    accessibilityRole="button"
                   >
                     <Ionicons name="close" size={14} color="#FFFFFF" />
                   </TouchableOpacity>
@@ -386,17 +499,13 @@ export const AddToMaintenanceScreen: React.FC = () => {
                   className="w-20 h-20 border border-[#E2E8F0] border-dashed rounded-lg items-center justify-center bg-[#F8FAFC]"
                   onPress={handleImagePick}
                   disabled={isSubmitting || imageLoading}
-                  accessibilityLabel="Add photo"
-                  accessibilityRole="button"
                 >
                   {imageLoading ? (
                     <ActivityIndicator size="small" color="#1E40AF" />
                   ) : (
                     <Ionicons name="camera-outline" size={28} color="#1E40AF" />
                   )}
-                  <Text className="text-[11px] text-[#64748B] mt-1">
-                    Add
-                  </Text>
+                  <Text className="text-[11px] text-[#64748B] mt-1">Add</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -407,7 +516,6 @@ export const AddToMaintenanceScreen: React.FC = () => {
             )}
           </View>
           
-          {/* Submit Button */}
           <TouchableOpacity
             className={`bg-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center mt-2 ${
               isSubmitting ? 'opacity-50' : ''

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Image, TouchableOpacity, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { WeightDisplay } from '../Inventory/WeightDisplay';
@@ -6,7 +6,10 @@ import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
 import {
   isWeightBasedItem,
   piecesToKg,
+  kgToPieces,
+  tonToKg,
   formatWeight,
+  getConversionErrorMessage,
 } from '../../utils/weightConversionUtils';
 import type { RequestItem } from '../../types/request';
 
@@ -29,39 +32,104 @@ export const RequestItemCard: React.FC<RequestItemCardProps> = ({
   availability,
 }) => {
   const { viewMode } = useWeightViewPreference();
-  const [quantity, setQuantity] = useState(item.quantityRequested);
   const isSteelItem = isWeightBasedItem({ weightPerMeter: item.weightPerMeter });
+  const hasFullWeightConfig = isSteelItem && item.weightPerMeter != null && item.lengthPerPiece != null;
+
+  const [entryMode, setEntryMode] = useState<'pieces' | 'kg' | 'ton'>('pieces');
+  const [amountStr, setAmountStr] = useState(String(item.quantityRequested || ''));
+  const [quantity, setQuantity] = useState(item.quantityRequested);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    if (entryMode === 'pieces') {
+      setAmountStr(String(item.quantityRequested || ''));
+    }
     setQuantity(item.quantityRequested);
-  }, [item.quantityRequested]);
+  }, [item.quantityRequested, entryMode]);
+
+  const handleModeChange = useCallback((m: 'pieces' | 'kg' | 'ton') => {
+    setEntryMode(m);
+    setErrorMsg(null);
+    if (quantity > 0 && hasFullWeightConfig) {
+      if (m === 'pieces') {
+        setAmountStr(String(quantity));
+      } else if (m === 'kg') {
+        setAmountStr(String(piecesToKg(quantity, item.weightPerMeter!, item.lengthPerPiece!)));
+      } else if (m === 'ton') {
+        setAmountStr(String(piecesToKg(quantity, item.weightPerMeter!, item.lengthPerPiece!) / 1000));
+      }
+    } else if (quantity > 0) {
+      setAmountStr(String(quantity));
+    } else {
+      setAmountStr('');
+    }
+  }, [quantity, hasFullWeightConfig, item.weightPerMeter, item.lengthPerPiece]);
+
+  const handleAmountChange = (text: string) => {
+    setAmountStr(text);
+    if (!text.trim()) {
+      setErrorMsg(null);
+      setQuantity(0);
+      onQuantityChange?.(item.itemId, 0);
+      return;
+    }
+
+    const num = parseFloat(text);
+    if (isNaN(num) || num < 0) {
+      setErrorMsg('Invalid amount');
+      return;
+    }
+
+    const isDiscreteUnit = (unit: string) => ['Pieces', 'Bags', 'Sets', 'Boxes', 'Rolls'].includes(unit);
+
+    if (entryMode === 'pieces' || !hasFullWeightConfig) {
+      if (entryMode === 'pieces' && hasFullWeightConfig && !Number.isInteger(num)) {
+        setErrorMsg('Pieces must be a whole number');
+        return;
+      }
+      if (!hasFullWeightConfig && isDiscreteUnit(item.unit) && !Number.isInteger(num)) {
+        setErrorMsg('Must be a whole number for this unit');
+        return;
+      }
+      setErrorMsg(null);
+      setQuantity(num);
+      onQuantityChange?.(item.itemId, num);
+    } else {
+      const kg = entryMode === 'ton' ? tonToKg(num) : num;
+      const res = kgToPieces(kg, item.weightPerMeter!, item.lengthPerPiece!);
+      if (!res.isExact) {
+        setErrorMsg(getConversionErrorMessage(kg, item.weightPerMeter!, item.lengthPerPiece!));
+      } else {
+        setErrorMsg(null);
+        setQuantity(res.pieces);
+        onQuantityChange?.(item.itemId, res.pieces);
+      }
+    }
+  };
 
   const handleIncrement = () => {
+    if (entryMode !== 'pieces' && hasFullWeightConfig) return;
     const newQty = quantity + 1;
+    setAmountStr(String(newQty));
     setQuantity(newQty);
+    setErrorMsg(null);
     onQuantityChange?.(item.itemId, newQty);
   };
 
   const handleDecrement = () => {
+    if (entryMode !== 'pieces' && hasFullWeightConfig) return;
     if (quantity > 1) {
       const newQty = quantity - 1;
+      setAmountStr(String(newQty));
       setQuantity(newQty);
+      setErrorMsg(null);
       onQuantityChange?.(item.itemId, newQty);
-    }
-  };
-
-  const handleQuantityInput = (text: string) => {
-    const num = parseInt(text, 10) || 0;
-    if (num >= 0) {
-      setQuantity(num);
-      onQuantityChange?.(item.itemId, num);
     }
   };
 
   return (
     <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
       <View className="flex-row gap-3">
-        {/* Image */}
         {item.imageUrl ? (
           <Image
             source={{ uri: item.imageUrl }}
@@ -74,14 +142,11 @@ export const RequestItemCard: React.FC<RequestItemCardProps> = ({
           </View>
         )}
 
-        {/* Content */}
         <View className="flex-1">
-          {/* Item Name */}
           <Text className="text-[15px] font-semibold text-[#0F172A] mb-1">
             {item.itemName}
           </Text>
 
-          {/* SKU & Type */}
           <View className="flex-row items-center gap-2 mb-2">
             <Text className="text-[13px] text-[#64748B]">{item.itemSku}</Text>
             <View className="w-1 h-1 rounded-full bg-[#64748B]" />
@@ -90,86 +155,112 @@ export const RequestItemCard: React.FC<RequestItemCardProps> = ({
             </Text>
           </View>
 
-          {/* Quantity Control */}
           {mode === 'create' || mode === 'edit' ? (
             <View>
+              {hasFullWeightConfig && (
+                <View className="flex-row gap-2 mb-3">
+                  {(['pieces', 'kg', 'ton'] as const).map((m) => (
+                    <TouchableOpacity
+                      key={m}
+                      className={`px-3 py-1.5 rounded-md border ${
+                        entryMode === m
+                          ? 'bg-[#1E40AF] border-[#1E40AF]'
+                          : 'bg-white border-[#E2E8F0]'
+                      }`}
+                      onPress={() => handleModeChange(m)}
+                    >
+                      <Text
+                        className={`text-[12px] font-medium ${
+                          entryMode === m ? 'text-white' : 'text-[#64748B]'
+                        }`}
+                      >
+                        {m === 'pieces' ? 'Pcs' : m === 'kg' ? 'Kg' : 'Ton'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
               <View className="flex-row items-center gap-3">
-                <Text className="text-[13px] text-[#64748B]">Quantity:</Text>
+                <Text className="text-[13px] text-[#64748B]">
+                  {entryMode === 'pieces' ? 'Quantity:' : entryMode === 'kg' ? 'Weight (Kg):' : 'Weight (Ton):'}
+                </Text>
                 <View className="flex-row items-center gap-2">
-                  <TouchableOpacity
-                    onPress={handleDecrement}
-                    className="w-8 h-8 border border-[#E2E8F0] rounded-full items-center justify-center"
-                    accessibilityRole="button"
-                    accessibilityLabel="Decrease quantity"
-                  >
-                    <Text className="text-[#1E40AF] text-lg">−</Text>
-                  </TouchableOpacity>
+                  {(!hasFullWeightConfig || entryMode === 'pieces') && (
+                    <TouchableOpacity
+                      onPress={handleDecrement}
+                      className="w-8 h-8 border border-[#E2E8F0] rounded-full items-center justify-center"
+                    >
+                      <Text className="text-[#1E40AF] text-lg">−</Text>
+                    </TouchableOpacity>
+                  )}
 
                   <TextInput
-                    value={String(quantity)}
-                    onChangeText={handleQuantityInput}
-                    keyboardType="numeric"
-                    className="w-16 border border-[#E2E8F0] rounded-lg px-2 text-center text-[15px] font-bold text-[#0F172A] bg-white"
-                    accessibilityLabel="Quantity input"
-                    style={{
-                      color: '#0F172A',
-                      textAlign: 'center',
-                      fontWeight: 'bold',
-                      fontSize: 15,
-                      minHeight: 44,
-                      paddingTop: 10,
-                      paddingBottom: 8,
-                    }}
-                    underlineColorAndroid="transparent"
-                    selectionColor="#1E40AF"
+                    value={amountStr}
+                    onChangeText={handleAmountChange}
+                    keyboardType="decimal-pad"
+                    className="border border-[#E2E8F0] rounded-lg px-2 text-center text-[15px] font-bold text-[#0F172A] bg-white"
+                    style={{ minWidth: 64, minHeight: 40, paddingVertical: 8 }}
                   />
 
-                  <TouchableOpacity
-                    onPress={handleIncrement}
-                    className="w-8 h-8 border border-[#1E40AF] rounded-full items-center justify-center bg-[#1E40AF]"
-                    accessibilityRole="button"
-                    accessibilityLabel="Increase quantity"
-                  >
-                    <Text className="text-white text-lg">+</Text>
-                  </TouchableOpacity>
+                  {(!hasFullWeightConfig || entryMode === 'pieces') && (
+                    <TouchableOpacity
+                      onPress={handleIncrement}
+                      className="w-8 h-8 border border-[#1E40AF] rounded-full items-center justify-center bg-[#1E40AF]"
+                    >
+                      <Text className="text-white text-lg">+</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {onRemove && (
                   <TouchableOpacity
                     onPress={() => onRemove(item.itemId)}
                     className="ml-auto w-9 h-9 items-center justify-center"
-                    accessibilityRole="button"
-                    accessibilityLabel="Remove item"
                   >
                     <Ionicons name="trash-outline" size={20} color="#DC2626" />
                   </TouchableOpacity>
                 )}
               </View>
-              {isSteelItem &&
-                item.weightPerMeter != null &&
-                item.lengthPerPiece != null &&
-                quantity > 0 && (
-                  <Text className="text-[13px] text-[#64748B] mt-1">
-                    ≈ {formatWeight(piecesToKg(quantity, item.weightPerMeter, item.lengthPerPiece), 'Kg')}
-                  </Text>
-                )}
+              
+              {hasFullWeightConfig && !errorMsg && quantity > 0 && entryMode !== 'pieces' && (
+                 <Text className="text-[13px] text-[#16A34A] mt-2 font-medium">
+                   = {quantity} pieces
+                 </Text>
+              )}
+              {hasFullWeightConfig && !errorMsg && quantity > 0 && entryMode === 'pieces' && (
+                 <Text className="text-[13px] text-[#64748B] mt-2">
+                   ≈ {formatWeight(piecesToKg(quantity, item.weightPerMeter!, item.lengthPerPiece!), 'Kg')}
+                 </Text>
+              )}
+
+              {errorMsg && (
+                <Text className="text-[12px] text-[#DC2626] mt-2 font-medium">
+                  {errorMsg}
+                </Text>
+              )}
             </View>
           ) : (
             <View className="flex-row items-center gap-2 flex-wrap">
               <Text className="text-[15px] text-[#0F172A]">Quantity: </Text>
-              <WeightDisplay
-                quantity={item.quantityRequested}
-                weightPerMeter={item.weightPerMeter}
-                lengthPerPiece={item.lengthPerPiece}
-                viewMode={viewMode}
-                unit="Pcs"
-              />
+              {hasFullWeightConfig ? (
+                <WeightDisplay
+                  quantity={item.quantityRequested}
+                  weightPerMeter={item.weightPerMeter}
+                  lengthPerPiece={item.lengthPerPiece}
+                  viewMode={viewMode}
+                  unit="Pcs"
+                />
+              ) : (
+                <Text className="text-[15px] text-[#0F172A]">
+                  {item.quantityRequested} {item.unit}
+                </Text>
+              )}
             </View>
           )}
 
-          {/* Availability Indicator (for Store Incharge) */}
           {availability && (
-            <View className={`mt-2 p-2 rounded-lg ${availability.sufficient ? 'bg-[#16A34A]/10' : 'bg-[#DC2626]/10'}`}>
+            <View className={`mt-3 p-2 rounded-lg ${availability.sufficient ? 'bg-[#16A34A]/10' : 'bg-[#DC2626]/10'}`}>
               <View className="flex-row items-center gap-2 flex-wrap">
                 <Ionicons
                   name={availability.sufficient ? 'checkmark-circle' : 'alert-circle'}
@@ -181,7 +272,7 @@ export const RequestItemCard: React.FC<RequestItemCardProps> = ({
                 </Text>
                 <View className="flex-row items-center gap-1 ml-auto">
                   <Text className="text-[13px] text-[#64748B]">Available: </Text>
-                  {isSteelItem && item.weightPerMeter != null && item.lengthPerPiece != null ? (
+                  {hasFullWeightConfig ? (
                     <WeightDisplay
                       quantity={availability.available}
                       weightPerMeter={item.weightPerMeter}
@@ -190,7 +281,9 @@ export const RequestItemCard: React.FC<RequestItemCardProps> = ({
                       unit="Pcs"
                     />
                   ) : (
-                    <Text className="text-[13px] text-[#64748B]">{availability.available}</Text>
+                    <Text className="text-[13px] text-[#64748B]">
+                      {availability.available} {item.unit}
+                    </Text>
                   )}
                 </View>
               </View>

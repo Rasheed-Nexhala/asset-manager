@@ -19,6 +19,9 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSelector } from 'react-redux';
+import { selectIsStoreIncharge } from '../../store/selectors/authSelectors';
+import { isLowStock } from '../../utils/inventoryUtils';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import {
@@ -55,6 +58,10 @@ export const SelectItemsScreen: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastDocRef = useRef<DocumentSnapshot | null>(null);
+
+  const isStoreIncharge = useSelector(selectIsStoreIncharge);
+  const isForPO = returnScreen === 'CreatePO';
+  const shouldRestrictStock = isForPO && isStoreIncharge;
 
   const hasMore = items.length < (totalCount ?? 0) && lastDoc != null;
   const filteredItems = items.filter((item) => !excludeItemIds.includes(item.id));
@@ -142,10 +149,11 @@ export const SelectItemsScreen: React.FC = () => {
   const handleAdd = useCallback(() => {
     const selected = filteredItems.filter((item) => selectedIds.has(item.id));
     if (selected.length === 0) return;
-    navigation.navigate(returnScreen as never, {
+    // @ts-ignore - dynamic navigation params
+    navigation.navigate(returnScreen as any, {
       ...returnParams,
       selectedItems: selected,
-    } as never);
+    } as any);
   }, [filteredItems, selectedIds, navigation, returnScreen, returnParams]);
 
   const handleBack = useCallback(() => {
@@ -155,16 +163,22 @@ export const SelectItemsScreen: React.FC = () => {
   const renderItem = useCallback(
     ({ item }: { item: Item }) => {
       const isSelected = selectedIds.has(item.id);
+      const isRestricted = shouldRestrictStock && !isLowStock(item);
+
       return (
         <TouchableOpacity
           className={`bg-white rounded-[10px] p-4 border mb-3 min-h-[48px] ${
             isSelected ? 'border-[#1E40AF] bg-[#1E40AF]/5' : 'border-[#E2E8F0]'
-          }`}
-          onPress={() => toggleItem(item.id)}
-          activeOpacity={0.7}
+          } ${isRestricted ? 'opacity-50' : ''}`}
+          onPress={() => {
+            if (!isRestricted) {
+              toggleItem(item.id);
+            }
+          }}
+          activeOpacity={isRestricted ? 1 : 0.7}
           accessibilityRole="checkbox"
           accessibilityLabel={`${item.name}, ${isSelected ? 'selected' : 'not selected'}`}
-          accessibilityState={{ checked: isSelected }}
+          accessibilityState={{ checked: isSelected, disabled: isRestricted }}
         >
           <View className="flex-row items-center">
             {/* Checkbox */}
@@ -172,6 +186,8 @@ export const SelectItemsScreen: React.FC = () => {
               className={`w-6 h-6 rounded border-2 mr-3 items-center justify-center ${
                 isSelected
                   ? 'bg-[#1E40AF] border-[#1E40AF]'
+                  : isRestricted
+                  ? 'bg-gray-100 border-[#CBD5E1]'
                   : 'bg-white border-[#E2E8F0]'
               }`}
             >
@@ -185,6 +201,7 @@ export const SelectItemsScreen: React.FC = () => {
                 source={{ uri: item.imageUrl }}
                 className="w-12 h-12 rounded-lg"
                 resizeMode="cover"
+                style={isRestricted ? { opacity: 0.5 } : undefined}
               />
             ) : (
               <View className="w-12 h-12 bg-[#F8FAFC] rounded-lg items-center justify-center">
@@ -192,18 +209,19 @@ export const SelectItemsScreen: React.FC = () => {
               </View>
             )}
             <View className="flex-1 ml-3">
-              <Text className="text-[15px] font-semibold text-[#0F172A]">
+              <Text className={`text-[15px] font-semibold ${isRestricted ? 'text-[#94A3B8]' : 'text-[#0F172A]'}`}>
                 {item.name}
               </Text>
               <Text className="text-[13px] text-[#64748B]">
                 SKU: {item.sku} • {item.categoryName ?? '—'}
+                {isRestricted && '\n(Sufficient Stock - Cannot Order)'}
               </Text>
             </View>
           </View>
         </TouchableOpacity>
       );
     },
-    [selectedIds, toggleItem]
+    [selectedIds, toggleItem, shouldRestrictStock]
   );
 
   const ListFooterComponent = useCallback(() => {

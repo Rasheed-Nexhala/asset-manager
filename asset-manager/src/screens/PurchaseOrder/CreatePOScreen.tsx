@@ -228,23 +228,26 @@ export const CreatePOScreen: React.FC = () => {
     });
   }, [navigation, poId, items]);
 
-  const handleQuantityChange = useCallback((itemId: string, delta: number) => {
+  const handleQuantityChange = useCallback((itemId: string, quantity: number, orderedUnit?: string, orderedQuantity?: number) => {
     setItems((prev) =>
       prev.map((p) => {
         if (p.itemId !== itemId) return p;
-        const q = Math.max(0, p.quantity + delta);
-        return { ...p, quantity: q, amount: q * p.unitPrice };
+        const q = Math.max(0, quantity);
+        // The unit price is entered per ordered unit. The amount should be orderedQuantity * unitPrice.
+        // If orderedQuantity isn't set (i.e. pieces), it defaults to q * unitPrice.
+        const orderQty = orderedQuantity ?? q;
+        return { ...p, quantity: q, orderedUnit, orderedQuantity, amount: orderQty * p.unitPrice };
       })
     );
   }, []);
 
   const handleUnitPriceChange = useCallback((itemId: string, price: number) => {
     setItems((prev) =>
-      prev.map((p) =>
-        p.itemId === itemId
-          ? { ...p, unitPrice: price, amount: p.quantity * price }
-          : p
-      )
+      prev.map((p) => {
+        if (p.itemId !== itemId) return p;
+        const orderQty = p.orderedQuantity ?? p.quantity;
+        return { ...p, unitPrice: price, amount: orderQty * price };
+      })
     );
   }, []);
 
@@ -281,6 +284,21 @@ export const CreatePOScreen: React.FC = () => {
         return;
       }
 
+      const invalidItem = items.find((i) => {
+        if (i.quantity <= 0) return true;
+        if (i.orderedUnit && (i.orderedUnit === 'Kg' || i.orderedUnit === 'Ton') && !Number.isInteger(i.quantity)) {
+          return true;
+        }
+        return false;
+      });
+      if (invalidItem) {
+        Alert.alert(
+          'Invalid quantity',
+          `Please review ${invalidItem.itemName}. Quantity must be positive and steel conversions must resolve to whole pieces.`
+        );
+        return;
+      }
+
       setIsSubmitting(true);
       setIsDraft(asDraft);
 
@@ -313,6 +331,8 @@ export const CreatePOScreen: React.FC = () => {
             quantity: i.quantity,
             unitPrice: i.unitPrice,
             gstPercentage: i.gstPercentage,
+            orderedUnit: i.orderedUnit,
+            orderedQuantity: i.orderedQuantity,
           })),
           justification: justification.trim(),
           expectedDeliveryDate: expectedDeliveryDate
@@ -627,18 +647,22 @@ export const CreatePOScreen: React.FC = () => {
                 {errors.items}
               </Text>
             )}
-            {items.map((item) => (
-              <View key={item.itemId} className="mb-3">
-                <POItemCard
-                  item={item}
-                  editable
-                  onRemove={() => handleRemoveItem(item.itemId)}
-                  onQuantityChange={(d) => handleQuantityChange(item.itemId, d)}
-                  onUnitPriceChange={(p) => handleUnitPriceChange(item.itemId, p)}
-                  onGstPercentageChange={(p) => handleGstPercentageChange(item.itemId, p)}
-                />
-              </View>
-            ))}
+            {items.map((item) => {
+              const invItem = allItems.find(i => i.id === item.itemId);
+              return (
+                <View key={item.itemId} className="mb-3">
+                  <POItemCard
+                    item={item}
+                    inventoryItem={invItem}
+                    editable
+                    onRemove={() => handleRemoveItem(item.itemId)}
+                    onQuantityChange={(q, u, o) => handleQuantityChange(item.itemId, q, u, o)}
+                    onUnitPriceChange={(p) => handleUnitPriceChange(item.itemId, p)}
+                    onGstPercentageChange={(p) => handleGstPercentageChange(item.itemId, p)}
+                  />
+                </View>
+              );
+            })}
           </View>
 
           {/* Summary */}

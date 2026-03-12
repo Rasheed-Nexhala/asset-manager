@@ -11,6 +11,8 @@ import {
   selectIsAuthenticated,
   selectRoleLoading,
   selectAuthInitialized,
+  selectIsAdmin,
+  selectIsStoreIncharge,
 } from '../store/selectors/authSelectors';
 import { AuthFlowScreen } from '../screens/Authentication/AuthFlowScreen';
 import { AuthCheckingScreen } from '../screens/Authentication/AuthCheckingScreen';
@@ -36,11 +38,17 @@ type NotificationData = {
  */
 function handleNotificationNavigation(
   data: NotificationData | undefined,
-  canNavigateToMain: boolean
+  canNavigateToMain: boolean,
+  isAdmin: boolean,
+  isStoreIncharge: boolean
 ): void {
   if (!data || !canNavigateToMain || !navigationRef.isReady()) return;
 
-  if (data.screen === 'ProcessRequest' && data.requestId) {
+  const canManageRequests = isAdmin || isStoreIncharge;
+  const canManagePo = isAdmin || isStoreIncharge;
+  const canReviewPo = isAdmin;
+
+  if (data.screen === 'ProcessRequest' && data.requestId && canManageRequests) {
     navigationRef.navigate('Main', {
       screen: 'Tabs',
       params: {
@@ -51,7 +59,7 @@ function handleNotificationNavigation(
         },
       },
     });
-  } else if (data.screen === 'RequestQueue') {
+  } else if (data.screen === 'RequestQueue' && canManageRequests) {
     navigationRef.navigate('Main', {
       screen: 'Tabs',
       params: {
@@ -59,7 +67,7 @@ function handleNotificationNavigation(
         params: { screen: 'RequestQueue' },
       },
     });
-  } else if ((data.screen === 'ApprovePO' || data.screen === 'ReceivePO') && data.poId) {
+  } else if (data.screen === 'ApprovePO' && data.poId && canReviewPo) {
     navigationRef.navigate('Main', {
       screen: 'Tabs',
       params: {
@@ -70,7 +78,18 @@ function handleNotificationNavigation(
         },
       },
     });
-  } else if (data.screen === 'PurchaseOrderList') {
+  } else if (data.screen === 'ReceivePO' && data.poId && canManagePo) {
+    navigationRef.navigate('Main', {
+      screen: 'Tabs',
+      params: {
+        screen: 'PurchaseOrders',
+        params: {
+          screen: data.screen,
+          params: { poId: data.poId },
+        },
+      },
+    });
+  } else if (data.screen === 'PurchaseOrderList' && canManagePo) {
     navigationRef.navigate('Main', {
       screen: 'Tabs',
       params: {
@@ -178,7 +197,9 @@ const MainStackNavigator: React.FC = () => {
  */
 function useNotificationResponseHandler(
   isAuthenticated: boolean,
-  isRoleLoading: boolean
+  isRoleLoading: boolean,
+  isAdmin: boolean,
+  isStoreIncharge: boolean
 ): void {
   const [coldStartData, setColdStartData] = useState<NotificationData | null>(null);
   const canNavigateToMain = isAuthenticated && !isRoleLoading;
@@ -195,10 +216,10 @@ function useNotificationResponseHandler(
 
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as NotificationData | undefined;
-      handleNotificationNavigation(data, canNavigateToMain);
+      handleNotificationNavigation(data, canNavigateToMain, isAdmin, isStoreIncharge);
     });
     return () => sub.remove();
-  }, [canNavigateToMain]);
+  }, [canNavigateToMain, isAdmin, isStoreIncharge]);
 
   // Process cold start when auth, role loaded, and nav are ready (may lag behind initial mount)
   useEffect(() => {
@@ -207,7 +228,7 @@ function useNotificationResponseHandler(
     const tryNavigate = (attempt = 0): void => {
       const maxAttempts = 50; // ~5s max wait
       if (navigationRef.isReady()) {
-        handleNotificationNavigation(coldStartData, canNavigateToMain);
+        handleNotificationNavigation(coldStartData, canNavigateToMain, isAdmin, isStoreIncharge);
         Notifications.clearLastNotificationResponseAsync();
         setColdStartData(null);
       } else if (attempt < maxAttempts) {
@@ -216,15 +237,22 @@ function useNotificationResponseHandler(
     };
 
     tryNavigate();
-  }, [canNavigateToMain, coldStartData]);
+  }, [canNavigateToMain, coldStartData, isAdmin, isStoreIncharge]);
 }
 
 export const RootNavigator: React.FC = () => {
   const authInitialized = useAppSelector(selectAuthInitialized);
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const isRoleLoading = useAppSelector(selectRoleLoading);
+  const isAdmin = useAppSelector(selectIsAdmin);
+  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
 
-  useNotificationResponseHandler(isAuthenticated, isRoleLoading);
+  useNotificationResponseHandler(
+    isAuthenticated,
+    isRoleLoading,
+    isAdmin,
+    isStoreIncharge
+  );
 
   return (
     <NavigationContainer ref={navigationRef}>

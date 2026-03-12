@@ -8,12 +8,15 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { PurchaseOrderItem } from '../../types/purchaseOrder';
+import type { Item } from '../../types/inventory';
+import { isWeightBasedItem, kgToPieces, tonToKg, formatWeight } from '../../utils/weightConversionUtils';
 
 interface POItemCardProps {
   item: PurchaseOrderItem;
+  inventoryItem?: Item | null;
   onRemove?: () => void;
   editable?: boolean;
-  onQuantityChange?: (delta: number) => void;
+  onQuantityChange?: (quantity: number, orderedUnit?: string, orderedQuantity?: number) => void;
   onUnitPriceChange?: (price: number) => void;
   onGstPercentageChange?: (percentage: number) => void;
 }
@@ -22,7 +25,6 @@ const formatCurrency = (amount: number): string => {
   return `₹${amount.toLocaleString('en-IN')}`;
 };
 
-/** Sanitize input to allow digits and one decimal point (e.g. "12.50", "12.") */
 const sanitizeDecimalInput = (t: string): string => {
   const sanitized = t.replace(/[^\d.]/g, '');
   const parts = sanitized.split('.');
@@ -34,18 +36,34 @@ const sanitizeDecimalInput = (t: string): string => {
 
 export const POItemCard: React.FC<POItemCardProps> = ({
   item,
+  inventoryItem,
   onRemove,
   editable = false,
   onQuantityChange,
   onUnitPriceChange,
   onGstPercentageChange,
 }) => {
+  const isSteel = inventoryItem ? isWeightBasedItem(inventoryItem) : false;
+  const hasFullWeightConfig = isSteel && inventoryItem?.weightPerMeter != null && inventoryItem?.lengthPerPiece != null;
+
+  const [entryMode, setEntryMode] = useState<'pieces' | 'kg' | 'ton'>('pieces');
+  const [quantityStr, setQuantityStr] = useState(
+    item.orderedQuantity ? String(item.orderedQuantity) : item.quantity > 0 ? String(item.quantity) : ''
+  );
+  
   const [unitPriceStr, setUnitPriceStr] = useState(
     item.unitPrice > 0 ? String(item.unitPrice) : ''
   );
   const [gstStr, setGstStr] = useState(
     (item.gstPercentage ?? 0) > 0 ? String(item.gstPercentage) : ''
   );
+  const [qtyError, setQtyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (item.orderedUnit === 'Kg') setEntryMode('kg');
+    else if (item.orderedUnit === 'Ton') setEntryMode('ton');
+    else setEntryMode('pieces');
+  }, [item.orderedUnit]);
 
   useEffect(() => {
     setUnitPriceStr(item.unitPrice > 0 ? String(item.unitPrice) : '');
@@ -55,13 +73,52 @@ export const POItemCard: React.FC<POItemCardProps> = ({
     setGstStr((item.gstPercentage ?? 0) > 0 ? String(item.gstPercentage) : '');
   }, [item.itemId]);
 
+  const handleQuantityInput = (text: string) => {
+    setQuantityStr(text);
+    if (!text.trim()) {
+      setQtyError(null);
+      onQuantityChange?.(0, entryMode === 'pieces' ? undefined : entryMode === 'kg' ? 'Kg' : 'Ton', 0);
+      return;
+    }
+
+    const num = parseFloat(text);
+    if (isNaN(num) || num < 0) {
+      setQtyError('Invalid amount');
+      return;
+    }
+
+    const isDiscreteUnit = (unit: string) => ['Pieces', 'Bags', 'Sets', 'Boxes', 'Rolls'].includes(unit);
+
+    if (entryMode === 'pieces' || !hasFullWeightConfig) {
+      if (entryMode === 'pieces' && hasFullWeightConfig && !Number.isInteger(num)) {
+        setQtyError('Must be whole number');
+        return;
+      }
+      if (!hasFullWeightConfig && isDiscreteUnit(inventoryItem?.unit || '') && !Number.isInteger(num)) {
+        setQtyError('Must be whole number for this unit');
+        return;
+      }
+      setQtyError(null);
+      onQuantityChange?.(num, undefined, undefined);
+    } else {
+      const kg = entryMode === 'ton' ? tonToKg(num) : num;
+      const res = kgToPieces(kg, inventoryItem!.weightPerMeter!, inventoryItem!.lengthPerPiece!);
+      if (!res.isExact) {
+        setQtyError('Inexact conversion');
+        return;
+      } else {
+        setQtyError(null);
+      }
+      onQuantityChange?.(res.pieces, entryMode === 'kg' ? 'Kg' : 'Ton', num);
+    }
+  };
+
   const gstPct = item.gstPercentage ?? 0;
-  const gstAmount =
-    item.gstAmount ?? Math.round((item.amount * gstPct) / 100);
+  const gstAmount = item.gstAmount ?? Math.round((item.amount * gstPct) / 100);
   const amountWithGst = item.amount + gstAmount;
+
   return (
     <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-3">
-      {/* Top row: Item name + Remove */}
       <View className="flex-row justify-between items-start mb-3">
         <View className="flex-1 min-w-0">
           <Text className="text-[15px] font-semibold text-[#0F172A]">
@@ -75,56 +132,69 @@ export const POItemCard: React.FC<POItemCardProps> = ({
           <TouchableOpacity
             onPress={onRemove}
             className="w-12 h-12 items-center justify-center -mr-2 -mt-1 rounded-full"
-            accessibilityLabel="Remove item"
-            accessibilityRole="button"
-            activeOpacity={0.7}
           >
             <Ionicons name="trash-outline" size={22} color="#DC2626" />
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Stacked layout: Quantity, Unit Price, GST, Amount — CIAMS gap-4 between fields, gap-1.5 label-to-input */}
       <View className="gap-4">
-        {/* Quantity — full-width stepper (CIAMS: minus=outline, plus=primary) */}
+        {editable && hasFullWeightConfig && (
+          <View className="gap-1.5">
+            <Text className="text-[15px] text-[#0F172A]">Order By</Text>
+            <View className="flex-row gap-2">
+              {(['pieces', 'kg', 'ton'] as const).map((m) => (
+                <TouchableOpacity
+                  key={m}
+                  className={`px-3 py-1.5 rounded-md border ${
+                    entryMode === m ? 'bg-[#1E40AF] border-[#1E40AF]' : 'bg-white border-[#E2E8F0]'
+                  }`}
+                  onPress={() => {
+                    setEntryMode(m);
+                    setQuantityStr('');
+                    setQtyError(null);
+                    onQuantityChange?.(0, m === 'pieces' ? undefined : m === 'kg' ? 'Kg' : 'Ton', 0);
+                  }}
+                >
+                  <Text className={`text-[12px] font-medium ${entryMode === m ? 'text-white' : 'text-[#64748B]'}`}>
+                    {m === 'pieces' ? 'Pieces' : m === 'kg' ? 'Kg' : 'Ton'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
         <View className="gap-1.5">
-          <Text className="text-[15px] text-[#0F172A]">Quantity</Text>
+          <Text className="text-[15px] text-[#0F172A]">Quantity {entryMode !== 'pieces' && `(${entryMode === 'kg' ? 'Kg' : 'Ton'})`}</Text>
           {editable && onQuantityChange ? (
-            <View className="flex-row items-center gap-3">
-              <TouchableOpacity
-                onPress={() => onQuantityChange(-1)}
-                className="w-12 h-12 border border-[#E2E8F0] rounded-full items-center justify-center bg-white"
-                accessibilityLabel="Decrease quantity"
-                accessibilityRole="button"
-                activeOpacity={0.7}
-              >
-                <Ionicons name="remove" size={22} color="#1E40AF" />
-              </TouchableOpacity>
-              <View className="flex-1 min-w-0 items-center justify-center h-12">
-                <Text className="text-[15px] font-medium text-[#0F172A]">
-                  {item.quantity}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => onQuantityChange(1)}
-                className="w-12 h-12 border-2 border-[#1E40AF] rounded-full items-center justify-center bg-[#1E40AF]"
-                accessibilityLabel="Increase quantity"
-                accessibilityRole="button"
-                activeOpacity={0.7}
-              >
-                <Ionicons name="add" size={22} color="white" />
-              </TouchableOpacity>
+            <View>
+              <TextInput
+                value={quantityStr}
+                onChangeText={handleQuantityInput}
+                placeholder="0"
+                placeholderTextColor="#94A3B8"
+                keyboardType="decimal-pad"
+                className={`border rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] ${
+                  qtyError ? 'border-[#DC2626]' : 'border-[#E2E8F0] focus:border-[#1E40AF]'
+                }`}
+              />
+              {qtyError && <Text className="text-[12px] text-[#DC2626] mt-1">{qtyError}</Text>}
+              {entryMode !== 'pieces' && !qtyError && item.quantity > 0 && (
+                <Text className="text-[12px] text-[#16A34A] mt-1">= {item.quantity} exact pieces</Text>
+              )}
             </View>
           ) : (
             <View className="h-12 justify-center">
-              <Text className="text-[15px] text-[#0F172A]">{item.quantity}</Text>
+              <Text className="text-[15px] text-[#0F172A]">
+                {item.orderedQuantity ? `${item.orderedQuantity} ${item.orderedUnit}` : `${item.quantity} Pieces`}
+              </Text>
             </View>
           )}
         </View>
 
-        {/* Unit Price — full-width input */}
         <View className="gap-1.5">
-          <Text className="text-[15px] text-[#0F172A]">Unit Price (₹)</Text>
+          <Text className="text-[15px] text-[#0F172A]">Unit Price (₹) {entryMode !== 'pieces' ? `per ${entryMode === 'kg' ? 'Kg' : 'Ton'}` : 'per Piece'}</Text>
           {editable && onUnitPriceChange ? (
             <TextInput
               value={unitPriceStr}
@@ -136,10 +206,6 @@ export const POItemCard: React.FC<POItemCardProps> = ({
               placeholder="0"
               placeholderTextColor="#94A3B8"
               keyboardType="decimal-pad"
-              {...(Platform.OS === 'android' && {
-                includeFontPadding: false,
-              })}
-              style={Platform.OS === 'android' ? { textAlignVertical: 'center' } : undefined}
               className="border border-[#E2E8F0] rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] focus:border-[#1E40AF]"
             />
           ) : (
@@ -151,7 +217,6 @@ export const POItemCard: React.FC<POItemCardProps> = ({
           )}
         </View>
 
-        {/* GST % — full-width input */}
         <View className="gap-1.5">
           <Text className="text-[15px] text-[#0F172A]">GST (%)</Text>
           {editable && onGstPercentageChange ? (
@@ -166,10 +231,6 @@ export const POItemCard: React.FC<POItemCardProps> = ({
               placeholder="0"
               placeholderTextColor="#94A3B8"
               keyboardType="decimal-pad"
-              {...(Platform.OS === 'android' && {
-                includeFontPadding: false,
-              })}
-              style={Platform.OS === 'android' ? { textAlignVertical: 'center' } : undefined}
               className="border border-[#E2E8F0] rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] focus:border-[#1E40AF]"
             />
           ) : (
@@ -184,7 +245,6 @@ export const POItemCard: React.FC<POItemCardProps> = ({
           )}
         </View>
 
-        {/* Amount (incl. GST) — full-width display; "—" when optional (0) */}
         <View className="gap-1.5">
           <Text className="text-[15px] text-[#0F172A]">
             Amount (incl. GST)

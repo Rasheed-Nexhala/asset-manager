@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import { selectAllItems, selectItemsLoading } from '../../store/selectors/inventorySelectors';
+import { isLowStock } from '../../utils/inventoryUtils';
 import type { Item } from '../../types/inventory';
 
 interface ItemSelectorModalProps {
@@ -19,6 +20,7 @@ interface ItemSelectorModalProps {
   onClose: () => void;
   onSelect: (items: Item[]) => void;
   excludeItemIds?: string[];
+  restrictToLowStock?: boolean;
 }
 
 export const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({
@@ -26,6 +28,7 @@ export const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({
   onClose,
   onSelect,
   excludeItemIds = [],
+  restrictToLowStock = false,
 }) => {
   const allItems = useSelector(selectAllItems);
   const isLoading = useSelector(selectItemsLoading);
@@ -131,12 +134,18 @@ export const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({
             renderItem={({ item }) => {
               const itemId = item?.id ?? '';
               const isSelected = selectedItems.has(itemId);
+              const isRestricted = restrictToLowStock && !isLowStock(item);
 
               return (
                 <TouchableOpacity
-                  onPress={() => itemId && toggleItem(itemId)}
-                  className="px-4 py-3 border-b border-[#E2E8F0]"
-                  activeOpacity={0.7}
+                  onPress={() => {
+                    if (itemId && !isRestricted) {
+                      toggleItem(itemId);
+                    }
+                  }}
+                  className={`px-4 py-3 border-b border-[#E2E8F0] ${isRestricted ? 'opacity-50' : ''}`}
+                  activeOpacity={isRestricted ? 1 : 0.7}
+                  disabled={isRestricted}
                 >
                   <View className="flex-row items-center gap-3">
                     {/* Checkbox */}
@@ -144,6 +153,8 @@ export const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({
                       className={`w-6 h-6 rounded border-2 items-center justify-center ${
                         isSelected
                           ? 'bg-[#1E40AF] border-[#1E40AF]'
+                          : isRestricted
+                          ? 'bg-gray-100 border-[#CBD5E1]'
                           : 'bg-white border-[#E2E8F0]'
                       }`}
                     >
@@ -157,6 +168,7 @@ export const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({
                       <Image
                         source={{ uri: item.imageUrl }}
                         className="w-12 h-12 rounded-lg"
+                        style={isRestricted ? { opacity: 0.5 } : undefined}
                       />
                     ) : (
                       <View className="w-12 h-12 rounded-lg bg-[#F1F5F9] items-center justify-center">
@@ -166,11 +178,12 @@ export const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({
 
                     {/* Item Info */}
                     <View className="flex-1">
-                      <Text className="text-[15px] font-semibold text-[#0F172A]">
+                      <Text className={`text-[15px] font-semibold ${isRestricted ? 'text-[#94A3B8]' : 'text-[#0F172A]'}`}>
                         {item.name ?? 'Unnamed Item'}
                       </Text>
                       <Text className="text-[13px] text-[#64748B]">
                         {item.sku ?? '—'} • {item.categoryName ?? '—'}
+                        {isRestricted && '\n(Sufficient Stock - Cannot Order)'}
                       </Text>
                     </View>
                   </View>

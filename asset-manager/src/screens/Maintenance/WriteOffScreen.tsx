@@ -108,7 +108,7 @@ export const WriteOffScreen: React.FC = () => {
     // Double confirmation dialog
     Alert.alert(
       'Confirm Write Off',
-      `Are you sure you want to write off ${writeOffQuantity} ${writeOffQuantity === 1 ? 'item' : 'items'}?\n\nThis action is PERMANENT and cannot be undone. The items will be permanently removed from total inventory.`,
+      `Are you sure you want to write off ${writeOffQuantity} ${writeOffQuantity === 1 ? 'Pc' : 'Pcs'}?\n\nThis action is PERMANENT and cannot be undone. The items will be permanently removed from total inventory.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -196,7 +196,7 @@ export const WriteOffScreen: React.FC = () => {
             <View className="flex-row justify-between items-center mt-2">
               <Text className="text-[13px] text-[#64748B]">Available Quantity</Text>
               <Text className="text-[15px] font-semibold text-[#0F172A]">
-                {maintenance.quantity}
+                {maintenance.quantity} Pcs
               </Text>
             </View>
           </View>
@@ -228,12 +228,23 @@ export const WriteOffScreen: React.FC = () => {
                 <Text className="text-[#1E40AF] text-xl font-bold">−</Text>
               </TouchableOpacity>
               <TextInput
-                className="border border-[#E2E8F0] rounded-lg h-12 px-4 bg-white flex-1 text-center text-xl font-bold"
-                value={writeOffQuantity.toString()}
+                className={`border rounded-lg h-12 px-4 bg-white flex-1 text-center text-xl font-bold ${errors.writeOffQuantity ? 'border-[#DC2626]' : 'border-[#E2E8F0]'}`}
+                value={Number.isNaN(writeOffQuantity) ? '' : writeOffQuantity.toString()}
                 onChangeText={(text) => {
+                  if (text === '') {
+                    setWriteOffQuantity(NaN as any);
+                    return;
+                  }
                   const num = parseInt(text, 10);
-                  if (!isNaN(num) && num > 0 && num <= maintenance.quantity) {
+                  if (!isNaN(num)) {
                     setWriteOffQuantity(num);
+                    if (num <= 0) {
+                      setErrors(prev => ({ ...prev, writeOffQuantity: 'Write-off quantity must be greater than 0' }));
+                    } else if (num > maintenance.quantity) {
+                      setErrors(prev => ({ ...prev, writeOffQuantity: `Cannot exceed ${maintenance.quantity}` }));
+                    } else {
+                      setErrors(prev => ({ ...prev, writeOffQuantity: '' }));
+                    }
                   }
                 }}
                 keyboardType="numeric"

@@ -327,7 +327,7 @@ export const MaintenanceDetailScreen: React.FC = () => {
           <View className="flex-row justify-between items-center">
             <Text className="text-[13px] text-[#64748B]">Quantity in Maintenance</Text>
             <Text className="text-[15px] font-semibold text-[#0F172A]">
-              {maintenance.quantity}
+              {maintenance.quantity} Pcs
             </Text>
           </View>
         </View>
@@ -448,7 +448,7 @@ export const MaintenanceDetailScreen: React.FC = () => {
                 <View className="flex-row justify-between items-center">
                   <Text className="text-[13px] text-[#64748B]">Returned Quantity</Text>
                   <Text className="text-[15px] text-[#0F172A]">
-                    {maintenance.returnedQuantity}
+                    {maintenance.returnedQuantity} Pcs
                   </Text>
                 </View>
               )}

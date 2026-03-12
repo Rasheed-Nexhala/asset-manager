@@ -188,7 +188,17 @@ service cloud.firestore {
      * Delete: Creator can delete own draft POs only
      */
     match /purchaseOrders/{poId} {
-      allow read, create, update: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge();
+      allow read, create: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge();
+      allow update: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge() &&
+        (
+          // Admin-only for approval/rejection transitions.
+          (
+            request.resource.data.status != resource.data.status &&
+            request.resource.data.status in ['approved', 'rejected']
+          )
+          ? isAdmin()
+          : true
+        );
       allow delete: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge() &&
         resource.data.status == 'draft' && resource.data.createdBy == request.auth.uid;
     }

@@ -40,8 +40,47 @@ const PURCHASE_ORDERS_COLLECTION = 'purchaseOrders';
 const PO_COUNTERS_COLLECTION = 'poCounters';
 const INVENTORY_COLLECTION = 'inventory';
 const ITEMS_COLLECTION = 'items';
+const USERS_COLLECTION = 'users';
 
 const DEFAULT_GST_PERCENTAGE = 18;
+
+const getInventoryDocId = (itemId: string, locationId: string): string =>
+  `${itemId}_${locationId}`;
+
+const validatePoItemQuantities = (
+  items: Array<{
+    itemName: string;
+    quantity: number;
+    orderedUnit?: string;
+    orderedQuantity?: number;
+  }>
+): void => {
+  for (const item of items) {
+    if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
+      throw new Error(`Invalid quantity for ${item.itemName}`);
+    }
+    if ((item.orderedUnit === 'Kg' || item.orderedUnit === 'Ton') && !Number.isInteger(item.quantity)) {
+      throw new Error(
+        `Invalid quantity for ${item.itemName}. Weight-based orders must convert to whole pieces.`
+      );
+    }
+    if (item.orderedQuantity != null && (!Number.isFinite(item.orderedQuantity) || item.orderedQuantity < 0)) {
+      throw new Error(`Invalid ordered quantity for ${item.itemName}`);
+    }
+  }
+};
+
+const ensureAdminUser = async (userId: string): Promise<void> => {
+  const userRef = doc(db, USERS_COLLECTION, userId);
+  const userSnap = await getDocFromServer(userRef);
+  if (!userSnap.exists()) {
+    throw new Error('User not found');
+  }
+  const role = userSnap.data()?.role;
+  if (role !== 'Admin') {
+    throw new Error('Only Admin can approve or reject purchase orders');
+  }
+};
 
 /**
  * Normalize items when reading from Firestore (backward compat for old POs without per-item GST)
@@ -65,6 +104,8 @@ const normalizePOItemsForRead = (
       gstPercentage: gstPct,
       gstAmount,
       receivedQuantity: (item.receivedQuantity as number | null) ?? null,
+      orderedUnit: (item.orderedUnit as string | undefined),
+      orderedQuantity: (item.orderedQuantity as number | undefined),
     };
   });
 
@@ -112,7 +153,8 @@ const buildPOItems = (
 ): PurchaseOrderFirestore['items'] =>
   items.map((item) => {
     const unitPrice = item.unitPrice ?? 0;
-    const amount = item.quantity * unitPrice;
+    const orderQty = item.orderedQuantity ?? item.quantity;
+    const amount = orderQty * unitPrice;
     const gstPct = item.gstPercentage ?? (unitPrice > 0 ? DEFAULT_GST_PERCENTAGE : 0);
     const gstAmount = gstPct > 0 ? Math.round((amount * gstPct) / 100) : 0;
     return {
@@ -126,6 +168,8 @@ const buildPOItems = (
       gstPercentage: gstPct,
       gstAmount,
       receivedQuantity: null,
+      orderedUnit: item.orderedUnit,
+      orderedQuantity: item.orderedQuantity,
     };
   });
 
@@ -154,6 +198,7 @@ export const createPO = async (
   createdByRole?: string
 ): Promise<string> => {
   try {
+    validatePoItemQuantities(data.items);
     const poNumber = await generatePoNumber();
     const items = buildPOItems(data.items);
     const { subtotal, gstAmount, totalAmount, gstPercentage } = calculateTotals(items);
@@ -313,6 +358,7 @@ export const updatePO = async (
   userName?: string
 ): Promise<PurchaseOrder | null> => {
   try {
+    validatePoItemQuantities(data.items);
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
     const poSnap = await getDocFromServer(poRef);
 
@@ -382,6 +428,7 @@ export const approvePO = async (
   data?: ApprovePOData
 ): Promise<void> => {
   try {
+    await ensureAdminUser(adminId);
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
     const poSnap = await getDocFromServer(poRef);
 
@@ -421,6 +468,7 @@ export const rejectPO = async (
   data: RejectPOData
 ): Promise<void> => {
   try {
+    await ensureAdminUser(adminId);
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
     const poSnap = await getDocFromServer(poRef);
 
@@ -512,26 +560,6 @@ export const receivePO = async (
     receiveData.receivedQuantities.map((r) => [r.itemId, r.receivedQuantity])
   );
 
-  // Query inventory refs before transaction
-  const inventoryRefs = new Map<string, { ref: any; hasStore: boolean }>();
-  for (const item of initialPoData.items) {
-    const receivedQty = receivedByQty.get(item.itemId) ?? 0;
-    if (receivedQty === 0) continue;
-
-    const storeInventoryQuery = query(
-      collection(db, INVENTORY_COLLECTION),
-      where('itemId', '==', item.itemId),
-      where('locationId', '==', storeLocationId),
-      limit(1)
-    );
-    const storeSnap = await getDocs(storeInventoryQuery);
-    if (storeSnap.empty) {
-      inventoryRefs.set(item.itemId, { ref: doc(collection(db, INVENTORY_COLLECTION)), hasStore: false });
-    } else {
-      inventoryRefs.set(item.itemId, { ref: storeSnap.docs[0].ref, hasStore: true });
-    }
-  }
-
   await runTransaction(db, async (transaction) => {
     // 1. Re-read PO document
     const poSnap = await transaction.get(poRef);
@@ -552,6 +580,9 @@ export const receivePO = async (
         throw new Error(
           `Invalid received quantity for ${item.itemName}: ${qty}. Must be between 0 and ${item.quantity}`
         );
+      }
+      if (!Number.isInteger(qty)) {
+        throw new Error(`Received quantity for ${item.itemName} must be a whole number`);
       }
     }
 
@@ -576,18 +607,19 @@ export const receivePO = async (
         throw new Error(`Item ${item.itemName} (${item.itemId}) not found`);
       }
 
-      const invInfo = inventoryRefs.get(item.itemId);
-      let invSnap = null;
-      if (invInfo && invInfo.hasStore) {
-        invSnap = await transaction.get(invInfo.ref);
-      }
+      const inventoryRef = doc(
+        db,
+        INVENTORY_COLLECTION,
+        getInventoryDocId(item.itemId, storeLocationId)
+      );
+      const invSnap = await transaction.get(inventoryRef);
 
       readsData.push({
         item,
         receivedQty,
         itemRef,
         itemData: itemSnap.data(),
-        invInfo,
+        inventoryRef,
         invSnap,
       });
     }
@@ -595,15 +627,15 @@ export const receivePO = async (
     // 3. Perform all writes
     const now = serverTimestamp();
     for (const data of readsData) {
-      const { item, receivedQty, itemRef, itemData, invInfo, invSnap } = data;
+      const { item, receivedQty, itemRef, itemData, inventoryRef, invSnap } = data;
 
-      if (invInfo.hasStore && invSnap && invSnap.exists()) {
-        transaction.update(invInfo.ref, {
+      if (invSnap && invSnap.exists()) {
+        transaction.update(inventoryRef, {
           quantity: invSnap.data().quantity + receivedQty,
           updatedAt: now,
         });
       } else {
-        transaction.set(invInfo.ref, {
+        transaction.set(inventoryRef, {
           itemId: item.itemId,
           itemName: item.itemName,
           itemSku: item.itemSku,

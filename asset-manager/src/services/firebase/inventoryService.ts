@@ -44,6 +44,12 @@ import { isLowStock } from '../../utils/inventoryUtils';
 const ITEMS_COLLECTION = 'items';
 const INVENTORY_COLLECTION = 'inventory';
 
+const getInventoryDocId = (itemId: string, locationId: string): string =>
+  `${itemId}_${locationId}`;
+
+const isDiscreteUnit = (unit: string): boolean =>
+  ['Pieces', 'Bags', 'Sets', 'Boxes', 'Rolls'].includes(unit);
+
 /**
  * Convert FirestoreItem to Item (for Redux store)
  */
@@ -626,6 +632,14 @@ export const createItem = async (
   categoryName: string
 ): Promise<string> => {
   try {
+    if (isDiscreteUnit(itemData.unit)) {
+      if (!Number.isInteger(itemData.initialQuantity)) {
+        throw new Error(`${itemData.unit} initial quantity must be a whole number`);
+      }
+      if (!Number.isInteger(itemData.minStockLevel)) {
+        throw new Error(`${itemData.unit} minimum stock must be a whole number`);
+      }
+    }
     const user = auth.currentUser;
     if (!user) {
       throw new Error('User must be authenticated to create items');
@@ -678,7 +692,11 @@ export const createItem = async (
     batch.set(itemRef, itemDocData);
 
     // Create initial inventory entry for central store
-    const inventoryRef = doc(collection(db, INVENTORY_COLLECTION));
+    const inventoryRef = doc(
+      db,
+      INVENTORY_COLLECTION,
+      getInventoryDocId(itemRef.id, getLocationId('store'))
+    );
     const inventoryDocData: Record<string, unknown> = {
       itemId: itemRef.id,
       itemName: itemData.name,
@@ -730,6 +748,11 @@ export const updateItem = async (
       throw new Error(`Item with ID ${id} not found`);
     }
     const itemData = itemDoc.data();
+
+    const resolvedUnit = updates.unit ?? itemData.unit;
+    if (updates.minStockLevel != null && isDiscreteUnit(resolvedUnit) && !Number.isInteger(updates.minStockLevel)) {
+      throw new Error(`${resolvedUnit} minimum stock must be a whole number`);
+    }
 
     // Enforce business rule: type cannot be changed after first transaction
     if (updates.type !== undefined && updates.type !== itemData.type) {
@@ -859,28 +882,11 @@ export const adjustQuantity = async (
     throw new Error('Location ID is required to adjust quantity');
   }
 
-  // Firestore transaction.get() accepts only DocumentReference, not Query.
-  // Fetch inventory doc ref OUTSIDE the transaction, then use it inside.
-  const inventoryQuery = query(
-    collection(db, INVENTORY_COLLECTION),
-    where('itemId', '==', adjustmentData.itemId),
-    where('locationId', '==', adjustmentData.locationId)
+  const inventoryDocRef = doc(
+    db,
+    INVENTORY_COLLECTION,
+    getInventoryDocId(adjustmentData.itemId, adjustmentData.locationId)
   );
-  const inventorySnapshot = await getDocs(inventoryQuery);
-
-  let inventoryDocRef: ReturnType<typeof doc>;
-  let currentQuantity = 0;
-  if (inventorySnapshot.empty) {
-    inventoryDocRef = doc(collection(db, INVENTORY_COLLECTION));
-    currentQuantity = 0;
-  } else {
-    const existingDoc = inventorySnapshot.docs[0];
-    if (!existingDoc?.ref) {
-      throw new Error('Invalid inventory snapshot: missing document reference');
-    }
-    inventoryDocRef = existingDoc.ref;
-    currentQuantity = existingDoc.data()?.quantity || 0;
-  }
 
   const itemRef = doc(db, ITEMS_COLLECTION, adjustmentData.itemId);
 
@@ -891,7 +897,7 @@ export const adjustQuantity = async (
       // Read inventory doc within transaction (transaction.get accepts DocumentReference only)
       const inventoryDoc = await transaction.get(inventoryDocRef);
       const invData = inventoryDoc.exists() ? inventoryDoc.data() : null;
-      const currentQty = invData?.quantity ?? currentQuantity;
+      const currentQty = invData?.quantity ?? 0;
 
       // Read item within transaction
       const itemDoc = await transaction.get(itemRef);

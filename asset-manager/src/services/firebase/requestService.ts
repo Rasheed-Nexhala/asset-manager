@@ -38,6 +38,9 @@ const REQUEST_COUNTERS_COLLECTION = 'requestCounters';
 const INVENTORY_COLLECTION = 'inventory';
 const ITEMS_COLLECTION = 'items';
 
+const getInventoryDocId = (itemId: string, locationId: string): string =>
+  `${itemId}_${locationId}`;
+
 /**
  * Generate unique request number using a counter document.
  * Format: REQ-YYYY-NNNN
@@ -371,30 +374,21 @@ export const transferRequest = async (
         throw new Error('Request has no items to transfer');
       }
 
-      // Step 2: Query all inventory documents we'll need (outside transaction)
+      // Step 2: Build deterministic inventory refs (outside transaction)
       const inventoryRefs: Map<string, { storeRef: any; siteRef: any }> = new Map();
 
       for (const item of items) {
-        // Query central store inventory
-        const centralStoreQuery = query(
-          collection(db, INVENTORY_COLLECTION),
-          where('itemId', '==', item.itemId),
-          where('locationId', '==', 'store'),
-          limit(1)
-        );
-        const centralStoreSnap = await getDocs(centralStoreQuery);
-        const storeRef = centralStoreSnap.empty ? null : centralStoreSnap.docs[0].ref;
-
-        // Query site inventory
         const siteLocationId = `site_${requestData.siteId}`;
-        const siteInventoryQuery = query(
-          collection(db, INVENTORY_COLLECTION),
-          where('itemId', '==', item.itemId),
-          where('locationId', '==', siteLocationId),
-          limit(1)
+        const storeRef = doc(
+          db,
+          INVENTORY_COLLECTION,
+          getInventoryDocId(item.itemId, 'store')
         );
-        const siteInventorySnap = await getDocs(siteInventoryQuery);
-        const siteRef = siteInventorySnap.empty ? null : siteInventorySnap.docs[0].ref;
+        const siteRef = doc(
+          db,
+          INVENTORY_COLLECTION,
+          getInventoryDocId(item.itemId, siteLocationId)
+        );
 
         inventoryRefs.set(item.itemId, { storeRef, siteRef });
       }
@@ -433,6 +427,9 @@ export const transferRequest = async (
       // Read all documents upfront
       for (const item of requestData.items) {
         const quantity = item.quantityApproved;
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+          throw new Error(`Invalid approved quantity for ${item.itemName}`);
+        }
 
         const refs = inventoryRefs.get(item.itemId);
         if (!refs) continue;
@@ -443,16 +440,10 @@ export const transferRequest = async (
         const itemData = itemSnap.exists() ? itemSnap.data() : null;
         
         // Read central store inventory
-        let storeDoc = null;
-        if (refs.storeRef) {
-          storeDoc = await transaction.get(refs.storeRef);
-        }
+        const storeDoc = await transaction.get(refs.storeRef);
         
         // Read site inventory
-        let siteDoc = null;
-        if (refs.siteRef) {
-          siteDoc = await transaction.get(refs.siteRef);
-        }
+        const siteDoc = await transaction.get(refs.siteRef);
         
         // Store all read data for this item
         readsData.push({
@@ -477,10 +468,15 @@ export const transferRequest = async (
         // Decrement central store
         if (storeDoc && storeDoc.exists()) {
           const currentQty = storeDoc.data().quantity;
+          if (currentQty < quantity) {
+            throw new Error(`Insufficient stock for ${item.itemName} in central store. Available: ${currentQty}, Required: ${quantity}`);
+          }
           transaction.update(refs.storeRef, {
             quantity: currentQty - quantity,
             updatedAt: serverTimestamp(),
           });
+        } else {
+          throw new Error(`Item ${item.itemName} not found in central store inventory`);
         }
         
         // Increment or create site inventory
@@ -493,7 +489,6 @@ export const transferRequest = async (
         } else {
           // Create new inventory entry - copy lengthPerPiece from central store if present
           const siteLocationId = `site_${requestData.siteId}`;
-          const newInventoryRef = doc(collection(db, INVENTORY_COLLECTION));
           const storeLengthPerPiece = storeDoc?.exists() ? storeDoc.data().lengthPerPiece : undefined;
           const lengthToUse = storeLengthPerPiece ?? item.lengthPerPiece;
           const newEntry: Record<string, unknown> = {
@@ -507,11 +502,14 @@ export const transferRequest = async (
             updatedAt: serverTimestamp(),
           };
           if (lengthToUse != null) newEntry.lengthPerPiece = lengthToUse;
-          transaction.set(newInventoryRef, newEntry);
+          transaction.set(refs.siteRef, newEntry);
         }
 
         // Update item's denormalized stock totals
         if (itemData) {
+          if ((itemData.centralStoreQuantity || 0) < quantity) {
+            throw new Error(`Insufficient central store stock tracked on item document for ${item.itemName}`);
+          }
           transaction.update(itemRef, {
             centralStoreQuantity: (itemData.centralStoreQuantity || 0) - quantity,
             atSitesQuantity: (itemData.atSitesQuantity || 0) + quantity,
@@ -657,38 +655,28 @@ const returnItemsBatch = async (
       throw new Error('Only transferred or partially returned requests can have items returned');
     }
 
-    // ─── Step 2: Query inventory document refs ───
-    const inventoryRefs: Map<string, { siteRef: any; storeRef: any; hasStore: boolean }> = new Map();
+    // ─── Step 2: Build deterministic inventory refs ───
+    const inventoryRefs: Map<string, { siteRef: any; storeRef: any }> = new Map();
 
     for (const returnItem of returnData.items) {
       const item = requestDataOuter.items.find((i: any) => i.itemId === returnItem.itemId);
       if (!item || item.itemType === 'consumable') continue;
 
-      // Site inventory
       const siteLocationId = `site_${requestDataOuter.siteId}`;
-      const siteInventoryQuery = query(
-        collection(db, INVENTORY_COLLECTION),
-        where('itemId', '==', returnItem.itemId),
-        where('locationId', '==', siteLocationId),
-        limit(1)
+      const siteRef = doc(
+        db,
+        INVENTORY_COLLECTION,
+        getInventoryDocId(returnItem.itemId, siteLocationId)
       );
-      const siteSnap = await getDocs(siteInventoryQuery);
-      const siteRef = siteSnap.empty ? null : siteSnap.docs[0].ref;
-
-      // Central store inventory
-      const storeInventoryQuery = query(
-        collection(db, INVENTORY_COLLECTION),
-        where('itemId', '==', returnItem.itemId),
-        where('locationId', '==', 'store'),
-        limit(1)
+      const storeRef = doc(
+        db,
+        INVENTORY_COLLECTION,
+        getInventoryDocId(returnItem.itemId, 'store')
       );
-      const storeSnap = await getDocs(storeInventoryQuery);
-      const storeRef = storeSnap.empty ? null : storeSnap.docs[0].ref;
 
       inventoryRefs.set(returnItem.itemId, {
         siteRef,
         storeRef,
-        hasStore: !storeSnap.empty,
       });
     }
 
@@ -708,6 +696,9 @@ const returnItemsBatch = async (
       for (const returnItem of returnData.items) {
         const item = requestData.items.find((i: any) => i.itemId === returnItem.itemId);
         if (!item || item.itemType === 'consumable') continue;
+        if (!Number.isInteger(returnItem.quantityReturned) || returnItem.quantityReturned < 1) {
+          throw new Error(`Invalid return quantity for ${item.itemName}`);
+        }
         const currentReturned = item.quantityReturned ?? 0;
         const remaining = item.quantityApproved - currentReturned;
         if (returnItem.quantityReturned > remaining || returnItem.quantityReturned < 1) {
@@ -731,15 +722,8 @@ const returnItemsBatch = async (
         const itemRef = doc(db, ITEMS_COLLECTION, returnItem.itemId);
         const itemSnap = await transaction.get(itemRef);
 
-        let siteDoc = null;
-        if (refs.siteRef) {
-          siteDoc = await transaction.get(refs.siteRef);
-        }
-
-        let storeDoc = null;
-        if (refs.hasStore && refs.storeRef) {
-          storeDoc = await transaction.get(refs.storeRef);
-        }
+        const siteDoc = await transaction.get(refs.siteRef);
+        const storeDoc = await transaction.get(refs.storeRef);
 
         readsData.push({
           returnItem,
@@ -762,23 +746,26 @@ const returnItemsBatch = async (
         // Update site inventory
         if (siteDoc && siteDoc.exists()) {
           const currentSiteQty = siteDoc.data().quantity;
+          if (currentSiteQty < qty) {
+            throw new Error(`Insufficient stock at site for ${item.itemName}. Available: ${currentSiteQty}, Trying to return: ${qty}`);
+          }
           transaction.update(refs.siteRef, {
             quantity: currentSiteQty - qty,
             updatedAt: now,
           });
+        } else {
+          throw new Error(`Item ${item.itemName} not found in site inventory. Cannot return.`);
         }
 
         // Update central store inventory
-        if (refs.hasStore && storeDoc && storeDoc.exists()) {
+        if (storeDoc && storeDoc.exists()) {
           const currentStoreQty = storeDoc.data().quantity;
           transaction.update(refs.storeRef, {
             quantity: currentStoreQty + qty,
             updatedAt: now,
           });
         } else {
-          // Store entry doesn't exist yet – create it
-          const newInventoryRef = doc(collection(db, INVENTORY_COLLECTION));
-          transaction.set(newInventoryRef, {
+          const newEntry: Record<string, unknown> = {
             itemId: returnItem.itemId,
             itemName: item.itemName,
             itemSku: item.itemSku,
@@ -787,7 +774,10 @@ const returnItemsBatch = async (
             locationName: 'Central Store',
             quantity: qty,
             updatedAt: now,
-          });
+          };
+          if (item.lengthPerPiece != null) newEntry.lengthPerPiece = item.lengthPerPiece;
+          if (item.weightPerMeter != null) newEntry.weightPerMeter = item.weightPerMeter;
+          transaction.set(refs.storeRef, newEntry);
         }
 
         // Update item denormalized stock totals

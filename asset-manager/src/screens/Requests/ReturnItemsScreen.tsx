@@ -322,7 +322,8 @@ export const ReturnItemsScreen: React.FC = () => {
                             {returnedItem.itemName}
                           </Text>
                           <Text className="text-[15px] text-[#0F172A]">
-                            {returnedItem.quantityReturned} returned
+                            {returnedItem.quantityReturned}{' '}
+                            {request.items.find(i => i.itemId === returnedItem.itemId)?.unit ?? 'units'} returned
                           </Text>
                         </View>
                         {isDamaged && (
@@ -415,7 +416,9 @@ export const ReturnItemsScreen: React.FC = () => {
                         unit="Pcs"
                       />
                     ) : (
-                      <Text className="text-[13px] text-[#64748B]">{item.remainingQuantity}</Text>
+                      <Text className="text-[13px] text-[#64748B]">
+                        {item.remainingQuantity} {requestItem?.unit ?? ''}
+                      </Text>
                     )}
                   </View>
                 </TouchableOpacity>

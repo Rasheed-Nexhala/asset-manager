@@ -1,5 +1,7 @@
 import React from 'react';
+import { useSelector } from 'react-redux';
 import { ItemSelectorModal } from '../Requests/ItemSelectorModal';
+import { selectIsStoreIncharge } from '../../store/selectors/authSelectors';
 import type { Item } from '../../types/inventory';
 
 interface POItemSelectorModalProps {
@@ -16,5 +18,6 @@ interface POItemSelectorModalProps {
 export const POItemSelectorModal: React.FC<POItemSelectorModalProps> = (
   props
 ) => {
-  return <ItemSelectorModal {...props} />;
+  const isStoreIncharge = useSelector(selectIsStoreIncharge);
+  return <ItemSelectorModal {...props} restrictToLowStock={isStoreIncharge} />;
 };

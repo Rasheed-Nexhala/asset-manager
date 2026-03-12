@@ -42,15 +42,19 @@ export const RequestStackNavigator: React.FC = () => {
         presentation: 'card',
       }}
     >
-      <Stack.Screen name="RequestQueue" component={RequestQueueScreen} />
       <Stack.Screen name="MyRequests" component={MyRequestsScreen} />
       <Stack.Screen name="CreateRequest" component={CreateRequestScreen} />
-      <Stack.Screen name="ProcessRequest" component={ProcessRequestScreen} />
       <Stack.Screen name="EditRequest" component={EditRequestScreen} />
-      <Stack.Screen name="RejectRequest" component={RejectRequestScreen} />
-      <Stack.Screen name="ConfirmTransfer" component={ConfirmTransferScreen} />
       <Stack.Screen name="ReturnItems" component={ReturnItemsScreen} />
       <Stack.Screen name="SelectItems" component={SelectItemsScreen} />
+      {(isAdmin || isStoreIncharge) && (
+        <>
+          <Stack.Screen name="RequestQueue" component={RequestQueueScreen} />
+          <Stack.Screen name="ProcessRequest" component={ProcessRequestScreen} />
+          <Stack.Screen name="RejectRequest" component={RejectRequestScreen} />
+          <Stack.Screen name="ConfirmTransfer" component={ConfirmTransferScreen} />
+        </>
+      )}
     </Stack.Navigator>
   );
 };

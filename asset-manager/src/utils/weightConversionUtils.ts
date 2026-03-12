@@ -82,7 +82,9 @@ export function kgToPieces(
   }
 
   const calculatedPieces = kg / weightPerPiece;
-  const isExact = Number.isInteger(calculatedPieces);
+  const EPSILON = 0.0001;
+  const roundedPieces = Math.round(calculatedPieces);
+  const isExact = Math.abs(calculatedPieces - roundedPieces) < EPSILON;
 
   if (!isExact) {
     const floorPieces = Math.floor(calculatedPieces);
@@ -104,7 +106,7 @@ export function kgToPieces(
 
   return {
     isExact: true,
-    pieces: calculatedPieces,
+    pieces: roundedPieces,
     actualKg: kg,
     weightPerPiece,
   };

@@ -346,11 +346,13 @@ export const ApprovePOScreen: React.FC = () => {
                   className="text-[15px] text-[#0F172A]"
                   numberOfLines={1}
                 >
-                  {item.quantity}
+                  {item.orderedQuantity != null && item.orderedUnit
+                    ? `${item.orderedQuantity} ${item.orderedUnit}`
+                    : `${item.quantity} Pcs`}
                 </Text>
               </View>
               <View className="shrink-0 min-w-[72px] items-end">
-                <Text className="text-[13px] text-[#64748B] mb-0.5">Unit</Text>
+                <Text className="text-[13px] text-[#64748B] mb-0.5">Unit Price</Text>
                 <Text
                   className="text-[15px] text-[#0F172A]"
                   numberOfLines={1}

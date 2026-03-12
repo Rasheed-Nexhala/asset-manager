@@ -30,6 +30,8 @@ import type { SteelMaster } from '../../types/steelMaster';
 
 /** Check if unit is weight-based (Kg or Ton) */
 const isWeightUnit = (unit: string): boolean => unit === 'Kg' || unit === 'Ton (MT)';
+const isDiscreteUnit = (unit: string): boolean =>
+  ['Pieces', 'Bags', 'Sets', 'Boxes', 'Rolls'].includes(unit);
 
 /**
  * Component Props Interface
@@ -472,6 +474,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         newErrors.initialQuantity = 'Initial quantity is required';
       } else if (isNaN(quantity) || quantity < 0) {
         newErrors.initialQuantity = 'Must be a valid number (0 or greater)';
+      } else if (!isWeightBased && isDiscreteUnit(formData.unit) && !Number.isInteger(quantity)) {
+        newErrors.initialQuantity = `${formData.unit} must be a whole number`;
       } else if (
         isWeightBased &&
         weightConfig &&
@@ -500,6 +504,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       newErrors.minStockLevel = 'Minimum stock level cannot be negative';
     } else if (minStock > MIN_STOCK_MAX) {
       newErrors.minStockLevel = `Minimum stock level seems unreasonably high (max ${MIN_STOCK_MAX.toLocaleString()})`;
+    } else if (!isWeightBased && isDiscreteUnit(formData.unit) && !Number.isInteger(minStock)) {
+      newErrors.minStockLevel = `${formData.unit} must be a whole number`;
     } else if (mode === 'create') {
       const initialQty = parseFloat(formData.initialQuantity);
       if (!isNaN(initialQty) && minStock > initialQty) {

@@ -22,6 +22,8 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   selectUserId,
   selectUserDisplayName,
+  selectIsAdmin,
+  selectIsStoreIncharge,
 } from '../../store/selectors/authSelectors';
 import type { Request } from '../../types/request';
 import type { RequestStackParamList } from '../../navigation/RequestStackParamList';
@@ -44,6 +46,8 @@ export const ConfirmTransferScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
+  const isAdmin = useAppSelector(selectIsAdmin);
+  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const { viewMode } = useWeightViewPreference();
 
   const [request, setRequest] = useState<Request | null>(null);
@@ -54,6 +58,14 @@ export const ConfirmTransferScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!isAdmin && !isStoreIncharge) {
+      Alert.alert('Access denied', 'Only Admin and Store Incharge can confirm transfers.', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+      setIsLoading(false);
+      return;
+    }
+
     let cancelled = false;
     requestService
       .getRequestById(requestId)
@@ -82,7 +94,7 @@ export const ConfirmTransferScreen: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [requestId, navigation]);
+  }, [requestId, navigation, isAdmin, isStoreIncharge]);
 
   const validateForm = (): boolean => {
     const newErrors: { receivedBy?: string } = {};
@@ -183,7 +195,9 @@ export const ConfirmTransferScreen: React.FC = () => {
                           unit="Pcs"
                         />
                       ) : (
-                        <Text className="text-[13px] text-[#64748B]">{item.quantityApproved}</Text>
+                        <Text className="text-[13px] text-[#64748B]">
+                          {item.quantityApproved} {item.unit}
+                        </Text>
                       )}
                     </View>
                   </View>

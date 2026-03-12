@@ -21,9 +21,10 @@ import type { RootState } from '../../../store';
 import type { Maintenance } from '../../../types/maintenance';
 
 const mockGoBack = jest.fn();
+let mockRouteParams = { maintenanceId: 'm1' };
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: jest.fn(), goBack: mockGoBack }),
-  useRoute: () => ({ params: { maintenanceId: 'm1' } }),
+  useRoute: () => ({ params: mockRouteParams }),
   useIsFocused: () => true,
 }));
 
@@ -213,6 +214,7 @@ const defaultPreloadedState: Partial<RootState> = {
 describe('WriteOffScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockRouteParams = { maintenanceId: 'm1' };
   });
 
   it('shows loading state when maintenance is null', () => {
@@ -240,7 +242,7 @@ describe('WriteOffScreen', () => {
     expect(screen.getByRole('header', { name: 'Write Off Item' })).toBeTruthy();
     expect(screen.getByText('Steel Bar')).toBeTruthy();
     expect(screen.getByText('SKU: SKU-001')).toBeTruthy();
-    expect(screen.getByText('5')).toBeTruthy(); // Available quantity
+    expect(screen.getByText('5 Pcs')).toBeTruthy(); // Available quantity
     expect(screen.getByRole('button', { name: 'Write-off reason selector' })).toBeTruthy();
     expect(screen.getByPlaceholderText('Detailed explanation for write-off')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Write off item' })).toBeTruthy();
@@ -368,5 +370,164 @@ describe('WriteOffScreen', () => {
     expect(mockGoBack).toHaveBeenCalled();
     alertSpy.mockRestore();
     dispatchSpy.mockRestore();
+  });
+
+  it('displays "1 Pcs" when maintenance quantity is 1', () => {
+    const singleItemMaintenance: Maintenance = {
+      ...mockMaintenance,
+      id: 'm1',
+      quantity: 1,
+    };
+
+    const stateWithSingleItem: Partial<RootState> = {
+      ...defaultPreloadedState,
+      maintenance: {
+        maintenanceRecords: [singleItemMaintenance],
+        selectedMaintenance: null,
+        loading: false,
+        error: null,
+        errorTimestamp: null,
+        filters: { status: 'all' },
+      },
+    };
+
+    renderWithStore(<WriteOffScreen />, stateWithSingleItem);
+
+    expect(screen.getByText('1 Pcs')).toBeTruthy();
+  });
+
+  it('manual quantity input: typing valid number updates display', () => {
+    renderWithStore(<WriteOffScreen />, defaultPreloadedState);
+
+    const quantityInput = screen.getByDisplayValue('5');
+    fireEvent.changeText(quantityInput, '2');
+
+    expect(screen.getByDisplayValue('2')).toBeTruthy();
+  });
+
+  it('manual quantity input: exceeding max shows validation error', () => {
+    renderWithStore(<WriteOffScreen />, defaultPreloadedState);
+
+    const quantityInput = screen.getByDisplayValue('5');
+    fireEvent.changeText(quantityInput, '10');
+
+    fireEvent.press(screen.getByRole('button', { name: 'Write off item' }));
+
+    expect(screen.getByText(/Cannot exceed 5/)).toBeTruthy();
+  });
+
+  it('manual quantity input: zero shows validation error', () => {
+    renderWithStore(<WriteOffScreen />, defaultPreloadedState);
+
+    const quantityInput = screen.getByDisplayValue('5');
+    fireEvent.changeText(quantityInput, '0');
+
+    fireEvent.press(screen.getByRole('button', { name: 'Write off item' }));
+
+    expect(screen.getByText(/Write-off quantity is required|Write-off quantity must be greater than 0/)).toBeTruthy();
+  });
+
+  it('confirmation dialog shows correct quantity text for single item', async () => {
+    const singleItemMaintenance: Maintenance = {
+      ...mockMaintenance,
+      id: 'm1',
+      quantity: 1,
+    };
+
+    const stateWithSingleItem: Partial<RootState> = {
+      ...defaultPreloadedState,
+      maintenance: {
+        maintenanceRecords: [singleItemMaintenance],
+        selectedMaintenance: null,
+        loading: false,
+        error: null,
+        errorTimestamp: null,
+        filters: { status: 'all' },
+      },
+    };
+
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((title, message, buttons) => {
+      if (title === 'Confirm Write Off') {
+        expect(message).toContain('1 Pc');
+        buttons?.find((b) => b.text === 'Confirm Write Off')?.onPress?.();
+      } else if (title === 'Success') {
+        expect(message).toContain('1 item');
+        buttons?.find((b) => b.text === 'OK')?.onPress?.();
+      }
+    });
+
+    renderWithStore(<WriteOffScreen />, stateWithSingleItem);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Write-off reason selector' }));
+    fireEvent.press(screen.getByText('Beyond Repair'));
+    fireEvent.press(screen.getByRole('button', { name: 'Write off item' }));
+
+    mockWriteOffResolve!();
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Confirm Write Off',
+        expect.stringContaining('1 Pc'),
+        expect.any(Array)
+      );
+    });
+
+    alertSpy.mockRestore();
+  });
+
+  it('submit with partial quantity (2 out of 5) succeeds', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((title, _message, buttons) => {
+      if (title === 'Confirm Write Off') {
+        buttons?.find((b) => b.text === 'Confirm Write Off')?.onPress?.();
+      } else if (title === 'Success') {
+        buttons?.find((b) => b.text === 'OK')?.onPress?.();
+      }
+    });
+
+    renderWithStore(<WriteOffScreen />, defaultPreloadedState);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Decrease quantity' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Decrease quantity' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Decrease quantity' }));
+    expect(screen.getByDisplayValue('2')).toBeTruthy();
+
+    fireEvent.press(screen.getByRole('button', { name: 'Write-off reason selector' }));
+    fireEvent.press(screen.getByText('Beyond Repair'));
+    fireEvent.press(screen.getByRole('button', { name: 'Write off item' }));
+
+    mockWriteOffResolve!();
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Success',
+        expect.stringMatching(/2 items written off successfully/),
+        expect.any(Array)
+      );
+    });
+
+    expect(mockGoBack).toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  it('accessibility: Write off item button has correct role and label', () => {
+    renderWithStore(<WriteOffScreen />, defaultPreloadedState);
+
+    const button = screen.getByRole('button', { name: 'Write off item' });
+    expect(button).toBeTruthy();
+    expect(button.props.accessibilityLabel).toBe('Write off item');
+    expect(button.props.accessibilityRole).toBe('button');
+  });
+
+  it('accessibility: increment and decrement buttons have correct labels', () => {
+    renderWithStore(<WriteOffScreen />, defaultPreloadedState);
+
+    expect(screen.getByRole('button', { name: 'Decrease quantity' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Increase quantity' })).toBeTruthy();
+  });
+
+  it('renders danger warning banner', () => {
+    renderWithStore(<WriteOffScreen />, defaultPreloadedState);
+
+    expect(screen.getByText('This permanently reduces total inventory. Cannot be undone.')).toBeTruthy();
   });
 });

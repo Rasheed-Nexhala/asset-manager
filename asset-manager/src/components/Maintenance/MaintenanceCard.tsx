@@ -54,7 +54,7 @@ export default function MaintenanceCard({ maintenance, onPress }: MaintenanceCar
           </View>
           <View className="flex-1">
             <Text className="text-[13px] text-[#64748B]">Quantity</Text>
-            <Text className="text-[15px] text-[#0F172A]">{maintenance.quantity}</Text>
+            <Text className="text-[15px] text-[#0F172A]">{maintenance.quantity} Pcs</Text>
           </View>
         </View>
         

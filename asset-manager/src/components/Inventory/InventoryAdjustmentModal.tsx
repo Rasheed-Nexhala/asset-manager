@@ -126,12 +126,21 @@ export const InventoryAdjustmentModal: React.FC<InventoryAdjustmentModalProps> =
       }
     }
 
+    const isDiscreteUnit = (unit: string) => ['Pieces', 'Bags', 'Sets', 'Boxes', 'Rolls'].includes(unit);
+
+    if (!newErrors.amount) {
+      if (entryMode === 'pieces' && isWeightBased && !Number.isInteger(num)) {
+        newErrors.amount = 'Pieces must be a whole number. Decimals are not allowed.';
+      } else if (!isWeightBased && isDiscreteUnit(item.unit) && !Number.isInteger(num)) {
+        newErrors.amount = `${item.unit} must be a whole number. Decimals are not allowed.`;
+      }
+    }
+
     if (
       isWeightBased &&
       (entryMode === 'kg' || entryMode === 'ton') &&
       conversionResult &&
-      !conversionResult.isExact &&
-      mode !== 'remove'
+      !conversionResult.isExact
     ) {
       const weightInKg = entryMode === 'ton' ? tonToKg(num) : num;
       newErrors.amount = getConversionErrorMessage(

@@ -79,12 +79,18 @@ export function generatePOHtml(po: PurchaseOrder, logoBase64?: string): string {
     const gstAmt = gstPct > 0 ? (Number(item.gstAmount) || Math.round((amount * gstPct) / 100)) : 0;
     const totalWithGst = amount + gstAmt;
     const quantity = Number(item.quantity) || 0;
+    const orderedQty = item.orderedQuantity != null ? Number(item.orderedQuantity) : null;
+    const orderedUnit = item.orderedUnit?.trim();
+    const displayQty = orderedQty != null && orderedUnit
+      ? `${orderedQty} ${orderedUnit} (${quantity} Pcs stock)`
+      : `${quantity} Pcs`;
+    const priceBasis = orderedUnit ? `per ${orderedUnit}` : 'per Piece';
     return `
       <tr>
         <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A;">${escapeHtml(item.itemName)}</td>
         <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 13px; color: #64748B;">${escapeHtml(item.itemSku)}</td>
-        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${quantity}</td>
-        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${formatCurrencyOrOptional(unitPrice)}</td>
+        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${escapeHtml(displayQty)}</td>
+        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${formatCurrencyOrOptional(unitPrice)} <span style="font-size: 12px; color: #64748B;">${escapeHtml(priceBasis)}</span></td>
         <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${formatGstOrOptional(gstPct)}</td>
         <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; font-weight: 600; color: #0F172A; text-align: right;">${formatCurrencyOrOptional(totalWithGst)}</td>
       </tr>`;

@@ -351,6 +351,9 @@ describe('ProcessRequestScreen', () => {
     expect(approveButton).toBeTruthy();
     fireEvent.press(approveButton);
 
+    await waitFor(() => {
+      expect(mockApproveRequestResolve).toBeDefined();
+    });
     mockApproveRequestResolve!();
 
     await waitFor(() => {

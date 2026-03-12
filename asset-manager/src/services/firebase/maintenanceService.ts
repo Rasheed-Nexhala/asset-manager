@@ -29,6 +29,9 @@ const MAINTENANCE_COLLECTION = 'maintenance';
 const ITEMS_COLLECTION = 'items';
 const INVENTORY_COLLECTION = 'inventory';
 
+const getInventoryDocId = (itemId: string, locationId: string): string =>
+  `${itemId}_${locationId}`;
+
 /**
  * Helper: Convert Firestore document to Redux-compatible format
  * 
@@ -106,17 +109,14 @@ export async function addToMaintenance(
   userName: string
 ): Promise<string> {
   try {
-    const inventoryQuery = query(
-      collection(db, INVENTORY_COLLECTION),
-      where('itemId', '==', data.itemId),
-      where('locationId', '==', 'store')
-    );
-    const inventorySnapOuter = await getDocs(inventoryQuery);
-    
-    if (inventorySnapOuter.empty) {
-      throw new Error('Item not found in central store inventory');
+    if (!Number.isInteger(data.quantity) || data.quantity <= 0) {
+      throw new Error('Maintenance quantity must be a whole number greater than zero');
     }
-    const inventoryDocRef = inventorySnapOuter.docs[0].ref;
+    const inventoryDocRef = doc(
+      db,
+      INVENTORY_COLLECTION,
+      getInventoryDocId(data.itemId, 'store')
+    );
 
     const maintenanceId = await runTransaction(db, async (transaction) => {
       // 1. Read item document
@@ -234,6 +234,9 @@ export async function returnFromMaintenance(
   userName: string
 ): Promise<void> {
   try {
+    if (!Number.isInteger(returnData.returnQuantity) || returnData.returnQuantity <= 0) {
+      throw new Error('Return quantity must be a whole number greater than zero');
+    }
     const maintenanceRef = doc(db, MAINTENANCE_COLLECTION, maintenanceId);
     const maintenanceSnapOuter = await getDoc(maintenanceRef);
     
@@ -243,18 +246,11 @@ export async function returnFromMaintenance(
     
     const maintenanceDataOuter = maintenanceSnapOuter.data() as MaintenanceFirestore;
 
-    const inventoryQuery = query(
-      collection(db, INVENTORY_COLLECTION),
-      where('itemId', '==', maintenanceDataOuter.itemId),
-      where('locationId', '==', 'store')
+    const inventoryDocRef = doc(
+      db,
+      INVENTORY_COLLECTION,
+      getInventoryDocId(maintenanceDataOuter.itemId, 'store')
     );
-    const inventorySnapOuter = await getDocs(inventoryQuery);
-    
-    if (inventorySnapOuter.empty) {
-      throw new Error('Central store inventory not found');
-    }
-    
-    const inventoryDocRef = inventorySnapOuter.docs[0].ref;
 
     await runTransaction(db, async (transaction) => {
       // 1. Read maintenance record
@@ -285,18 +281,29 @@ export async function returnFromMaintenance(
       
       // 3. Read central store inventory
       const inventoryDoc = await transaction.get(inventoryDocRef);
-      
-      if (!inventoryDoc.exists()) {
-        throw new Error('Central store inventory not found');
-      }
-      
-      const inventoryData = inventoryDoc.data();
+      const inventoryData = inventoryDoc.exists() ? inventoryDoc.data() : null;
       
       // 4. Update inventory (add back to central store)
-      transaction.update(inventoryDocRef, {
-        quantity: inventoryData.quantity + returnData.returnQuantity,
-        updatedAt: Timestamp.now(),
-      });
+      if (inventoryData) {
+        transaction.update(inventoryDocRef, {
+          quantity: inventoryData.quantity + returnData.returnQuantity,
+          updatedAt: Timestamp.now(),
+        });
+      } else {
+        const newEntry: Record<string, any> = {
+          itemId: maintenanceData.itemId,
+          itemName: maintenanceData.itemName,
+          itemSku: maintenanceData.itemSku,
+          locationId: 'store',
+          locationType: 'store',
+          locationName: 'Central Store',
+          quantity: returnData.returnQuantity,
+          updatedAt: Timestamp.now(),
+        };
+        if (itemData.lengthPerPiece != null) newEntry.lengthPerPiece = itemData.lengthPerPiece;
+        if (itemData.weightPerMeter != null) newEntry.weightPerMeter = itemData.weightPerMeter;
+        transaction.set(inventoryDocRef, newEntry);
+      }
       
       // 5. Update item denormalized counts
       const currentInMaintenance = itemData.inMaintenanceQuantity || 0;
@@ -370,6 +377,9 @@ export async function writeOffItem(
   userName: string
 ): Promise<void> {
   try {
+    if (!Number.isInteger(writeOffData.writeOffQuantity) || writeOffData.writeOffQuantity <= 0) {
+      throw new Error('Write-off quantity must be a whole number greater than zero');
+    }
     await runTransaction(db, async (transaction) => {
       // 1. Read maintenance record
       const maintenanceRef = doc(db, MAINTENANCE_COLLECTION, maintenanceId);

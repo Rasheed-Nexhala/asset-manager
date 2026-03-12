@@ -289,4 +289,159 @@ describe('AddToMaintenanceScreen — Add to Maintenance flow', () => {
 
     expect(mockNavigate).toHaveBeenCalledWith('MaintenanceDashboard');
   });
+
+  it('shows validation error when submitting without issue type', () => {
+    mockRouteParams = { selectedItem: mockItem };
+    renderWithStore(<AddToMaintenanceScreen />, defaultPreloadedState);
+
+    expect(screen.getByText('Steel Bar')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Add to maintenance' }));
+
+    expect(screen.getByText('Please select issue type')).toBeTruthy();
+  });
+
+  it('quantity increment and decrement work when item is selected', () => {
+    mockRouteParams = { selectedItem: mockItem };
+    renderWithStore(<AddToMaintenanceScreen />, defaultPreloadedState);
+
+    const incrementBtn = screen.getByRole('button', { name: 'Increase quantity' });
+    const decrementBtn = screen.getByRole('button', { name: 'Decrease quantity' });
+    const amountInput = screen.getByDisplayValue('1');
+
+    expect(amountInput).toBeTruthy();
+
+    fireEvent.press(incrementBtn);
+    expect(screen.getByDisplayValue('2')).toBeTruthy();
+
+    fireEvent.press(incrementBtn);
+    expect(screen.getByDisplayValue('3')).toBeTruthy();
+
+    fireEvent.press(decrementBtn);
+    expect(screen.getByDisplayValue('2')).toBeTruthy();
+
+    fireEvent.press(decrementBtn);
+    expect(screen.getByDisplayValue('1')).toBeTruthy();
+  });
+
+  it('quantity validation: cannot exceed available quantity', () => {
+    mockRouteParams = { selectedItem: mockItem };
+    renderWithStore(<AddToMaintenanceScreen />, defaultPreloadedState);
+
+    const amountInput = screen.getByDisplayValue('1');
+    fireEvent.changeText(amountInput, '999');
+
+    fireEvent.press(screen.getByText('Select Issue Type'));
+    fireEvent.press(screen.getByText('Physical Damage'));
+    fireEvent.press(screen.getByRole('button', { name: 'Add to maintenance' }));
+
+    expect(screen.getByText(/Cannot exceed available quantity \(10\)/)).toBeTruthy();
+  });
+
+  it('quantity validation: pieces must be whole number for weight-based items', () => {
+    const steelItem: Item = {
+      ...mockItem,
+      id: 'steel1',
+      name: 'Steel Rebar',
+      weightPerMeter: 2.5,
+      lengthPerPiece: 6,
+      isWeightBased: true,
+    } as Item;
+
+    mockRouteParams = { selectedItem: steelItem };
+    renderWithStore(<AddToMaintenanceScreen />, defaultPreloadedState);
+
+    const input = screen.getByDisplayValue('1');
+    fireEvent.changeText(input, '2.5');
+
+    fireEvent.press(screen.getByText('Select Issue Type'));
+    fireEvent.press(screen.getByText('Physical Damage'));
+    fireEvent.press(screen.getByRole('button', { name: 'Add to maintenance' }));
+
+    expect(screen.getByText(/Pieces must be a whole number/)).toBeTruthy();
+  });
+
+  it('submits with custom quantity successfully', async () => {
+    mockRouteParams = { selectedItem: mockItem };
+    renderWithStore(<AddToMaintenanceScreen />, defaultPreloadedState);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Increase quantity' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Increase quantity' }));
+    expect(screen.getByDisplayValue('3')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Select Issue Type'));
+    fireEvent.press(screen.getByText('Wear and Tear'));
+
+    fireEvent.press(screen.getByRole('button', { name: 'Add to maintenance' }));
+
+    mockAddToMaintenanceResolve!();
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith('Success', 'Item has been added to maintenance', expect.any(Array));
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('MaintenanceDashboard');
+  });
+
+  it('all issue types are selectable', () => {
+    mockRouteParams = { selectedItem: mockItem };
+    renderWithStore(<AddToMaintenanceScreen />, defaultPreloadedState);
+
+    const issueTypes = ['Motor/Electrical', 'Physical Damage', 'Wear and Tear', 'Missing Parts', 'Other'];
+
+    issueTypes.forEach((label) => {
+      fireEvent.press(screen.getByRole('button', { name: 'Issue type selector' }));
+      fireEvent.press(screen.getByText(label));
+      expect(screen.getByText(label)).toBeTruthy();
+    });
+  });
+
+  it('Reported By field is optional and can be filled', async () => {
+    mockRouteParams = { selectedItem: mockItem };
+    renderWithStore(<AddToMaintenanceScreen />, defaultPreloadedState);
+
+    fireEvent.changeText(
+      screen.getByPlaceholderText('Name of person reporting the issue (optional)'),
+      'John Doe'
+    );
+
+    fireEvent.press(screen.getByText('Select Issue Type'));
+    fireEvent.press(screen.getByText('Missing Parts'));
+
+    fireEvent.press(screen.getByRole('button', { name: 'Add to maintenance' }));
+
+    mockAddToMaintenanceResolve!();
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith('Success', 'Item has been added to maintenance', expect.any(Array));
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('MaintenanceDashboard');
+  });
+
+  it('weight-based item shows Pcs/Kg/Ton mode toggle', () => {
+    const steelItem: Item = {
+      ...mockItem,
+      id: 'steel1',
+      name: 'Steel Rebar',
+      weightPerMeter: 2.5,
+      lengthPerPiece: 6,
+      isWeightBased: true,
+    } as Item;
+
+    mockRouteParams = { selectedItem: steelItem };
+    renderWithStore(<AddToMaintenanceScreen />, defaultPreloadedState);
+
+    expect(screen.getByText('Pcs')).toBeTruthy();
+    expect(screen.getByText('Kg')).toBeTruthy();
+    expect(screen.getByText('Ton')).toBeTruthy();
+  });
+
+  it('accessibility: Add to maintenance button has correct role and label', () => {
+    renderWithStore(<AddToMaintenanceScreen />, defaultPreloadedState);
+
+    const button = screen.getByRole('button', { name: 'Add to maintenance' });
+    expect(button).toBeTruthy();
+    expect(button.props.accessibilityLabel).toBe('Add to maintenance');
+    expect(button.props.accessibilityRole).toBe('button');
+  });
 });
