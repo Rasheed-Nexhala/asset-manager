@@ -8,7 +8,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -18,7 +18,6 @@ import { FormField } from '../../components/FormField';
 import {
   VendorSelector,
   POItemCard,
-  POItemSelectorModal,
 } from '../../components/PurchaseOrder';
 import {
   printPurchaseOrder,
@@ -47,7 +46,6 @@ import type {
   PurchaseOrder,
   PurchaseOrderItem,
 } from '../../types/purchaseOrder';
-import type { Item } from '../../types/inventory';
 import type { Vendor } from '../../types/vendor';
 import type { PurchaseOrderStackParamList } from '../../navigation/PurchaseOrderStackParamList';
 
@@ -60,6 +58,10 @@ type NavigationProp = StackNavigationProp<
 const DEFAULT_GST_PERCENTAGE = 18;
 
 const formatCurrency = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+
+/** Format currency or "—" when 0 (optional/not provided) */
+const formatCurrencyOrOptional = (n: number) =>
+  n > 0 ? formatCurrency(n) : '—';
 
 export const CreatePOScreen: React.FC = () => {
   const route = useRoute<RouteParams>();
@@ -86,7 +88,6 @@ export const CreatePOScreen: React.FC = () => {
     null
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [itemSelectorVisible, setItemSelectorVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDraft, setIsDraft] = useState(false);
   const [isLoadingPO, setIsLoadingPO] = useState(false);
@@ -167,8 +168,10 @@ export const CreatePOScreen: React.FC = () => {
 
   const subtotal = items.reduce((s, i) => s + i.amount, 0);
   const gstAmount = items.reduce(
-    (sum, i) =>
-      sum + Math.round((i.amount * (i.gstPercentage ?? DEFAULT_GST_PERCENTAGE)) / 100),
+    (sum, i) => {
+      const gstPct = i.gstPercentage ?? (i.unitPrice && i.unitPrice > 0 ? DEFAULT_GST_PERCENTAGE : 0);
+      return sum + Math.round((i.amount * gstPct) / 100);
+    },
     0
   );
   const totalAmount = subtotal + gstAmount;
@@ -184,31 +187,46 @@ export const CreatePOScreen: React.FC = () => {
     return Object.keys(e).length === 0;
   }, [vendorName, vendorContact, items.length]);
 
-  const handleItemsSelected = useCallback((selected: Item[]) => {
-    const newItems: PurchaseOrderItem[] = selected.map((item) => ({
-      itemId: item.id,
-      itemName: item.name,
-      itemSku: item.sku,
-      isExistingItem: true,
-      quantity: 1,
-      unitPrice: 0,
-      amount: 0,
-      gstPercentage: DEFAULT_GST_PERCENTAGE,
-      receivedQuantity: null,
-    }));
-    setItems((prev) => {
-      const byId = new Map(prev.map((p) => [p.itemId, p]));
-      newItems.forEach((n) => {
-        if (!byId.has(n.itemId)) byId.set(n.itemId, n);
-      });
-      return Array.from(byId.values());
+  // Handle selectedItems when returning from SelectItemsScreen
+  useFocusEffect(
+    useCallback(() => {
+      const selected = route.params?.selectedItems;
+      if (selected && selected.length > 0) {
+        const newItems: PurchaseOrderItem[] = selected.map((item) => ({
+          itemId: item.id,
+          itemName: item.name,
+          itemSku: item.sku,
+          isExistingItem: true,
+          quantity: 1,
+          unitPrice: 0,
+          amount: 0,
+          gstPercentage: undefined,
+          receivedQuantity: null,
+        }));
+        setItems((prev) => {
+          const byId = new Map(prev.map((p) => [p.itemId, p]));
+          newItems.forEach((n) => {
+            if (!byId.has(n.itemId)) byId.set(n.itemId, n);
+          });
+          return Array.from(byId.values());
+        });
+        setErrors((prev) => {
+          const next = { ...prev };
+          delete next.items;
+          return next;
+        });
+        navigation.setParams({ selectedItems: undefined } as Record<string, unknown>);
+      }
+    }, [route.params?.selectedItems, navigation])
+  );
+
+  const handleAddItemsPress = useCallback(() => {
+    navigation.navigate('SelectItems', {
+      returnScreen: 'CreatePO',
+      returnParams: { poId },
+      excludeItemIds: items.map((i) => i.itemId),
     });
-    setErrors((prev) => {
-      const next = { ...prev };
-      delete next.items;
-      return next;
-    });
-  }, []);
+  }, [navigation, poId, items]);
 
   const handleQuantityChange = useCallback((itemId: string, delta: number) => {
     setItems((prev) =>
@@ -263,12 +281,6 @@ export const CreatePOScreen: React.FC = () => {
         return;
       }
 
-      const invalidPrice = items.find((i) => i.unitPrice <= 0);
-      if (invalidPrice) {
-        Alert.alert('Error', `Please enter unit price for ${invalidPrice.itemName}`);
-        return;
-      }
-
       setIsSubmitting(true);
       setIsDraft(asDraft);
 
@@ -300,7 +312,7 @@ export const CreatePOScreen: React.FC = () => {
             isExistingItem: i.isExistingItem,
             quantity: i.quantity,
             unitPrice: i.unitPrice,
-            gstPercentage: i.gstPercentage ?? DEFAULT_GST_PERCENTAGE,
+            gstPercentage: i.gstPercentage,
           })),
           justification: justification.trim(),
           expectedDeliveryDate: expectedDeliveryDate
@@ -343,10 +355,13 @@ export const CreatePOScreen: React.FC = () => {
                   err instanceof Error ? err.message : 'Failed to print'
                 );
               }
-              navigation.goBack();
+              navigation.navigate('PurchaseOrderList');
             },
           },
-          { text: 'OK', onPress: () => navigation.goBack() },
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('PurchaseOrderList'),
+          },
         ]);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Failed to save';
@@ -401,7 +416,10 @@ export const CreatePOScreen: React.FC = () => {
             try {
               await dispatch(deletePO({ poId, userId })).unwrap();
               Alert.alert('Success', 'Draft deleted', [
-                { text: 'OK', onPress: () => navigation.goBack() },
+                {
+                  text: 'OK',
+                  onPress: () => navigation.navigate('PurchaseOrderList'),
+                },
               ]);
             } catch (err: unknown) {
               Alert.alert(
@@ -595,7 +613,7 @@ export const CreatePOScreen: React.FC = () => {
                 ITEMS
               </Text>
               <TouchableOpacity
-                onPress={() => setItemSelectorVisible(true)}
+                onPress={handleAddItemsPress}
                 className="flex-row items-center gap-2"
               >
                 <Ionicons name="add" size={20} color="#1E40AF" />
@@ -631,13 +649,13 @@ export const CreatePOScreen: React.FC = () => {
             <View className="flex-row justify-between mb-2">
               <Text className="text-[15px] text-[#64748B]">Subtotal</Text>
               <Text className="text-[15px] text-[#0F172A]">
-                {formatCurrency(subtotal)}
+                {formatCurrencyOrOptional(subtotal)}
               </Text>
             </View>
             <View className="flex-row justify-between mb-2">
               <Text className="text-[15px] text-[#64748B]">Total GST</Text>
               <Text className="text-[15px] text-[#0F172A]">
-                {formatCurrency(gstAmount)}
+                {formatCurrencyOrOptional(gstAmount)}
               </Text>
             </View>
             <View className="flex-row justify-between pt-2 border-t border-[#E2E8F0]">
@@ -645,7 +663,7 @@ export const CreatePOScreen: React.FC = () => {
                 Total
               </Text>
               <Text className="text-[15px] font-semibold text-[#0F172A]">
-                {formatCurrency(totalAmount)}
+                {formatCurrencyOrOptional(totalAmount)}
               </Text>
             </View>
           </View>
@@ -759,12 +777,6 @@ export const CreatePOScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      <POItemSelectorModal
-        isVisible={itemSelectorVisible}
-        onClose={() => setItemSelectorVisible(false)}
-        onSelect={handleItemsSelected}
-        excludeItemIds={items.map((i) => i.itemId)}
-      />
     </ScreenLayout>
   );
 };

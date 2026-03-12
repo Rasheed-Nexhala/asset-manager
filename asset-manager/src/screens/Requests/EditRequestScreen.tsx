@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
@@ -15,12 +15,12 @@ import { ScreenHeader } from '../../components/ScreenHeader';
 import { FormField } from '../../components/FormField';
 import { PrioritySelector } from '../../components/Requests/PrioritySelector';
 import { RequestItemCard } from '../../components/Requests/RequestItemCard';
-import { ItemSelectorModal } from '../../components/Requests/ItemSelectorModal';
 import { editRequest, submitDraftRequest, deleteRequest } from '../../store/thunks/requestThunks';
 import { requestService } from '../../services/firebase/requestService';
 import {
   selectUserId,
   selectUserDisplayName,
+  selectIsSiteManager,
 } from '../../store/selectors/authSelectors';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import type {
@@ -28,7 +28,6 @@ import type {
   EditRequestData,
   RequestItem,
 } from '../../types/request';
-import type { Item } from '../../types/inventory';
 import type { RequestStackParamList } from '../../navigation/RequestStackParamList';
 
 type RouteParams = RouteProp<RequestStackParamList, 'EditRequest'>;
@@ -52,6 +51,7 @@ export const EditRequestScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
+  const isSiteManager = useAppSelector(selectIsSiteManager);
 
   const [request, setRequest] = useState<{
     id: string;
@@ -69,9 +69,33 @@ export const EditRequestScreen: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const isBusy = isSavingDraft || isSubmittingRequest || isDeleting;
   const [isLoading, setIsLoading] = useState(true);
-  const [itemSelectorVisible, setItemSelectorVisible] = useState(false);
 
   const hasItems = items.length > 0;
+
+  // Handle selectedItems when returning from SelectItemsScreen
+  useFocusEffect(
+    useCallback(() => {
+      const selected = route.params?.selectedItems;
+      if (selected && selected.length > 0) {
+        const newItems: RequestItem[] = selected.map((item) => ({
+          itemId: item.id,
+          itemName: item.name,
+          itemSku: item.sku,
+          itemType: item.type,
+          categoryId: item.categoryId,
+          categoryName: item.categoryName,
+          imageUrl: item.imageUrl,
+          quantityRequested: 1,
+          quantityApproved: 1,
+          quantityReturned: 0,
+          status: 'pending',
+        }));
+        setItems((prev) => [...prev, ...newItems]);
+        setErrors((e) => ({ ...e, items: undefined }));
+        navigation.setParams({ selectedItems: undefined } as Record<string, unknown>);
+      }
+    }, [route.params?.selectedItems, navigation])
+  );
   const isButtonDisabled = isBusy || !hasItems;
 
   useEffect(() => {
@@ -119,23 +143,13 @@ export const EditRequestScreen: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleItemsSelected = (selectedItems: Item[]) => {
-    const newItems: RequestItem[] = selectedItems.map((item) => ({
-      itemId: item.id,
-      itemName: item.name,
-      itemSku: item.sku,
-      itemType: item.type,
-      categoryId: item.categoryId,
-      categoryName: item.categoryName,
-      imageUrl: item.imageUrl,
-      quantityRequested: 1,
-      quantityApproved: 1,
-      quantityReturned: 0,
-      status: 'pending',
-    }));
-    setItems([...items, ...newItems]);
-    setErrors((prev) => ({ ...prev, items: undefined }));
-  };
+  const handleAddItemsPress = useCallback(() => {
+    navigation.navigate('SelectItems', {
+      returnScreen: 'EditRequest',
+      returnParams: { requestId },
+      excludeItemIds: items.map((i) => i.itemId),
+    });
+  }, [navigation, requestId, items]);
 
   const handleQuantityChange = (itemId: string, quantity: number) => {
     setItems((prev) =>
@@ -172,7 +186,12 @@ export const EditRequestScreen: React.FC = () => {
                 deleteRequest({ requestId, userId })
               ).unwrap();
               Alert.alert('Success', 'Draft deleted', [
-                { text: 'OK', onPress: () => navigation.goBack() },
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    navigation.navigate(isSiteManager ? 'MyRequests' : 'RequestQueue');
+                  },
+                },
               ]);
             } catch (error: unknown) {
               Alert.alert(
@@ -232,7 +251,14 @@ export const EditRequestScreen: React.FC = () => {
       Alert.alert(
         'Success',
         isDraft ? 'Draft saved successfully' : 'Request submitted successfully',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              navigation.navigate(isSiteManager ? 'MyRequests' : 'RequestQueue');
+            },
+          },
+        ]
       );
     } catch (error: unknown) {
       Alert.alert(
@@ -303,7 +329,7 @@ export const EditRequestScreen: React.FC = () => {
                 Items <Text className="text-[#DC2626]">*</Text>
               </Text>
               <TouchableOpacity
-                onPress={() => setItemSelectorVisible(true)}
+                onPress={handleAddItemsPress}
                 className="flex-row items-center gap-1"
                 accessibilityRole="button"
                 accessibilityLabel="Add items"
@@ -420,13 +446,6 @@ export const EditRequestScreen: React.FC = () => {
           </Text>
         </TouchableOpacity>
       </View>
-
-      <ItemSelectorModal
-        isVisible={itemSelectorVisible}
-        onClose={() => setItemSelectorVisible(false)}
-        onSelect={handleItemsSelected}
-        excludeItemIds={items.map((i) => i.itemId)}
-      />
     </ScreenLayout>
   );
 };

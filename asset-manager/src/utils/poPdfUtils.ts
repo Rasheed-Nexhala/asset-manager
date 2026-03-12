@@ -1,8 +1,28 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { Asset } from 'expo-asset';
+import * as ImageManipulator from 'expo-image-manipulator';
 import type { PurchaseOrder, PurchaseOrderItem } from '../types/purchaseOrder';
 
 const DEFAULT_GST_PERCENTAGE = 18;
+
+/** Load IBF logo as base64 for embedding in PDF HTML. Returns empty string on failure. */
+async function loadLogoBase64(): Promise<string> {
+  try {
+    const [asset] = await Asset.loadAsync(require('../assets/images/IBF_logo.png'));
+    const uri = asset.localUri ?? asset.uri;
+    if (!uri) return '';
+
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [],
+      { base64: true, format: ImageManipulator.SaveFormat.PNG }
+    );
+    return result.base64 ?? '';
+  } catch {
+    return '';
+  }
+}
 
 const formatDate = (iso: string | null | undefined): string => {
   if (!iso) return '—';
@@ -15,6 +35,14 @@ const formatDate = (iso: string | null | undefined): string => {
 
 const formatCurrency = (amount: number): string =>
   `₹${amount.toLocaleString('en-IN')}`;
+
+/** Format currency or "—" when amount is 0 (optional/not provided) */
+const formatCurrencyOrOptional = (amount: number): string =>
+  amount > 0 ? formatCurrency(amount) : '—';
+
+/** Format GST % or "—" when 0 (optional/not provided) */
+const formatGstOrOptional = (gstPct: number): string =>
+  gstPct > 0 ? `${gstPct}%` : '—';
 
 const statusLabels: Record<string, string> = {
   draft: 'Draft',
@@ -37,27 +65,28 @@ const statusBadgeClass: Record<string, string> = {
 /**
  * Generate HTML string for a Purchase Order PDF.
  * Uses CIAMS design system colors and typography.
+ * @param po - Purchase order data
+ * @param logoBase64 - Optional base64-encoded logo image for header
  */
-export function generatePOHtml(po: PurchaseOrder): string {
+export function generatePOHtml(po: PurchaseOrder, logoBase64?: string): string {
   const statusLabel = statusLabels[po.status] ?? po.status;
   const statusStyle = statusBadgeClass[po.status] ?? statusBadgeClass.draft;
 
   const itemRows = (po.items ?? []).map((item) => {
     const amount = Number(item.amount) || 0;
-    const gstPct = Number(item.gstPercentage ?? DEFAULT_GST_PERCENTAGE) || DEFAULT_GST_PERCENTAGE;
-    const gstAmt =
-      Number(item.gstAmount) || Math.round((amount * gstPct) / 100);
+    const unitPrice = Number(item.unitPrice) || 0;
+    const gstPct = Number(item.gstPercentage ?? (unitPrice > 0 ? DEFAULT_GST_PERCENTAGE : 0)) || 0;
+    const gstAmt = gstPct > 0 ? (Number(item.gstAmount) || Math.round((amount * gstPct) / 100)) : 0;
     const totalWithGst = amount + gstAmt;
     const quantity = Number(item.quantity) || 0;
-    const unitPrice = Number(item.unitPrice) || 0;
     return `
       <tr>
         <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A;">${escapeHtml(item.itemName)}</td>
         <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 13px; color: #64748B;">${escapeHtml(item.itemSku)}</td>
         <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${quantity}</td>
-        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${formatCurrency(unitPrice)}</td>
-        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${gstPct}%</td>
-        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; font-weight: 600; color: #0F172A; text-align: right;">${formatCurrency(totalWithGst)}</td>
+        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${formatCurrencyOrOptional(unitPrice)}</td>
+        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${formatGstOrOptional(gstPct)}</td>
+        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; font-weight: 600; color: #0F172A; text-align: right;">${formatCurrencyOrOptional(totalWithGst)}</td>
       </tr>`;
   }).join('');
 
@@ -66,13 +95,19 @@ export function generatePOHtml(po: PurchaseOrder): string {
     footerParts.push(`Received by ${escapeHtml(po.receivedByName)} on ${formatDate(po.receivedAt)}`);
   }
 
+  const logoImg = logoBase64
+    ? `<div class="header-logo"><img src="data:image/png;base64,${logoBase64}" alt="IBF Logo" style="height: 48px; width: auto; display: block;" /></div>`
+    : '';
+
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <style>
     body { font-family: -apple-system, Helvetica, sans-serif; color: #0F172A; padding: 24px; font-size: 15px; }
-    .header { border-bottom: 2px solid #1E40AF; padding-bottom: 16px; margin-bottom: 24px; }
+    .header { border-bottom: 2px solid #1E40AF; padding-bottom: 16px; margin-bottom: 24px; display: flex; flex-direction: row; align-items: center; gap: 16px; }
+    .header-brand { flex: 1; }
+    .header-logo { flex-shrink: 0; }
     .section { margin-bottom: 24px; }
     .section-title { font-size: 17px; font-weight: 600; color: #0F172A; margin-bottom: 12px; }
     .label { font-size: 13px; color: #64748B; }
@@ -82,16 +117,22 @@ export function generatePOHtml(po: PurchaseOrder): string {
     th { background: #F8FAFC; font-size: 13px; color: #64748B; font-weight: 600; padding: 8px 12px; text-align: left; }
     .status-badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 500; margin-left: 8px; }
     .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #E2E8F0; font-size: 13px; color: #64748B; }
+    .signature-block { margin-top: 48px; display: flex; flex-direction: column; align-items: flex-end; }
+    .signature-line { width: 200px; border-bottom: 1px solid #0F172A; padding-bottom: 4px; }
+    .signature-label { font-size: 13px; color: #64748B; margin-top: 8px; }
   </style>
 </head>
 <body>
   <div class="header">
-    <p style="font-size: 16px; font-weight: 600; margin: 0 0 8px; color: #1E40AF;">IBF Engineering Services Pvt Ltd</p>
-    <h1 style="font-size: 22px; font-weight: 600; margin: 0; color: #0F172A;">PURCHASE ORDER</h1>
-    <p style="font-size: 15px; margin: 8px 0 0; color: #0F172A;">
-      ${escapeHtml(po.poNumber)}
-      <span class="status-badge" style="${statusStyle}">${escapeHtml(statusLabel)}</span>
-    </p>
+    ${logoImg}
+    <div class="header-brand">
+      <p style="font-size: 16px; font-weight: 600; margin: 0 0 8px; color: #1E40AF;">IBF Engineering Services Pvt Ltd</p>
+      <h1 style="font-size: 22px; font-weight: 600; margin: 0; color: #0F172A;">PURCHASE ORDER</h1>
+      <p style="font-size: 15px; margin: 8px 0 0; color: #0F172A;">
+        ${escapeHtml(po.poNumber)}
+        <span class="status-badge" style="${statusStyle}">${escapeHtml(statusLabel)}</span>
+      </p>
+    </div>
   </div>
 
   <div class="section">
@@ -125,15 +166,15 @@ export function generatePOHtml(po: PurchaseOrder): string {
     <div class="section-title">SUMMARY</div>
     <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
       <span class="label">Subtotal</span>
-      <span class="value">${formatCurrency(Number(po.subtotal) || 0)}</span>
+      <span class="value">${formatCurrencyOrOptional(Number(po.subtotal) || 0)}</span>
     </div>
     <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
       <span class="label">Total GST</span>
-      <span class="value">${formatCurrency(Number(po.gstAmount) || 0)}</span>
+      <span class="value">${formatCurrencyOrOptional(Number(po.gstAmount) || 0)}</span>
     </div>
     <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 1px solid #E2E8F0;">
       <span class="section-title" style="margin: 0;">Total</span>
-      <span style="font-size: 17px; font-weight: 600; color: #0F172A;">${formatCurrency(Number(po.totalAmount) || 0)}</span>
+      <span style="font-size: 17px; font-weight: 600; color: #0F172A;">${formatCurrencyOrOptional(Number(po.totalAmount) || 0)}</span>
     </div>
   </div>
 
@@ -145,6 +186,11 @@ export function generatePOHtml(po: PurchaseOrder): string {
   <div class="section">
     <div class="section-title">EXPECTED DELIVERY</div>
     <p style="margin: 0; font-size: 15px; color: #0F172A;">${formatDate(po.expectedDeliveryDate)}</p>
+  </div>
+
+  <div class="signature-block">
+    <div class="signature-line"></div>
+    <p class="signature-label" style="margin-right: 0;">Authorized Signature</p>
   </div>
 
   ${footerParts.length > 0 ? `<div class="footer">
@@ -187,10 +233,11 @@ export function buildDraftPOForPrint(
   poNumber: string = 'DRAFT'
 ): PurchaseOrder {
   const items = formData.items.map((i) => {
-    const amount = i.amount ?? i.quantity * i.unitPrice;
-    const gstPct = i.gstPercentage ?? DEFAULT_GST_PERCENTAGE;
-    const gstAmt = i.gstAmount ?? Math.round((amount * gstPct) / 100);
-    return { ...i, amount, gstAmount: gstAmt };
+    const unitPrice = i.unitPrice ?? 0;
+    const amount = i.amount ?? i.quantity * unitPrice;
+    const gstPct = i.gstPercentage ?? (unitPrice > 0 ? DEFAULT_GST_PERCENTAGE : 0);
+    const gstAmt = gstPct > 0 ? (i.gstAmount ?? Math.round((amount * gstPct) / 100)) : 0;
+    return { ...i, amount, gstAmount: gstAmt, unitPrice };
   });
   const subtotal = items.reduce((s, i) => s + i.amount, 0);
   const gstAmount = items.reduce((s, i) => s + (i.gstAmount ?? 0), 0);
@@ -238,7 +285,8 @@ export function buildDraftPOForPrint(
  */
 export async function printPurchaseOrder(po: PurchaseOrder): Promise<void> {
   try {
-    const html = generatePOHtml(po);
+    const logoBase64 = await loadLogoBase64();
+    const html = generatePOHtml(po, logoBase64);
     const { uri } = await Print.printToFileAsync({
       html,
       width: 612,

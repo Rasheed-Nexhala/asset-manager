@@ -111,5 +111,113 @@ describe('poPdfUtils', () => {
       });
       expect(po.poNumber).toBe('DRAFT');
     });
+
+    it('handles optional unit price and GST (shows — when not provided)', () => {
+      const formData = {
+        vendorName: 'Test',
+        vendorContact: '999',
+        items: [
+          {
+            itemId: 'i1',
+            itemName: 'Item Without Price',
+            itemSku: 'SKU-1',
+            quantity: 5,
+            unitPrice: 0,
+            amount: 0,
+            gstPercentage: undefined,
+          },
+        ],
+        justification: '',
+        expectedDeliveryDate: null,
+        userName: 'U',
+      };
+
+      const po = buildDraftPOForPrint(formData, 'DRAFT');
+      expect(po.items[0].amount).toBe(0);
+      expect(po.items[0].gstAmount).toBe(0);
+      expect(po.subtotal).toBe(0);
+      expect(po.totalAmount).toBe(0);
+    });
+  });
+
+  describe('generatePOHtml with optional unit price and GST', () => {
+    it('shows — for items with no unit price or GST', () => {
+      const po: PurchaseOrder = {
+        id: 'po1',
+        poNumber: 'PO-002',
+        vendorId: 'v1',
+        vendorName: 'Vendor',
+        vendorContact: '',
+        items: [
+          {
+            itemId: 'i1',
+            itemName: 'Item',
+            itemSku: 'SKU',
+            isExistingItem: true,
+            quantity: 10,
+            unitPrice: 0,
+            amount: 0,
+            gstPercentage: 0,
+            gstAmount: 0,
+            receivedQuantity: null,
+          },
+        ],
+        subtotal: 0,
+        gstPercentage: 0,
+        gstAmount: 0,
+        totalAmount: 0,
+        status: 'draft',
+        createdByName: 'User',
+        createdAt: '2025-02-24',
+      } as PurchaseOrder;
+
+      const html = generatePOHtml(po);
+      expect(html).toContain('—');
+      expect(html).not.toContain('₹0');
+    });
+
+    it('includes signature block and Authorized Signature label', () => {
+      const po: PurchaseOrder = {
+        id: 'po1',
+        poNumber: 'PO-003',
+        vendorId: 'v1',
+        vendorName: 'Vendor',
+        vendorContact: '',
+        items: [],
+        subtotal: 0,
+        gstPercentage: 0,
+        gstAmount: 0,
+        totalAmount: 0,
+        status: 'draft',
+        createdByName: 'User',
+        createdAt: '2025-02-24',
+      } as PurchaseOrder;
+
+      const html = generatePOHtml(po);
+      expect(html).toContain('signature-block');
+      expect(html).toContain('Authorized Signature');
+    });
+
+    it('includes logo when logoBase64 is provided', () => {
+      const po: PurchaseOrder = {
+        id: 'po1',
+        poNumber: 'PO-004',
+        vendorId: 'v1',
+        vendorName: 'Vendor',
+        vendorContact: '',
+        items: [],
+        subtotal: 0,
+        gstPercentage: 0,
+        gstAmount: 0,
+        totalAmount: 0,
+        status: 'draft',
+        createdByName: 'User',
+        createdAt: '2025-02-24',
+      } as PurchaseOrder;
+
+      const html = generatePOHtml(po, 'fakeBase64Data');
+      expect(html).toContain('data:image/png;base64,fakeBase64Data');
+      expect(html).toContain('header-logo');
+    });
   });
 });

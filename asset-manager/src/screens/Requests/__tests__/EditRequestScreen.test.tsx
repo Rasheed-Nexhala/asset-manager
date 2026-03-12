@@ -27,10 +27,12 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 const mockGoBack = jest.fn();
+const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: jest.fn(), goBack: mockGoBack, canGoBack: () => true }),
+  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack, canGoBack: () => true, setParams: jest.fn() }),
   useRoute: () => ({ params: { requestId: 'req1' } }),
   useIsFocused: () => true,
+  useFocusEffect: (cb: () => void) => cb(),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -322,7 +324,7 @@ describe('EditRequestScreen', () => {
       );
     });
 
-    expect(mockGoBack).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith('RequestQueue');
   });
 
   it('Submit Request dispatches submitDraftRequest', async () => {
@@ -355,7 +357,7 @@ describe('EditRequestScreen', () => {
       );
     });
 
-    expect(mockGoBack).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith('RequestQueue');
   });
 
   it('Delete Draft shows confirmation and dispatches deleteRequest on confirm', async () => {
@@ -395,7 +397,9 @@ describe('EditRequestScreen', () => {
       expect(Alert.alert).toHaveBeenCalledWith('Success', 'Draft deleted', expect.any(Array));
     });
 
-    expect(mockGoBack).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('RequestQueue');
+    });
   });
 
   it('Back button calls goBack', async () => {

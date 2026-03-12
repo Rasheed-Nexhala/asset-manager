@@ -14,6 +14,7 @@ export { MySiteInventoryScreen } from './Inventory/MySiteInventoryScreen';
 export { OtherSiteInventoryScreen } from './Inventory/OtherSiteInventoryScreen';
 export { InventoryUpdateRequestsScreen } from './Inventory/InventoryUpdateRequestsScreen';
 export { CategorySelectScreen } from './Inventory/CategorySelectScreen';
+export { SelectItemsScreen } from './SelectItems';
 export { CategoryManagementScreen } from './Inventory/CategoryManagementScreen';
 export { SiteManagementScreen } from './Sites/SiteManagementScreen';
 export { AddSiteScreen } from './Sites/AddSiteScreen';

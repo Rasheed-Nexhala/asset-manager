@@ -16,6 +16,7 @@ import {
   ConfirmTransferScreen,
   ReturnItemsScreen,
 } from '../screens/Requests';
+import { SelectItemsScreen } from '../screens/SelectItems';
 
 const Stack = createStackNavigator<RequestStackParamList>();
 
@@ -49,6 +50,7 @@ export const RequestStackNavigator: React.FC = () => {
       <Stack.Screen name="RejectRequest" component={RejectRequestScreen} />
       <Stack.Screen name="ConfirmTransfer" component={ConfirmTransferScreen} />
       <Stack.Screen name="ReturnItems" component={ReturnItemsScreen} />
+      <Stack.Screen name="SelectItems" component={SelectItemsScreen} />
     </Stack.Navigator>
   );
 };

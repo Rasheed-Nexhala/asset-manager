@@ -48,6 +48,14 @@ const formatDate = (iso: string | null | undefined): string => {
 
 const formatCurrency = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 
+/** Format currency or "—" when amount is 0 (optional/not provided) */
+const formatCurrencyOrOptional = (n: number) =>
+  n > 0 ? formatCurrency(n) : '—';
+
+/** Format GST % or "—" when 0 (optional/not provided) */
+const formatGstOrOptional = (pct: number | undefined) =>
+  pct != null && pct > 0 ? `${pct}%` : '—';
+
 export const ApprovePOScreen: React.FC = () => {
   const route = useRoute<RouteParams>();
   const navigation = useNavigation<NavigationProp>();
@@ -347,7 +355,7 @@ export const ApprovePOScreen: React.FC = () => {
                   className="text-[15px] text-[#0F172A]"
                   numberOfLines={1}
                 >
-                  {formatCurrency(item.unitPrice)}
+                  {formatCurrencyOrOptional(item.unitPrice ?? 0)}
                 </Text>
               </View>
               <View className="shrink-0 min-w-[56px] items-end">
@@ -356,7 +364,7 @@ export const ApprovePOScreen: React.FC = () => {
                   className="text-[15px] text-[#0F172A]"
                   numberOfLines={1}
                 >
-                  {item.gstPercentage ?? 18}%
+                  {formatGstOrOptional(item.gstPercentage)}
                 </Text>
               </View>
               <View className="shrink-0 min-w-[72px] items-end">
@@ -365,11 +373,11 @@ export const ApprovePOScreen: React.FC = () => {
                   className="text-[15px] font-semibold text-[#0F172A]"
                   numberOfLines={1}
                 >
-                  {formatCurrency(
+                  {formatCurrencyOrOptional(
                     item.amount +
                       (item.gstAmount ??
                         Math.round(
-                          (item.amount * (item.gstPercentage ?? 18)) / 100
+                          (item.amount * (item.gstPercentage ?? 0)) / 100
                         ))
                   )}
                 </Text>
@@ -382,19 +390,19 @@ export const ApprovePOScreen: React.FC = () => {
           <View className="flex-row justify-between mb-1">
             <Text className="text-[15px] text-[#64748B]">Subtotal</Text>
             <Text className="text-[15px] text-[#0F172A]">
-              {formatCurrency(po.subtotal)}
+              {formatCurrencyOrOptional(po.subtotal)}
             </Text>
           </View>
           <View className="flex-row justify-between mb-1">
             <Text className="text-[15px] text-[#64748B]">Total GST</Text>
             <Text className="text-[15px] text-[#0F172A]">
-              {formatCurrency(po.gstAmount)}
+              {formatCurrencyOrOptional(po.gstAmount)}
             </Text>
           </View>
           <View className="flex-row justify-between pt-2 border-t border-[#E2E8F0]">
             <Text className="text-[15px] font-semibold text-[#0F172A]">Total</Text>
             <Text className="text-[15px] font-semibold text-[#0F172A]">
-              {formatCurrency(po.totalAmount)}
+              {formatCurrencyOrOptional(po.totalAmount)}
             </Text>
           </View>
         </View>

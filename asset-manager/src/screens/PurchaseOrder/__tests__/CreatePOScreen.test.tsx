@@ -23,9 +23,10 @@ import type { Vendor } from '../../../types/vendor';
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack }),
+  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack, setParams: jest.fn() }),
   useRoute: () => ({ params: {} }),
   useIsFocused: () => true,
+  useFocusEffect: (cb: () => void) => cb(),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({

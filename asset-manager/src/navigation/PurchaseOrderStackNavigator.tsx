@@ -9,6 +9,7 @@ import {
   ApprovePOScreen,
   ReceivePOScreen,
 } from '../screens/PurchaseOrder';
+import { SelectItemsScreen } from '../screens/SelectItems';
 
 const Stack = createStackNavigator<PurchaseOrderStackParamList>();
 
@@ -32,6 +33,7 @@ export const PurchaseOrderStackNavigator: React.FC = () => {
       <Stack.Screen name="AddVendor" component={AddVendorScreen} />
       <Stack.Screen name="ApprovePO" component={ApprovePOScreen} />
       <Stack.Screen name="ReceivePO" component={ReceivePOScreen} />
+      <Stack.Screen name="SelectItems" component={SelectItemsScreen} />
     </Stack.Navigator>
   );
 };

@@ -65,10 +65,11 @@ const requestsSlice = createSlice({
       action.payload.forEach((r) => {
         if (r.status !== 'draft' && !byId.has(r.id)) byId.set(r.id, r);
       });
-      state.requests = Array.from(byId.values());
+      const requests = Array.from(byId.values());
+      state.requests = requests;
       state.loading = false;
-      // Clear queue pagination (subscription replaces paginated data)
-      state.requestsTotalCount = null;
+      // Subscription provides full list: set count so UI never shows loading forever
+      state.requestsTotalCount = requests.length;
       state.requestsLastDoc = null;
       state.requestsHasMore = false;
     },
@@ -79,10 +80,11 @@ const requestsSlice = createSlice({
       action.payload.forEach((r) => {
         if (!byId.has(r.id)) byId.set(r.id, r);
       });
-      state.myRequests = Array.from(byId.values());
+      const myRequests = Array.from(byId.values());
+      state.myRequests = myRequests;
       state.loading = false;
-      // Clear my-requests pagination (subscription replaces paginated data)
-      state.myRequestsTotalCount = null;
+      // Subscription provides full list: set count so UI never shows loading forever
+      state.myRequestsTotalCount = myRequests.length;
       state.myRequestsLastDoc = null;
       state.myRequestsHasMore = false;
     },
@@ -99,21 +101,39 @@ const requestsSlice = createSlice({
 
       if (!existsInMyRequests) {
         state.myRequests.unshift(action.payload);
+        // Keep total count in sync for "Showing X of Y" display
+        state.myRequestsTotalCount = state.myRequests.length;
       }
       if (!isDraft) {
         const existsInRequests = state.requests.some((r) => r.id === action.payload.id);
         if (!existsInRequests) {
           state.requests.unshift(action.payload);
+          state.requestsTotalCount = state.requests.length;
         }
       }
     },
 
     removeRequest: (state, action: PayloadAction<string>) => {
       const id = action.payload;
+      const wasInRequests = state.requests.some((r) => r.id === id);
+      const wasInMyRequests = state.myRequests.some((r) => r.id === id);
       state.requests = state.requests.filter((r) => r.id !== id);
       state.myRequests = state.myRequests.filter((r) => r.id !== id);
       if (state.selectedRequest?.id === id) {
         state.selectedRequest = null;
+      }
+      // Keep total counts in sync for "Showing X of Y" display
+      if (wasInMyRequests) {
+        state.myRequestsTotalCount = Math.max(
+          0,
+          (state.myRequestsTotalCount ?? 0) - 1
+        );
+      }
+      if (wasInRequests) {
+        state.requestsTotalCount = Math.max(
+          0,
+          (state.requestsTotalCount ?? 0) - 1
+        );
       }
     },
 
@@ -214,6 +234,10 @@ const requestsSlice = createSlice({
       })
       .addCase(`${FETCH_REQUESTS_PAGINATED}/rejected`, (state) => {
         state.loading = false;
+        state.requests = [];
+        state.requestsTotalCount = 0;
+        state.requestsLastDoc = null;
+        state.requestsHasMore = false;
       })
       .addCase(`${LOAD_MORE_REQUESTS}/pending`, (state) => {
         state.requestsLoadingMore = true;
@@ -243,6 +267,11 @@ const requestsSlice = createSlice({
       })
       .addCase(`${FETCH_MY_REQUESTS_PAGINATED}/rejected`, (state) => {
         state.loading = false;
+        // Prevent infinite loading: set empty state so UI can show error/empty
+        state.myRequests = [];
+        state.myRequestsTotalCount = 0;
+        state.myRequestsLastDoc = null;
+        state.myRequestsHasMore = false;
       })
       .addCase(`${LOAD_MORE_MY_REQUESTS}/pending`, (state) => {
         state.myRequestsLoadingMore = true;

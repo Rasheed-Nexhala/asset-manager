@@ -17,6 +17,7 @@ import type { Request } from '../../../types/request';
 const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: mockNavigate, goBack: jest.fn() }),
+  useFocusEffect: (cb: () => void | (() => void)) => cb(),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({

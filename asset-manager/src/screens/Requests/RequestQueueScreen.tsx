@@ -21,6 +21,7 @@ import {
   fetchRequestsPaginated,
   loadMoreRequests,
 } from '../../store/thunks/requestThunks';
+import { useRequestQueueSubscription } from '../../hooks/useRequestsSubscriptions';
 import {
   selectFilteredAndSearchedRequestsSortedByDate,
   selectRequestsLoading,
@@ -55,6 +56,9 @@ export const RequestQueueScreen: React.FC = () => {
   const loadingMore = useAppSelector(selectRequestsLoadingMore);
   const sites = useAppSelector(selectAllSites);
   const allItems = useAppSelector(selectAllItems);
+
+  // Real-time Firestore snapshot updates when screen is focused
+  useRequestQueueSubscription();
 
   // Ensure inventory is loaded for availability display (isAllSufficient on RequestCard).
   useEffect(() => {

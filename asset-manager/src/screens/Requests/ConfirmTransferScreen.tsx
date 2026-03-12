@@ -49,7 +49,6 @@ export const ConfirmTransferScreen: React.FC = () => {
   const [request, setRequest] = useState<Request | null>(null);
   const [receivedBy, setReceivedBy] = useState('');
   const [transferNotes, setTransferNotes] = useState('');
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<{ receivedBy?: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,9 +61,6 @@ export const ConfirmTransferScreen: React.FC = () => {
         if (cancelled) return;
         if (r && r.status === 'approved') {
           setRequest(r);
-          const items = Array.isArray(r.items) ? r.items : [];
-          const itemIds = items.map((i) => i?.itemId).filter(Boolean) as string[];
-          setSelectedItems(new Set(itemIds));
         } else {
           Alert.alert(
             'Error',
@@ -87,18 +83,6 @@ export const ConfirmTransferScreen: React.FC = () => {
       cancelled = true;
     };
   }, [requestId, navigation]);
-
-  const toggleItem = (itemId: string) => {
-    setSelectedItems((prev) => {
-      const next = new Set(prev);
-      if (next.has(itemId)) {
-        next.delete(itemId);
-      } else {
-        next.add(itemId);
-      }
-      return next;
-    });
-  };
 
   const validateForm = (): boolean => {
     const newErrors: { receivedBy?: string } = {};
@@ -172,35 +156,18 @@ export const ConfirmTransferScreen: React.FC = () => {
             </Text>
           </View>
 
-          {/* Items Checklist */}
+          {/* Items to Transfer (read-only list) */}
           <View className="gap-2">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-[17px] font-semibold text-[#0F172A]">
-                Items to Transfer
-              </Text>
-            </View>
+            <Text className="text-[17px] font-semibold text-[#0F172A]">
+              Items to Transfer
+            </Text>
             {(Array.isArray(request.items) ? request.items : []).map((item) => {
-              const isSelected = selectedItems.has(item.itemId);
               const isSteelItem = isWeightBasedItem({ weightPerMeter: item.weightPerMeter });
               return (
-                <TouchableOpacity
+                <View
                   key={item.itemId}
-                  onPress={() => toggleItem(item.itemId)}
                   className="flex-row items-center p-4 bg-white rounded-[10px] border border-[#E2E8F0]"
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: isSelected }}
                 >
-                  <View
-                    className={`w-6 h-6 rounded border-2 mr-3 items-center justify-center ${
-                      isSelected
-                        ? 'border-[#1E40AF] bg-[#1E40AF]'
-                        : 'border-[#E2E8F0]'
-                    }`}
-                  >
-                    {isSelected && (
-                      <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                    )}
-                  </View>
                   <View className="flex-1">
                     <Text className="text-[15px] font-semibold text-[#0F172A]">
                       {item.itemName}
@@ -220,7 +187,7 @@ export const ConfirmTransferScreen: React.FC = () => {
                       )}
                     </View>
                   </View>
-                </TouchableOpacity>
+                </View>
               );
             })}
           </View>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,13 +15,14 @@ import { ScreenHeader } from '../../components/ScreenHeader';
 import { FormField } from '../../components/FormField';
 import { PrioritySelector } from '../../components/Requests/PrioritySelector';
 import { RequestItemCard } from '../../components/Requests/RequestItemCard';
-import { ItemSelectorModal } from '../../components/Requests/ItemSelectorModal';
+import { useFocusEffect } from '@react-navigation/native';
 import { createRequest } from '../../store/thunks/requestThunks';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
 import { fetchSites } from '../../store/slices/sitesSlice';
 import {
   selectUserId,
   selectUserDisplayName,
+  selectIsSiteManager,
 } from '../../store/selectors/authSelectors';
 import { selectSiteById, selectSitesLoading } from '../../store/selectors/sitesSelectors';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -50,6 +51,7 @@ export const CreateRequestScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
+  const isSiteManager = useAppSelector(selectIsSiteManager);
   const site = useAppSelector(selectSiteById(siteId));
   const sitesLoading = useAppSelector(selectSitesLoading);
 
@@ -60,7 +62,19 @@ export const CreateRequestScreen: React.FC = () => {
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const isBusy = isSubmittingRequest || isSavingDraft;
-  const [itemSelectorVisible, setItemSelectorVisible] = useState(false);
+
+  // Handle selectedItems when returning from SelectItemsScreen
+  useFocusEffect(
+    useCallback(() => {
+      const selected = route.params?.selectedItems;
+      if (selected && selected.length > 0) {
+        const newItems = selected.map((item) => ({ ...item, quantity: 1 }));
+        setItems((prev) => [...prev, ...newItems]);
+        setErrors((e) => ({ ...e, items: undefined }));
+        navigation.setParams({ selectedItems: undefined } as Record<string, unknown>);
+      }
+    }, [route.params?.selectedItems, navigation])
+  );
 
   // Ensure sites and items are loaded when creating a request
   useEffect(() => {
@@ -102,14 +116,13 @@ export const CreateRequestScreen: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleItemsSelected = (selectedItems: Item[]) => {
-    const newItems = selectedItems.map((item) => ({
-      ...item,
-      quantity: 1,
-    }));
-    setItems([...items, ...newItems]);
-    setErrors({ ...errors, items: undefined });
-  };
+  const handleAddItemsPress = useCallback(() => {
+    navigation.navigate('SelectItems', {
+      returnScreen: 'CreateRequest',
+      returnParams: { siteId },
+      excludeItemIds: items.map((i) => i.id),
+    });
+  }, [navigation, siteId, items]);
 
   const handleQuantityChange = (itemId: string, quantity: number) => {
     setItems((prev) =>
@@ -175,7 +188,9 @@ export const CreateRequestScreen: React.FC = () => {
         [
           {
             text: 'OK',
-            onPress: () => navigation.goBack(),
+            onPress: () => {
+              navigation.navigate(isSiteManager ? 'MyRequests' : 'RequestQueue');
+            },
           },
         ]
       );
@@ -235,7 +250,7 @@ export const CreateRequestScreen: React.FC = () => {
                 Items <Text className="text-[#DC2626]">*</Text>
               </Text>
               <TouchableOpacity
-                onPress={() => setItemSelectorVisible(true)}
+                onPress={handleAddItemsPress}
                 className="flex-row items-center gap-1"
                 accessibilityRole="button"
                 accessibilityLabel="Add items"
@@ -348,13 +363,6 @@ export const CreateRequestScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </View>
-
-      <ItemSelectorModal
-        isVisible={itemSelectorVisible}
-        onClose={() => setItemSelectorVisible(false)}
-        onSelect={handleItemsSelected}
-        excludeItemIds={items.map((item) => item.id)}
-      />
     </ScreenLayout>
   );
 };

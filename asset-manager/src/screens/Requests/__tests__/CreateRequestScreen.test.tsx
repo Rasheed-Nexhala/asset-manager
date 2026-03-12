@@ -28,10 +28,18 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
+const mockRouteParams: { siteId: string; selectedItems?: Item[] } = { siteId: 'site1' };
+const mockSetParams = jest.fn((p: Partial<typeof mockRouteParams>) => {
+  if ('selectedItems' in p) {
+    if (p.selectedItems === undefined) delete mockRouteParams.selectedItems;
+    else mockRouteParams.selectedItems = p.selectedItems;
+  }
+});
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack }),
-  useRoute: () => ({ params: { siteId: 'site1' } }),
+  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack, setParams: mockSetParams }),
+  useRoute: () => ({ params: { ...mockRouteParams } }),
   useIsFocused: () => true,
+  useFocusEffect: (cb: () => void) => cb(),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -238,6 +246,8 @@ const defaultPreloadedState: Partial<RootState> = {
 describe('CreateRequestScreen — Create Request → Item Selector → Submit flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockRouteParams.siteId = 'site1';
+    delete mockRouteParams.selectedItems;
     jest.spyOn(Alert, 'alert').mockImplementation((_title: string, _message?: string, buttons?: Array<{ text?: string; onPress?: () => void }>) => {
       buttons?.find((b) => b.text === 'OK')?.onPress?.();
     });
@@ -254,24 +264,33 @@ describe('CreateRequestScreen — Create Request → Item Selector → Submit fl
     expect(screen.getByRole('button', { name: 'Submit request' })).toBeTruthy();
   });
 
-  it('opens ItemSelectorModal when Add items is pressed', () => {
+  it('navigates to SelectItems when Add items is pressed', () => {
     renderWithStore(<CreateRequestScreen />, defaultPreloadedState);
 
     fireEvent.press(screen.getByRole('button', { name: 'Add items' }));
 
-    expect(screen.getByText('Select Items')).toBeTruthy();
-    expect(screen.getByText('Steel Bar')).toBeTruthy();
-    expect(screen.getByText('Cement Bag')).toBeTruthy();
+    expect(mockNavigate).toHaveBeenCalledWith('SelectItems', {
+      returnScreen: 'CreateRequest',
+      returnParams: { siteId: 'site1' },
+      excludeItemIds: [],
+    });
   });
 
-  it('adds selected items to list when confirming in modal', () => {
-    renderWithStore(<CreateRequestScreen />, defaultPreloadedState);
+  it('adds selected items to list when returning from SelectItems with selection', () => {
+    const { rerender, store } = renderWithStore(<CreateRequestScreen />, defaultPreloadedState);
 
     fireEvent.press(screen.getByRole('button', { name: 'Add items' }));
-    fireEvent.press(screen.getByText('Steel Bar'));
-    fireEvent.press(screen.getByText('Add (1)'));
+    expect(mockNavigate).toHaveBeenCalledWith('SelectItems', expect.any(Object));
 
-    expect(screen.queryByText('Select Items')).toBeNull();
+    mockRouteParams.selectedItems = [mockItems[0]];
+    rerender(
+      <Provider store={store}>
+        <WeightViewPreferenceProvider>
+          <CreateRequestScreen />
+        </WeightViewPreferenceProvider>
+      </Provider>
+    );
+
     expect(screen.getByText('Steel Bar')).toBeTruthy();
     expect(screen.queryByText('No items added yet')).toBeNull();
   });
@@ -285,11 +304,16 @@ describe('CreateRequestScreen — Create Request → Item Selector → Submit fl
   });
 
   it('submits request and navigates back on success', async () => {
-    renderWithStore(<CreateRequestScreen />, defaultPreloadedState);
+    const { rerender, store } = renderWithStore(<CreateRequestScreen />, defaultPreloadedState);
 
-    fireEvent.press(screen.getByRole('button', { name: 'Add items' }));
-    fireEvent.press(screen.getByText('Steel Bar'));
-    fireEvent.press(screen.getByText('Add (1)'));
+    mockRouteParams.selectedItems = [mockItems[0]];
+    rerender(
+      <Provider store={store}>
+        <WeightViewPreferenceProvider>
+          <CreateRequestScreen />
+        </WeightViewPreferenceProvider>
+      </Provider>
+    );
 
     fireEvent.press(screen.getByRole('button', { name: 'Submit request' }));
 
@@ -303,10 +327,10 @@ describe('CreateRequestScreen — Create Request → Item Selector → Submit fl
       );
     });
 
-    expect(mockGoBack).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith('RequestQueue');
   });
 
-  it('saves draft and navigates back on success', async () => {
+  it('saves draft and navigates to list on success', async () => {
     renderWithStore(<CreateRequestScreen />, defaultPreloadedState);
 
     fireEvent.press(screen.getByRole('button', { name: 'Save as draft' }));
@@ -321,15 +345,20 @@ describe('CreateRequestScreen — Create Request → Item Selector → Submit fl
       );
     });
 
-    expect(mockGoBack).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith('RequestQueue');
   });
 
   it('shows error alert when createRequest rejects', async () => {
-    renderWithStore(<CreateRequestScreen />, defaultPreloadedState);
+    const { rerender, store } = renderWithStore(<CreateRequestScreen />, defaultPreloadedState);
 
-    fireEvent.press(screen.getByRole('button', { name: 'Add items' }));
-    fireEvent.press(screen.getByText('Steel Bar'));
-    fireEvent.press(screen.getByText('Add (1)'));
+    mockRouteParams.selectedItems = [mockItems[0]];
+    rerender(
+      <Provider store={store}>
+        <WeightViewPreferenceProvider>
+          <CreateRequestScreen />
+        </WeightViewPreferenceProvider>
+      </Provider>
+    );
 
     fireEvent.press(screen.getByRole('button', { name: 'Submit request' }));
 
@@ -341,11 +370,16 @@ describe('CreateRequestScreen — Create Request → Item Selector → Submit fl
   });
 
   it('disables submit buttons while submitting', async () => {
-    renderWithStore(<CreateRequestScreen />, defaultPreloadedState);
+    const { rerender, store } = renderWithStore(<CreateRequestScreen />, defaultPreloadedState);
 
-    fireEvent.press(screen.getByRole('button', { name: 'Add items' }));
-    fireEvent.press(screen.getByText('Steel Bar'));
-    fireEvent.press(screen.getByText('Add (1)'));
+    mockRouteParams.selectedItems = [mockItems[0]];
+    rerender(
+      <Provider store={store}>
+        <WeightViewPreferenceProvider>
+          <CreateRequestScreen />
+        </WeightViewPreferenceProvider>
+      </Provider>
+    );
 
     fireEvent.press(screen.getByRole('button', { name: 'Submit request' }));
 
@@ -355,7 +389,7 @@ describe('CreateRequestScreen — Create Request → Item Selector → Submit fl
     mockCreateRequestResolve!('req-123');
 
     await waitFor(() => {
-      expect(mockGoBack).toHaveBeenCalled();
+      expect(mockNavigate).toHaveBeenCalledWith('RequestQueue');
     });
   });
 });

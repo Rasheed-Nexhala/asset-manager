@@ -356,6 +356,111 @@ export const getItemsForMaintenanceCount = async (
 };
 
 /**
+ * Build query constraints for generic item selection (Requests, PO).
+ * Filters: status=active, optional name prefix search.
+ *
+ * @param searchTerm - Optional prefix to filter by item name (case-sensitive in Firestore)
+ */
+const buildSelectionItemsQueryConstraints = (
+  searchTerm?: string
+): QueryConstraint[] => {
+  const constraints: QueryConstraint[] = [where('status', '==', 'active')];
+  const trimmed = searchTerm?.trim();
+  if (trimmed) {
+    constraints.push(where('name', '>=', trimmed));
+    constraints.push(where('name', '<=', trimmed + '\uf8ff'));
+  }
+  constraints.push(orderBy('name', 'asc'));
+  return constraints;
+};
+
+/** Page size for item selection (Requests, PO) */
+export const SELECTION_ITEMS_PAGE_SIZE = 15;
+
+/**
+ * List active items for selection (Requests, PO). Paginated with optional name prefix search.
+ *
+ * @param searchTerm - Optional prefix to filter by item name
+ * @param pageSize - Items per page
+ * @param lastDoc - Cursor for next page
+ * @returns Items and cursor for next page
+ */
+export const listItemsForSelectionPaginated = async (
+  searchTerm: string | undefined,
+  pageSize: number,
+  lastDoc?: DocumentSnapshot
+): Promise<{ items: Item[]; lastDoc: DocumentSnapshot | null }> => {
+  try {
+    const constraints = buildSelectionItemsQueryConstraints(searchTerm);
+    if (lastDoc) {
+      constraints.push(startAfter(lastDoc));
+    }
+    constraints.push(limit(pageSize));
+
+    const q = query(collection(db, ITEMS_COLLECTION), ...constraints);
+    const snapshot = await getDocsFromServer(q);
+
+    const items: Item[] = snapshot.docs.map((docSnap) => {
+      const data = docSnap.data();
+      const firestoreItem: FirestoreItem = {
+        id: docSnap.id,
+        name: data.name,
+        sku: data.sku,
+        description: data.description,
+        categoryId: data.categoryId,
+        categoryName: data.categoryName,
+        type: data.type,
+        unit: data.unit,
+        imageUrl: data.imageUrl,
+        minStockLevel: data.minStockLevel ?? 0,
+        status: data.status,
+        totalQuantity: data.totalQuantity || 0,
+        centralStoreQuantity: data.centralStoreQuantity || 0,
+        atSitesQuantity: data.atSitesQuantity || 0,
+        inMaintenanceQuantity: data.inMaintenanceQuantity || 0,
+        weightPerMeter: data.weightPerMeter,
+        lengthPerPiece: data.lengthPerPiece,
+        steelMasterId: data.steelMasterId,
+        steelMasterName: data.steelMasterName,
+        isWeightBased: data.isWeightBased,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+      };
+      return firestoreItemToItem(firestoreItem);
+    });
+
+    const newLastDoc =
+      snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
+
+    return { items, lastDoc: newLastDoc };
+  } catch (error) {
+    console.error('Error listing items for selection:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get total count of active items for selection (Requests, PO).
+ * Uses same constraints as listItemsForSelectionPaginated.
+ *
+ * @param searchTerm - Optional prefix to filter by item name
+ * @returns Total count from server
+ */
+export const getItemsForSelectionCount = async (
+  searchTerm: string | undefined
+): Promise<number> => {
+  try {
+    const constraints = buildSelectionItemsQueryConstraints(searchTerm);
+    const q = query(collection(db, ITEMS_COLLECTION), ...constraints);
+    const snapshot = await getCountFromServer(q);
+    return snapshot.data().count;
+  } catch (error) {
+    console.error('Error getting items for selection count:', error);
+    throw error;
+  }
+};
+
+/**
  * Build FirestoreItem from Firestore document data (shared by getItemById and subscribeItemById)
  */
 const docDataToItem = (id: string, data: Record<string, unknown>): Item =>

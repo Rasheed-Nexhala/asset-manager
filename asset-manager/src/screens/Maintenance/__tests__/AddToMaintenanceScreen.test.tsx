@@ -267,7 +267,7 @@ describe('AddToMaintenanceScreen — Add to Maintenance flow', () => {
       expect(Alert.alert).toHaveBeenCalledWith('Success', 'Item has been added to maintenance', expect.any(Array));
     });
 
-    expect(mockGoBack).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith('MaintenanceDashboard');
   });
 
   it('submits successfully without description (description is optional)', async () => {
@@ -286,6 +286,6 @@ describe('AddToMaintenanceScreen — Add to Maintenance flow', () => {
       expect(Alert.alert).toHaveBeenCalledWith('Success', 'Item has been added to maintenance', expect.any(Array));
     });
 
-    expect(mockGoBack).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith('MaintenanceDashboard');
   });
 });

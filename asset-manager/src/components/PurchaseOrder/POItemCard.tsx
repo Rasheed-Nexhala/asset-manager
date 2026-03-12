@@ -184,14 +184,14 @@ export const POItemCard: React.FC<POItemCardProps> = ({
           )}
         </View>
 
-        {/* Amount (incl. GST) — full-width display */}
+        {/* Amount (incl. GST) — full-width display; "—" when optional (0) */}
         <View className="gap-1.5">
           <Text className="text-[15px] text-[#0F172A]">
             Amount (incl. GST)
           </Text>
           <View className="h-12 justify-center">
             <Text className="text-[15px] font-semibold text-[#0F172A]">
-              {formatCurrency(amountWithGst)}
+              {amountWithGst > 0 ? formatCurrency(amountWithGst) : '—'}
             </Text>
           </View>
         </View>

@@ -111,16 +111,17 @@ const buildPOItems = (
   items: CreatePurchaseOrderData['items']
 ): PurchaseOrderFirestore['items'] =>
   items.map((item) => {
-    const amount = item.quantity * item.unitPrice;
-    const gstPct = item.gstPercentage ?? DEFAULT_GST_PERCENTAGE;
-    const gstAmount = Math.round((amount * gstPct) / 100);
+    const unitPrice = item.unitPrice ?? 0;
+    const amount = item.quantity * unitPrice;
+    const gstPct = item.gstPercentage ?? (unitPrice > 0 ? DEFAULT_GST_PERCENTAGE : 0);
+    const gstAmount = gstPct > 0 ? Math.round((amount * gstPct) / 100) : 0;
     return {
       itemId: item.itemId,
       itemName: item.itemName,
       itemSku: item.itemSku,
       isExistingItem: item.isExistingItem,
       quantity: item.quantity,
-      unitPrice: item.unitPrice,
+      unitPrice,
       amount,
       gstPercentage: gstPct,
       gstAmount,

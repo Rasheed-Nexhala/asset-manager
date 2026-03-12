@@ -170,8 +170,8 @@ export interface CreatePurchaseOrderData {
     itemSku: string;
     isExistingItem: boolean;
     quantity: number;
-    unitPrice: number;
-    gstPercentage: number;
+    unitPrice?: number;
+    gstPercentage?: number;
   }>;
   justification: string;
   expectedDeliveryDate: string | null;

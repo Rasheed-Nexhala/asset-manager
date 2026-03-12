@@ -441,15 +441,26 @@ export const loadMoreRequests = createAsyncThunk(
 
 /**
  * Fetch my requests with pagination (first page + total count).
+ *
+ * Optimization: For new users with 0 requests, we fetch the list first. If it
+ * returns fewer than PAGE_SIZE results, we know the total count without running
+ * the expensive getRequestsCount query. This avoids slow loading for empty lists.
  */
 export const fetchMyRequestsPaginated = createAsyncThunk(
   'requests/fetchMyRequestsPaginated',
   async (userId: string) => {
     const listFilters: RequestListFilters = { userId };
-    const [totalCount, listResult] = await Promise.all([
-      getRequestsCount(listFilters),
-      listRequestsPaginated(listFilters, REQUESTS_PAGE_SIZE),
-    ]);
+    // Fetch list first - for 0 requests this returns quickly
+    const listResult = await listRequestsPaginated(
+      listFilters,
+      REQUESTS_PAGE_SIZE
+    );
+    // If we got fewer than a full page, total = list length (skip count query)
+    const needsCount =
+      listResult.requests.length >= REQUESTS_PAGE_SIZE;
+    const totalCount = needsCount
+      ? await getRequestsCount(listFilters)
+      : listResult.requests.length;
     return {
       requests: listResult.requests,
       totalCount,

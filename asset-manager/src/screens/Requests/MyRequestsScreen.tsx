@@ -20,6 +20,7 @@ import {
   fetchMyRequestsPaginated,
   loadMoreMyRequests,
 } from '../../store/thunks/requestThunks';
+import { useMyRequestsSubscription } from '../../hooks/useRequestsSubscriptions';
 import {
   selectMyRequestsByStatusAndSearch,
   selectRequestsLoading,
@@ -30,6 +31,7 @@ import {
 import {
   selectUserId,
   selectIsSiteManager,
+  selectAuthInitialized,
 } from '../../store/selectors/authSelectors';
 import { selectAllSites } from '../../store/selectors/sitesSelectors';
 import { fetchSites } from '../../store/slices/sitesSlice';
@@ -59,6 +61,7 @@ export const MyRequestsScreen: React.FC = () => {
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const userId = useAppSelector(selectUserId);
+  const authInitialized = useAppSelector(selectAuthInitialized);
   const isSiteManager = useAppSelector(selectIsSiteManager);
   const sites = useAppSelector(selectAllSites);
   const filteredRequests = useAppSelector((state) =>
@@ -73,6 +76,9 @@ export const MyRequestsScreen: React.FC = () => {
     if (!userId || sites.length === 0) return null;
     return sites.find((site) => site.managerId === userId) || null;
   }, [userId, sites]);
+
+  // Real-time Firestore snapshot updates when screen is focused
+  useMyRequestsSubscription();
 
   // Ensure sites are loaded for currentSite (used by Create Request button).
   useEffect(() => {
@@ -172,7 +178,28 @@ export const MyRequestsScreen: React.FC = () => {
 
   const isInitialOrRefetching =
     filteredRequests.length === 0 && totalCount === null;
-  if (isInitialOrRefetching || (isLoading && filteredRequests.length === 0)) {
+  const showLoading =
+    isInitialOrRefetching || (isLoading && filteredRequests.length === 0);
+
+  // Auth not ready: avoid infinite loading when userId is null during auth init
+  if (authInitialized && !userId) {
+    return (
+      <ScreenLayout edges={['top']}>
+        <ScreenHeader title="My Requests" />
+        <View className="flex-1 items-center justify-center px-4">
+          <Ionicons name="person-outline" size={80} color="#64748B" />
+          <Text className="text-[22px] font-semibold text-[#0F172A] text-center mb-2 mt-4">
+            Sign In Required
+          </Text>
+          <Text className="text-[15px] text-[#64748B] text-center">
+            Please sign in to view your requests.
+          </Text>
+        </View>
+      </ScreenLayout>
+    );
+  }
+
+  if (showLoading) {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader title="My Requests" />
