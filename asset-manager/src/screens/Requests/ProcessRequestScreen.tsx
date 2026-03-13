@@ -93,6 +93,7 @@ export const ProcessRequestScreen: React.FC = () => {
   }, [dispatch, inventoryItems.length]);
   const { viewMode, toggleViewMode } = useWeightViewPreference();
   const [request, setRequest] = useState<Request | null>(requestFromStore ?? null);
+  const [approvedQuantities, setApprovedQuantities] = useState<Record<string, number>>({});
   const [availability, setAvailability] = useState<ItemAvailability[]>([]);
   const [storeNotes, setStoreNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -143,8 +144,41 @@ export const ProcessRequestScreen: React.FC = () => {
     }
   }, [requestFromStore, requestId, request]);
 
+  // Initialize approvedQuantities when request loads or changes to pending
+  useEffect(() => {
+    if (request && request.status === 'pending') {
+      setApprovedQuantities((prev) => {
+        if (Object.keys(prev).length > 0) return prev;
+        const initial: Record<string, number> = {};
+        const items = Array.isArray(request.items) ? request.items : [];
+        items.forEach((item) => {
+          initial[item.itemId] = item.quantityRequested;
+        });
+        return initial;
+      });
+    }
+  }, [request]);
+
+  const handleQuantityChange = useCallback((itemId: string, qty: number) => {
+    const originalItem = Array.isArray(request?.items) 
+      ? request.items.find(i => i.itemId === itemId) 
+      : null;
+    const maxQty = originalItem?.quantityRequested ?? Infinity;
+    
+    // Clamp between 1 and maxQty
+    const clampedQty = Math.max(1, Math.min(qty, maxQty));
+    
+    setApprovedQuantities(prev => ({
+      ...prev,
+      [itemId]: clampedQty
+    }));
+  }, [request]);
+
   const canProcess = isStoreIncharge || isAdmin;
-  const allSufficient = availability.length > 0 && availability.every((a) => a.sufficient);
+  const allSufficient = availability.length > 0 && availability.every((a) => {
+    const requested = approvedQuantities[a.itemId] ?? a.requested;
+    return a.available >= requested;
+  });
   const isPending = request?.status === 'pending';
 
   useEffect(() => {
@@ -189,11 +223,11 @@ export const ProcessRequestScreen: React.FC = () => {
   const getAvailabilityForItem = useCallback(
     (itemId: string) => {
       const a = availability.find((av) => av.itemId === itemId);
-      return a
-        ? { available: a.available, sufficient: a.sufficient }
-        : undefined;
+      if (!a) return undefined;
+      const requested = approvedQuantities[itemId] ?? a.requested;
+      return { available: a.available, sufficient: a.available >= requested };
     },
-    [availability]
+    [availability, approvedQuantities]
   );
 
   const handleCreatePOForShortfall = useCallback(() => {
@@ -230,7 +264,7 @@ export const ProcessRequestScreen: React.FC = () => {
       const itemsToCheck = Array.isArray(request.items) ? request.items.map((item) => ({
         itemId: item.itemId,
         itemName: item.itemName,
-        quantityRequested: item.quantityRequested,
+        quantityRequested: approvedQuantities[item.itemId] ?? item.quantityRequested,
       })) : [];
       const approveSourceLocationId =
         request.requestType === 'site_transfer' && request.sourceSiteId
@@ -238,7 +272,10 @@ export const ProcessRequestScreen: React.FC = () => {
           : 'store';
       
       const currentAvailability = await requestService.checkItemsAvailability(itemsToCheck, approveSourceLocationId);
-      const isStillSufficient = currentAvailability.length > 0 && currentAvailability.every((a) => a.sufficient);
+      const isStillSufficient = currentAvailability.length > 0 && currentAvailability.every((a) => {
+        const qty = approvedQuantities[a.itemId] ?? a.requested;
+        return a.available >= qty;
+      });
       
       if (!isStillSufficient) {
         setAvailability(currentAvailability);
@@ -255,6 +292,10 @@ export const ProcessRequestScreen: React.FC = () => {
           processedBy: userId,
           processedByName: userName,
           storeNotes: storeNotes.trim() || undefined,
+          updatedItems: Object.entries(approvedQuantities).map(([itemId, quantityApproved]) => ({
+            itemId,
+            quantityApproved,
+          })),
         })
       ).unwrap();
 
@@ -267,7 +308,7 @@ export const ProcessRequestScreen: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [request, userId, userName, storeNotes, allSufficient, dispatch, navigation]);
+  }, [request, userId, userName, storeNotes, allSufficient, approvedQuantities, dispatch, navigation]);
 
   const handleReject = useCallback(() => {
     navigation.navigate('RejectRequest', { requestId });
@@ -414,11 +455,13 @@ export const ProcessRequestScreen: React.FC = () => {
                 key={item.itemId}
                 item={{
                   ...item,
+                  quantityRequested: approvedQuantities[item.itemId] ?? item.quantityRequested,
                   unit:
                     item.unit ||
                     inventoryItems.find((inventoryItem) => inventoryItem.id === item.itemId)?.unit,
                 }}
-                mode="view"
+                mode={canProcess && isPending ? 'edit' : 'view'}
+                onQuantityChange={handleQuantityChange}
                 availability={
                   canProcess && isPending
                     ? getAvailabilityForItem(item.itemId)

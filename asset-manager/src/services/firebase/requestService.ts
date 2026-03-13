@@ -93,6 +93,22 @@ export const createRequest = async (
 
     const isSiteTransfer = requestData.requestType === 'site_transfer';
     
+    if (!requestData.items || requestData.items.length === 0) {
+      throw new Error('Request must contain at least one item');
+    }
+
+    const itemIds = new Set<string>();
+    for (const item of requestData.items) {
+      if (itemIds.has(item.itemId)) {
+        throw new Error(`Duplicate item found in request: ${item.itemName || item.itemId}`);
+      }
+      itemIds.add(item.itemId);
+
+      if (typeof item.quantity !== 'number' || isNaN(item.quantity) || item.quantity <= 0) {
+        throw new Error(`Invalid quantity for item: ${item.itemName || item.itemId}. Quantity must be a numeric value greater than 0.`);
+      }
+    }
+
     const newRequest: Record<string, unknown> = {
       requestNumber,
       siteId: requestData.siteId,
@@ -167,16 +183,15 @@ export const checkItemsAvailability = async (
   try {
     const availabilityChecks = await Promise.all(
       items.map(async (item) => {
-        const inventoryQuery = query(
-          collection(db, INVENTORY_COLLECTION),
-          where('itemId', '==', item.itemId),
-          where('locationId', '==', locationId),
-          limit(1)
+        const inventoryDocRef = doc(
+          db,
+          INVENTORY_COLLECTION,
+          getInventoryDocId(item.itemId, locationId)
         );
-        const inventorySnapshot = await getDocs(inventoryQuery);
-        const available = inventorySnapshot.empty 
-          ? 0 
-          : inventorySnapshot.docs[0].data()?.quantity || 0;
+        const inventorySnapshot = await getDoc(inventoryDocRef);
+        const available = inventorySnapshot.exists() 
+          ? inventorySnapshot.data()?.quantity || 0 
+          : 0;
         
         return {
           itemId: item.itemId,
@@ -283,7 +298,8 @@ export const approveRequest = async (
   requestId: string,
   processedBy: string,
   processedByName: string,
-  storeNotes?: string
+  storeNotes?: string,
+  updatedItems?: Array<{ itemId: string; quantityApproved: number }>
 ): Promise<void> => {
   try {
     // First check availability
@@ -295,7 +311,23 @@ export const approveRequest = async (
     }
     
     const requestData = requestSnap.data();
-    const items = Array.isArray(requestData?.items) ? requestData.items : [];
+    if (requestData.status !== 'pending') {
+      throw new Error('Only pending requests can be approved');
+    }
+
+    let items = Array.isArray(requestData?.items) ? requestData.items : [];
+
+    // Apply updated quantities if provided
+    if (updatedItems && updatedItems.length > 0) {
+      const updatedMap = new Map(updatedItems.map(i => [i.itemId, i.quantityApproved]));
+      items = items.map(item => {
+        const newQty = updatedMap.get(item.itemId);
+        if (newQty !== undefined) {
+          return { ...item, quantityApproved: newQty };
+        }
+        return item;
+      });
+    }
 
     // For site transfers, check availability at the SOURCE site, not the central store.
     const locationId =
@@ -304,10 +336,10 @@ export const approveRequest = async (
         : 'store';
 
     const availability = await checkItemsAvailability(
-      items.map((item: { itemId: string; itemName: string; quantityRequested: number }) => ({
+      items.map((item: any) => ({
         itemId: item.itemId,
         itemName: item.itemName ?? item.itemId,
-        quantityRequested: item.quantityRequested ?? 0,
+        quantityRequested: item.quantityApproved ?? item.quantityRequested ?? 0,
       })),
       locationId
     );
@@ -318,14 +350,25 @@ export const approveRequest = async (
       throw new Error('Cannot approve: insufficient stock for some items');
     }
     
-    // Update status
-    await updateDoc(requestRef, {
-      status: 'approved',
-      processedBy,
-      processedByName,
-      processedAt: serverTimestamp(),
-      storeNotes: storeNotes || null,
-      updatedAt: serverTimestamp(),
+    // Update status within transaction to prevent race conditions
+    await runTransaction(db, async (transaction) => {
+      const txSnap = await transaction.get(requestRef);
+      if (!txSnap.exists()) {
+        throw new Error('Request not found');
+      }
+      if (txSnap.data().status !== 'pending') {
+        throw new Error('Only pending requests can be approved');
+      }
+      
+      transaction.update(requestRef, {
+        items,
+        status: 'approved',
+        processedBy,
+        processedByName,
+        processedAt: serverTimestamp(),
+        storeNotes: storeNotes || null,
+        updatedAt: serverTimestamp(),
+      });
     });
   } catch (error) {
     console.error('Error approving request:', error);
@@ -345,14 +388,24 @@ export const rejectRequest = async (
   try {
     const requestRef = doc(db, REQUESTS_COLLECTION, requestId);
     
-    await updateDoc(requestRef, {
-      status: 'rejected',
-      processedBy,
-      processedByName,
-      processedAt: serverTimestamp(),
-      rejectionReason: rejectionData.reason,
-      rejectionComments: rejectionData.comments || '',
-      updatedAt: serverTimestamp(),
+    await runTransaction(db, async (transaction) => {
+      const requestSnap = await transaction.get(requestRef);
+      if (!requestSnap.exists()) {
+        throw new Error('Request not found');
+      }
+      if (requestSnap.data().status !== 'pending') {
+        throw new Error('Only pending requests can be rejected');
+      }
+      
+      transaction.update(requestRef, {
+        status: 'rejected',
+        processedBy,
+        processedByName,
+        processedAt: serverTimestamp(),
+        rejectionReason: rejectionData.reason,
+        rejectionComments: rejectionData.comments || '',
+        updatedAt: serverTimestamp(),
+      });
     });
   } catch (error) {
     console.error('Error rejecting request:', error);
@@ -704,6 +757,22 @@ const returnItemsBatch = async (
   userName: string
 ): Promise<void> => {
   try {
+    if (!returnData.items || returnData.items.length === 0) {
+      throw new Error('Return must contain at least one item');
+    }
+
+    const returnItemIds = new Set<string>();
+    for (const item of returnData.items) {
+      if (returnItemIds.has(item.itemId)) {
+        throw new Error(`Duplicate item found in return: ${item.itemId}`);
+      }
+      returnItemIds.add(item.itemId);
+
+      if (typeof item.quantityReturned !== 'number' || isNaN(item.quantityReturned) || item.quantityReturned <= 0) {
+        throw new Error(`Invalid return quantity for item: ${item.itemId}. Quantity must be a numeric value greater than 0.`);
+      }
+    }
+
     // ─── Step 1: Fresh-read request from Firestore server ───
     const requestRef = doc(db, REQUESTS_COLLECTION, requestId);
     const requestSnapOuter = await getDocFromServer(requestRef);

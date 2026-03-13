@@ -162,11 +162,13 @@ export const approveRequest = createAsyncThunk(
       processedBy,
       processedByName,
       storeNotes,
+      updatedItems,
     }: {
       requestId: string;
       processedBy: string;
       processedByName: string;
       storeNotes?: string;
+      updatedItems?: Array<{ itemId: string; quantityApproved: number }>;
     },
     { dispatch, rejectWithValue }
   ) => {
@@ -178,7 +180,8 @@ export const approveRequest = createAsyncThunk(
         requestId,
         processedBy,
         processedByName,
-        storeNotes
+        storeNotes,
+        updatedItems
       );
 
       // Fetch updated request

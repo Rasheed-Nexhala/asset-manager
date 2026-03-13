@@ -61,9 +61,9 @@ export const ConfirmTransferScreen: React.FC = () => {
   }, [dispatch, inventoryItems.length]);
 
   const [request, setRequest] = useState<Request | null>(null);
-  const [receivedBy, setReceivedBy] = useState('');
+  const [receivedByName, setReceivedByName] = useState('');
   const [transferNotes, setTransferNotes] = useState('');
-  const [errors, setErrors] = useState<{ receivedBy?: string }>({});
+  const [errors, setErrors] = useState<{ receivedByName?: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -107,10 +107,10 @@ export const ConfirmTransferScreen: React.FC = () => {
   }, [requestId, navigation, isAdmin, isStoreIncharge]);
 
   const validateForm = (): boolean => {
-    const newErrors: { receivedBy?: string } = {};
+    const newErrors: { receivedByName?: string } = {};
 
-    if (!receivedBy.trim()) {
-      newErrors.receivedBy = 'Received by is required';
+    if (!receivedByName.trim()) {
+      newErrors.receivedByName = 'Received by is required';
     }
 
     setErrors(newErrors);
@@ -127,8 +127,8 @@ export const ConfirmTransferScreen: React.FC = () => {
         transferRequest({
           requestId,
           transferData: {
-            receivedBy: receivedBy.trim(),
-            receivedByName: receivedBy.trim(),
+            receivedBy: '',
+            receivedByName: receivedByName.trim(),
           },
           transferredBy: userId,
           transferredByName: userName,
@@ -240,13 +240,13 @@ export const ConfirmTransferScreen: React.FC = () => {
           <FormField
             label="Received By"
             required
-            value={receivedBy}
+            value={receivedByName}
             onChangeText={(text) => {
-              setReceivedBy(text);
-              setErrors((prev) => ({ ...prev, receivedBy: undefined }));
+              setReceivedByName(text);
+              setErrors((prev) => ({ ...prev, receivedByName: undefined }));
             }}
             placeholder="Name of person receiving items at site"
-            error={errors.receivedBy}
+            error={errors.receivedByName}
           />
 
           <FormField
