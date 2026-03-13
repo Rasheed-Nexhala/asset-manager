@@ -11,7 +11,7 @@ import {
   Modal,
   TouchableWithoutFeedback,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
@@ -57,6 +57,7 @@ type NavigationProp = StackNavigationProp<
   InventoryStackParamList,
   'CentralStoreInventory'
 >;
+type RouteParams = RouteProp<InventoryStackParamList, 'CentralStoreInventory'>;
 
 /** Convert local filter state to Redux ItemFilters (for Firestore queries) */
 const toItemFilters = (f: FilterState): ItemFilters => ({
@@ -67,13 +68,15 @@ const toItemFilters = (f: FilterState): ItemFilters => ({
 
 export const CentralStoreInventoryScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteParams>();
   const dispatch = useAppDispatch();
+  const lowStockFilterFromNav = route.params?.lowStockFilter ?? false;
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filters, setLocalFilters] = useState<FilterState>({
-    stock: 'all',
+    stock: lowStockFilterFromNav ? 'low_stock' : 'all',
   });
-  const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [showFilters, setShowFilters] = useState<boolean>(lowStockFilterFromNav);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [showMoreMenu, setShowMoreMenu] = useState<boolean>(false);
 

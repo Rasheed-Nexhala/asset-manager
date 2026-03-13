@@ -19,7 +19,8 @@ export type NotificationPrefType =
   | 'stockAlerts'
   | 'maintenanceAlerts'
   | 'purchaseOrderUpdates'
-  | 'userUpdates';
+  | 'userUpdates'
+  | 'inventoryUpdateRequestUpdates';
 
 /**
  * Sends push notifications via Expo Push Service.
@@ -113,6 +114,49 @@ export async function getAdminAndStoreInchargeUserIds(): Promise<string[]> {
   for (const doc of snapshot.docs) {
     const role = doc.data()?.role as string | undefined;
     if (role === 'Admin' || role === 'StoreIncharge') {
+      ids.push(doc.id);
+    }
+  }
+  return ids;
+}
+
+/**
+ * Returns deduplicated Expo push tokens for all active Admin users only.
+ * Use when Store Incharge creates something that only Admin should be notified about
+ * (e.g. inventory update requests).
+ */
+export async function getAdminOnlyTokens(
+  type: NotificationPrefType
+): Promise<string[]> {
+  const snapshot = await db
+    .collection('users')
+    .where('isActive', '==', true)
+    .get();
+
+  const all: string[] = [];
+  for (const doc of snapshot.docs) {
+    const role = doc.data()?.role as string | undefined;
+    if (role === 'Admin') {
+      const tokens = await getUserPushTokens(doc.id, type);
+      all.push(...tokens);
+    }
+  }
+  return [...new Set(all)];
+}
+
+/**
+ * Returns user IDs of active Admin users only (for in-app notifications).
+ */
+export async function getAdminOnlyUserIds(): Promise<string[]> {
+  const snapshot = await db
+    .collection('users')
+    .where('isActive', '==', true)
+    .get();
+
+  const ids: string[] = [];
+  for (const doc of snapshot.docs) {
+    const role = doc.data()?.role as string | undefined;
+    if (role === 'Admin') {
       ids.push(doc.id);
     }
   }

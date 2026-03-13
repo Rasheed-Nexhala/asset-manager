@@ -59,6 +59,19 @@ describe('RequestCard', () => {
     expect(screen.getByText('Insufficient stock')).toBeTruthy();
   });
 
+  it('shows "View to check availability" when availabilityUnknown is true', () => {
+    render(
+      <RequestCard
+        request={mockRequest}
+        onPress={jest.fn()}
+        showAvailability
+        isAllSufficient={false}
+        availabilityUnknown
+      />
+    );
+    expect(screen.getByText('View to check availability')).toBeTruthy();
+  });
+
   it('renders status badge', () => {
     render(<RequestCard request={mockRequest} onPress={jest.fn()} />);
     expect(screen.getByText('Pending')).toBeTruthy();

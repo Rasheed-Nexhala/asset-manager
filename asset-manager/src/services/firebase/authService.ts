@@ -44,51 +44,73 @@ export const signUp = async (
 
 /**
  * Log authentication event via Cloud Function (login/logout)
- * Uses try-catch to not block auth flow on logging failure
+ * Uses try-catch to not block auth flow on logging failure.
+ * Retries once on unauthenticated to handle token propagation delay (React Native).
  */
 async function logAuthEventToCloud(
   actionType: 'user_login' | 'user_logout',
   userName: string,
   userRole: string
 ): Promise<void> {
-  try {
+  const payload = {
+    actionType,
+    userName,
+    userRole,
+    details: '',
+    deviceInfo: 'React Native',
+    appVersion: '1.0.0',
+  };
+
+  const attemptLog = async (): Promise<void> => {
     const logAuthEventFn = httpsCallable<
       { actionType: string; userName: string; userRole: string; details?: string; deviceInfo?: string; appVersion?: string },
       { success: boolean }
     >(functions, 'logAuthEvent');
-    await logAuthEventFn({
-      actionType,
-      userName,
-      userRole,
-      details: '',
-      deviceInfo: 'React Native',
-      appVersion: '1.0.0',
-    });
-  } catch (error: unknown) {
-    const code = (error as { code?: string })?.code ?? '';
-    const message = (error as { message?: string })?.message ?? String(error);
-    
-    // Log as error instead of silently swallowing or just info logging
-    console.error('Failed to log auth event to cloud:', { code, message, error });
-    
-    // Not-found/unavailable = Cloud Function not deployed or unreachable
-    if (code === 'functions/not-found' || code === 'functions/unavailable' || message.includes('not-found')) {
-      console.error(
-        'Activity log (logAuthEvent) unavailable. Deploy Cloud Functions to enable auth event logging.'
-      );
+    await logAuthEventFn(payload);
+  };
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      await attemptLog();
+      return;
+    } catch (error: unknown) {
+      const code = (error as { code?: string })?.code ?? '';
+      const message = (error as { message?: string })?.message ?? String(error);
+      const isUnauthenticated = code === 'unauthenticated' || message.includes('unauthenticated');
+
+      // Retry once on unauthenticated (token propagation delay in React Native)
+      if (isUnauthenticated && attempt < 2) {
+        await new Promise((r) => setTimeout(r, 400));
+        continue;
+      }
+
+      // Not-found/unavailable = Cloud Function not deployed or unreachable
+      if (code === 'functions/not-found' || code === 'functions/unavailable' || message.includes('not-found')) {
+        if (__DEV__) {
+          console.warn('Activity log (logAuthEvent) unavailable. Deploy Cloud Functions to enable auth event logging.');
+        }
+        return;
+      }
+      // Unauthenticated = token not ready after retry; log as warn (non-blocking)
+      if (isUnauthenticated) {
+        if (__DEV__) {
+          console.warn('Activity log (logAuthEvent): request was unauthenticated; event not logged.');
+        }
+        return;
+      }
+      // Permission-denied = Firestore/Cloud Function rules block the call
+      if (code === 'permission-denied' || message.includes('permission-denied')) {
+        if (__DEV__) {
+          console.warn('Activity log (logAuthEvent): permission denied; event not logged.');
+        }
+        return;
+      }
+      // Unexpected error
+      if (__DEV__) {
+        console.warn('Failed to log auth event to cloud:', { code, message });
+      }
       return;
     }
-    // Unauthenticated = token not ready or expired when request was sent
-    if (code === 'unauthenticated' || message.includes('unauthenticated')) {
-      console.error('Activity log (logAuthEvent): request was unauthenticated; event not logged.');
-      return;
-    }
-    // Permission-denied = Firestore/Cloud Function rules block the call
-    if (code === 'permission-denied' || message.includes('permission-denied')) {
-      console.error('Activity log (logAuthEvent): permission denied; event not logged.');
-      return;
-    }
-    // Don't throw - logging failure should not block auth, but we have correctly logged the error
   }
 }
 

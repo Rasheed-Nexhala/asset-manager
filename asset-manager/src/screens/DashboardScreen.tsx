@@ -331,7 +331,6 @@ export const DashboardScreen: React.FC = () => {
                 <Text className="text-[17px] font-semibold text-[#0F172A]">Activity Log</Text>
                 <Ionicons name="chevron-forward" size={20} color="#64748B" />
               </TouchableOpacity>
-              <MyRecentActivityWidget onViewAll={() => navigation.navigate('MyActivity')} />
               {(lowStockItems.length > 0 || isInitialLoad || itemsLoading) && (
                 <LowStockAlertWidget
                   items={lowStockItems.map((i) => ({
@@ -340,10 +339,24 @@ export const DashboardScreen: React.FC = () => {
                     currentQty: i.centralStoreQuantity ?? i.totalQuantity ?? 0,
                     minQty: i.minStockLevel ?? 0,
                   }))}
-                  onViewAll={() => tabNav?.navigate('Inventory', { screen: 'CentralStoreInventory' })}
-                  onCreatePO={() =>
-                    tabNav?.navigate('PurchaseOrders', { screen: 'CreatePO', params: {} })
+                  onViewAll={() =>
+                    tabNav?.navigate('Inventory', {
+                      screen: 'CentralStoreInventory',
+                      params: { lowStockFilter: true },
+                    })
                   }
+                  onCreatePO={(itemId) => {
+                    const item = lowStockItems.find((i) => i.id === itemId);
+                    if (!item) return;
+                    const shortfall = Math.max(1, (item.minStockLevel ?? 0) - (item.centralStoreQuantity ?? 0));
+                    tabNav?.navigate('PurchaseOrders', {
+                      screen: 'CreatePO',
+                      params: {
+                        selectedItems: [item],
+                        initialQuantities: { [item.id]: shortfall },
+                      },
+                    });
+                  }}
                   loading={isInitialLoad || itemsLoading}
                 />
               )}
@@ -356,6 +369,7 @@ export const DashboardScreen: React.FC = () => {
                   loading={isInitialLoad || requestsLoading}
                 />
               )}
+              <MyRecentActivityWidget onViewAll={() => navigation.navigate('MyActivity')} />
             </>
           )}
 
@@ -372,10 +386,24 @@ export const DashboardScreen: React.FC = () => {
                     currentQty: i.centralStoreQuantity ?? i.totalQuantity ?? 0,
                     minQty: i.minStockLevel ?? 0,
                   }))}
-                  onViewAll={() => tabNav?.navigate('Inventory', { screen: 'CentralStoreInventory' })}
-                  onCreatePO={() =>
-                    tabNav?.navigate('PurchaseOrders', { screen: 'CreatePO', params: {} })
+                  onViewAll={() =>
+                    tabNav?.navigate('Inventory', {
+                      screen: 'CentralStoreInventory',
+                      params: { lowStockFilter: true },
+                    })
                   }
+                  onCreatePO={(itemId) => {
+                    const item = lowStockItems.find((i) => i.id === itemId);
+                    if (!item) return;
+                    const shortfall = Math.max(1, (item.minStockLevel ?? 0) - (item.centralStoreQuantity ?? 0));
+                    tabNav?.navigate('PurchaseOrders', {
+                      screen: 'CreatePO',
+                      params: {
+                        selectedItems: [item],
+                        initialQuantities: { [item.id]: shortfall },
+                      },
+                    });
+                  }}
                   loading={isInitialLoad || itemsLoading}
                 />
               )}

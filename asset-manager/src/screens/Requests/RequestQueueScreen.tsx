@@ -85,8 +85,11 @@ export const RequestQueueScreen: React.FC = () => {
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    dispatch(fetchRequestsPaginated());
-    setTimeout(() => setRefreshing(false), 800);
+    // Refresh both requests AND items so availability (centralStoreQuantity) is up-to-date
+    Promise.all([
+      dispatch(fetchRequestsPaginated()),
+      dispatch(fetchItems()),
+    ]).finally(() => setTimeout(() => setRefreshing(false), 800));
   }, [dispatch]);
 
   const handleSearchChange = useCallback((text: string) => {
@@ -143,18 +146,31 @@ export const RequestQueueScreen: React.FC = () => {
 
   const renderRequestCard = useCallback(
     ({ item }: { item: Request }) => {
-      const isAllSufficient = item.items.every((ri) => {
-        const invItem = allItems.find((i) => i.id === ri.itemId);
-        const available = invItem?.centralStoreQuantity ?? 0;
-        return available >= ri.quantityRequested;
-      });
+      // Only show availability for pending/approved; hide once transferred, returned, etc.
+      const showAvailability =
+        item.status === 'pending' || item.status === 'approved';
+
+      // Site transfers use source-site inventory, not central store. We don't have
+      // per-site inventory in the list, so show "View to check" instead of wrong status.
+      const isSiteTransfer = item.requestType === 'site_transfer';
+      const availabilityUnknown = isSiteTransfer;
+
+      const isAllSufficient = availabilityUnknown
+        ? false // Not used when unknown
+        : item.items.every((ri) => {
+            const invItem = allItems.find((i) => i.id === ri.itemId);
+            const available = invItem?.centralStoreQuantity ?? 0;
+            return available >= ri.quantityRequested;
+          });
+
       return (
         <View className="px-4 pb-3">
           <RequestCard
             request={item}
             onPress={() => handleRequestPress(item)}
-            showAvailability
+            showAvailability={showAvailability}
             isAllSufficient={isAllSufficient}
+            availabilityUnknown={availabilityUnknown}
           />
         </View>
       );

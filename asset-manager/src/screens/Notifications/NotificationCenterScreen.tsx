@@ -101,6 +101,11 @@ export const NotificationCenterScreen: React.FC = () => {
             params: { itemId: data.itemId },
           },
         });
+      } else if (data?.screen === 'InventoryUpdateRequests') {
+        nav.navigate('Tabs', {
+          screen: 'Inventory',
+          params: { screen: 'InventoryUpdateRequests' },
+        });
       } else if (data?.screen === 'Users') {
         nav.navigate('Tabs', {
           screen: 'Dashboard',

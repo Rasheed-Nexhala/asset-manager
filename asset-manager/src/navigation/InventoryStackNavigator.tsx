@@ -25,7 +25,7 @@ import { MaintenanceStackNavigator } from './MaintenanceStackNavigator';
  */
 export type InventoryStackParamList = {
   // Central Store screens (Admin/StoreIncharge)
-  CentralStoreInventory: undefined;
+  CentralStoreInventory: { lowStockFilter?: boolean } | undefined;
   AddEditItem: { itemId?: string; selectedCategoryId?: string } | undefined;
   ItemDetail: { itemId: string };
   SteelMaster: undefined;

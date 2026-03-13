@@ -200,6 +200,13 @@ export const MaintenanceDashboardScreen: React.FC = () => {
           accessibilityLabel: 'Add to maintenance',
         }}
       />
+
+      {/* Info note */}
+      <View className="bg-[#E0F2FE] px-4 py-2.5 border-b border-[#0EA5E9]/20">
+        <Text className="text-[13px] text-[#0369A1] text-center w-full">
+          Only Non Consumable items can be added to maintenance.
+        </Text>
+      </View>
       
       {/* Tab Bar */}
       <View className="bg-white border-b border-[#E2E8F0] flex-row">

@@ -18,6 +18,8 @@ import {
   getUserPushTokens,
   getAdminAndStoreInchargeTokens,
   getAdminAndStoreInchargeUserIds,
+  getAdminOnlyTokens,
+  getAdminOnlyUserIds,
   createInAppNotification,
 } from './notifications';
 
@@ -929,6 +931,53 @@ export const onPurchaseOrderCreated = onDocumentCreated(
         }
       } catch (notifErr) {
         logger.error('Push failed for new PO', { notifErr, poId });
+      }
+    }
+  }
+);
+
+/**
+ * Firestore Trigger: Notify Admin when Store Incharge creates inventory update request
+ * Triggered when a new document is created in inventoryUpdateRequests collection
+ */
+export const onInventoryUpdateRequestCreated = onDocumentCreated(
+  'inventoryUpdateRequests/{requestId}',
+  async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) {
+      logger.warn('onInventoryUpdateRequestCreated: No data associated with the event');
+      return;
+    }
+
+    const request = snapshot.data();
+    const requestId = event.params.requestId;
+    const requestedByName = request.requestedByName ?? 'Store Incharge';
+    const reason = request.reason ?? 'Inventory update required';
+
+    if (request.status === 'pending') {
+      try {
+        const tokens = await getAdminOnlyTokens('inventoryUpdateRequestUpdates');
+        if (tokens.length > 0) {
+          const title = 'Inventory Update Request';
+          const body = `${requestedByName} requested access to update inventory: ${reason}`;
+          const pushData = { screen: 'InventoryUpdateRequests', requestId };
+          const userIds = await getAdminOnlyUserIds();
+          for (const uid of userIds) {
+            await createInAppNotification(
+              uid,
+              'inventory_update_request_pending',
+              title,
+              body,
+              pushData
+            );
+          }
+          await sendExpoPushNotification(tokens, title, body, pushData);
+        }
+      } catch (notifErr) {
+        logger.error('Push failed for inventory update request', {
+          notifErr,
+          requestId,
+        });
       }
     }
   }

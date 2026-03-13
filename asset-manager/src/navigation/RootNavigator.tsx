@@ -136,6 +136,14 @@ function handleNotificationNavigation(
         },
       },
     });
+  } else if (data.screen === 'InventoryUpdateRequests' && isAdmin) {
+    navigationRef.navigate('Main', {
+      screen: 'Tabs',
+      params: {
+        screen: 'Inventory',
+        params: { screen: 'InventoryUpdateRequests' },
+      },
+    });
   } else if (data.screen === 'Users') {
     navigationRef.navigate('Main', {
       screen: 'Tabs',

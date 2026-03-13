@@ -9,7 +9,10 @@ interface RequestCardProps {
   request: Request;
   onPress: () => void;
   showAvailability?: boolean;
+  /** True = all items available, false = insufficient, undefined = unknown (e.g. site_transfer needs source-site check) */
   isAllSufficient?: boolean;
+  /** When true, availability cannot be determined from list (e.g. site_transfer uses source-site inventory) */
+  availabilityUnknown?: boolean;
 }
 
 const priorityConfig = {
@@ -44,6 +47,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
   onPress,
   showAvailability = false,
   isAllSufficient = false,
+  availabilityUnknown = false,
 }) => {
   const priorityInfo =
     priorityConfig[request?.priority as keyof typeof priorityConfig] ??
@@ -92,15 +96,47 @@ export const RequestCard: React.FC<RequestCardProps> = ({
 
       {/* Availability Indicator (for Store Incharge) */}
       {showAvailability && (
-        <View className={`p-2 rounded-lg mb-3 ${isAllSufficient ? 'bg-[#16A34A]/10' : 'bg-[#DC2626]/10'}`}>
+        <View
+          className={`p-2 rounded-lg mb-3 ${
+            availabilityUnknown
+              ? 'bg-[#64748B]/10'
+              : isAllSufficient
+                ? 'bg-[#16A34A]/10'
+                : 'bg-[#DC2626]/10'
+          }`}
+        >
           <View className="flex-row items-center gap-2">
             <Ionicons
-              name={isAllSufficient ? 'checkmark-circle' : 'alert-circle'}
+              name={
+                availabilityUnknown
+                  ? 'help-circle-outline'
+                  : isAllSufficient
+                    ? 'checkmark-circle'
+                    : 'alert-circle'
+              }
               size={16}
-              color={isAllSufficient ? '#16A34A' : '#DC2626'}
+              color={
+                availabilityUnknown
+                  ? '#64748B'
+                  : isAllSufficient
+                    ? '#16A34A'
+                    : '#DC2626'
+              }
             />
-            <Text className={`text-[13px] font-medium ${isAllSufficient ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
-              {isAllSufficient ? 'All items available' : 'Insufficient stock'}
+            <Text
+              className={`text-[13px] font-medium ${
+                availabilityUnknown
+                  ? 'text-[#64748B]'
+                  : isAllSufficient
+                    ? 'text-[#16A34A]'
+                    : 'text-[#DC2626]'
+              }`}
+            >
+              {availabilityUnknown
+                ? 'View to check availability'
+                : isAllSufficient
+                  ? 'All items available'
+                  : 'Insufficient stock'}
             </Text>
           </View>
         </View>

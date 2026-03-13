@@ -253,6 +253,52 @@ export const ProcessRequestScreen: React.FC = () => {
     });
   }, [availability, inventoryItems, navigation]);
 
+  // Replenishment: after fulfilling this request, will central store fall below minStockLevel?
+  // Only for standard requests (central store → site). Site transfers move between sites.
+  const replenishmentItems = React.useMemo(() => {
+    if (
+      request?.requestType === 'site_transfer' ||
+      availability.length === 0 ||
+      !allSufficient
+    ) {
+      return [];
+    }
+    const items: Array<{ itemId: string; itemName: string; qtyToReplenish: number }> = [];
+    availability.forEach((a) => {
+      const requested = approvedQuantities[a.itemId] ?? a.requested;
+      const remainingAfterFulfillment = a.available - requested;
+      const invItem = inventoryItems.find((i) => i.id === a.itemId);
+      const minStockLevel = invItem?.minStockLevel ?? 0;
+      if (remainingAfterFulfillment < minStockLevel) {
+        const qtyToReplenish = minStockLevel - remainingAfterFulfillment;
+        items.push({
+          itemId: a.itemId,
+          itemName: a.itemName,
+          qtyToReplenish: Math.max(1, Math.ceil(qtyToReplenish)),
+        });
+      }
+    });
+    return items;
+  }, [request?.requestType, availability, allSufficient, approvedQuantities, inventoryItems]);
+
+  const handleCreatePOForReplenishment = useCallback(() => {
+    if (replenishmentItems.length === 0) return;
+    const selectedItems = inventoryItems.filter((i) =>
+      replenishmentItems.some((r) => r.itemId === i.id)
+    );
+    const initialQuantities: Record<string, number> = {};
+    replenishmentItems.forEach((r) => {
+      initialQuantities[r.itemId] = r.qtyToReplenish;
+    });
+    (navigation as any).navigate('PurchaseOrders', {
+      screen: 'CreatePO',
+      params: {
+        selectedItems,
+        initialQuantities,
+      }
+    });
+  }, [replenishmentItems, inventoryItems, navigation]);
+
   useAutoClearError(subscriptionError, () => setSubscriptionError(null));
 
   const handleApprove = useCallback(async () => {
@@ -665,6 +711,39 @@ export const ProcessRequestScreen: React.FC = () => {
                   <Ionicons name="cart-outline" size={20} color="#FFFFFF" />
                   <Text className="text-[15px] font-semibold text-white">
                     Create PO for Shortfall
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+          {/* Replenishment Banner: Stock sufficient but will go low after fulfillment */}
+          {canProcess &&
+            isPending &&
+            !isCheckingAvailability &&
+            allSufficient &&
+            replenishmentItems.length > 0 && (
+              <View className="bg-[#D97706]/10 rounded-[10px] p-4 border border-[#D97706]/30">
+                <View className="flex-row items-center gap-2 mb-2">
+                  <Ionicons name="alert-circle-outline" size={24} color="#D97706" />
+                  <Text className="text-[15px] font-semibold text-[#D97706]">
+                    Replenishment recommended
+                  </Text>
+                </View>
+                <Text className="text-[13px] text-[#64748B] mb-3">
+                  After fulfilling this request, central store stock will fall below the minimum
+                  level for {replenishmentItems.length} item{replenishmentItems.length > 1 ? 's' : ''}.
+                  Create a PO to replenish and avoid stockouts.
+                </Text>
+                <TouchableOpacity
+                  onPress={handleCreatePOForReplenishment}
+                  className="bg-[#D97706] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2 mt-1"
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Create PO to replenish"
+                >
+                  <Ionicons name="cart-outline" size={20} color="#FFFFFF" />
+                  <Text className="text-[15px] font-semibold text-white">
+                    Create PO to replenish
                   </Text>
                 </TouchableOpacity>
               </View>
