@@ -23,6 +23,7 @@ import type { Item, Category } from '../../../types/inventory';
 const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: mockNavigate, goBack: jest.fn() }),
+  useRoute: () => ({ params: { lowStockFilter: false } }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
