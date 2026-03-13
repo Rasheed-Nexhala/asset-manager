@@ -10,6 +10,7 @@ import {
   RequestQueueScreen,
   MyRequestsScreen,
   CreateRequestScreen,
+  CreateSiteTransferRequestScreen,
   ProcessRequestScreen,
   EditRequestScreen,
   RejectRequestScreen,
@@ -44,6 +45,8 @@ export const RequestStackNavigator: React.FC = () => {
     >
       <Stack.Screen name="MyRequests" component={MyRequestsScreen} />
       <Stack.Screen name="CreateRequest" component={CreateRequestScreen} />
+      {/* CreateSiteTransferRequest: available to Site Managers from OtherSiteInventory */}
+      <Stack.Screen name="CreateSiteTransferRequest" component={CreateSiteTransferRequestScreen} />
       <Stack.Screen name="EditRequest" component={EditRequestScreen} />
       <Stack.Screen name="ReturnItems" component={ReturnItemsScreen} />
       <Stack.Screen name="SelectItems" component={SelectItemsScreen} />

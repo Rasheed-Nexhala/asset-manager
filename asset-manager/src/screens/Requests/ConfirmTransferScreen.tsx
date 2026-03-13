@@ -172,10 +172,27 @@ export const ConfirmTransferScreen: React.FC = () => {
         <View className="gap-4 py-4">
           {/* Request Summary */}
           <View className="bg-[#F8FAFC] rounded-lg p-4">
-            <Text className="text-[13px] text-[#64748B] mb-1">Transfer to</Text>
-            <Text className="text-[17px] font-semibold text-[#0F172A]">
-              {request.siteName}
-            </Text>
+            {request.requestType === 'site_transfer' ? (
+              <>
+                <Text className="text-[13px] text-[#64748B] mb-1">Site Transfer</Text>
+                <View className="flex-row items-center gap-2 flex-wrap">
+                  <Text className="text-[15px] font-semibold text-[#0F172A]">
+                    {request.sourceSiteName ?? '—'}
+                  </Text>
+                  <Ionicons name="arrow-forward" size={16} color="#7C3AED" />
+                  <Text className="text-[15px] font-semibold text-[#0F172A]">
+                    {request.siteName}
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text className="text-[13px] text-[#64748B] mb-1">Transfer to</Text>
+                <Text className="text-[17px] font-semibold text-[#0F172A]">
+                  {request.siteName}
+                </Text>
+              </>
+            )}
           </View>
 
           {/* Items to Transfer (read-only list) */}

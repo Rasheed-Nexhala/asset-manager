@@ -80,7 +80,7 @@ const generateRequestNumber = async (): Promise<string> => {
 };
 
 /**
- * Create a new request
+ * Create a new request (standard or site_transfer)
  */
 export const createRequest = async (
   requestData: CreateRequestData,
@@ -90,8 +90,10 @@ export const createRequest = async (
 ): Promise<string> => {
   try {
     const requestNumber = await generateRequestNumber();
+
+    const isSiteTransfer = requestData.requestType === 'site_transfer';
     
-    const newRequest = {
+    const newRequest: Record<string, unknown> = {
       requestNumber,
       siteId: requestData.siteId,
       siteName: requestData.siteName,
@@ -137,6 +139,13 @@ export const createRequest = async (
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
+
+    // Site transfer fields (only set when relevant to keep documents clean)
+    if (isSiteTransfer) {
+      newRequest.requestType = 'site_transfer';
+      if (requestData.sourceSiteId) newRequest.sourceSiteId = requestData.sourceSiteId;
+      if (requestData.sourceSiteName) newRequest.sourceSiteName = requestData.sourceSiteName;
+    }
     
     const docRef = await addDoc(collection(db, REQUESTS_COLLECTION), newRequest);
     return docRef.id;
@@ -147,10 +156,13 @@ export const createRequest = async (
 };
 
 /**
- * Check availability of items in central store
+ * Check availability of items at a given location.
+ * Defaults to 'store' (central store) for standard requests.
+ * For site_transfer requests, pass the source site's locationId (e.g. 'site_abc123').
  */
 export const checkItemsAvailability = async (
-  items: Array<{ itemId: string; itemName: string; quantityRequested: number }>
+  items: Array<{ itemId: string; itemName: string; quantityRequested: number }>,
+  locationId: string = 'store'
 ): Promise<ItemAvailability[]> => {
   try {
     const availabilityChecks = await Promise.all(
@@ -158,7 +170,7 @@ export const checkItemsAvailability = async (
         const inventoryQuery = query(
           collection(db, INVENTORY_COLLECTION),
           where('itemId', '==', item.itemId),
-          where('locationId', '==', 'store'),
+          where('locationId', '==', locationId),
           limit(1)
         );
         const inventorySnapshot = await getDocs(inventoryQuery);
@@ -284,12 +296,20 @@ export const approveRequest = async (
     
     const requestData = requestSnap.data();
     const items = Array.isArray(requestData?.items) ? requestData.items : [];
+
+    // For site transfers, check availability at the SOURCE site, not the central store.
+    const locationId =
+      requestData.requestType === 'site_transfer' && requestData.sourceSiteId
+        ? `site_${requestData.sourceSiteId}`
+        : 'store';
+
     const availability = await checkItemsAvailability(
       items.map((item: { itemId: string; itemName: string; quantityRequested: number }) => ({
         itemId: item.itemId,
         itemName: item.itemName ?? item.itemId,
         quantityRequested: item.quantityRequested ?? 0,
-      }))
+      })),
+      locationId
     );
 
     // Ensure all items sufficient
@@ -343,6 +363,22 @@ export const rejectRequest = async (
 const MAX_TRANSFER_RETRIES = 3;
 
 /**
+ * Thrown for business-rule violations inside transferRequest.
+ * These are never transient — retrying would not help — so the retry
+ * loop checks for this class and exits immediately without waiting.
+ *
+ * Example real-world analogy: if you ask a shopkeeper for an item and
+ * they say "we don't stock that", waiting 1 second and asking again
+ * won't change the answer. The shop needs to restock first.
+ */
+class TransferValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TransferValidationError';
+  }
+}
+
+/**
  * Transfer request items (atomic inventory update)
  * Uses retry logic for transient failures (network, etc.)
  */
@@ -361,21 +397,28 @@ export const transferRequest = async (
       const requestSnap = await getDoc(requestRef);
 
       if (!requestSnap.exists()) {
-        throw new Error('Request not found');
+        throw new TransferValidationError('Request not found');
       }
 
       const requestData = requestSnap.data();
 
       if (requestData.status !== 'approved') {
-        throw new Error('Only approved requests can be transferred');
+        throw new TransferValidationError('Only approved requests can be transferred');
       }
 
       const items = Array.isArray(requestData?.items) ? requestData.items : [];
       if (items.length === 0) {
-        throw new Error('Request has no items to transfer');
+        throw new TransferValidationError('Request has no items to transfer');
       }
 
-      // Step 2: Build deterministic inventory refs (outside transaction)
+      // Step 2: Build deterministic inventory refs (outside transaction).
+      // For site_transfer: source = site_${sourceSiteId}, dest = site_${siteId}.
+      // For standard: source = store, dest = site_${siteId}.
+      const isSiteTransfer = requestData.requestType === 'site_transfer';
+      const sourceLocationId = isSiteTransfer
+        ? `site_${requestData.sourceSiteId}`
+        : 'store';
+
       const inventoryRefs: Map<string, { storeRef: any; siteRef: any }> = new Map();
 
       for (const item of items) {
@@ -383,7 +426,7 @@ export const transferRequest = async (
         const storeRef = doc(
           db,
           INVENTORY_COLLECTION,
-          getInventoryDocId(item.itemId, 'store')
+          getInventoryDocId(item.itemId, sourceLocationId)
         );
         const siteRef = doc(
           db,
@@ -404,13 +447,13 @@ export const transferRequest = async (
       const requestSnap = await transaction.get(requestRef);
       
       if (!requestSnap.exists()) {
-        throw new Error('Request not found');
+        throw new TransferValidationError('Request not found');
       }
       
       const requestData = requestSnap.data();
       
       if (requestData.status !== 'approved') {
-        throw new Error('Only approved requests can be transferred');
+        throw new TransferValidationError('Only approved requests can be transferred');
       }
       
       // Prepare array to collect all read data
@@ -429,7 +472,7 @@ export const transferRequest = async (
       for (const item of requestData.items) {
         const quantity = item.quantityApproved;
         if (!Number.isInteger(quantity) || quantity <= 0) {
-          throw new Error(`Invalid approved quantity for ${item.itemName}`);
+          throw new TransferValidationError(`Invalid approved quantity for ${item.itemName}`);
         }
 
         const refs = inventoryRefs.get(item.itemId);
@@ -462,25 +505,36 @@ export const transferRequest = async (
       // PHASE 2: ALL WRITES (after all reads are complete)
       // =====================================================
       
+      // Whether this is a site-to-site transfer (read from the re-fetched request inside tx)
+      const isSiteTransferTx = requestData.requestType === 'site_transfer';
+      const sourceName = isSiteTransferTx
+        ? requestData.sourceSiteName ?? 'Source Site'
+        : 'Central Store';
+
       // Process all writes based on the read data
       for (const data of readsData) {
         const { item, quantity, itemRef, itemData, refs, storeDoc, siteDoc } = data;
         
-        // Decrement central store
+        // Decrement source location (central store OR source site for site_transfer)
         if (storeDoc && storeDoc.exists()) {
           const currentQty = storeDoc.data().quantity;
           if (currentQty < quantity) {
-            throw new Error(`Insufficient stock for ${item.itemName} in central store. Available: ${currentQty}, Required: ${quantity}`);
+            throw new TransferValidationError(
+              `Insufficient stock for "${item.itemName}" at ${sourceName}. Available: ${currentQty}, Required: ${quantity}`
+            );
           }
           transaction.update(refs.storeRef, {
             quantity: currentQty - quantity,
             updatedAt: serverTimestamp(),
           });
         } else {
-          throw new Error(`Item ${item.itemName} not found in central store inventory`);
+          throw new TransferValidationError(
+            `Item "${item.itemName}" has no inventory record at "${sourceName}". ` +
+            `Please run the inventory migration or add stock via an adjustment first.`
+          );
         }
         
-        // Increment or create site inventory
+        // Increment or create destination site inventory
         if (siteDoc && siteDoc.exists()) {
           const currentQty = siteDoc.data().quantity;
           transaction.update(refs.siteRef, {
@@ -488,10 +542,10 @@ export const transferRequest = async (
             updatedAt: serverTimestamp(),
           });
         } else {
-          // Create new inventory entry - copy lengthPerPiece from central store if present
+          // Create new inventory entry - copy lengthPerPiece from source if present
           const siteLocationId = `site_${requestData.siteId}`;
-          const storeLengthPerPiece = storeDoc?.exists() ? storeDoc.data().lengthPerPiece : undefined;
-          const lengthToUse = storeLengthPerPiece ?? item.lengthPerPiece;
+          const sourceLengthPerPiece = storeDoc?.exists() ? storeDoc.data().lengthPerPiece : undefined;
+          const lengthToUse = sourceLengthPerPiece ?? item.lengthPerPiece;
           const newEntry: Record<string, unknown> = {
             itemId: item.itemId,
             itemName: item.itemName,
@@ -506,10 +560,12 @@ export const transferRequest = async (
           transaction.set(refs.siteRef, newEntry);
         }
 
-        // Update item's denormalized stock totals
-        if (itemData) {
+        // Update item's denormalized stock totals.
+        // Standard: store→site means centralStoreQty-- and atSitesQty++.
+        // Site transfer: site→site means atSitesQty stays the same (items remain "at sites").
+        if (itemData && !isSiteTransferTx) {
           if ((itemData.centralStoreQuantity || 0) < quantity) {
-            throw new Error(`Insufficient central store stock tracked on item document for ${item.itemName}`);
+            throw new TransferValidationError(`Insufficient central store stock tracked on item document for ${item.itemName}`);
           }
           transaction.update(itemRef, {
             centralStoreQuantity: (itemData.centralStoreQuantity || 0) - quantity,
@@ -540,6 +596,13 @@ export const transferRequest = async (
       return;
     } catch (error) {
       lastError = error;
+
+      // Domain/validation errors: retrying won't help — surface immediately.
+      if (error instanceof TransferValidationError) {
+        console.error('Transfer validation error:', error.message);
+        throw error;
+      }
+
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorCode = (error as { code?: string })?.code ?? '';
       const isRetryable =

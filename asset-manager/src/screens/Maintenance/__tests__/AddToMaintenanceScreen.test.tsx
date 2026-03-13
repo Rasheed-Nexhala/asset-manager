@@ -436,6 +436,59 @@ describe('AddToMaintenanceScreen — Add to Maintenance flow', () => {
     expect(screen.getByText('Ton')).toBeTruthy();
   });
 
+  it('kg entry mode: accepts exact kg and converts to pieces for submit', async () => {
+    const steelItem: Item = {
+      ...mockItem,
+      id: 'steel1',
+      name: 'Steel Rebar',
+      weightPerMeter: 5,
+      lengthPerPiece: 6,
+      isWeightBased: true,
+    } as Item;
+
+    mockRouteParams = { selectedItem: steelItem };
+    renderWithStore(<AddToMaintenanceScreen />, defaultPreloadedState);
+
+    fireEvent.press(screen.getByText('Kg'));
+    const input = screen.getByLabelText('Quantity amount');
+    fireEvent.changeText(input, '150'); // 150 kg = 5 pieces (exact)
+
+    fireEvent.press(screen.getByText('Select Issue Type'));
+    fireEvent.press(screen.getByText('Physical Damage'));
+    fireEvent.press(screen.getByRole('button', { name: 'Add to maintenance' }));
+
+    mockAddToMaintenanceResolve!();
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith('Success', 'Item has been added to maintenance', expect.any(Array));
+    });
+    expect(mockNavigate).toHaveBeenCalledWith('MaintenanceDashboard');
+  });
+
+  it('ton entry mode: validates inexact conversion shows error', () => {
+    const steelItem: Item = {
+      ...mockItem,
+      id: 'steel1',
+      name: 'Steel Rebar',
+      weightPerMeter: 5,
+      lengthPerPiece: 6,
+      isWeightBased: true,
+    } as Item;
+
+    mockRouteParams = { selectedItem: steelItem };
+    renderWithStore(<AddToMaintenanceScreen />, defaultPreloadedState);
+
+    fireEvent.press(screen.getByText('Ton'));
+    const input = screen.getByLabelText('Quantity amount');
+    fireEvent.changeText(input, '0.1'); // 100 kg = 3.33... pieces (inexact)
+
+    fireEvent.press(screen.getByText('Select Issue Type'));
+    fireEvent.press(screen.getByText('Physical Damage'));
+    fireEvent.press(screen.getByRole('button', { name: 'Add to maintenance' }));
+
+    expect(screen.getByText(/Cannot convert|exact pieces/)).toBeTruthy();
+  });
+
   it('accessibility: Add to maintenance button has correct role and label', () => {
     renderWithStore(<AddToMaintenanceScreen />, defaultPreloadedState);
 

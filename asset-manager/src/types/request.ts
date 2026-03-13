@@ -44,17 +44,30 @@ export interface RequestItem {
 }
 
 /**
+ * Request type distinguishes standard (store → site) from site-to-site transfers.
+ * Defaults to 'standard' when not present (backward-compatible).
+ */
+export type RequestType = 'standard' | 'site_transfer';
+
+/**
  * Main request document structure in Firestore
  */
 export interface Request {
   id: string;
   requestNumber: string; // REQ-2025-0045
-  
+
+  // Request type (standard = central store → site; site_transfer = site A → site B)
+  requestType?: RequestType;
+
   // Site & User
   siteId: string;
   siteName: string;
   requestedBy: string;
   requestedByName: string;
+
+  // For site_transfer: the site items are moved FROM
+  sourceSiteId?: string;
+  sourceSiteName?: string;
   
   // Status & Priority
   status: RequestStatus;
@@ -125,6 +138,9 @@ export interface ItemAvailability {
 export interface CreateRequestData {
   siteId: string;
   siteName: string;
+  requestType?: RequestType;
+  sourceSiteId?: string;
+  sourceSiteName?: string;
   priority: RequestPriority;
   purpose?: string;
   items: Array<{

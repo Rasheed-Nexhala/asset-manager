@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { Request } from '../../types/request';
 import { RequestStatusBadge } from './RequestStatusBadge';
+import { RequestTypeBadge } from './RequestTypeBadge';
 
 interface RequestCardProps {
   request: Request;
@@ -57,7 +58,7 @@ export const RequestCard: React.FC<RequestCardProps> = ({
       accessibilityRole="button"
       accessibilityLabel={`Request ${request.requestNumber}`}
     >
-      {/* Top Row: Request Number + Status Badge */}
+      {/* Top Row: Request Number + Badges */}
       <View className="flex-row justify-between items-center mb-3">
         <View className="flex-row items-center gap-2 flex-1">
           <Text className="text-lg">{priorityInfo.emoji}</Text>
@@ -65,14 +66,23 @@ export const RequestCard: React.FC<RequestCardProps> = ({
             {request?.requestNumber ?? '—'}
           </Text>
         </View>
-        <RequestStatusBadge status={request.status} />
+        <View className="flex-row items-center gap-1.5">
+          <RequestTypeBadge requestType={request.requestType} />
+          <RequestStatusBadge status={request.status} />
+        </View>
       </View>
 
       {/* Middle: Key Info */}
       <View className="flex-row gap-4 mb-3">
         <View className="flex-1">
-          <Text className="text-[13px] text-[#64748B]">Site</Text>
-          <Text className="text-[15px] text-[#0F172A]">{request?.siteName ?? '—'}</Text>
+          <Text className="text-[13px] text-[#64748B]">
+            {request?.requestType === 'site_transfer' ? 'Transfer' : 'Site'}
+          </Text>
+          <Text className="text-[15px] text-[#0F172A]" numberOfLines={1}>
+            {request?.requestType === 'site_transfer' && request.sourceSiteName
+              ? `${request.sourceSiteName} → ${request.siteName}`
+              : (request?.siteName ?? '—')}
+          </Text>
         </View>
         <View className="flex-1">
           <Text className="text-[13px] text-[#64748B]">Items</Text>

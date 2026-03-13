@@ -62,6 +62,14 @@ jest.mock('../../../services/firebase/siteService', () => ({
     }
     return mockGetSiteResult === 'pending' ? undefined : mockGetSiteResult;
   }),
+  subscribeToSites: jest.fn(() => () => {}),
+}));
+
+const mockNavigateToCreateSiteTransferRequest = jest.fn();
+jest.mock('../../../navigation/navigationUtils', () => ({
+  navigateToProcessRequest: jest.fn(),
+  navigateToCreateSiteTransferRequest: (...args: unknown[]) =>
+    mockNavigateToCreateSiteTransferRequest(...args),
 }));
 
 let mockFetchInventoryResult: InventoryEntry[] | 'reject' | 'pending' = [];
@@ -232,6 +240,10 @@ const defaultInventoryState = {
   error: null,
   errorTimestamp: null,
   filters: null,
+  totalCount: null,
+  lastDoc: null,
+  hasMore: false,
+  loadingMore: false,
 };
 
 describe('OtherSiteInventoryScreen', () => {
@@ -315,5 +327,137 @@ describe('OtherSiteInventoryScreen', () => {
     fireEvent.press(backButton);
 
     expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  it('shows Request Transfer button and calls navigateToCreateSiteTransferRequest when Site Manager has assigned site', async () => {
+    mockGetSiteResult = mockSite;
+
+    const siteManagerUser = {
+      uid: 'sm1',
+      email: 'sm@test.com',
+      displayName: 'Site Manager',
+    } as import('firebase/auth').User;
+
+    const mySite: Site = {
+      id: 's2',
+      name: 'My Site',
+      address: '456 South St',
+      contactNumber: null,
+      managerId: 'sm1',
+      managerName: 'Site Manager',
+      status: 'active',
+      createdAt: '2025-01-01',
+      updatedAt: '2025-01-01',
+    };
+
+    const preloadedInventory = {
+      ...defaultInventoryState,
+      items: [mockItem],
+      inventoryByLocation: { site_s1: [mockInventoryEntry] },
+      loading: false,
+      error: null,
+    };
+
+    renderWithStore(<OtherSiteInventoryScreen />, {
+      auth: {
+        user: siteManagerUser,
+        userRole: { role: 'SiteManager', isActive: true, permissions: [] },
+        isLoading: false,
+        isRoleLoading: false,
+        authInitialized: true,
+        error: null,
+        isAuthenticated: true,
+      },
+      sites: {
+        sites: [{ ...mockSite, managerId: 'other' }, mySite],
+        isLoading: false,
+        error: null,
+        searchQuery: '',
+        validationLoading: false,
+        lastValidationAt: null,
+      },
+      inventory: preloadedInventory,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Steel Rod 12mm')).toBeTruthy();
+    });
+
+    const requestTransferButton = screen.getByText('Request Transfer');
+    expect(requestTransferButton).toBeTruthy();
+
+    fireEvent.press(requestTransferButton);
+
+    expect(mockNavigateToCreateSiteTransferRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceSiteId: 's1',
+        sourceSiteName: 'North Site',
+        destinationSiteId: 's2',
+        destinationSiteName: 'My Site',
+        preselectedItem: expect.objectContaining({
+          itemId: 'item-1',
+          itemName: 'Steel Rod 12mm',
+          itemSku: 'STL-001',
+          availableQty: 10,
+        }),
+      })
+    );
+  });
+
+  it('shows site transfer banner when Site Manager has assigned site', async () => {
+    mockGetSiteResult = mockSite;
+
+    const siteManagerUser = {
+      uid: 'sm1',
+      email: 'sm@test.com',
+      displayName: 'Site Manager',
+    } as import('firebase/auth').User;
+
+    const mySite: Site = {
+      id: 's2',
+      name: 'My Site',
+      address: '456 South St',
+      contactNumber: null,
+      managerId: 'sm1',
+      managerName: 'Site Manager',
+      status: 'active',
+      createdAt: '2025-01-01',
+      updatedAt: '2025-01-01',
+    };
+
+    const preloadedInventory = {
+      ...defaultInventoryState,
+      items: [mockItem],
+      inventoryByLocation: { site_s1: [mockInventoryEntry] },
+      loading: false,
+      error: null,
+    };
+
+    renderWithStore(<OtherSiteInventoryScreen />, {
+      auth: {
+        user: siteManagerUser,
+        userRole: { role: 'SiteManager', isActive: true, permissions: [] },
+        isLoading: false,
+        isRoleLoading: false,
+        authInitialized: true,
+        error: null,
+        isAuthenticated: true,
+      },
+      sites: {
+        sites: [{ ...mockSite, managerId: 'other' }, mySite],
+        isLoading: false,
+        error: null,
+        searchQuery: '',
+        validationLoading: false,
+        lastValidationAt: null,
+      },
+      inventory: preloadedInventory,
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Tap "Request Transfer" on any item to move it from this site to My Site/)
+      ).toBeTruthy();
+    });
   });
 });

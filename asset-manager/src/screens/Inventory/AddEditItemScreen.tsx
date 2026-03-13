@@ -104,6 +104,8 @@ export const AddEditItemScreen: React.FC = () => {
         weightPerMeter: item.weightPerMeter,
         lengthPerPiece: item.lengthPerPiece,
         steelMasterId: item.steelMasterId,
+        centralStoreQuantity: item.centralStoreQuantity,
+        totalQuantity: item.totalQuantity,
       };
     }
     return undefined;

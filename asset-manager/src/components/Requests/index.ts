@@ -6,6 +6,7 @@
  */
 
 export { RequestStatusBadge } from './RequestStatusBadge';
+export { RequestTypeBadge } from './RequestTypeBadge';
 export { PrioritySelector } from './PrioritySelector';
 export { RequestCard } from './RequestCard';
 export { RequestItemCard } from './RequestItemCard';

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useAutoClearError } from '../../hooks/useAutoClearError';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,8 +10,13 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchInventoryByLocation } from '../../store/thunks/inventoryThunks';
 import { clearError } from '../../store/slices/inventorySlice';
 import { selectInventoryByLocation, selectItemsLoading, selectItemsError, selectAllItems } from '../../store/selectors/inventorySelectors';
+import { selectAllSites, selectAssignedSiteIdForUser } from '../../store/selectors/sitesSelectors';
+import { selectUserId, selectIsSiteManager } from '../../store/selectors/authSelectors';
 import { getSite } from '../../services/firebase/siteService';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
+import { fetchSites, setSites } from '../../store/slices/sitesSlice';
+import { subscribeToSites } from '../../services/firebase/siteService';
+import { navigateToCreateSiteTransferRequest } from '../../navigation/navigationUtils';
 import { getLocationId } from '../../utils/locationUtils';
 import type { Site } from '../../types/sites';
 import type { InventoryEntry, Item } from '../../types/inventory';
@@ -53,6 +58,27 @@ export const OtherSiteInventoryScreen: React.FC = () => {
   const allItems = useAppSelector(selectAllItems);
   const isLoading = useAppSelector(selectItemsLoading);
   const error = useAppSelector(selectItemsError);
+
+  // Auth & current user's site (for Site Managers requesting transfers)
+  const userId = useAppSelector(selectUserId);
+  const isSiteManager = useAppSelector(selectIsSiteManager);
+  const sites = useAppSelector(selectAllSites);
+  const myAssignedSiteId = useAppSelector(selectAssignedSiteIdForUser(userId));
+  const myAssignedSite = useMemo(
+    () => sites.find((s) => s.id === myAssignedSiteId) ?? null,
+    [sites, myAssignedSiteId]
+  );
+
+  // Ensure sites list is loaded so we can find the user's own site
+  useEffect(() => {
+    if (sites.length === 0) {
+      dispatch(fetchSites());
+      const unsubscribe = subscribeToSites((updatedSites: Site[]) => {
+        dispatch(setSites(updatedSites));
+      });
+      return () => unsubscribe();
+    }
+  }, [dispatch, sites.length]);
 
   // Load site information
   useEffect(() => {
@@ -136,6 +162,49 @@ export const OtherSiteInventoryScreen: React.FC = () => {
     }
   }, [navigation]);
 
+  /**
+   * Navigate to CreateSiteTransferRequest (in the Requests tab stack).
+   * Only available for Site Managers who have their own site assigned.
+   */
+  const handleRequestTransfer = useCallback(
+    (entry: InventoryEntry, item: Item) => {
+      if (!myAssignedSiteId || !myAssignedSite) {
+        Alert.alert(
+          'No Site Assigned',
+          'You need to be assigned to a site before requesting a transfer.'
+        );
+        return;
+      }
+      if (entry.quantity <= 0) {
+        Alert.alert(
+          'No Stock Available',
+          `There is no available stock of "${entry.itemName}" at ${site?.name ?? 'this site'}.`
+        );
+        return;
+      }
+      navigateToCreateSiteTransferRequest({
+        sourceSiteId: siteId,
+        sourceSiteName: site?.name ?? 'Other Site',
+        destinationSiteId: myAssignedSiteId,
+        destinationSiteName: myAssignedSite.name,
+        preselectedItem: {
+          itemId: entry.itemId,
+          itemName: entry.itemName,
+          itemSku: entry.itemSku,
+          unit: item.unit,
+          itemType: item.type === 'fuel' ? 'consumable' : item.type,
+          categoryId: item.categoryId,
+          categoryName: item.categoryName,
+          imageUrl: item.imageUrl,
+          availableQty: entry.quantity,
+          weightPerMeter: item.weightPerMeter,
+          lengthPerPiece: item.lengthPerPiece ?? entry.lengthPerPiece,
+        },
+      });
+    },
+    [siteId, site, myAssignedSiteId, myAssignedSite]
+  );
+
   useAutoClearError(siteError, () => setSiteError(null));
   useAutoClearError(error, () => dispatch(clearError()));
 
@@ -194,14 +263,25 @@ export const OtherSiteInventoryScreen: React.FC = () => {
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {/* Info Banner */}
-        <View className="bg-[#3B82F6]/15 px-4 py-3 mx-4 mt-4 rounded-[10px] border border-[#3B82F6]/30">
-          <View className="flex-row items-start gap-3">
-            <Ionicons name="information-circle" size={20} color="#1E40AF" />
-            <Text className="text-[13px] text-[#1E40AF] flex-1">
-              Need these items? Contact Store Incharge to coordinate transfer.
-            </Text>
+        {isSiteManager && myAssignedSiteId ? (
+          <View className="bg-[#7C3AED]/10 px-4 py-3 mx-4 mt-4 rounded-[10px] border border-[#7C3AED]/20">
+            <View className="flex-row items-start gap-3">
+              <Ionicons name="swap-horizontal" size={20} color="#7C3AED" />
+              <Text className="text-[13px] text-[#7C3AED] flex-1">
+                Tap "Request Transfer" on any item to move it from this site to {myAssignedSite?.name ?? 'your site'}.
+              </Text>
+            </View>
           </View>
-        </View>
+        ) : (
+          <View className="bg-[#3B82F6]/15 px-4 py-3 mx-4 mt-4 rounded-[10px] border border-[#3B82F6]/30">
+            <View className="flex-row items-start gap-3">
+              <Ionicons name="information-circle" size={20} color="#1E40AF" />
+              <Text className="text-[13px] text-[#1E40AF] flex-1">
+                Need these items? Contact Store Incharge to coordinate transfer.
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Manager and Contact Information */}
         {(managerName || contactNumber) && (
@@ -254,6 +334,11 @@ export const OtherSiteInventoryScreen: React.FC = () => {
                   onPress={() => {
                     navigation.navigate('ItemDetail', { itemId: entry.itemId });
                   }}
+                  onRequestTransfer={
+                    isSiteManager && myAssignedSiteId && myAssignedSiteId !== siteId
+                      ? () => handleRequestTransfer(entry, item)
+                      : undefined
+                  }
                 />
               ))}
             </View>

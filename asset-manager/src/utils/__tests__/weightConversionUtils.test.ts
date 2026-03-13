@@ -124,5 +124,71 @@ describe('weightConversionUtils', () => {
       expect(result).toContain('Kg');
       expect(result).toContain('500');
     });
+
+    it('formats zero correctly', () => {
+      expect(formatWeight(0, 'Kg')).toContain('0');
+      expect(formatWeight(0, 'Ton (MT)')).toContain('0');
+    });
+
+    it('formats decimal kg with locale', () => {
+      const result = formatWeight(1234.56, 'Kg');
+      expect(result).toMatch(/\d[\d,]*\.?\d*\s*Kg/);
+    });
+  });
+
+  describe('Ton → Kg → Pieces conversion flow', () => {
+    it('converts 1 Ton to 1000 kg, then to pieces when weightPerPiece is 30', () => {
+      const kg = tonToKg(1);
+      expect(kg).toBe(1000);
+      const result = kgToPieces(kg, 5, 6); // 30 kg per piece
+      expect(result.isExact).toBe(false); // 1000/30 = 33.33...
+      expect(result.suggestions).toBeDefined();
+      expect(result.suggestions![0].pieces).toBe(33);
+      expect(result.suggestions![1].pieces).toBe(34);
+    });
+
+    it('converts 3 Ton to exact pieces when weightPerPiece divides evenly', () => {
+      const kg = tonToKg(3); // 3000 kg
+      const result = kgToPieces(kg, 5, 6); // 30 kg per piece → 3000/30 = 100
+      expect(result.isExact).toBe(true);
+      expect(result.pieces).toBe(100);
+    });
+  });
+
+  describe('kgToPieces edge cases', () => {
+    it('handles floating-point precision (0.1 + 0.2 style)', () => {
+      const result = kgToPieces(90.00000000000001, 5, 6); // ~90, should be 3 pieces
+      expect(result.isExact).toBe(true);
+      expect(result.pieces).toBe(3);
+    });
+
+    it('handles very small weightPerPiece', () => {
+      const result = kgToPieces(0.001, 0.001, 1);
+      expect(result.pieces).toBe(1);
+      expect(result.isExact).toBe(true);
+    });
+
+    it('suggestions include floor and ceil when inexact', () => {
+      const result = kgToPieces(50, 5, 6); // 50/30 = 1.66...
+      expect(result.suggestions).toHaveLength(2);
+      expect(result.suggestions![0].pieces).toBe(1);
+      expect(result.suggestions![0].kg).toBe(30);
+      expect(result.suggestions![1].pieces).toBe(2);
+      expect(result.suggestions![1].kg).toBe(60);
+    });
+  });
+
+  describe('piecesToKg edge cases', () => {
+    it('handles zero pieces', () => {
+      expect(piecesToKg(0, 5, 6)).toBe(0);
+    });
+
+    it('handles single piece', () => {
+      expect(piecesToKg(1, 5, 6)).toBe(30);
+    });
+
+    it('handles decimal weightPerMeter', () => {
+      expect(piecesToKg(10, 2.5, 6)).toBe(150); // 10 * 6 * 2.5
+    });
   });
 });

@@ -15,6 +15,7 @@ import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { RequestItemCard } from '../../components/Requests/RequestItemCard';
 import { RequestStatusBadge } from '../../components/Requests/RequestStatusBadge';
+import { RequestTypeBadge } from '../../components/Requests/RequestTypeBadge';
 import { ViewModeToggle } from '../../components/Inventory/ViewModeToggle';
 import { FormField } from '../../components/FormField';
 import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
@@ -168,7 +169,12 @@ export const ProcessRequestScreen: React.FC = () => {
           itemName: item.itemName,
           quantityRequested: item.quantityRequested,
         }));
-        const result = await requestService.checkItemsAvailability(itemsToCheck);
+        // Site transfer: check availability at source site, not central store
+        const sourceLocationId =
+          request.requestType === 'site_transfer' && request.sourceSiteId
+            ? `site_${request.sourceSiteId}`
+            : 'store';
+        const result = await requestService.checkItemsAvailability(itemsToCheck, sourceLocationId);
         setAvailability(result);
       } catch {
         setAvailability([]);
@@ -197,14 +203,18 @@ export const ProcessRequestScreen: React.FC = () => {
 
     setIsLoading(true);
     try {
-      // Final re-check availability before approving
+      // Final re-check availability before approving (use source site for site_transfer)
       const itemsToCheck = Array.isArray(request.items) ? request.items.map((item) => ({
         itemId: item.itemId,
         itemName: item.itemName,
         quantityRequested: item.quantityRequested,
       })) : [];
+      const approveSourceLocationId =
+        request.requestType === 'site_transfer' && request.sourceSiteId
+          ? `site_${request.sourceSiteId}`
+          : 'store';
       
-      const currentAvailability = await requestService.checkItemsAvailability(itemsToCheck);
+      const currentAvailability = await requestService.checkItemsAvailability(itemsToCheck, approveSourceLocationId);
       const isStillSufficient = currentAvailability.length > 0 && currentAvailability.every((a) => a.sufficient);
       
       if (!isStillSufficient) {
@@ -310,22 +320,42 @@ export const ProcessRequestScreen: React.FC = () => {
           {/* Request Header */}
           <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
             <View className="flex-row justify-between items-center mb-3">
-              <View className="flex-row items-center gap-2">
+              <View className="flex-row items-center gap-2 flex-1">
                 <Text className="text-lg">{priorityInfo.emoji}</Text>
                 <Text className="text-[17px] font-semibold text-[#0F172A]">
                   {request.requestNumber}
                 </Text>
               </View>
-              <RequestStatusBadge status={request.status} />
+              <View className="flex-row items-center gap-1.5">
+                <RequestTypeBadge requestType={request.requestType} />
+                <RequestStatusBadge status={request.status} />
+              </View>
             </View>
 
             <View className="gap-2">
-              <View className="flex-row justify-between">
-                <Text className="text-[13px] text-[#64748B]">Site</Text>
-                <Text className="text-[15px] text-[#0F172A]">
-                  {request.siteName}
-                </Text>
-              </View>
+              {request.requestType === 'site_transfer' ? (
+                <>
+                  <View className="flex-row justify-between">
+                    <Text className="text-[13px] text-[#64748B]">From Site</Text>
+                    <Text className="text-[15px] text-[#0F172A]">
+                      {request.sourceSiteName ?? '—'}
+                    </Text>
+                  </View>
+                  <View className="flex-row justify-between">
+                    <Text className="text-[13px] text-[#64748B]">To Site</Text>
+                    <Text className="text-[15px] text-[#0F172A]">
+                      {request.siteName}
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <View className="flex-row justify-between">
+                  <Text className="text-[13px] text-[#64748B]">Site</Text>
+                  <Text className="text-[15px] text-[#0F172A]">
+                    {request.siteName}
+                  </Text>
+                </View>
+              )}
               <View className="flex-row justify-between">
                 <Text className="text-[13px] text-[#64748B]">Requested by</Text>
                 <Text className="text-[15px] text-[#0F172A]">
@@ -554,9 +584,10 @@ export const ProcessRequestScreen: React.FC = () => {
                   </Text>
                 </View>
                 <Text className="text-[13px] text-[#64748B]">
-                  Some items do not have sufficient quantity in the central
-                  store. You can wait for stock to arrive or reject this request.
-                  Approval is disabled until all items are available.
+                  {request.requestType === 'site_transfer'
+                    ? `Some items do not have sufficient quantity at ${request.sourceSiteName ?? 'the source site'}. You can wait or reject this request.`
+                    : 'Some items do not have sufficient quantity in the central store. You can wait for stock to arrive or reject this request.'}
+                  {' '}Approval is disabled until all items are available.
                 </Text>
               </View>
             )}

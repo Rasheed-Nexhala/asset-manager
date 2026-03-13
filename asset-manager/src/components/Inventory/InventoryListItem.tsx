@@ -17,6 +17,8 @@ export interface InventoryListItemProps {
   weightPerMeter?: number;
   lengthPerPiece?: number;
   onPress?: () => void;
+  /** When provided, renders a "Request Transfer" button below the card content */
+  onRequestTransfer?: () => void;
 }
 
 /**
@@ -52,6 +54,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
   weightPerMeter,
   lengthPerPiece,
   onPress,
+  onRequestTransfer,
 }) => {
   const { viewMode: globalViewMode } = useWeightViewPreference();
   const [localViewMode, setLocalViewMode] = useState<WeightViewMode>(globalViewMode);
@@ -123,6 +126,19 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
 
   const accessibilityLabel = `Item: ${entry.itemName}. SKU: ${entry.itemSku}. Type: ${typeDetails.label}. Quantity: ${entry.quantity} ${unit}`;
 
+  const transferButton = onRequestTransfer ? (
+    <TouchableOpacity
+      onPress={onRequestTransfer}
+      className="mt-3 pt-3 border-t border-[#E2E8F0] flex-row items-center justify-center gap-1.5 min-h-[36px]"
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`Request transfer of ${entry.itemName}`}
+    >
+      <Ionicons name="swap-horizontal" size={16} color="#7C3AED" />
+      <Text className="text-[13px] font-semibold text-[#7C3AED]">Request Transfer</Text>
+    </TouchableOpacity>
+  ) : null;
+
   if (onPress) {
     return (
       <TouchableOpacity
@@ -133,6 +149,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
         accessibilityLabel={accessibilityLabel}
       >
         {cardContent}
+        {transferButton}
       </TouchableOpacity>
     );
   }
@@ -144,6 +161,7 @@ export const InventoryListItem: React.FC<InventoryListItemProps> = ({
       accessibilityLabel={accessibilityLabel}
     >
       {cardContent}
+      {transferButton}
     </View>
   );
 };

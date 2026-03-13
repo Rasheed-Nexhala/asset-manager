@@ -7,7 +7,9 @@
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "migrate:inventory": "ts-node src/migrateInventory.ts",
+    "migrate:inventory:execute": "DRY_RUN=false ts-node src/migrateInventory.ts"
   },
   "engines": {
     "node": "24"
@@ -21,6 +23,7 @@
   },
   "devDependencies": {
     "firebase-functions-test": "^3.4.1",
+    "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
   },
   "private": true

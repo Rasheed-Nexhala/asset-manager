@@ -365,4 +365,78 @@ describe('ProcessRequestScreen', () => {
     expect(mockReplace).not.toHaveBeenCalled();
     expect(mockGoBack).not.toHaveBeenCalled();
   });
+
+  it('calls checkItemsAvailability with source site locationId for site_transfer requests', async () => {
+    const { requestService } = require('../../../services/firebase/requestService');
+    const mockCheck = requestService.checkItemsAvailability as jest.Mock;
+    mockCheck.mockClear();
+
+    const siteTransferRequest = createMockRequest({
+      requestType: 'site_transfer',
+      sourceSiteId: 'siteA',
+      sourceSiteName: 'Site Alpha',
+      siteId: 'siteB',
+      siteName: 'Site Beta',
+    });
+    renderWithStore(<ProcessRequestScreen />, {
+      ...defaultPreloadedState,
+      requests: {
+        requests: [siteTransferRequest],
+        myRequests: [],
+        selectedRequest: null,
+        loading: false,
+        error: null,
+        errorTimestamp: null,
+        filters: { status: 'all', priority: 'all', siteId: 'all' },
+      },
+    });
+
+    mockSubscribeCallback?.(siteTransferRequest);
+
+    await waitFor(() => {
+      expect(screen.getByText('Steel Bar')).toBeTruthy();
+    });
+
+    expect(mockCheck).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          itemId: 'item1',
+          itemName: 'Steel Bar',
+          quantityRequested: 5,
+        }),
+      ]),
+      'site_siteA'
+    );
+  });
+
+  it('renders From Site and To Site for site_transfer requests', async () => {
+    const siteTransferRequest = createMockRequest({
+      requestType: 'site_transfer',
+      sourceSiteId: 'siteA',
+      sourceSiteName: 'Site Alpha',
+      siteId: 'siteB',
+      siteName: 'Site Beta',
+    });
+    renderWithStore(<ProcessRequestScreen />, {
+      ...defaultPreloadedState,
+      requests: {
+        requests: [siteTransferRequest],
+        myRequests: [],
+        selectedRequest: null,
+        loading: false,
+        error: null,
+        errorTimestamp: null,
+        filters: { status: 'all', priority: 'all', siteId: 'all' },
+      },
+    });
+
+    mockSubscribeCallback?.(siteTransferRequest);
+
+    await waitFor(() => {
+      expect(screen.getByText('From Site')).toBeTruthy();
+      expect(screen.getByText('To Site')).toBeTruthy();
+      expect(screen.getByText('Site Alpha')).toBeTruthy();
+      expect(screen.getByText('Site Beta')).toBeTruthy();
+    });
+  });
 });

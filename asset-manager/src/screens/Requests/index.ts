@@ -1,6 +1,7 @@
 export { RequestQueueScreen } from './RequestQueueScreen';
 export { MyRequestsScreen } from './MyRequestsScreen';
 export { CreateRequestScreen } from './CreateRequestScreen';
+export { CreateSiteTransferRequestScreen } from './CreateSiteTransferRequestScreen';
 export { ProcessRequestScreen } from './ProcessRequestScreen';
 export { EditRequestScreen } from './EditRequestScreen';
 export { RejectRequestScreen } from './RejectRequestScreen';

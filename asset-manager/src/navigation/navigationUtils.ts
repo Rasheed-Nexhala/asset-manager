@@ -1,4 +1,5 @@
 import { navigationRef } from './RootNavigator';
+import type { RequestStackParamList } from './RequestStackParamList';
 
 /**
  * Navigate to ProcessRequest screen using the root navigator.
@@ -14,6 +15,26 @@ export function navigateToProcessRequest(requestId: string): void {
       params: {
         screen: 'ProcessRequest',
         params: { requestId },
+      },
+    },
+  });
+}
+
+/**
+ * Navigate to CreateSiteTransferRequest screen from outside the Request stack
+ * (e.g. from OtherSiteInventoryScreen in the Inventory stack).
+ */
+export function navigateToCreateSiteTransferRequest(
+  params: RequestStackParamList['CreateSiteTransferRequest']
+): void {
+  if (!navigationRef.isReady()) return;
+  navigationRef.navigate('Main', {
+    screen: 'Tabs',
+    params: {
+      screen: 'Requests',
+      params: {
+        screen: 'CreateSiteTransferRequest',
+        params,
       },
     },
   });

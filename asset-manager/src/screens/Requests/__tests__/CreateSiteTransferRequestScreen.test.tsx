@@ -1,7 +1,6 @@
 /**
- * Confirm Transfer flow
- * Tests loading state, form render for approved requests, non-approved Alert/goBack,
- * validation (receivedBy required), submit with transferRequest thunk, success Alert, back button.
+ * CreateSiteTransferRequestScreen — Site-to-site transfer request flow
+ * Tests: render with route params, validation (quantity), submit with createRequest (requestType: site_transfer).
  */
 import React from 'react';
 import { Alert } from 'react-native';
@@ -9,7 +8,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react-nativ
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { WeightViewPreferenceProvider } from '../../../hooks/useWeightViewPreference';
-import { ConfirmTransferScreen } from '../ConfirmTransferScreen';
+import { CreateSiteTransferRequestScreen } from '../CreateSiteTransferRequestScreen';
 import authReducer from '../../../store/slices/authSlice';
 import sitesReducer from '../../../store/slices/sitesSlice';
 import inventoryReducer from '../../../store/slices/inventorySlice';
@@ -19,7 +18,6 @@ import maintenanceReducer from '../../../store/slices/maintenanceSlice';
 import activityLogReducer from '../../../store/slices/activityLogSlice';
 import purchaseOrderReducer from '../../../store/slices/purchaseOrderSlice';
 import type { RootState } from '../../../store';
-import type { Request, RequestItem } from '../../../types/request';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn().mockResolvedValue(null),
@@ -28,10 +26,29 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
+const mockRouteParams = {
+  sourceSiteId: 'siteA',
+  sourceSiteName: 'Site Alpha',
+  destinationSiteId: 'siteB',
+  destinationSiteName: 'Site Beta',
+  preselectedItem: {
+    itemId: 'item1',
+    itemName: 'Steel Bar',
+    itemSku: 'SKU-001',
+    unit: 'piece',
+    itemType: 'consumable' as const,
+    categoryId: 'cat1',
+    categoryName: 'Steel',
+    imageUrl: undefined,
+    availableQty: 10,
+    weightPerMeter: undefined,
+    lengthPerPiece: undefined,
+  },
+};
+
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack, canGoBack: () => true }),
-  useRoute: () => ({ params: { requestId: 'req1' } }),
-  useIsFocused: () => true,
+  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack }),
+  useRoute: () => ({ params: mockRouteParams }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -40,20 +57,8 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-let mockGetRequestByIdResolve: (r: Request | null) => void;
-let mockTransferRequestResolve: () => void;
-let mockTransferRequestReject: (err: unknown) => void;
-
-jest.mock('../../../services/firebase/requestService', () => ({
-  requestService: {
-    getRequestById: jest.fn(() =>
-      new Promise<Request | null>((resolve) => {
-        mockGetRequestByIdResolve = resolve;
-      })
-    ),
-    subscribeToRequests: jest.fn(() => () => {}),
-  },
-}));
+let mockCreateRequestResolve: (value: string) => void;
+let mockCreateRequestReject: (reason: unknown) => void;
 
 jest.mock('../../../store/thunks/authThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
@@ -100,19 +105,18 @@ jest.mock('../../../store/thunks/inventoryThunks', () => {
 jest.mock('../../../store/thunks/requestThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
-    createRequest: createAsyncThunk('requests/createRequest', async () => null),
-    editRequest: createAsyncThunk('requests/editRequest', async () => null),
-    rejectRequest: createAsyncThunk('requests/rejectRequest', async () => null),
-    processRequest: createAsyncThunk('requests/processRequest', async () => null),
-    transferRequest: createAsyncThunk(
-      'requests/transferRequest',
-      async () =>
-        new Promise<unknown>((resolve, reject) => {
-          mockTransferRequestResolve = resolve;
-          mockTransferRequestReject = reject;
+    createRequest: createAsyncThunk(
+      'requests/createRequest',
+      async (arg: unknown) =>
+        new Promise<string>((resolve, reject) => {
+          mockCreateRequestResolve = resolve;
+          mockCreateRequestReject = reject;
         })
     ),
-    confirmTransfer: createAsyncThunk('requests/confirmTransfer', async () => null),
+    editRequest: createAsyncThunk('requests/editRequest', async () => null),
+    rejectRequest: createAsyncThunk('requests/rejectRequest', async () => null),
+    approveRequest: createAsyncThunk('requests/approveRequest', async () => null),
+    transferRequest: createAsyncThunk('requests/transferRequest', async () => null),
     returnItems: createAsyncThunk('requests/returnItems', async () => null),
   };
 });
@@ -161,49 +165,6 @@ jest.mock('../../../store/thunks/purchaseOrderThunks', () => {
   };
 });
 
-const createMockRequestItem = (overrides: Partial<RequestItem> = {}): RequestItem => ({
-  itemId: 'item1',
-  itemName: 'Steel Bar',
-  itemSku: 'SKU-001',
-  itemType: 'non_consumable',
-  categoryId: 'cat1',
-  categoryName: 'Steel',
-  quantityRequested: 5,
-  quantityApproved: 5,
-  quantityReturned: 0,
-  status: 'approved',
-  ...overrides,
-});
-
-const createMockRequest = (overrides: Partial<Request> = {}): Request =>
-  ({
-    id: 'req1',
-    requestNumber: 'REQ-001',
-    siteId: 'site1',
-    siteName: 'Site A',
-    requestedBy: 'u1',
-    requestedByName: 'User One',
-    status: 'approved',
-    priority: 'medium',
-    purpose: 'Site work',
-    items: [createMockRequestItem()],
-    processedBy: null,
-    processedByName: null,
-    processedAt: null,
-    storeNotes: null,
-    rejectionReason: null,
-    rejectionComments: null,
-    transferredAt: null,
-    transferredBy: null,
-    transferredByName: null,
-    receivedBy: null,
-    receivedByName: null,
-    returnHistory: null,
-    createdAt: null,
-    updatedAt: null,
-    ...overrides,
-  } as Request);
-
 function renderWithStore(ui: React.ReactElement, preloadedState: Partial<RootState> = {}) {
   const store = configureStore({
     reducer: {
@@ -231,129 +192,73 @@ function renderWithStore(ui: React.ReactElement, preloadedState: Partial<RootSta
 const defaultPreloadedState: Partial<RootState> = {
   auth: {
     user: { uid: 'user1', email: 'user@test.com', displayName: 'Test User' } as import('firebase/auth').User,
-    userRole: { role: 'StoreIncharge', isActive: true, permissions: [] },
+    userRole: { role: 'SiteManager', isActive: true, permissions: [] },
     isLoading: false,
     isRoleLoading: false,
-    authInitialized: false,
+    authInitialized: true,
     error: null,
     isAuthenticated: true,
   },
+  sites: {
+    sites: [],
+    isLoading: false,
+    error: null,
+    searchQuery: '',
+    validationLoading: false,
+    lastValidationAt: null,
+  },
 };
 
-describe('ConfirmTransferScreen', () => {
+describe('CreateSiteTransferRequestScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(Alert, 'alert').mockImplementation((_title: string, _message?: string, buttons?: Array<{ text?: string; onPress?: () => void }>) => {
-      buttons?.find((b) => b.text === 'OK')?.onPress?.();
-    });
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   });
 
-  it('shows loading initially', () => {
-    renderWithStore(<ConfirmTransferScreen />, defaultPreloadedState);
+  it('renders screen with transfer route and item summary', () => {
+    renderWithStore(<CreateSiteTransferRequestScreen />, defaultPreloadedState);
 
-    expect(screen.getByText('Loading transfer details...')).toBeTruthy();
-  });
-
-  it('renders form when approved request loads', async () => {
-    renderWithStore(<ConfirmTransferScreen />, defaultPreloadedState);
-
-    mockGetRequestByIdResolve!(createMockRequest());
-
-    await waitFor(() => {
-      expect(screen.getByText('Site A')).toBeTruthy();
-    });
-
-    expect(screen.getByText('Items to Transfer')).toBeTruthy();
+    expect(screen.getByText('Request Transfer')).toBeTruthy();
+    expect(screen.getByText('Site Transfer Request')).toBeTruthy();
+    expect(screen.getByText('Site Alpha')).toBeTruthy();
+    expect(screen.getByText('Site Beta')).toBeTruthy();
     expect(screen.getByText('Steel Bar')).toBeTruthy();
-    expect(screen.getByText('Received By')).toBeTruthy();
-    expect(screen.getByPlaceholderText('Name of person receiving items at site')).toBeTruthy();
-    expect(screen.getByPlaceholderText('Any additional notes...')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Confirm transfer' })).toBeTruthy();
+    expect(screen.getByText('SKU: SKU-001')).toBeTruthy();
+    expect(screen.getByText(/Available at Site Alpha: 10 piece/)).toBeTruthy();
+    expect(screen.getByPlaceholderText('Max 10')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Submit transfer request' })).toBeTruthy();
   });
 
-  it('non-approved request shows Alert and goBack', async () => {
-    renderWithStore(<ConfirmTransferScreen />, defaultPreloadedState);
+  it('shows validation error when quantity exceeds available', () => {
+    renderWithStore(<CreateSiteTransferRequestScreen />, defaultPreloadedState);
 
-    mockGetRequestByIdResolve!(createMockRequest({ status: 'pending' }));
+    fireEvent.changeText(screen.getByPlaceholderText('Max 10'), '15');
+    fireEvent.press(screen.getByRole('button', { name: 'Submit transfer request' }));
+
+    expect(screen.getByText(/Maximum available at Site Alpha: 10/)).toBeTruthy();
+  });
+
+  it('submits successfully and shows success Alert when createRequest resolves', async () => {
+    renderWithStore(<CreateSiteTransferRequestScreen />, defaultPreloadedState);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Submit transfer request' }));
+
+    mockCreateRequestResolve!('req-123');
 
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
-        'Error',
-        'Only approved requests can be transferred',
+        'Request Submitted',
+        expect.stringContaining('Steel Bar'),
         expect.any(Array)
       );
     });
-
-    expect(mockGoBack).toHaveBeenCalled();
   });
 
-  it('validation: receivedBy required', async () => {
-    renderWithStore(<ConfirmTransferScreen />, defaultPreloadedState);
-
-    mockGetRequestByIdResolve!(createMockRequest());
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Confirm transfer' })).toBeTruthy();
-    });
-
-    fireEvent.press(screen.getByRole('button', { name: 'Confirm transfer' }));
-
-    expect(screen.getByText('Received by is required')).toBeTruthy();
-  });
-
-  it('submit dispatches transferRequest and success Alert', async () => {
-    renderWithStore(<ConfirmTransferScreen />, defaultPreloadedState);
-
-    mockGetRequestByIdResolve!(createMockRequest());
-
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText('Name of person receiving items at site')).toBeTruthy();
-    });
-
-    fireEvent.changeText(
-      screen.getByPlaceholderText('Name of person receiving items at site'),
-      'John Doe'
-    );
-    fireEvent.press(screen.getByRole('button', { name: 'Confirm transfer' }));
-
-    mockTransferRequestResolve!();
-
-    await waitFor(() => {
-      expect(Alert.alert).toHaveBeenCalledWith('Success', 'Transfer confirmed successfully', expect.any(Array));
-    });
-  });
-
-  it('back button calls goBack', async () => {
-    renderWithStore(<ConfirmTransferScreen />, defaultPreloadedState);
-
-    mockGetRequestByIdResolve!(createMockRequest());
-
-    await waitFor(() => {
-      expect(screen.getByText('Site A')).toBeTruthy();
-    });
+  it('back button calls goBack', () => {
+    renderWithStore(<CreateSiteTransferRequestScreen />, defaultPreloadedState);
 
     fireEvent.press(screen.getByRole('button', { name: 'Go back' }));
 
     expect(mockGoBack).toHaveBeenCalled();
-  });
-
-  it('renders Site Transfer route (source → destination) for site_transfer requests', async () => {
-    const siteTransferRequest = createMockRequest({
-      requestType: 'site_transfer',
-      sourceSiteId: 'siteA',
-      sourceSiteName: 'Site Alpha',
-      siteId: 'siteB',
-      siteName: 'Site Beta',
-    });
-
-    renderWithStore(<ConfirmTransferScreen />, defaultPreloadedState);
-
-    mockGetRequestByIdResolve!(siteTransferRequest);
-
-    await waitFor(() => {
-      expect(screen.getByText('Site Transfer')).toBeTruthy();
-      expect(screen.getByText('Site Alpha')).toBeTruthy();
-      expect(screen.getByText('Site Beta')).toBeTruthy();
-    });
   });
 });

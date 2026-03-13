@@ -63,4 +63,43 @@ describe('RequestCard', () => {
     render(<RequestCard request={mockRequest} onPress={jest.fn()} />);
     expect(screen.getByText('Pending')).toBeTruthy();
   });
+
+  it('renders Site Transfer badge when requestType is site_transfer', () => {
+    const siteTransferRequest = {
+      ...mockRequest,
+      requestType: 'site_transfer' as const,
+      sourceSiteId: 'siteA',
+      sourceSiteName: 'Site Alpha',
+      siteId: 'siteB',
+      siteName: 'Site Beta',
+    };
+    render(<RequestCard request={siteTransferRequest} onPress={jest.fn()} />);
+    expect(screen.getByText('Site Transfer')).toBeTruthy();
+  });
+
+  it('shows source → destination for site_transfer requests', () => {
+    const siteTransferRequest = {
+      ...mockRequest,
+      requestType: 'site_transfer' as const,
+      sourceSiteId: 'siteA',
+      sourceSiteName: 'Site Alpha',
+      siteId: 'siteB',
+      siteName: 'Site Beta',
+    };
+    render(<RequestCard request={siteTransferRequest} onPress={jest.fn()} />);
+    expect(screen.getByText('Site Alpha → Site Beta')).toBeTruthy();
+  });
+
+  it('shows Transfer label instead of Site for site_transfer', () => {
+    const siteTransferRequest = {
+      ...mockRequest,
+      requestType: 'site_transfer' as const,
+      sourceSiteId: 'siteA',
+      sourceSiteName: 'Site Alpha',
+      siteId: 'siteB',
+      siteName: 'Site Beta',
+    };
+    render(<RequestCard request={siteTransferRequest} onPress={jest.fn()} />);
+    expect(screen.getByText('Transfer')).toBeTruthy();
+  });
 });
