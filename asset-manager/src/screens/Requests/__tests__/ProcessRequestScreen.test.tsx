@@ -27,9 +27,10 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 const mockGoBack = jest.fn();
 const mockReplace = jest.fn();
+const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
-    navigate: jest.fn(),
+    navigate: mockNavigate,
     goBack: mockGoBack,
     replace: mockReplace,
     canGoBack: () => true,
@@ -407,6 +408,76 @@ describe('ProcessRequestScreen', () => {
       ]),
       'site_siteA'
     );
+  });
+
+  it('shows Create PO for Shortfall button and navigates when stock is insufficient', async () => {
+    const { requestService } = require('../../../services/firebase/requestService');
+    const mockCheck = requestService.checkItemsAvailability as jest.Mock;
+    mockCheck.mockResolvedValueOnce([
+      { itemId: 'item1', itemName: 'Steel Bar', requested: 100, available: 50, sufficient: false },
+    ]);
+
+    const mockRequest = createMockRequest({
+      items: [createMockRequestItem({ quantityRequested: 100 })],
+    });
+
+    const inventoryItem = {
+      id: 'item1',
+      name: 'Steel Bar',
+      sku: 'SKU-001',
+      categoryId: 'cat1',
+      categoryName: 'Steel',
+      type: 'consumable' as const,
+      unit: 'Pcs',
+      minStockLevel: 10,
+      status: 'active' as const,
+      totalQuantity: 50,
+      centralStoreQuantity: 50,
+      atSitesQuantity: 0,
+      inMaintenanceQuantity: 0,
+    };
+
+    renderWithStore(<ProcessRequestScreen />, {
+      ...defaultPreloadedState,
+      requests: {
+        requests: [mockRequest],
+        myRequests: [],
+        selectedRequest: null,
+        loading: false,
+        error: null,
+        errorTimestamp: null,
+        filters: { status: 'all', priority: 'all', siteId: 'all' },
+      },
+      inventory: {
+        items: [inventoryItem],
+        categories: [],
+        inventoryByLocation: {},
+        lowStockItemIds: [],
+        filters: null,
+        loading: false,
+        error: null,
+        errorTimestamp: null,
+      },
+    });
+
+    mockSubscribeCallback?.(mockRequest);
+
+    await waitFor(() => {
+      expect(screen.getByText('Insufficient Stock')).toBeTruthy();
+    });
+
+    const createPOButton = screen.getByRole('button', { name: 'Create PO for Shortfall' });
+    expect(createPOButton).toBeTruthy();
+
+    fireEvent.press(createPOButton);
+
+    expect(mockNavigate).toHaveBeenCalledWith('PurchaseOrders', {
+      screen: 'CreatePO',
+      params: {
+        selectedItems: [inventoryItem],
+        initialQuantities: { item1: 50 },
+      },
+    });
   });
 
   it('renders From Site and To Site for site_transfer requests', async () => {

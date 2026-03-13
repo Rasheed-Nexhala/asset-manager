@@ -22,9 +22,13 @@ import type { Vendor } from '../../../types/vendor';
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
+let mockRouteParams: Record<string, unknown> = {};
+const mockSetParams = jest.fn((params: Record<string, unknown>) => {
+  Object.assign(mockRouteParams, params);
+});
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack, setParams: jest.fn() }),
-  useRoute: () => ({ params: {} }),
+  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack, setParams: mockSetParams }),
+  useRoute: () => ({ params: mockRouteParams }),
   useIsFocused: () => true,
   useFocusEffect: (cb: () => void) => cb(),
 }));
@@ -258,6 +262,7 @@ const defaultPreloadedState: Partial<RootState> = {
 describe('CreatePOScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockRouteParams = {};
     jest.spyOn(Alert, 'alert').mockImplementation((_title: string, _message?: string, buttons?: Array<{ text?: string; onPress?: () => void }>) => {
       buttons?.find((b) => b.text === 'OK')?.onPress?.();
     });
@@ -314,5 +319,17 @@ describe('CreatePOScreen', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Go back' }));
 
     expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  it('pre-fills items with initialQuantities when selectedItems passed via route params', () => {
+    mockRouteParams = {
+      selectedItems: mockItems,
+      initialQuantities: { item1: 50 },
+    };
+
+    renderWithStore(<CreatePOScreen />, defaultPreloadedState);
+
+    expect(screen.getByText('Steel Bar')).toBeTruthy();
+    expect(screen.getByDisplayValue('50')).toBeTruthy();
   });
 });

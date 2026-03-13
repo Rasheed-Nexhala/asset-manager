@@ -288,8 +288,8 @@ describe('ReceivePOScreen', () => {
 
     expect(screen.getByText('ABC Suppliers')).toBeTruthy();
     expect(screen.getByText('Steel Bar')).toBeTruthy();
-    expect(screen.getByText('ITEMS TO RECEIVE (FULL QUANTITY)')).toBeTruthy();
-    expect(screen.getByText(/Partial receiving is not allowed/)).toBeTruthy();
+    expect(screen.getByText('ITEMS TO RECEIVE')).toBeTruthy();
+    expect(screen.getByText(/Partial or excess delivery is allowed/)).toBeTruthy();
     expect(screen.getByText(/Invoice\/Bill/)).toBeTruthy();
     expect(screen.getByText('Received Date')).toBeTruthy();
     expect(screen.getByText('Notes (Optional)')).toBeTruthy();

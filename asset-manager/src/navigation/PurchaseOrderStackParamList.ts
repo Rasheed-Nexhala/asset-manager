@@ -5,7 +5,7 @@ import type { Item } from '../types/inventory';
  */
 export type PurchaseOrderStackParamList = {
   PurchaseOrderList: undefined;
-  CreatePO: { poId?: string; selectedItems?: Item[] };
+  CreatePO: { poId?: string; selectedItems?: Item[]; initialQuantities?: Record<string, number> };
   VendorManagement: undefined;
   AddVendor: { vendorId?: string };
   ApprovePO: { poId: string };

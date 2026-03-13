@@ -249,20 +249,23 @@ export const CreatePOScreen: React.FC = () => {
     useCallback(() => {
       const selected = route.params?.selectedItems;
       if (selected && selected.length > 0) {
-        const newItems: PurchaseOrderItem[] = selected.map((item) => ({
-          itemId: item.id,
-          itemName: item.name,
-          itemSku: item.sku,
-          unit: item.unit,
-          isExistingItem: true,
-          quantity: 1,
-          unitPrice: 0,
-          amount: 0,
-          gstPercentage: undefined,
-          receivedQuantity: null,
-          orderedUnit: item.unit,
-          orderedQuantity: 1,
-        }));
+        const newItems: PurchaseOrderItem[] = selected.map((item) => {
+          const initialQty = route.params?.initialQuantities?.[item.id] ?? 1;
+          return {
+            itemId: item.id,
+            itemName: item.name,
+            itemSku: item.sku,
+            unit: item.unit,
+            isExistingItem: true,
+            quantity: initialQty,
+            unitPrice: 0,
+            amount: 0,
+            gstPercentage: undefined,
+            receivedQuantity: null,
+            orderedUnit: item.unit,
+            orderedQuantity: initialQty,
+          };
+        });
         setItems((prev) => {
           const byId = new Map(prev.map((p) => [p.itemId, p]));
           newItems.forEach((n) => {

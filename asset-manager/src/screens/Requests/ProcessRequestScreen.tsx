@@ -196,6 +196,29 @@ export const ProcessRequestScreen: React.FC = () => {
     [availability]
   );
 
+  const handleCreatePOForShortfall = useCallback(() => {
+    // Identify items with shortfall
+    const shortfallItems = availability.filter((a) => !a.sufficient);
+    const selectedItems = inventoryItems.filter((i) => 
+      shortfallItems.some((sa) => sa.itemId === i.id)
+    );
+    
+    // Map their shortfall quantities
+    const initialQuantities: Record<string, number> = {};
+    shortfallItems.forEach((sa) => {
+      initialQuantities[sa.itemId] = Math.max(0, sa.requested - sa.available);
+    });
+
+    // Navigate to PurchaseOrders tab -> CreatePO screen
+    (navigation as any).navigate('PurchaseOrders', {
+      screen: 'CreatePO',
+      params: {
+        selectedItems,
+        initialQuantities,
+      }
+    });
+  }, [availability, inventoryItems, navigation]);
+
   useAutoClearError(subscriptionError, () => setSubscriptionError(null));
 
   const handleApprove = useCallback(async () => {
@@ -576,19 +599,31 @@ export const ProcessRequestScreen: React.FC = () => {
             !isCheckingAvailability &&
             !allSufficient &&
             availability.length > 0 && (
-              <View className="bg-[#DC2626]/15 rounded-lg p-4 border border-[#DC2626]/30">
+              <View className="bg-[#DC2626]/15 rounded-[10px] p-4 border border-[#DC2626]/30">
                 <View className="flex-row items-center gap-2 mb-2">
                   <Ionicons name="alert-circle" size={24} color="#DC2626" />
                   <Text className="text-[15px] font-semibold text-[#DC2626]">
                     Insufficient Stock
                   </Text>
                 </View>
-                <Text className="text-[13px] text-[#64748B]">
+                <Text className="text-[13px] text-[#64748B] mb-3">
                   {request.requestType === 'site_transfer'
                     ? `Some items do not have sufficient quantity at ${request.sourceSiteName ?? 'the source site'}. You can wait or reject this request.`
                     : 'Some items do not have sufficient quantity in the central store. You can wait for stock to arrive or reject this request.'}
                   {' '}Approval is disabled until all items are available.
                 </Text>
+                <TouchableOpacity
+                  onPress={handleCreatePOForShortfall}
+                  className="bg-[#DC2626] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2 mt-1"
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Create PO for Shortfall"
+                >
+                  <Ionicons name="cart-outline" size={20} color="#FFFFFF" />
+                  <Text className="text-[15px] font-semibold text-white">
+                    Create PO for Shortfall
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
 
