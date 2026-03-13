@@ -71,10 +71,12 @@ export const ReceivePOScreen: React.FC = () => {
       .then((p) => {
         if (p) {
           setPo(p);
-          // Pre-fill each item with its ordered (inventory) quantity
+          // Pre-fill each item with its remaining quantity
           const initial: Record<string, string> = {};
           p.items.forEach((item) => {
-            initial[item.itemId] = String(item.quantity);
+            const received = item.receivedQuantity ?? 0;
+            const remaining = Math.max(0, item.quantity - received);
+            initial[item.itemId] = remaining > 0 ? String(remaining) : '0';
           });
           setReceivedQtys(initial);
           setLoadError(null);
@@ -212,6 +214,7 @@ export const ReceivePOScreen: React.FC = () => {
         return {
           itemName: item.itemName,
           orderedQty: item.quantity,
+          remainingQty: Math.max(0, item.quantity - (item.receivedQuantity ?? 0)),
           currentQty: current,
           receivedQty,
           newQty: current + receivedQty,
@@ -272,13 +275,13 @@ export const ReceivePOScreen: React.FC = () => {
     );
   }
 
-  if (po.status !== 'approved' && po.status !== 'ordered') {
+  if (po.status !== 'approved' && po.status !== 'ordered' && po.status !== 'partially_received') {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader title="Receive PO" showBack onBackPress={handleBack} />
         <View className="flex-1 items-center justify-center px-4">
           <Text className="text-[15px] text-[#64748B] text-center">
-            Only approved or ordered POs can be received. Current status: {po.status}.
+            Only approved, ordered, or partially received POs can be received. Current status: {po.status}.
           </Text>
         </View>
       </ScreenLayout>
@@ -322,13 +325,15 @@ export const ReceivePOScreen: React.FC = () => {
             const raw = receivedQtys[item.itemId] ?? '';
             const receivedQty = parseInt(raw, 10);
             const orderedQty = item.quantity;
+            const alreadyReceived = item.receivedQuantity ?? 0;
+            const remainingQty = Math.max(0, orderedQty - alreadyReceived);
             const orderedLabel = item.orderedQuantity
               ? `${item.orderedQuantity} ${item.orderedUnit}`
               : `${orderedQty} ${item.unit || 'Pcs'}`;
 
-            const isPartial = !isNaN(receivedQty) && receivedQty < orderedQty && receivedQty >= 0;
-            const isExcess = !isNaN(receivedQty) && receivedQty > orderedQty;
-            const isExact = !isNaN(receivedQty) && receivedQty === orderedQty;
+            const isPartial = !isNaN(receivedQty) && receivedQty > 0 && receivedQty < remainingQty;
+            const isExcess = !isNaN(receivedQty) && receivedQty > remainingQty;
+            const isExact = !isNaN(receivedQty) && receivedQty > 0 && receivedQty === remainingQty;
 
             return (
               <View
@@ -342,7 +347,7 @@ export const ReceivePOScreen: React.FC = () => {
                       {item.itemName}
                     </Text>
                     <Text className="text-[13px] text-[#64748B] mt-0.5">
-                      Ordered: {orderedLabel}
+                      Ordered: {orderedLabel}{alreadyReceived > 0 ? ` • Received: ${alreadyReceived} ${item.unit || 'Pcs'}` : ''}
                     </Text>
                   </View>
                   {isExact && (

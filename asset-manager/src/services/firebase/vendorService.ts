@@ -5,6 +5,7 @@ import {
   doc,
   getDoc,
   updateDoc,
+  deleteDoc,
   query,
   orderBy,
   serverTimestamp,
@@ -150,6 +151,20 @@ export const updateVendor = async (
     await updateDoc(doc(db, VENDORS_COLLECTION, id), updatePayload);
   } catch (error) {
     console.error('Error updating vendor:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete an existing vendor
+ *
+ * @param id - Vendor document ID
+ */
+export const deleteVendor = async (id: string): Promise<void> => {
+  try {
+    await deleteDoc(doc(db, VENDORS_COLLECTION, id));
+  } catch (error) {
+    console.error('Error deleting vendor:', error);
     throw error;
   }
 };

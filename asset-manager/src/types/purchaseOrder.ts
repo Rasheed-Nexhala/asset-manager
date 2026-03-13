@@ -12,6 +12,7 @@ export type PurchaseOrderStatus =
   | 'pending_approval'
   | 'approved'
   | 'ordered'
+  | 'partially_received'
   | 'received'
   | 'rejected';
 

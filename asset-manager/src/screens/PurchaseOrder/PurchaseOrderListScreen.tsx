@@ -116,7 +116,7 @@ export const PurchaseOrderListScreen: React.FC = () => {
         navigation.navigate('CreatePO', { poId: po.id });
       } else if (po.status === 'pending_approval') {
         navigation.navigate('ApprovePO', { poId: po.id });
-      } else if (po.status === 'approved' || po.status === 'ordered') {
+      } else if (po.status === 'approved' || po.status === 'ordered' || po.status === 'partially_received') {
         navigation.navigate('ReceivePO', { poId: po.id });
       } else {
         navigation.navigate('ApprovePO', { poId: po.id });
@@ -266,6 +266,7 @@ export const PurchaseOrderListScreen: React.FC = () => {
             )}
             {renderFilterChip('Approved', 'approved', 'Filter by approved')}
             {renderFilterChip('Received', 'received', 'Filter by received')}
+            {renderFilterChip('Partial', 'partially_received', 'Filter by partially received')}
             {renderFilterChip('Draft', 'draft', 'Filter by draft')}
             {renderFilterChip('Rejected', 'rejected', 'Filter by rejected')}
           </View>

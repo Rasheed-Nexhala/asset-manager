@@ -226,7 +226,7 @@ export const DashboardScreen: React.FC = () => {
 
   const poAwaitingApproval = purchaseOrders.filter((o) => o.status === 'pending_approval');
   const poApprovedReady = purchaseOrders.filter((o) => o.status === 'approved');
-  const poOrderedAwaiting = purchaseOrders.filter((o) => o.status === 'ordered');
+  const poOrderedAwaiting = purchaseOrders.filter((o) => o.status === 'ordered' || o.status === 'partially_received');
 
   const statsForStore = [
     ...(showInventory ? [{ icon: '📦', value: items.length, label: 'Items' }] : []),

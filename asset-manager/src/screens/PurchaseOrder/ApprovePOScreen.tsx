@@ -229,7 +229,7 @@ export const ApprovePOScreen: React.FC = () => {
     );
   }
 
-  if (po.status === 'ordered') {
+  if (po.status === 'ordered' || po.status === 'partially_received') {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader
@@ -245,7 +245,7 @@ export const ApprovePOScreen: React.FC = () => {
         />
         <View className="flex-1 items-center justify-center px-4">
           <Text className="text-[15px] text-[#64748B] text-center">
-            This PO has been marked as ordered. You can receive it from the list.
+            This PO has been {po.status === 'partially_received' ? 'partially received' : 'marked as ordered'}. You can receive it from the list.
           </Text>
         </View>
       </ScreenLayout>
@@ -256,7 +256,7 @@ export const ApprovePOScreen: React.FC = () => {
     po.status === 'approved' && (isAdmin || isStoreIncharge);
 
   const isReadOnly =
-    po.status === 'received' || po.status === 'rejected';
+    po.status === 'received' || po.status === 'partially_received' || po.status === 'rejected';
   const showApproveReject = po.status === 'pending_approval' && isAdmin;
   const statusBadge =
     po.status === 'pending_approval'
@@ -267,7 +267,9 @@ export const ApprovePOScreen: React.FC = () => {
         ? 'Approved'
         : po.status === 'received'
           ? 'Received'
-          : 'Rejected';
+          : po.status === 'partially_received'
+            ? 'Partially Received'
+            : 'Rejected';
 
   return (
     <ScreenLayout edges={['top']}>
@@ -297,11 +299,13 @@ export const ApprovePOScreen: React.FC = () => {
             className={`text-[13px] mt-1 font-medium ${
               po.status === 'received'
                 ? 'text-[#16A34A]'
-                : po.status === 'rejected'
-                  ? 'text-[#DC2626]'
-                  : po.status === 'approved'
-                    ? 'text-[#1E40AF]'
-                    : 'text-[#D97706]'
+                : po.status === 'partially_received'
+                  ? 'text-[#D97706]'
+                  : po.status === 'rejected'
+                    ? 'text-[#DC2626]'
+                    : po.status === 'approved'
+                      ? 'text-[#1E40AF]'
+                      : 'text-[#D97706]'
             }`}
           >
             {po.status === 'pending_approval' && isAdmin ? '⏳ ' : ''}

@@ -53,6 +53,8 @@ const validatePoItemQuantities = (
     quantity: number;
     orderedUnit?: string;
     orderedQuantity?: number;
+    unitPrice?: number;
+    gstPercentage?: number;
   }>
 ): void => {
   for (const item of items) {
@@ -66,6 +68,12 @@ const validatePoItemQuantities = (
     }
     if (item.orderedQuantity != null && (!Number.isFinite(item.orderedQuantity) || item.orderedQuantity < 0)) {
       throw new Error(`Invalid ordered quantity for ${item.itemName}`);
+    }
+    if (item.unitPrice != null && (!Number.isFinite(item.unitPrice) || item.unitPrice < 0)) {
+      throw new Error(`Invalid unit price for ${item.itemName}. Must be 0 or greater.`);
+    }
+    if (item.gstPercentage != null && (!Number.isFinite(item.gstPercentage) || item.gstPercentage < 0)) {
+      throw new Error(`Invalid GST percentage for ${item.itemName}. Must be 0 or greater.`);
     }
   }
 };
@@ -362,18 +370,6 @@ export const updatePO = async (
   try {
     validatePoItemQuantities(data.items);
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
-    const poSnap = await getDocFromServer(poRef);
-
-    if (!poSnap.exists()) {
-      throw new Error('Purchase order not found');
-    }
-
-    const poData = poSnap.data();
-    if (poData.status !== 'draft') {
-      throw new Error(
-        `Cannot update PO with status "${poData.status}". Only draft POs can be updated.`
-      );
-    }
 
     const items = buildPOItems(data.items);
     const { subtotal, gstAmount, totalAmount, gstPercentage } = calculateTotals(items);
@@ -388,25 +384,39 @@ export const updatePO = async (
     const reviewedByName = isAdminAutoApprove ? userName : null;
     const reviewedAt = isAdminAutoApprove ? serverTimestamp() : null;
 
-    await updateDoc(poRef, {
-      vendorId: data.vendorId,
-      vendorName: data.vendorName,
-      vendorContact: data.vendorContact,
-      vendorEmail: data.vendorEmail ?? null,
-      vendorAddress: data.vendorAddress ?? null,
-      items,
-      subtotal,
-      gstPercentage,
-      gstAmount,
-      totalAmount,
-      justification: data.justification.trim(),
-      expectedDeliveryDate: expectedDeliveryTimestamp,
-      status,
-      createdByRole: createdByRole ?? null,
-      reviewedBy,
-      reviewedByName,
-      reviewedAt,
-      updatedAt: serverTimestamp(),
+    await runTransaction(db, async (transaction) => {
+      const poSnap = await transaction.get(poRef);
+      if (!poSnap.exists()) {
+        throw new Error('Purchase order not found');
+      }
+
+      const poData = poSnap.data();
+      if (poData.status !== 'draft') {
+        throw new Error(
+          `Cannot update PO with status "${poData.status}". Only draft POs can be updated.`
+        );
+      }
+
+      transaction.update(poRef, {
+        vendorId: data.vendorId,
+        vendorName: data.vendorName,
+        vendorContact: data.vendorContact,
+        vendorEmail: data.vendorEmail ?? null,
+        vendorAddress: data.vendorAddress ?? null,
+        items,
+        subtotal,
+        gstPercentage,
+        gstAmount,
+        totalAmount,
+        justification: data.justification.trim(),
+        expectedDeliveryDate: expectedDeliveryTimestamp,
+        status,
+        createdByRole: createdByRole ?? null,
+        reviewedBy,
+        reviewedByName,
+        reviewedAt,
+        updatedAt: serverTimestamp(),
+      });
     });
 
     if (!isDraft) {
@@ -432,27 +442,29 @@ export const approvePO = async (
   try {
     await ensureAdminUser(adminId);
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
-    const poSnap = await getDocFromServer(poRef);
 
-    if (!poSnap.exists()) {
-      throw new Error('Purchase order not found');
-    }
+    await runTransaction(db, async (transaction) => {
+      const poSnap = await transaction.get(poRef);
+      if (!poSnap.exists()) {
+        throw new Error('Purchase order not found');
+      }
 
-    const poData = poSnap.data();
-    if (poData.status !== 'pending_approval') {
-      throw new Error(
-        `Cannot approve PO with status "${poData.status}". Only pending approval POs can be approved.`
-      );
-    }
+      const poData = poSnap.data();
+      if (poData.status !== 'pending_approval') {
+        throw new Error(
+          `Cannot approve PO with status "${poData.status}". Only pending approval POs can be approved.`
+        );
+      }
 
-    await updateDoc(poRef, {
-      status: 'approved',
-      reviewedBy: adminId,
-      reviewedByName: adminName,
-      reviewedAt: serverTimestamp(),
-      adminComments: data?.adminComments?.trim() ?? null,
-      rejectionReason: null,
-      updatedAt: serverTimestamp(),
+      transaction.update(poRef, {
+        status: 'approved',
+        reviewedBy: adminId,
+        reviewedByName: adminName,
+        reviewedAt: serverTimestamp(),
+        adminComments: data?.adminComments?.trim() ?? null,
+        rejectionReason: null,
+        updatedAt: serverTimestamp(),
+      });
     });
   } catch (error) {
     console.error('Error approving PO:', error);
@@ -472,27 +484,29 @@ export const rejectPO = async (
   try {
     await ensureAdminUser(adminId);
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
-    const poSnap = await getDocFromServer(poRef);
 
-    if (!poSnap.exists()) {
-      throw new Error('Purchase order not found');
-    }
+    await runTransaction(db, async (transaction) => {
+      const poSnap = await transaction.get(poRef);
+      if (!poSnap.exists()) {
+        throw new Error('Purchase order not found');
+      }
 
-    const poData = poSnap.data();
-    if (poData.status !== 'pending_approval') {
-      throw new Error(
-        `Cannot reject PO with status "${poData.status}". Only pending approval POs can be rejected.`
-      );
-    }
+      const poData = poSnap.data();
+      if (poData.status !== 'pending_approval') {
+        throw new Error(
+          `Cannot reject PO with status "${poData.status}". Only pending approval POs can be rejected.`
+        );
+      }
 
-    await updateDoc(poRef, {
-      status: 'rejected',
-      reviewedBy: adminId,
-      reviewedByName: adminName,
-      reviewedAt: serverTimestamp(),
-      rejectionReason: data.rejectionReason.trim(),
-      adminComments: data.adminComments?.trim() ?? null,
-      updatedAt: serverTimestamp(),
+      transaction.update(poRef, {
+        status: 'rejected',
+        reviewedBy: adminId,
+        reviewedByName: adminName,
+        reviewedAt: serverTimestamp(),
+        rejectionReason: data.rejectionReason.trim(),
+        adminComments: data.adminComments?.trim() ?? null,
+        updatedAt: serverTimestamp(),
+      });
     });
   } catch (error) {
     console.error('Error rejecting PO:', error);
@@ -506,22 +520,24 @@ export const rejectPO = async (
 export const markPOOrdered = async (poId: string): Promise<void> => {
   try {
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
-    const poSnap = await getDocFromServer(poRef);
 
-    if (!poSnap.exists()) {
-      throw new Error('Purchase order not found');
-    }
+    await runTransaction(db, async (transaction) => {
+      const poSnap = await transaction.get(poRef);
+      if (!poSnap.exists()) {
+        throw new Error('Purchase order not found');
+      }
 
-    const poData = poSnap.data();
-    if (poData.status !== 'approved') {
-      throw new Error(
-        `Cannot mark PO as ordered. Current status: "${poData.status}". Only approved POs can be marked as ordered.`
-      );
-    }
+      const poData = poSnap.data();
+      if (poData.status !== 'approved') {
+        throw new Error(
+          `Cannot mark PO as ordered. Current status: "${poData.status}". Only approved POs can be marked as ordered.`
+        );
+      }
 
-    await updateDoc(poRef, {
-      status: 'ordered',
-      updatedAt: serverTimestamp(),
+      transaction.update(poRef, {
+        status: 'ordered',
+        updatedAt: serverTimestamp(),
+      });
     });
   } catch (error) {
     console.error('Error marking PO as ordered:', error);
@@ -548,9 +564,9 @@ export const receivePO = async (
   }
 
   const initialPoData = initialPoSnap.data();
-  if (initialPoData.status !== 'approved' && initialPoData.status !== 'ordered') {
+  if (initialPoData.status !== 'approved' && initialPoData.status !== 'ordered' && initialPoData.status !== 'partially_received') {
     throw new Error(
-      `Cannot receive PO with status "${initialPoData.status}". Only approved or ordered POs can be received.`
+      `Cannot receive PO with status "${initialPoData.status}". Only approved, ordered, or partially received POs can be received.`
     );
   }
 
@@ -570,9 +586,9 @@ export const receivePO = async (
     }
 
     const poData = poSnap.data();
-    if (poData.status !== 'approved' && poData.status !== 'ordered') {
+    if (poData.status !== 'approved' && poData.status !== 'ordered' && poData.status !== 'partially_received') {
       throw new Error(
-        `Cannot receive PO with status "${poData.status}". Only approved or ordered POs can be received.`
+        `Cannot receive PO with status "${poData.status}". Only approved, ordered, or partially received POs can be received.`
       );
     }
 
@@ -667,13 +683,25 @@ export const receivePO = async (
       new Date(receiveData.receivedDate)
     );
 
-    const updatedItems = poData.items.map((item: any) => ({
-      ...item,
-      receivedQuantity: receivedByQty.get(item.itemId) ?? 0,
-    }));
+    let allFullyReceived = true;
+    const updatedItems = poData.items.map((item: any) => {
+      const newlyReceived = receivedByQty.get(item.itemId) ?? 0;
+      const totalReceived = (item.receivedQuantity ?? 0) + newlyReceived;
+      
+      if (totalReceived < item.quantity) {
+        allFullyReceived = false;
+      }
+
+      return {
+        ...item,
+        receivedQuantity: totalReceived,
+      };
+    });
+
+    const newStatus = allFullyReceived ? 'received' : 'partially_received';
 
     transaction.update(poRef, {
-      status: 'received',
+      status: newStatus,
       receivedAt: receivedAtTimestamp,
       receivedBy: userId,
       receivedByName: userName,
@@ -807,6 +835,8 @@ export const subscribeToPurchaseOrders = (
   if (statusFilter && statusFilter !== 'all') {
     q = query(q, where('status', '==', statusFilter));
   }
+
+  q = query(q, limit(50));
 
   const unsub = onSnapshot(
     q,

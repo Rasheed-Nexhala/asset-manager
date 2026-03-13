@@ -4,6 +4,7 @@ import { View, Text } from 'react-native';
 interface InventoryUpdate {
   itemName: string;
   orderedQty: number;
+  remainingQty?: number;
   currentQty: number;
   receivedQty: number;
   newQty: number;
@@ -25,9 +26,10 @@ export const POReceiptSummary: React.FC<POReceiptSummaryProps> = ({
         Inventory will be updated:
       </Text>
       {visibleUpdates.map((u, i) => {
-        const isPartial = u.receivedQty < u.orderedQty;
-        const isExcess = u.receivedQty > u.orderedQty;
-        const isExact = u.receivedQty === u.orderedQty;
+        const expected = u.remainingQty ?? u.orderedQty;
+        const isPartial = u.receivedQty > 0 && u.receivedQty < expected;
+        const isExcess = u.receivedQty > expected;
+        const isExact = u.receivedQty > 0 && u.receivedQty === expected;
 
         return (
           <View key={i} className="mb-2">
@@ -52,7 +54,7 @@ export const POReceiptSummary: React.FC<POReceiptSummaryProps> = ({
               )}
             </View>
             <Text className="text-[13px] text-[#64748B] ml-2">
-              {`${u.currentQty} → ${u.newQty} (+${u.receivedQty} of ${u.orderedQty} ordered)`}
+              {`${u.currentQty} → ${u.newQty} (+${u.receivedQty} of ${expected} expected)`}
             </Text>
           </View>
         );

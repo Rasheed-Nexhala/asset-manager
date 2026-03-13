@@ -27,6 +27,7 @@ import { createPO, updatePO, deletePO } from '../../store/thunks/purchaseOrderTh
 import {
   subscribeToVendors,
   createVendor,
+  deleteVendor,
 } from '../../services/firebase/vendorService';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
@@ -98,6 +99,7 @@ export const CreatePOScreen: React.FC = () => {
   const [editingPOStatus, setEditingPOStatus] = useState<'draft' | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [initialStateHash, setInitialStateHash] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = subscribeToVendors((v) => dispatch(setVendors(v)));
@@ -142,6 +144,24 @@ export const CreatePOScreen: React.FC = () => {
         po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate) : null
       );
       setEditingPOStatus('draft');
+
+      setInitialStateHash(JSON.stringify({
+        selectedVendorId: po.vendorId,
+        vendorName: po.vendorName,
+        vendorContact: po.vendorContact,
+        vendorEmail: po.vendorEmail ?? '',
+        vendorAddress: po.vendorAddress ?? '',
+        items: po.items.map(i => ({
+          itemId: i.itemId,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          gstPercentage: i.gstPercentage,
+          orderedUnit: i.orderedUnit,
+          orderedQuantity: i.orderedQuantity,
+        })),
+        justification: po.justification,
+        expectedDeliveryDate: po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate).toISOString() : null,
+      }));
     };
 
     if (poFromStore) {
@@ -167,6 +187,41 @@ export const CreatePOScreen: React.FC = () => {
       })
       .finally(() => setIsLoadingPO(false));
   }, [poId, poFromStore?.id, loadPORetryTrigger, navigation]);
+
+  useEffect(() => {
+    if (!poId && initialStateHash === null) {
+      setInitialStateHash(JSON.stringify({
+        selectedVendorId: null,
+        vendorName: '',
+        vendorContact: '',
+        vendorEmail: '',
+        vendorAddress: '',
+        items: [],
+        justification: '',
+        expectedDeliveryDate: null,
+      }));
+    }
+  }, [poId, initialStateHash]);
+
+  const currentHash = JSON.stringify({
+    selectedVendorId,
+    vendorName: vendorName.trim(),
+    vendorContact: vendorContact.trim(),
+    vendorEmail: vendorEmail.trim(),
+    vendorAddress: vendorAddress.trim(),
+    items: items.map(i => ({
+      itemId: i.itemId,
+      quantity: i.quantity,
+      unitPrice: i.unitPrice,
+      gstPercentage: i.gstPercentage,
+      orderedUnit: i.orderedUnit,
+      orderedQuantity: i.orderedQuantity,
+    })),
+    justification: justification.trim(),
+    expectedDeliveryDate: expectedDeliveryDate ? expectedDeliveryDate.toISOString() : null,
+  });
+
+  const isDirty = initialStateHash !== null && currentHash !== initialStateHash;
 
   const subtotal = items.reduce((s, i) => s + i.amount, 0);
   const gstAmount = items.reduce(
@@ -392,10 +447,15 @@ export const CreatePOScreen: React.FC = () => {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Failed to save';
         if (vendorCreatedThisAttempt) {
-          setSelectedVendorId(vendorId);
+          try {
+            await deleteVendor(vendorId);
+            setSelectedVendorId(null);
+          } catch (deleteErr) {
+            console.error('Failed to clean up orphaned vendor', deleteErr);
+          }
           Alert.alert(
-            'Vendor Saved',
-            'The vendor was saved, but the purchase order could not be created. Please try again. The vendor has been pre-selected.',
+            'Error',
+            `Failed to create purchase order. Vendor creation rolled back. ${msg}`,
             [{ text: 'OK' }]
           );
         } else {
@@ -758,8 +818,8 @@ export const CreatePOScreen: React.FC = () => {
           <View className="flex-row gap-3 mt-4">
             <TouchableOpacity
               onPress={() => handleSubmit(true)}
-              disabled={isSubmitting || isDeleting}
-              className="flex-1 border-[1.5px] border-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center"
+              disabled={isSubmitting || isDeleting || !isDirty}
+              className={`flex-1 border-[1.5px] border-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center ${!isDirty ? 'opacity-50' : ''}`}
             >
               {isSubmitting && isDraft ? (
                 <ActivityIndicator size="small" color="#1E40AF" />

@@ -30,6 +30,11 @@ const statusConfig: Record<
     text: 'text-[#16A34A]',
     label: 'Ordered',
   },
+  partially_received: {
+    bg: 'bg-[#D97706]/15',
+    text: 'text-[#D97706]',
+    label: 'Partially Received',
+  },
   received: {
     bg: 'bg-[#16A34A]/15',
     text: 'text-[#16A34A]',
