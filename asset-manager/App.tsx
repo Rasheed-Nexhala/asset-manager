@@ -4,7 +4,9 @@ import * as Sentry from '@sentry/react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { LogBox, StyleSheet, View } from 'react-native';
+import { InteractionManager, LogBox, StyleSheet, View } from 'react-native';
+import { useFonts } from 'expo-font';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
 import { store } from './src/store';
@@ -41,6 +43,14 @@ LogBox.ignoreLogs([
 ]);
 
 function AppContent() {
+  const [fontsLoaded, fontError] = useFonts({ ...Ionicons.font });
+
+  useEffect(() => {
+    if (fontError) {
+      console.error('Error loading fonts:', fontError);
+    }
+  }, [fontError]);
+
   useAuthStateSync();
   const userId = useAppSelector(selectUserId);
   const authInitialized = useAppSelector(selectAuthInitialized);
@@ -51,11 +61,12 @@ function AppContent() {
   const { isOffline, retry } = useNetworkStatus();
 
   useEffect(() => {
-    // Hide native splash after our SplashOverlay has painted, so the transition is seamless.
-    const id = requestAnimationFrame(() => {
+    // Wait for all animations/interactions to settle before hiding the native splash,
+    // ensuring SplashOverlay is fully painted and committed to the screen first.
+    const task = InteractionManager.runAfterInteractions(() => {
       SplashScreen.hideAsync();
     });
-    return () => cancelAnimationFrame(id);
+    return () => task.cancel();
   }, []);
 
   useEffect(() => {
@@ -79,7 +90,8 @@ function AppContent() {
     });
   }, [authInitialized, userId]);
 
-  if (!authInitialized) {
+  // Proceed if auth is done AND (fonts are loaded OR they failed to load, so we don't get stuck)
+  if (!authInitialized || (!fontsLoaded && !fontError)) {
     return (
       <>
         <StatusBar style="dark" />

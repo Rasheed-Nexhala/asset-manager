@@ -7,11 +7,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "notification": {
       "icon": "./assets/notification-icon.png",
       "androidMode": "default",
@@ -45,9 +40,14 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/splash.png",
           "backgroundColor": "#ffffff",
-          "resizeMode": "contain"
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "android": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#ffffff",
+            "imageWidth": 200
+          }
         }
       ],
       [
