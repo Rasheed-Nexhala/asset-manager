@@ -20,6 +20,7 @@ import { WeightViewPreferenceProvider } from './src/hooks/useWeightViewPreferenc
 import { useNetworkStatus } from './src/hooks/useNetworkStatus';
 import { NoInternetScreen } from './src/components/NoInternetScreen';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
+import { SplashOverlay } from './src/components/SplashOverlay';
 
 Sentry.init({
   // Replace this with your DSN from sentry.io → Project Settings → Client Keys
@@ -50,10 +51,12 @@ function AppContent() {
   const { isOffline, retry } = useNetworkStatus();
 
   useEffect(() => {
-    if (authInitialized) {
+    // Hide native splash after our SplashOverlay has painted, so the transition is seamless.
+    const id = requestAnimationFrame(() => {
       SplashScreen.hideAsync();
-    }
-  }, [authInitialized]);
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   useEffect(() => {
     if (!authInitialized) return;
@@ -75,6 +78,15 @@ function AppContent() {
       },
     });
   }, [authInitialized, userId]);
+
+  if (!authInitialized) {
+    return (
+      <>
+        <StatusBar style="dark" />
+        <SplashOverlay />
+      </>
+    );
+  }
 
   return (
     <>

@@ -2,6 +2,7 @@ import {
   collection,
   addDoc,
   doc,
+  getDoc,
   getDocs,
   query,
   where,
@@ -12,6 +13,7 @@ import {
   Unsubscribe,
   QuerySnapshot,
   runTransaction,
+  updateDoc,
 } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import { auth } from '../../../config/firebase';

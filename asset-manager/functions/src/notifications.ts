@@ -81,9 +81,11 @@ export async function getUserPushTokens(
 /**
  * Returns deduplicated Expo push tokens for all active Admin and StoreIncharge users
  * who have enabled the given notification type.
+ * @param excludeUserId - Optional user ID to exclude (e.g. the actor who triggered the event)
  */
 export async function getAdminAndStoreInchargeTokens(
-  type: NotificationPrefType
+  type: NotificationPrefType,
+  excludeUserId?: string
 ): Promise<string[]> {
   const snapshot = await db
     .collection('users')
@@ -92,6 +94,7 @@ export async function getAdminAndStoreInchargeTokens(
 
   const all: string[] = [];
   for (const doc of snapshot.docs) {
+    if (excludeUserId && doc.id === excludeUserId) continue;
     const role = doc.data()?.role as string | undefined;
     if (role === 'Admin' || role === 'StoreIncharge') {
       const tokens = await getUserPushTokens(doc.id, type);
@@ -103,8 +106,11 @@ export async function getAdminAndStoreInchargeTokens(
 
 /**
  * Returns user IDs of active Admin and StoreIncharge users (for in-app notifications).
+ * @param excludeUserId - Optional user ID to exclude (e.g. the actor who triggered the event)
  */
-export async function getAdminAndStoreInchargeUserIds(): Promise<string[]> {
+export async function getAdminAndStoreInchargeUserIds(
+  excludeUserId?: string
+): Promise<string[]> {
   const snapshot = await db
     .collection('users')
     .where('isActive', '==', true)
@@ -112,6 +118,7 @@ export async function getAdminAndStoreInchargeUserIds(): Promise<string[]> {
 
   const ids: string[] = [];
   for (const doc of snapshot.docs) {
+    if (excludeUserId && doc.id === excludeUserId) continue;
     const role = doc.data()?.role as string | undefined;
     if (role === 'Admin' || role === 'StoreIncharge') {
       ids.push(doc.id);
@@ -124,9 +131,11 @@ export async function getAdminAndStoreInchargeUserIds(): Promise<string[]> {
  * Returns deduplicated Expo push tokens for all active Admin users only.
  * Use when Store Incharge creates something that only Admin should be notified about
  * (e.g. inventory update requests).
+ * @param excludeUserId - Optional user ID to exclude (e.g. the actor who triggered the event)
  */
 export async function getAdminOnlyTokens(
-  type: NotificationPrefType
+  type: NotificationPrefType,
+  excludeUserId?: string
 ): Promise<string[]> {
   const snapshot = await db
     .collection('users')
@@ -135,6 +144,7 @@ export async function getAdminOnlyTokens(
 
   const all: string[] = [];
   for (const doc of snapshot.docs) {
+    if (excludeUserId && doc.id === excludeUserId) continue;
     const role = doc.data()?.role as string | undefined;
     if (role === 'Admin') {
       const tokens = await getUserPushTokens(doc.id, type);
@@ -146,8 +156,11 @@ export async function getAdminOnlyTokens(
 
 /**
  * Returns user IDs of active Admin users only (for in-app notifications).
+ * @param excludeUserId - Optional user ID to exclude (e.g. the actor who triggered the event)
  */
-export async function getAdminOnlyUserIds(): Promise<string[]> {
+export async function getAdminOnlyUserIds(
+  excludeUserId?: string
+): Promise<string[]> {
   const snapshot = await db
     .collection('users')
     .where('isActive', '==', true)
@@ -155,6 +168,7 @@ export async function getAdminOnlyUserIds(): Promise<string[]> {
 
   const ids: string[] = [];
   for (const doc of snapshot.docs) {
+    if (excludeUserId && doc.id === excludeUserId) continue;
     const role = doc.data()?.role as string | undefined;
     if (role === 'Admin') {
       ids.push(doc.id);

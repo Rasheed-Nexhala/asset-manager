@@ -125,12 +125,16 @@ export const onRequestCreated = onDocumentCreated(
 
     if (request.status === 'pending') {
       try {
-        const tokens = await getAdminAndStoreInchargeTokens('requestUpdates');
+        const requestedBy = request.requestedBy as string | undefined;
+        const tokens = await getAdminAndStoreInchargeTokens(
+          'requestUpdates',
+          requestedBy
+        );
         if (tokens.length > 0) {
           const title = 'New Request';
           const body = `${request.requestedByName ?? 'Someone'} submitted request ${request.requestNumber ?? requestId}`;
           const pushData = { screen: 'RequestQueue', requestId };
-          const userIds = await getAdminAndStoreInchargeUserIds();
+          const userIds = await getAdminAndStoreInchargeUserIds(requestedBy);
           for (const uid of userIds) {
             await createInAppNotification(uid, 'new_request', title, body, pushData);
           }
@@ -201,15 +205,18 @@ export const onRequestUpdated = onDocumentUpdated(
         ],
       });
 
-      // Push notifications for request status changes
+      // Push notifications for request status changes (exclude actor: don't notify processedBy)
       const requestNumber = after.requestNumber ?? requestId;
       const pushData = { screen: 'ProcessRequest', requestId };
+      const requestedBy = after.requestedBy as string | undefined;
+      const processedBy = after.processedBy as string | undefined;
+      const shouldNotifyRequester = requestedBy && requestedBy !== processedBy;
       try {
-        if (after.status === 'approved') {
-          const tokens = await getUserPushTokens(after.requestedBy, 'requestUpdates');
+        if (after.status === 'approved' && shouldNotifyRequester) {
+          const tokens = await getUserPushTokens(requestedBy!, 'requestUpdates');
           if (tokens.length > 0) {
             await createInAppNotification(
-              after.requestedBy,
+              requestedBy!,
               'request_approved',
               'Request Approved',
               `Your request ${requestNumber} has been approved.`,
@@ -219,11 +226,11 @@ export const onRequestUpdated = onDocumentUpdated(
               `Your request ${requestNumber} has been approved.`,
               pushData);
           }
-        } else if (after.status === 'rejected') {
-          const tokens = await getUserPushTokens(after.requestedBy, 'requestUpdates');
+        } else if (after.status === 'rejected' && shouldNotifyRequester) {
+          const tokens = await getUserPushTokens(requestedBy!, 'requestUpdates');
           if (tokens.length > 0) {
             await createInAppNotification(
-              after.requestedBy,
+              requestedBy!,
               'request_rejected',
               'Request Rejected',
               `Your request ${requestNumber} was rejected.`,
@@ -233,11 +240,11 @@ export const onRequestUpdated = onDocumentUpdated(
               `Your request ${requestNumber} was rejected.`,
               pushData);
           }
-        } else if (after.status === 'transferred') {
-          const tokens = await getUserPushTokens(after.requestedBy, 'requestUpdates');
+        } else if (after.status === 'transferred' && shouldNotifyRequester) {
+          const tokens = await getUserPushTokens(requestedBy!, 'requestUpdates');
           if (tokens.length > 0) {
             await createInAppNotification(
-              after.requestedBy,
+              requestedBy!,
               'request_transferred',
               'Items Transferred',
               `Items for request ${requestNumber} have been transferred.`,
@@ -248,9 +255,13 @@ export const onRequestUpdated = onDocumentUpdated(
               pushData);
           }
         } else if (after.status === 'returned' || after.status === 'partially_returned') {
-          const tokens = await getAdminAndStoreInchargeTokens('requestUpdates');
+          const processedBy = after.processedBy as string | undefined;
+          const tokens = await getAdminAndStoreInchargeTokens(
+            'requestUpdates',
+            processedBy
+          );
           if (tokens.length > 0) {
-            const userIds = await getAdminAndStoreInchargeUserIds();
+            const userIds = await getAdminAndStoreInchargeUserIds(processedBy);
             for (const uid of userIds) {
               await createInAppNotification(
                 uid,
@@ -312,6 +323,34 @@ export const onRequestUpdated = onDocumentUpdated(
         details: after.storeNotes ?? '',
         changes,
       });
+
+      const processedBy = after.processedBy as string | undefined;
+      const requestedBy = after.requestedBy as string | undefined;
+      if (
+        requestedBy &&
+        requestedBy !== processedBy &&
+        processedBy
+      ) {
+        try {
+          const tokens = await getUserPushTokens(requestedBy, 'requestUpdates');
+          if (tokens.length > 0) {
+            const requestNumber = after.requestNumber ?? requestId;
+            const title = 'Request Edited';
+            const body = `Request ${requestNumber} was modified by Store`;
+            const pushData = { screen: 'ProcessRequest', requestId };
+            await createInAppNotification(
+              requestedBy,
+              'request_edited',
+              title,
+              body,
+              pushData
+            );
+            await sendExpoPushNotification(tokens, title, body, pushData);
+          }
+        } catch (notifErr) {
+          logger.error('Push failed for request edited', { notifErr, requestId });
+        }
+      }
     }
   }
 );
@@ -347,7 +386,11 @@ export const onMaintenanceAdded = onDocumentCreated(
     });
 
     try {
-      const tokens = await getAdminAndStoreInchargeTokens('maintenanceAlerts');
+      const addedBy = maintenance.addedBy as string | undefined;
+      const tokens = await getAdminAndStoreInchargeTokens(
+        'maintenanceAlerts',
+        addedBy
+      );
       if (tokens.length > 0) {
         const addedByName = maintenance.addedByName ?? 'Someone';
         const quantity = maintenance.quantity ?? 0;
@@ -355,7 +398,7 @@ export const onMaintenanceAdded = onDocumentCreated(
         const title = 'New Maintenance';
         const body = `${addedByName} moved ${quantity} ${itemName} to maintenance`;
         const pushData = { screen: 'Maintenance', maintenanceId };
-        const userIds = await getAdminAndStoreInchargeUserIds();
+        const userIds = await getAdminAndStoreInchargeUserIds(addedBy);
         for (const uid of userIds) {
           await createInAppNotification(uid, 'maintenance_added', title, body, pushData);
         }
@@ -398,14 +441,17 @@ export const onUserCreated = onDocumentCreated(
     });
 
     try {
-      const tokens = await getAdminAndStoreInchargeTokens('userUpdates');
+      const tokens = await getAdminAndStoreInchargeTokens(
+        'userUpdates',
+        userId
+      );
       if (tokens.length > 0) {
         const displayName = user.displayName ?? user.email ?? 'Unknown';
         const role = (user.role as string) ?? 'Unassigned';
         const title = 'New User Signed Up';
         const body = `${displayName} joined as ${role}`;
         const pushData = { screen: 'Users' };
-        const userIds = await getAdminAndStoreInchargeUserIds();
+        const userIds = await getAdminAndStoreInchargeUserIds(userId);
         for (const uid of userIds) {
           await createInAppNotification(uid, 'new_user_signup', title, body, pushData);
         }
@@ -518,6 +564,87 @@ export const onUserUpdated = onDocumentUpdated(
       details: '',
       changes,
     });
+
+    const targetName = after.displayName ?? after.email ?? userId;
+    const updatedBy = after.updatedBy as string | undefined;
+
+    try {
+      if (isDeleted) {
+        const tokens = await getAdminOnlyTokens('userUpdates');
+        if (tokens.length > 0) {
+          const title = 'User Deleted Account';
+          const body = `${targetName} deleted their account`;
+          const pushData = { screen: 'Users' };
+          const userIds = await getAdminOnlyUserIds();
+          for (const uid of userIds) {
+            await createInAppNotification(
+              uid,
+              'user_deleted',
+              title,
+              body,
+              pushData
+            );
+          }
+          await sendExpoPushNotification(tokens, title, body, pushData);
+        }
+      } else if (isDeactivated) {
+        const tokens = await getAdminOnlyTokens('userUpdates', updatedBy);
+        if (tokens.length > 0) {
+          const title = 'User Deactivated';
+          const body = `${targetName} was deactivated`;
+          const pushData = { screen: 'Users' };
+          const userIds = await getAdminOnlyUserIds(updatedBy);
+          for (const uid of userIds) {
+            await createInAppNotification(
+              uid,
+              'user_deactivated',
+              title,
+              body,
+              pushData
+            );
+          }
+          await sendExpoPushNotification(tokens, title, body, pushData);
+        }
+      } else if (before.isActive === false && after.isActive === true) {
+        const tokens = await getAdminOnlyTokens('userUpdates', updatedBy);
+        if (tokens.length > 0) {
+          const title = 'User Re-enabled';
+          const body = `${targetName} was re-enabled`;
+          const pushData = { screen: 'Users' };
+          const userIds = await getAdminOnlyUserIds(updatedBy);
+          for (const uid of userIds) {
+            await createInAppNotification(
+              uid,
+              'user_enabled',
+              title,
+              body,
+              pushData
+            );
+          }
+          await sendExpoPushNotification(tokens, title, body, pushData);
+        }
+      } else if (before.role !== after.role) {
+        const tokens = await getAdminOnlyTokens('userUpdates', updatedBy);
+        if (tokens.length > 0) {
+          const title = 'User Role Changed';
+          const body = `${targetName} role changed to ${after.role}`;
+          const pushData = { screen: 'Users' };
+          const userIds = await getAdminOnlyUserIds(updatedBy);
+          for (const uid of userIds) {
+            await createInAppNotification(
+              uid,
+              'user_role_changed',
+              title,
+              body,
+              pushData
+            );
+          }
+          await sendExpoPushNotification(tokens, title, body, pushData);
+        }
+      }
+    } catch (notifErr) {
+      logger.error('Push failed for user update', { notifErr, userId });
+    }
   }
 );
 
@@ -662,32 +789,64 @@ export const onItemUpdated = onDocumentUpdated(
       changes,
     });
 
-    // Low stock alert: notify when item JUST crossed into low stock
+    // Low stock / critical stock alert: notify when item JUST crossed threshold
     try {
       const centralStoreQtyBefore = (before.centralStoreQuantity ?? 0) as number;
       const centralStoreQtyAfter = (after.centralStoreQuantity ?? 0) as number;
       const minStockBefore = (before.minStockLevel ?? 0) as number;
       const minStockAfter = (after.minStockLevel ?? 0) as number;
+      const criticalThreshold = Math.max(0, Math.floor(minStockAfter / 2));
 
       const centralStoreQuantityChanged = centralStoreQtyBefore !== centralStoreQtyAfter;
       const isNowLowStock = centralStoreQtyAfter <= minStockAfter;
-      const wasAboveThreshold = centralStoreQtyBefore > minStockBefore;
+      const isNowCritical = centralStoreQtyAfter <= criticalThreshold;
+      const wasAboveMin = centralStoreQtyBefore > minStockBefore;
+      const wasAboveCritical = centralStoreQtyBefore > criticalThreshold;
 
-      if (centralStoreQuantityChanged && isNowLowStock && wasAboveThreshold) {
-        const itemName = after.name ?? 'Item';
-        const itemSku = after.sku ?? itemId;
-        const title = 'Low Stock Alert';
-        const body = `${itemName} (${itemSku}) is below minimum level (${centralStoreQtyAfter}/${minStockAfter})`;
-        const pushData = { screen: 'ItemDetail', itemId };
+      const updatedBy = after.updatedBy as string | undefined;
 
-        const tokens = await getAdminAndStoreInchargeTokens('stockAlerts');
-        if (tokens.length > 0) {
-          await sendExpoPushNotification(tokens, title, body, pushData);
-        }
+      if (centralStoreQuantityChanged && wasAboveMin) {
+        // Critical takes precedence over low stock
+        const criticalCrossed = isNowCritical && wasAboveCritical;
+        const lowCrossed = isNowLowStock && !criticalCrossed;
 
-        const userIds = await getAdminAndStoreInchargeUserIds();
-        for (const uid of userIds) {
-          await createInAppNotification(uid, 'low_stock_alert', title, body, pushData);
+        if (criticalCrossed || lowCrossed) {
+          const itemName = after.name ?? 'Item';
+          const itemSku = after.sku ?? itemId;
+          const pushData = { screen: 'ItemDetail', itemId };
+          const tokens = await getAdminAndStoreInchargeTokens(
+            'stockAlerts',
+            updatedBy
+          );
+          const userIds = await getAdminAndStoreInchargeUserIds(updatedBy);
+
+          if (criticalCrossed && tokens.length > 0) {
+            const title = 'Stock Critical';
+            const body = `${itemName} (${itemSku}) is critically low (${centralStoreQtyAfter} left)`;
+            await sendExpoPushNotification(tokens, title, body, pushData);
+            for (const uid of userIds) {
+              await createInAppNotification(
+                uid,
+                'stock_critical_alert',
+                title,
+                body,
+                pushData
+              );
+            }
+          } else if (lowCrossed && tokens.length > 0) {
+            const title = 'Low Stock Alert';
+            const body = `${itemName} (${itemSku}) is below minimum level (${centralStoreQtyAfter}/${minStockAfter})`;
+            await sendExpoPushNotification(tokens, title, body, pushData);
+            for (const uid of userIds) {
+              await createInAppNotification(
+                uid,
+                'low_stock_alert',
+                title,
+                body,
+                pushData
+              );
+            }
+          }
         }
       }
     } catch (notifErr) {
@@ -824,10 +983,18 @@ export const onMaintenanceUpdated = onDocumentUpdated(
       });
 
       try {
-        const tokens = await getAdminAndStoreInchargeTokens('maintenanceAlerts');
+        const afterUpdates = Array.isArray(after.updates) ? after.updates : [];
+        const lastUpdate = afterUpdates[afterUpdates.length - 1];
+        const actor = lastUpdate && typeof lastUpdate === 'object' && lastUpdate?.addedBy
+          ? String(lastUpdate.addedBy)
+          : undefined;
+        const tokens = await getAdminAndStoreInchargeTokens(
+          'maintenanceAlerts',
+          actor
+        );
         if (tokens.length > 0) {
           const pushData = { screen: 'MaintenanceDetail', maintenanceId };
-          const userIds = await getAdminAndStoreInchargeUserIds();
+          const userIds = await getAdminAndStoreInchargeUserIds(actor);
           if (after.status === 'returned') {
             const quantity = after.returnedQuantity ?? after.quantity ?? 0;
             const itemName = after.itemName ?? 'item';
@@ -918,12 +1085,16 @@ export const onPurchaseOrderCreated = onDocumentCreated(
 
     if (po.status === 'pending_approval') {
       try {
-        const tokens = await getAdminAndStoreInchargeTokens('purchaseOrderUpdates');
+        const createdBy = po.createdBy as string | undefined;
+        const tokens = await getAdminAndStoreInchargeTokens(
+          'purchaseOrderUpdates',
+          createdBy
+        );
         if (tokens.length > 0) {
           const title = 'New PO Pending Approval';
           const body = `${po.createdByName ?? 'Someone'} submitted PO ${po.poNumber ?? poId} for approval`;
           const pushData = { screen: 'ApprovePO', poId };
-          const userIds = await getAdminAndStoreInchargeUserIds();
+          const userIds = await getAdminAndStoreInchargeUserIds(createdBy);
           for (const uid of userIds) {
             await createInAppNotification(uid, 'po_pending_approval', title, body, pushData);
           }
@@ -956,12 +1127,16 @@ export const onInventoryUpdateRequestCreated = onDocumentCreated(
 
     if (request.status === 'pending') {
       try {
-        const tokens = await getAdminOnlyTokens('inventoryUpdateRequestUpdates');
+        const requestedBy = request.requestedBy as string | undefined;
+        const tokens = await getAdminOnlyTokens(
+          'inventoryUpdateRequestUpdates',
+          requestedBy
+        );
         if (tokens.length > 0) {
           const title = 'Inventory Update Request';
           const body = `${requestedByName} requested access to update inventory: ${reason}`;
           const pushData = { screen: 'InventoryUpdateRequests', requestId };
-          const userIds = await getAdminOnlyUserIds();
+          const userIds = await getAdminOnlyUserIds(requestedBy);
           for (const uid of userIds) {
             await createInAppNotification(
               uid,
@@ -975,6 +1150,81 @@ export const onInventoryUpdateRequestCreated = onDocumentCreated(
         }
       } catch (notifErr) {
         logger.error('Push failed for inventory update request', {
+          notifErr,
+          requestId,
+        });
+      }
+    }
+  }
+);
+
+/**
+ * Firestore Trigger: Notify Store Incharge when Admin approves/rejects inventory update request
+ */
+export const onInventoryUpdateRequestUpdated = onDocumentUpdated(
+  'inventoryUpdateRequests/{requestId}',
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    if (!before || !after || before.status === after.status) {
+      return;
+    }
+
+    const requestId = event.params.requestId;
+    const requestedBy = after.requestedBy as string | undefined;
+    const approvedBy = after.approvedBy as string | undefined;
+
+    if (after.status === 'approved') {
+      try {
+        if (requestedBy && requestedBy !== approvedBy) {
+          const tokens = await getUserPushTokens(
+            requestedBy,
+            'inventoryUpdateRequestUpdates'
+          );
+          if (tokens.length > 0) {
+            const title = 'Inventory Update Access Approved';
+            const body = `Your request to update inventory has been approved. Access expires in the app.`;
+            const pushData = { screen: 'InventoryUpdateRequests', requestId };
+            await createInAppNotification(
+              requestedBy,
+              'inventory_update_request_approved',
+              title,
+              body,
+              pushData
+            );
+            await sendExpoPushNotification(tokens, title, body, pushData);
+          }
+        }
+      } catch (notifErr) {
+        logger.error('Push failed for inventory update request approved', {
+          notifErr,
+          requestId,
+        });
+      }
+    } else if (after.status === 'rejected') {
+      try {
+        if (requestedBy && requestedBy !== approvedBy) {
+          const tokens = await getUserPushTokens(
+            requestedBy,
+            'inventoryUpdateRequestUpdates'
+          );
+          if (tokens.length > 0) {
+            const reason = after.rejectionReason ?? 'Rejected by Admin';
+            const title = 'Inventory Update Request Rejected';
+            const body = `Your request was rejected: ${reason}`;
+            const pushData = { screen: 'InventoryUpdateRequests', requestId };
+            await createInAppNotification(
+              requestedBy,
+              'inventory_update_request_rejected',
+              title,
+              body,
+              pushData
+            );
+            await sendExpoPushNotification(tokens, title, body, pushData);
+          }
+        }
+      } catch (notifErr) {
+        logger.error('Push failed for inventory update request rejected', {
           notifErr,
           requestId,
         });
@@ -1065,47 +1315,58 @@ export const onPurchaseOrderUpdated = onDocumentUpdated(
 
     // Push notifications for PO status changes
     try {
+      const createdBy = after.createdBy as string | undefined;
+      const reviewedBy = after.reviewedBy as string | undefined;
+      const receivedBy = after.receivedBy as string | undefined;
+
       if (after.status === 'approved') {
-        const pushData = { screen: 'ApprovePO' as const, poId };
-        const creatorTokens = await getUserPushTokens(after.createdBy, 'purchaseOrderUpdates');
-        if (creatorTokens.length > 0) {
-          await createInAppNotification(
-            after.createdBy,
-            'po_approved',
-            'PO Approved',
-            `Your PO ${targetDisplay} has been approved.`,
-            pushData
-          );
-          await sendExpoPushNotification(
-            creatorTokens,
-            'PO Approved',
-            `Your PO ${targetDisplay} has been approved.`,
-            pushData
-          );
+        if (createdBy && createdBy !== reviewedBy) {
+          const pushData = { screen: 'ApprovePO' as const, poId };
+          const creatorTokens = await getUserPushTokens(createdBy, 'purchaseOrderUpdates');
+          if (creatorTokens.length > 0) {
+            await createInAppNotification(
+              createdBy,
+              'po_approved',
+              'PO Approved',
+              `Your PO ${targetDisplay} has been approved.`,
+              pushData
+            );
+            await sendExpoPushNotification(
+              creatorTokens,
+              'PO Approved',
+              `Your PO ${targetDisplay} has been approved.`,
+              pushData
+            );
+          }
         }
       } else if (after.status === 'rejected') {
-        const pushData = { screen: 'ApprovePO' as const, poId };
-        const creatorTokens = await getUserPushTokens(after.createdBy, 'purchaseOrderUpdates');
-        if (creatorTokens.length > 0) {
-          await createInAppNotification(
-            after.createdBy,
-            'po_rejected',
-            'PO Rejected',
-            `Your PO ${targetDisplay} was rejected.`,
-            pushData
-          );
-          await sendExpoPushNotification(
-            creatorTokens,
-            'PO Rejected',
-            `Your PO ${targetDisplay} was rejected.`,
-            pushData
-          );
+        if (createdBy && createdBy !== reviewedBy) {
+          const pushData = { screen: 'ApprovePO' as const, poId };
+          const creatorTokens = await getUserPushTokens(createdBy, 'purchaseOrderUpdates');
+          if (creatorTokens.length > 0) {
+            await createInAppNotification(
+              createdBy,
+              'po_rejected',
+              'PO Rejected',
+              `Your PO ${targetDisplay} was rejected.`,
+              pushData
+            );
+            await sendExpoPushNotification(
+              creatorTokens,
+              'PO Rejected',
+              `Your PO ${targetDisplay} was rejected.`,
+              pushData
+            );
+          }
         }
       } else if (after.status === 'ordered') {
         const pushData = { screen: 'PurchaseOrderList' as const, poId };
-        const tokens = await getAdminAndStoreInchargeTokens('purchaseOrderUpdates');
+        const tokens = await getAdminAndStoreInchargeTokens(
+          'purchaseOrderUpdates',
+          createdBy
+        );
         if (tokens.length > 0) {
-          const userIds = await getAdminAndStoreInchargeUserIds();
+          const userIds = await getAdminAndStoreInchargeUserIds(createdBy);
           for (const uid of userIds) {
             await createInAppNotification(
               uid,
@@ -1124,9 +1385,12 @@ export const onPurchaseOrderUpdated = onDocumentUpdated(
         }
       } else if (after.status === 'received') {
         const pushData = { screen: 'ReceivePO' as const, poId };
-        const tokens = await getAdminAndStoreInchargeTokens('purchaseOrderUpdates');
+        const tokens = await getAdminAndStoreInchargeTokens(
+          'purchaseOrderUpdates',
+          receivedBy
+        );
         if (tokens.length > 0) {
-          const userIds = await getAdminAndStoreInchargeUserIds();
+          const userIds = await getAdminAndStoreInchargeUserIds(receivedBy);
           for (const uid of userIds) {
             await createInAppNotification(
               uid,

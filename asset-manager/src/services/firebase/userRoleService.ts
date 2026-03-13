@@ -11,7 +11,7 @@ import {
   QuerySnapshot,
   DocumentSnapshot,
 } from 'firebase/firestore';
-import { db } from '../../../config/firebase';
+import { db, auth } from '../../../config/firebase';
 import type { UserRoleData, UserRole, Permission, UserListItem } from '../../types/roles';
 
 const USERS_COLLECTION = 'users';
@@ -94,16 +94,23 @@ export const createDefaultUserDocument = async (
 
 /**
  * Update user role (Admin only)
+ * Stores updatedBy/updatedByName for notification exclusion (actor doesn't get notified)
  */
 export const updateUserRole = async (
   userId: string,
   role: UserRole
 ): Promise<void> => {
   try {
-    await updateDoc(doc(db, USERS_COLLECTION, userId), {
+    const currentUser = auth.currentUser;
+    const updates: Record<string, unknown> = {
       role,
       updatedAt: serverTimestamp(),
-    });
+    };
+    if (currentUser?.uid) {
+      updates.updatedBy = currentUser.uid;
+      updates.updatedByName = currentUser.displayName ?? currentUser.email ?? 'Admin';
+    }
+    await updateDoc(doc(db, USERS_COLLECTION, userId), updates);
   } catch (error) {
     console.error('Error updating user role:', error);
     throw error;
@@ -112,16 +119,23 @@ export const updateUserRole = async (
 
 /**
  * Update user active status
+ * Stores updatedBy/updatedByName for notification exclusion (actor doesn't get notified)
  */
 export const updateUserActiveStatus = async (
   userId: string,
   isActive: boolean
 ): Promise<void> => {
   try {
-    await updateDoc(doc(db, USERS_COLLECTION, userId), {
+    const currentUser = auth.currentUser;
+    const updates: Record<string, unknown> = {
       isActive,
       updatedAt: serverTimestamp(),
-    });
+    };
+    if (currentUser?.uid) {
+      updates.updatedBy = currentUser.uid;
+      updates.updatedByName = currentUser.displayName ?? currentUser.email ?? 'Admin';
+    }
+    await updateDoc(doc(db, USERS_COLLECTION, userId), updates);
   } catch (error) {
     console.error('Error updating user active status:', error);
     throw error;
@@ -133,6 +147,7 @@ export const updateUserActiveStatus = async (
  * Used for account deletion (Guideline 5.1.1(v)).
  * Sets soft-delete fields and isActive: false; preserves name, email, userId. Firebase Auth is deleted separately.
  * Firestore rules must allow self soft-delete.
+ * Actor is the user themselves (self-delete) - no updatedBy needed.
  */
 export const markUserAsDeleted = async (userId: string): Promise<void> => {
   try {
