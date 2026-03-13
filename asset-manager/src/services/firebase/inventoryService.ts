@@ -137,6 +137,8 @@ export const listItems = async (filters?: ItemFilters): Promise<Item[]> => {
         steelMasterId: data.steelMasterId,
         steelMasterName: data.steelMasterName,
         isWeightBased: data.isWeightBased,
+        standardUnitPrice: data.standardUnitPrice,
+        standardGstPercentage: data.standardGstPercentage,
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
       };
@@ -256,6 +258,8 @@ export const listItemsPaginated = async (
         steelMasterId: data.steelMasterId,
         steelMasterName: data.steelMasterName,
         isWeightBased: data.isWeightBased,
+        standardUnitPrice: data.standardUnitPrice,
+        standardGstPercentage: data.standardGstPercentage,
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
       };
@@ -342,11 +346,13 @@ export const listItemsForMaintenancePaginated = async (
           inMaintenanceQuantity: data.inMaintenanceQuantity || 0,
           weightPerMeter: data.weightPerMeter,
           lengthPerPiece: data.lengthPerPiece,
-          steelMasterId: data.steelMasterId,
-          steelMasterName: data.steelMasterName,
-          isWeightBased: data.isWeightBased,
-          createdAt: data.createdAt,
-          updatedAt: data.updatedAt,
+        steelMasterId: data.steelMasterId,
+        steelMasterName: data.steelMasterName,
+        isWeightBased: data.isWeightBased,
+        standardUnitPrice: data.standardUnitPrice,
+        standardGstPercentage: data.standardGstPercentage,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
         };
         return firestoreItemToItem(firestoreItem);
       })
@@ -472,6 +478,8 @@ const docSnapToItem = (docSnap: DocumentSnapshot): Item => {
     steelMasterId: data?.steelMasterId,
     steelMasterName: data?.steelMasterName,
     isWeightBased: data?.isWeightBased,
+    standardUnitPrice: data?.standardUnitPrice,
+    standardGstPercentage: data?.standardGstPercentage,
     createdAt: data?.createdAt,
     updatedAt: data?.updatedAt,
   } as FirestoreItem;
@@ -629,6 +637,8 @@ const docDataToItem = (id: string, data: Record<string, unknown>): Item =>
     steelMasterId: data.steelMasterId,
     steelMasterName: data.steelMasterName,
     isWeightBased: data.isWeightBased,
+    standardUnitPrice: data.standardUnitPrice,
+    standardGstPercentage: data.standardGstPercentage,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
   } as FirestoreItem);
@@ -837,6 +847,8 @@ export const createItem = async (
       if (itemData.createdByName) itemDocData.createdByName = itemData.createdByName;
       if (itemData.createdByRole) itemDocData.createdByRole = itemData.createdByRole;
       if (itemData.weightPerMeter != null) itemDocData.weightPerMeter = itemData.weightPerMeter;
+      if (itemData.standardUnitPrice != null) itemDocData.standardUnitPrice = itemData.standardUnitPrice;
+      if (itemData.standardGstPercentage != null) itemDocData.standardGstPercentage = itemData.standardGstPercentage;
       if (lengthPerPiece != null) itemDocData.lengthPerPiece = lengthPerPiece;
       if (steelMasterId) itemDocData.steelMasterId = steelMasterId;
       if (steelMasterName) itemDocData.steelMasterName = steelMasterName;
@@ -1281,6 +1293,8 @@ export const subscribeItems = (
           centralStoreQuantity: data.centralStoreQuantity || 0,
           atSitesQuantity: data.atSitesQuantity || 0,
           inMaintenanceQuantity: data.inMaintenanceQuantity || 0,
+          standardUnitPrice: data.standardUnitPrice,
+          standardGstPercentage: data.standardGstPercentage,
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
         };

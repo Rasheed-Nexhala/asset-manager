@@ -69,6 +69,8 @@ interface FormState {
   initialQuantity: string;
   minStockLevel: string;
   status: ItemStatus;
+  standardUnitPrice: string;
+  standardGstPercentage: string;
   imageUri?: string;
 }
 
@@ -83,6 +85,8 @@ interface FormErrors {
   unit?: string;
   initialQuantity?: string;
   minStockLevel?: string;
+  standardUnitPrice?: string;
+  standardGstPercentage?: string;
 }
 
 /**
@@ -142,6 +146,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     initialQuantity: '',
     minStockLevel: initialMinStockLevelDisplay || initialData?.minStockLevel?.toString() || '',
     status: initialData?.status || 'active',
+    standardUnitPrice: initialData?.standardUnitPrice != null ? String(initialData.standardUnitPrice) : '',
+    standardGstPercentage: initialData?.standardGstPercentage != null ? String(initialData.standardGstPercentage) : '',
     imageUri: initialData?.imageUrl || undefined,
   });
 
@@ -538,6 +544,22 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       }
     }
 
+    // Standard unit price (optional) - if provided, must be >= 0
+    if (formData.standardUnitPrice.trim()) {
+      const price = parseFloat(formData.standardUnitPrice);
+      if (isNaN(price) || price < 0) {
+        newErrors.standardUnitPrice = 'Must be 0 or greater';
+      }
+    }
+
+    // Standard GST % (optional) - if provided, must be 0-100
+    if (formData.standardGstPercentage.trim()) {
+      const gst = parseFloat(formData.standardGstPercentage);
+      if (isNaN(gst) || gst < 0 || gst > 100) {
+        newErrors.standardGstPercentage = 'Must be between 0 and 100';
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }, [formData, mode, isWeightBased, weightConfig, initialData]);
@@ -615,6 +637,13 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       minStockLevelPieces = Math.round(resultMin.pieces);
     }
 
+    const standardUnitPrice = formData.standardUnitPrice.trim()
+      ? parseFloat(formData.standardUnitPrice)
+      : undefined;
+    const standardGstPercentage = formData.standardGstPercentage.trim()
+      ? parseFloat(formData.standardGstPercentage)
+      : undefined;
+
     if (mode === 'create') {
       const createData: CreateItemData = {
         name: formData.name.trim(),
@@ -629,6 +658,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         lengthPerPiece,
         steelMasterId,
         steelMasterName: selectedSteelMaster?.name,
+        standardUnitPrice,
+        standardGstPercentage,
       };
       onSubmit(createData, formData.imageUri);
     } else {
@@ -642,6 +673,8 @@ export const ItemForm: React.FC<ItemFormProps> = ({
         status: formData.status,
         weightPerMeter,
         lengthPerPiece,
+        standardUnitPrice,
+        standardGstPercentage,
       };
       onSubmit(updateData, formData.imageUri);
     }
@@ -971,6 +1004,56 @@ export const ItemForm: React.FC<ItemFormProps> = ({
           {errors.minStockLevel && (
             <Text className="text-[13px] text-[#DC2626]" accessibilityLiveRegion="polite">
               {errors.minStockLevel}
+            </Text>
+          )}
+        </View>
+
+        {/* Standard Unit Price - used as default when raising POs */}
+        <View className="gap-1.5">
+          <Text className="text-[15px] text-[#0F172A]">Standard Unit Price (₹)</Text>
+          <TextInput
+            className={`border rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] ${
+              errors.standardUnitPrice ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
+            }`}
+            placeholderTextColor="#94A3B8"
+            placeholder="e.g. 150 (optional, used as default in POs)"
+            value={formData.standardUnitPrice}
+            onChangeText={(text) => updateField('standardUnitPrice', text)}
+            keyboardType="decimal-pad"
+            editable={!loading}
+            accessibilityLabel="Standard unit price input"
+          />
+          <Text className="text-[13px] text-[#64748B]">
+            Default price when this item is added to a purchase order
+          </Text>
+          {errors.standardUnitPrice && (
+            <Text className="text-[13px] text-[#DC2626]" accessibilityLiveRegion="polite">
+              {errors.standardUnitPrice}
+            </Text>
+          )}
+        </View>
+
+        {/* Standard GST % - used as default when raising POs */}
+        <View className="gap-1.5">
+          <Text className="text-[15px] text-[#0F172A]">Standard GST (%)</Text>
+          <TextInput
+            className={`border rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] ${
+              errors.standardGstPercentage ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
+            }`}
+            placeholderTextColor="#94A3B8"
+            placeholder="e.g. 18 (optional, used as default in POs)"
+            value={formData.standardGstPercentage}
+            onChangeText={(text) => updateField('standardGstPercentage', text)}
+            keyboardType="decimal-pad"
+            editable={!loading}
+            accessibilityLabel="Standard GST percentage input"
+          />
+          <Text className="text-[13px] text-[#64748B]">
+            Default GST % when this item is added to a purchase order
+          </Text>
+          {errors.standardGstPercentage && (
+            <Text className="text-[13px] text-[#DC2626]" accessibilityLiveRegion="polite">
+              {errors.standardGstPercentage}
             </Text>
           )}
         </View>

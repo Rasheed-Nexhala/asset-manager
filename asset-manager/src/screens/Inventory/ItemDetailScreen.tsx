@@ -390,6 +390,28 @@ export const ItemDetailScreen: React.FC = () => {
                 <Text className="text-[15px] text-[#0F172A]">{item.description}</Text>
               </View>
             )}
+
+            {/* Standard Price & GST - visible only to Admin and Store Incharge */}
+            {(isAdmin || isStoreIncharge) && (
+              <>
+                <View className="flex-row justify-between items-center">
+                  <Text className="text-[13px] text-[#64748B]">Standard Unit Price</Text>
+                  <Text className="text-[15px] text-[#0F172A]">
+                    {item.standardUnitPrice != null && item.standardUnitPrice > 0
+                      ? `₹${item.standardUnitPrice.toLocaleString('en-IN')}`
+                      : '—'}
+                  </Text>
+                </View>
+                <View className="flex-row justify-between items-center">
+                  <Text className="text-[13px] text-[#64748B]">Standard GST</Text>
+                  <Text className="text-[15px] text-[#0F172A]">
+                    {item.standardGstPercentage != null && item.standardGstPercentage > 0
+                      ? `${item.standardGstPercentage}%`
+                      : '—'}
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
 

@@ -245,13 +245,16 @@ export const CreatePOScreen: React.FC = () => {
     return Object.keys(e).length === 0;
   }, [vendorName, vendorContact, items.length]);
 
-  // Handle selectedItems when returning from SelectItemsScreen
+  // Handle selectedItems when returning from SelectItemsScreen or ProcessRequestScreen
   useFocusEffect(
     useCallback(() => {
       const selected = route.params?.selectedItems;
       if (selected && selected.length > 0) {
         const newItems: PurchaseOrderItem[] = selected.map((item) => {
           const initialQty = route.params?.initialQuantities?.[item.id] ?? 1;
+          const unitPrice = item.standardUnitPrice ?? 0;
+          const gstPercentage = item.standardGstPercentage ?? (unitPrice > 0 ? DEFAULT_GST_PERCENTAGE : undefined);
+          const amount = unitPrice > 0 ? initialQty * unitPrice : 0;
           return {
             itemId: item.id,
             itemName: item.name,
@@ -259,9 +262,9 @@ export const CreatePOScreen: React.FC = () => {
             unit: item.unit,
             isExistingItem: true,
             quantity: initialQty,
-            unitPrice: 0,
-            amount: 0,
-            gstPercentage: undefined,
+            unitPrice,
+            amount,
+            gstPercentage,
             receivedQuantity: null,
             orderedUnit: item.unit,
             orderedQuantity: initialQty,

@@ -53,6 +53,10 @@ export interface FirestoreItem {
   steelMasterName?: string;       // Denormalized name for display
   isWeightBased?: boolean;        // Flag for quick identification (derived from weightPerMeter)
   
+  // Standard pricing (used as defaults when raising purchase orders)
+  standardUnitPrice?: number;     // Default unit price per unit when creating PO
+  standardGstPercentage?: number; // Default GST % when creating PO (e.g. 18)
+  
   createdAt: Timestamp;           // Creation timestamp
   updatedAt: Timestamp;           // Last modified timestamp
 }
@@ -82,6 +86,8 @@ export interface Item {
   steelMasterId?: string;
   steelMasterName?: string;
   isWeightBased?: boolean;
+  standardUnitPrice?: number;     // Default unit price when creating PO
+  standardGstPercentage?: number; // Default GST % when creating PO
   createdAt: string;             // Serialized creation timestamp (ISO string)
   updatedAt: string;             // Serialized last modified timestamp (ISO string)
 }
@@ -154,6 +160,8 @@ export interface CreateItemData {
   lengthPerPiece?: number;
   steelMasterId?: string;
   steelMasterName?: string;
+  standardUnitPrice?: number;     // Default unit price when creating PO
+  standardGstPercentage?: number; // Default GST % when creating PO
   /** User who created the item (for activity log) */
   createdBy?: string;
   createdByName?: string;
@@ -177,6 +185,8 @@ export interface UpdateItemData {
   status?: ItemStatus;
   weightPerMeter?: number;
   lengthPerPiece?: number;
+  standardUnitPrice?: number;     // Default unit price when creating PO
+  standardGstPercentage?: number; // Default GST % when creating PO
   /** User who updated the item (for activity log) */
   updatedBy?: string;
   updatedByName?: string;
