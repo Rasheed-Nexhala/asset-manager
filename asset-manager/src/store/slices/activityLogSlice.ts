@@ -90,6 +90,14 @@ const activityLogSlice = createSlice({
       state.lastDoc = null;
     },
 
+    /**
+     * Client-side search only. Updates searchQuery without clearing logs or refetching.
+     * Use setFilters for server-side filters (date, category, etc.) that require a refetch.
+     */
+    setSearchQuery: (state, action: PayloadAction<string>) => {
+      state.filters.searchQuery = action.payload ?? '';
+    },
+
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
     },
@@ -257,6 +265,7 @@ const activityLogSlice = createSlice({
 export const {
   setFilters,
   clearFilters,
+  setSearchQuery,
   setLoading,
   setMyActivityLoading,
   setError,

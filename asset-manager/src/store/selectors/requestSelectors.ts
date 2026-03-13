@@ -264,6 +264,7 @@ export const selectMyRequestsByStatusAndSearch = createSelector(
       filtered = filtered.filter((r) => {
         const matchesRequestNumber = (r.requestNumber ?? '').toLowerCase().includes(lowerQuery);
         const matchesSiteName = (r.siteName ?? '').toLowerCase().includes(lowerQuery);
+        const matchesRequestedBy = (r.requestedByName ?? '').toLowerCase().includes(lowerQuery);
         const matchesPurpose = (r.purpose ?? '').toLowerCase().includes(lowerQuery);
         const matchesItem = Array.isArray(r.items)
           ? r.items.some(
@@ -273,7 +274,7 @@ export const selectMyRequestsByStatusAndSearch = createSelector(
                 (item.categoryName ?? '').toLowerCase().includes(lowerQuery)
             )
           : false;
-        return matchesRequestNumber || matchesSiteName || matchesPurpose || matchesItem;
+        return matchesRequestNumber || matchesSiteName || matchesRequestedBy || matchesPurpose || matchesItem;
       });
     }
     return [...filtered].sort(

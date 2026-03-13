@@ -240,7 +240,7 @@ export const MyRequestsScreen: React.FC = () => {
           <Ionicons name="search" size={20} color="#94A3B8" />
           <TextInput
             className="flex-1 ml-3 text-[15px] text-[#0F172A]"
-            placeholder="Search by request number, site, purpose, or item..."
+            placeholder="Search by request number, site, requester, purpose, or item..."
             placeholderTextColor="#94A3B8"
             value={searchQuery}
             onChangeText={handleSearchChange}

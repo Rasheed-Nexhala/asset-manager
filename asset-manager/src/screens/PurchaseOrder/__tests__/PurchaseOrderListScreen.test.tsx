@@ -390,7 +390,7 @@ describe('PurchaseOrderListScreen', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText('Search by PO number, vendor, or item...')).toBeTruthy();
+      expect(screen.getByPlaceholderText('Search by PO number, vendor, justification, or item...')).toBeTruthy();
     });
     expect(screen.getByLabelText('Search purchase orders')).toBeTruthy();
   });
@@ -411,7 +411,7 @@ describe('PurchaseOrderListScreen', () => {
     });
 
     fireEvent.changeText(
-      screen.getByPlaceholderText('Search by PO number, vendor, or item...'),
+      screen.getByPlaceholderText('Search by PO number, vendor, justification, or item...'),
       'nonexistent'
     );
 

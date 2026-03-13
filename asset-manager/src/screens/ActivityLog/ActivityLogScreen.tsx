@@ -3,6 +3,7 @@ import { useAutoClearError } from '../../hooks/useAutoClearError';
 import {
   View,
   Text,
+  TextInput,
   FlatList,
   TouchableOpacity,
   RefreshControl,
@@ -34,6 +35,7 @@ import {
 } from '../../store/thunks/activityLogThunks';
 import {
   setFilters,
+  setSearchQuery,
   clearFilters,
   clearError,
 } from '../../store/slices/activityLogSlice';
@@ -109,6 +111,14 @@ export const ActivityLogScreen: React.FC = () => {
     // Filter clear will trigger useEffect to resubscribe
   }, [dispatch]);
 
+  // Search change handler (client-side only, no refetch)
+  const handleSearchChange = useCallback(
+    (text: string) => {
+      dispatch(setSearchQuery(text ?? ''));
+    },
+    [dispatch]
+  );
+
   // Card press handler
   const handleCardPress = useCallback((log: ActivityLog) => {
     setSelectedLog(log);
@@ -117,13 +127,14 @@ export const ActivityLogScreen: React.FC = () => {
 
   useAutoClearError(error, () => dispatch(clearError()));
 
-  // Check if filters are applied
+  // Check if filters or search are applied
   const hasActiveFilters =
     Boolean(filters.startDate) ||
     Boolean(filters.endDate) ||
     Boolean(filters.userId) ||
     (filters.actionCategory && filters.actionCategory !== 'all') ||
-    (filters.actionType && filters.actionType !== 'all');
+    (filters.actionType && filters.actionType !== 'all') ||
+    Boolean(filters.searchQuery?.trim());
 
   // Avoid flash of empty state: show loader when no fetch has completed yet
   const isInitialOrRefetching =
@@ -165,6 +176,32 @@ export const ActivityLogScreen: React.FC = () => {
           <Text className="text-[13px] text-[#DC2626]">{error}</Text>
         </View>
       )}
+
+      {/* CIAMS Search Bar - always visible above filter */}
+      <View className="bg-white border-b border-[#E2E8F0] px-4 py-3">
+        <View className="bg-[#F1F5F9] rounded-full h-12 px-4 flex-row items-center">
+          <Ionicons name="search" size={20} color="#94A3B8" />
+          <TextInput
+            className="flex-1 ml-3 text-[15px] text-[#0F172A]"
+            placeholder="Search by user, target, summary, or details..."
+            placeholderTextColor="#94A3B8"
+            value={filters.searchQuery ?? ''}
+            onChangeText={handleSearchChange}
+            accessibilityLabel="Search activity logs"
+            accessibilityRole="search"
+          />
+          {(filters.searchQuery?.length ?? 0) > 0 && (
+            <TouchableOpacity
+              onPress={() => handleSearchChange('')}
+              className="w-8 h-8 items-center justify-center"
+              accessibilityLabel="Clear search"
+              accessibilityRole="button"
+            >
+              <Ionicons name="close-circle" size={20} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
 
       {/* Filter Bar - minimum 48px height */}
       <View className="px-4 pb-3 flex-row items-center gap-2 min-h-[48px]">

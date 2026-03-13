@@ -364,6 +364,7 @@ export const getItemsForMaintenanceCount = async (
 /**
  * Build query constraints for generic item selection (Requests, PO).
  * Filters: status=active, optional name prefix search.
+ * Used when searchTerm is empty (single query) or for the name branch of dual-query search.
  *
  * @param searchTerm - Optional prefix to filter by item name (case-sensitive in Firestore)
  */
@@ -372,11 +373,11 @@ const buildSelectionItemsQueryConstraints = (
   allowedItemTypes?: string[]
 ): QueryConstraint[] => {
   const constraints: QueryConstraint[] = [where('status', '==', 'active')];
-  
+
   if (allowedItemTypes && allowedItemTypes.length > 0) {
     constraints.push(where('type', 'in', allowedItemTypes));
   }
-  
+
   const trimmed = searchTerm?.trim();
   if (trimmed) {
     constraints.push(where('name', '>=', trimmed));
@@ -386,15 +387,83 @@ const buildSelectionItemsQueryConstraints = (
   return constraints;
 };
 
+/**
+ * Build query constraints for SKU prefix search (used in dual-query search).
+ * Firestore does not support OR across different fields, so we run name + SKU
+ * queries in parallel and merge results.
+ *
+ * @param searchTerm - Prefix to filter by SKU (case-sensitive in Firestore)
+ */
+const buildSelectionItemsQueryConstraintsBySku = (
+  searchTerm: string,
+  allowedItemTypes?: string[]
+): QueryConstraint[] => {
+  const constraints: QueryConstraint[] = [where('status', '==', 'active')];
+
+  if (allowedItemTypes && allowedItemTypes.length > 0) {
+    constraints.push(where('type', 'in', allowedItemTypes));
+  }
+
+  const trimmed = searchTerm.trim();
+  constraints.push(where('sku', '>=', trimmed));
+  constraints.push(where('sku', '<=', trimmed + '\uf8ff'));
+  constraints.push(orderBy('sku', 'asc'));
+  return constraints;
+};
+
 /** Page size for item selection (Requests, PO) */
 export const SELECTION_ITEMS_PAGE_SIZE = 15;
 
 /**
- * List active items for selection (Requests, PO). Paginated with optional name prefix search.
+ * Max items to fetch when using dual-query search (name + SKU).
+ * When search is active, we fetch from both queries, merge by id, and return
+ * up to this many unique items. No cursor-based "load more" — all results
+ * are returned in one call. Tradeoff: scalable for typical catalogs (<200 matches);
+ * for very large result sets, consider Algolia/Elasticsearch or a search index.
+ */
+const SELECTION_SEARCH_MAX_FETCH = 200;
+
+/**
+ * Map Firestore document snapshot to Item (shared by selection list helpers).
+ */
+const docSnapToItem = (docSnap: DocumentSnapshot): Item => {
+  const data = docSnap.data();
+  const firestoreItem: FirestoreItem = {
+    id: docSnap.id,
+    name: data?.name,
+    sku: data?.sku,
+    description: data?.description,
+    categoryId: data?.categoryId,
+    categoryName: data?.categoryName,
+    type: data?.type,
+    unit: data?.unit,
+    imageUrl: data?.imageUrl,
+    minStockLevel: data?.minStockLevel ?? 0,
+    status: data?.status,
+    totalQuantity: data?.totalQuantity || 0,
+    centralStoreQuantity: data?.centralStoreQuantity || 0,
+    atSitesQuantity: data?.atSitesQuantity || 0,
+    inMaintenanceQuantity: data?.inMaintenanceQuantity || 0,
+    weightPerMeter: data?.weightPerMeter,
+    lengthPerPiece: data?.lengthPerPiece,
+    steelMasterId: data?.steelMasterId,
+    steelMasterName: data?.steelMasterName,
+    isWeightBased: data?.isWeightBased,
+    createdAt: data?.createdAt,
+    updatedAt: data?.updatedAt,
+  } as FirestoreItem;
+  return firestoreItemToItem(firestoreItem);
+};
+
+/**
+ * List active items for selection (Requests, PO). Paginated with optional
+ * name/SKU prefix search. When search is active, runs two Firestore queries
+ * (name + SKU) in parallel, merges by id, dedupes, sorts by name, and returns
+ * up to SELECTION_SEARCH_MAX_FETCH items (no cursor-based load more).
  *
- * @param searchTerm - Optional prefix to filter by item name
- * @param pageSize - Items per page
- * @param lastDoc - Cursor for next page
+ * @param searchTerm - Optional prefix to filter by item name or SKU
+ * @param pageSize - Items per page (ignored when search active; returns all up to max)
+ * @param lastDoc - Cursor for next page (ignored when search active)
  * @returns Items and cursor for next page
  */
 export const listItemsForSelectionPaginated = async (
@@ -404,7 +473,45 @@ export const listItemsForSelectionPaginated = async (
   allowedItemTypes?: string[]
 ): Promise<{ items: Item[]; lastDoc: DocumentSnapshot | null }> => {
   try {
-    const constraints = buildSelectionItemsQueryConstraints(searchTerm, allowedItemTypes);
+    const trimmed = searchTerm?.trim();
+
+    if (trimmed) {
+      // Dual-query search: name prefix + SKU prefix. Firestore has no OR across fields.
+      const fetchPerQuery = Math.ceil(SELECTION_SEARCH_MAX_FETCH / 2);
+      const [nameSnapshot, skuSnapshot] = await Promise.all([
+        getDocsFromServer(
+          query(
+            collection(db, ITEMS_COLLECTION),
+            ...buildSelectionItemsQueryConstraints(trimmed, allowedItemTypes),
+            limit(fetchPerQuery)
+          )
+        ),
+        getDocsFromServer(
+          query(
+            collection(db, ITEMS_COLLECTION),
+            ...buildSelectionItemsQueryConstraintsBySku(trimmed, allowedItemTypes),
+            limit(fetchPerQuery)
+          )
+        ),
+      ]);
+
+      const byId = new Map<string, Item>();
+      const addDoc = (docSnap: DocumentSnapshot) => {
+        if (!byId.has(docSnap.id)) {
+          byId.set(docSnap.id, docSnapToItem(docSnap));
+        }
+      };
+      nameSnapshot.docs.forEach(addDoc);
+      skuSnapshot.docs.forEach(addDoc);
+
+      const merged = Array.from(byId.values()).sort((a, b) =>
+        (a.name ?? '').localeCompare(b.name ?? '')
+      );
+      return { items: merged, lastDoc: null };
+    }
+
+    // No search: single query with cursor-based pagination
+    const constraints = buildSelectionItemsQueryConstraints(undefined, allowedItemTypes);
     if (lastDoc) {
       constraints.push(startAfter(lastDoc));
     }
@@ -413,35 +520,7 @@ export const listItemsForSelectionPaginated = async (
     const q = query(collection(db, ITEMS_COLLECTION), ...constraints);
     const snapshot = await getDocsFromServer(q);
 
-    const items: Item[] = snapshot.docs.map((docSnap) => {
-      const data = docSnap.data();
-      const firestoreItem: FirestoreItem = {
-        id: docSnap.id,
-        name: data.name,
-        sku: data.sku,
-        description: data.description,
-        categoryId: data.categoryId,
-        categoryName: data.categoryName,
-        type: data.type,
-        unit: data.unit,
-        imageUrl: data.imageUrl,
-        minStockLevel: data.minStockLevel ?? 0,
-        status: data.status,
-        totalQuantity: data.totalQuantity || 0,
-        centralStoreQuantity: data.centralStoreQuantity || 0,
-        atSitesQuantity: data.atSitesQuantity || 0,
-        inMaintenanceQuantity: data.inMaintenanceQuantity || 0,
-        weightPerMeter: data.weightPerMeter,
-        lengthPerPiece: data.lengthPerPiece,
-        steelMasterId: data.steelMasterId,
-        steelMasterName: data.steelMasterName,
-        isWeightBased: data.isWeightBased,
-        createdAt: data.createdAt,
-        updatedAt: data.updatedAt,
-      };
-      return firestoreItemToItem(firestoreItem);
-    });
-
+    const items: Item[] = snapshot.docs.map(docSnapToItem);
     const newLastDoc =
       snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
 
@@ -454,17 +533,45 @@ export const listItemsForSelectionPaginated = async (
 
 /**
  * Get total count of active items for selection (Requests, PO).
- * Uses same constraints as listItemsForSelectionPaginated.
+ * When search is active: runs name + SKU count queries, fetches doc IDs,
+ * merges to unique set, returns size. Capped by fetch limit for performance.
  *
- * @param searchTerm - Optional prefix to filter by item name
- * @returns Total count from server
+ * @param searchTerm - Optional prefix to filter by item name or SKU
+ * @returns Total count from server (or unique merged count when searching)
  */
 export const getItemsForSelectionCount = async (
   searchTerm: string | undefined,
   allowedItemTypes?: string[]
 ): Promise<number> => {
   try {
-    const constraints = buildSelectionItemsQueryConstraints(searchTerm, allowedItemTypes);
+    const trimmed = searchTerm?.trim();
+
+    if (trimmed) {
+      const fetchPerQuery = Math.ceil(SELECTION_SEARCH_MAX_FETCH / 2);
+      const [nameSnapshot, skuSnapshot] = await Promise.all([
+        getDocsFromServer(
+          query(
+            collection(db, ITEMS_COLLECTION),
+            ...buildSelectionItemsQueryConstraints(trimmed, allowedItemTypes),
+            limit(fetchPerQuery)
+          )
+        ),
+        getDocsFromServer(
+          query(
+            collection(db, ITEMS_COLLECTION),
+            ...buildSelectionItemsQueryConstraintsBySku(trimmed, allowedItemTypes),
+            limit(fetchPerQuery)
+          )
+        ),
+      ]);
+
+      const uniqueIds = new Set<string>();
+      nameSnapshot.docs.forEach((d) => uniqueIds.add(d.id));
+      skuSnapshot.docs.forEach((d) => uniqueIds.add(d.id));
+      return uniqueIds.size;
+    }
+
+    const constraints = buildSelectionItemsQueryConstraints(undefined, allowedItemTypes);
     const q = query(collection(db, ITEMS_COLLECTION), ...constraints);
     const snapshot = await getCountFromServer(q);
     return snapshot.data().count;

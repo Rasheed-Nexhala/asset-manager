@@ -42,7 +42,9 @@ export const VendorManagementScreen: React.FC = () => {
     const q = searchQuery.toLowerCase();
     return (
       v.name.toLowerCase().includes(q) ||
-      (v.phone ?? '').toLowerCase().includes(q)
+      (v.contactPerson ?? '').toLowerCase().includes(q) ||
+      (v.phone ?? '').toLowerCase().includes(q) ||
+      (v.email ?? '').toLowerCase().includes(q)
     );
   });
 
@@ -92,7 +94,7 @@ export const VendorManagementScreen: React.FC = () => {
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search vendors..."
+            placeholder="Search by name, contact, phone, or email..."
             placeholderTextColor="#94A3B8"
             className="border border-[#E2E8F0] rounded-lg h-12 pl-10 pr-4 bg-white"
           />

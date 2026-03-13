@@ -218,8 +218,8 @@ describe('VendorManagementScreen', () => {
 
   it('search filters vendors', () => {
     mockVendorsToReturn = null;
-    const vendor1 = createMockVendor({ id: 'v1', name: 'Steel Suppliers Ltd', phone: '9876543210' });
-    const vendor2 = createMockVendor({ id: 'v2', name: 'Hardware Plus', phone: '1234567890' });
+    const vendor1 = createMockVendor({ id: 'v1', name: 'Steel Suppliers Ltd', phone: '9876543210', email: 'steel@suppliers.com', contactPerson: 'Jane Steel' });
+    const vendor2 = createMockVendor({ id: 'v2', name: 'Hardware Plus', phone: '1234567890', email: 'info@hardware.com', contactPerson: 'Bob Smith' });
 
     renderWithStore(<VendorManagementScreen />, {
       purchaseOrders: {
@@ -231,11 +231,32 @@ describe('VendorManagementScreen', () => {
     expect(screen.getByText('Steel Suppliers Ltd')).toBeTruthy();
     expect(screen.getByText('Hardware Plus')).toBeTruthy();
 
-    fireEvent.changeText(screen.getByPlaceholderText('Search vendors...'), 'Steel');
+    fireEvent.changeText(screen.getByPlaceholderText('Search by name, contact, phone, or email...'), 'Steel');
 
     expect(screen.getByText('Steel Suppliers Ltd')).toBeTruthy();
     expect(screen.queryByText('Hardware Plus')).toBeNull();
     expect(screen.getByText('Total Vendors: 1')).toBeTruthy();
+  });
+
+  it('search filters by contact person and email', () => {
+    mockVendorsToReturn = null;
+    const vendor1 = createMockVendor({ id: 'v1', name: 'Acme Corp', contactPerson: 'Alice Johnson', email: 'alice@acme.com' });
+    const vendor2 = createMockVendor({ id: 'v2', name: 'Beta Inc', contactPerson: 'Bob Wilson', email: 'bob@beta.io' });
+
+    renderWithStore(<VendorManagementScreen />, {
+      purchaseOrders: {
+        ...defaultPurchaseOrderState,
+        vendors: [vendor1, vendor2],
+      },
+    });
+
+    fireEvent.changeText(screen.getByPlaceholderText('Search by name, contact, phone, or email...'), 'Alice');
+    expect(screen.getByText('Acme Corp')).toBeTruthy();
+    expect(screen.queryByText('Beta Inc')).toBeNull();
+
+    fireEvent.changeText(screen.getByPlaceholderText('Search by name, contact, phone, or email...'), 'bob@beta');
+    expect(screen.getByText('Beta Inc')).toBeTruthy();
+    expect(screen.queryByText('Acme Corp')).toBeNull();
   });
 
   it('Add button navigates to AddVendor with empty params', () => {
