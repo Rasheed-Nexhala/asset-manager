@@ -87,17 +87,27 @@ export const VendorManagementScreen: React.FC = () => {
       />
 
       <View className="px-4 py-3 bg-white border-b border-[#E2E8F0]">
-        <View className="relative">
-          <View className="absolute left-3 top-0 h-12 items-center justify-center z-10">
-            <Ionicons name="search" size={20} color="#64748B" />
-          </View>
+        <View className="bg-[#F1F5F9] rounded-full h-12 px-4 flex-row items-center">
+          <Ionicons name="search" size={20} color="#94A3B8" />
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Search by name, contact, phone, or email..."
             placeholderTextColor="#94A3B8"
-            className="border border-[#E2E8F0] rounded-lg h-12 pl-10 pr-4 bg-white"
+            className="flex-1 ml-3 text-[15px] text-[#0F172A]"
+            accessibilityLabel="Search vendors"
+            accessibilityRole="search"
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              className="w-12 h-12 items-center justify-center"
+              accessibilityLabel="Clear search"
+              accessibilityRole="button"
+            >
+              <Ionicons name="close-circle" size={20} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 

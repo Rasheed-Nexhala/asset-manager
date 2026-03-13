@@ -578,9 +578,9 @@ export const receivePO = async (
 
     for (const item of poData.items) {
       const qty = receivedByQty.get(item.itemId) ?? 0;
-      if (qty < 0 || qty > item.quantity) {
+      if (qty < 0) {
         throw new Error(
-          `Invalid received quantity for ${item.itemName}: ${qty}. Must be between 0 and ${item.quantity}`
+          `Invalid received quantity for ${item.itemName}: ${qty}. Must be 0 or greater`
         );
       }
       if (!Number.isInteger(qty)) {

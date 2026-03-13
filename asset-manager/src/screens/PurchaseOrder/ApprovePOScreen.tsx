@@ -340,12 +340,9 @@ export const ApprovePOScreen: React.FC = () => {
                   {item.itemName}
                 </Text>
               </View>
-              <View className="shrink-0 w-10">
+              <View className="shrink-0 min-w-[64px]">
                 <Text className="text-[13px] text-[#64748B] mb-0.5">Qty</Text>
-                <Text
-                  className="text-[15px] text-[#0F172A]"
-                  numberOfLines={1}
-                >
+                <Text className="text-[15px] text-[#0F172A]">
                   {/*
                     orderedUnit/orderedQuantity represent user-entered ordering unit.
                     Fallback to item's base inventory unit for consistency across modules.
@@ -441,6 +438,92 @@ export const ApprovePOScreen: React.FC = () => {
                 </Text>
               </View>
             )}
+          </View>
+        )}
+
+        {po.status === 'received' && (
+          <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-4">
+            <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">
+              RECEIPT DETAILS
+            </Text>
+
+            <View className="flex-row justify-between mb-3">
+              <View>
+                <Text className="text-[13px] text-[#64748B]">Received by</Text>
+                <Text className="text-[15px] text-[#0F172A]">
+                  {po.receivedByName || '—'}
+                </Text>
+              </View>
+              <View className="items-end">
+                <Text className="text-[13px] text-[#64748B]">Received on</Text>
+                <Text className="text-[15px] text-[#0F172A]">
+                  {formatDate(po.receivedAt)}
+                </Text>
+              </View>
+            </View>
+
+            {po.receivedNotes ? (
+              <View className="bg-[#F8FAFC] rounded-lg px-3 py-2 mb-3 border border-[#E2E8F0]">
+                <Text className="text-[12px] text-[#64748B] mb-0.5">Notes</Text>
+                <Text className="text-[14px] text-[#0F172A]">{po.receivedNotes}</Text>
+              </View>
+            ) : null}
+
+            <Text className="text-[12px] font-semibold text-[#64748B] uppercase tracking-wide mb-2">
+              Items Received
+            </Text>
+
+            {po.items.map((item, i) => {
+              const orderedQty = item.quantity;
+              const receivedQty = item.receivedQuantity ?? 0;
+              const isExact = receivedQty === orderedQty;
+              const isPartial = receivedQty < orderedQty;
+              const isExcess = receivedQty > orderedQty;
+              const orderedLabel =
+                item.orderedQuantity != null && item.orderedUnit
+                  ? `${item.orderedQuantity} ${item.orderedUnit}`
+                  : `${orderedQty} ${item.unit || 'Pcs'}`;
+
+              return (
+                <View
+                  key={item.itemId + i}
+                  className={`py-3 ${i < po.items.length - 1 ? 'border-b border-[#E2E8F0]' : ''}`}
+                >
+                  <View className="flex-row items-center justify-between mb-1">
+                    <Text
+                      className="text-[15px] font-medium text-[#0F172A] flex-1 mr-2"
+                      numberOfLines={1}
+                    >
+                      {item.itemName}
+                    </Text>
+                    {isExact && (
+                      <View className="px-2 py-1 rounded-full bg-[#16A34A]/15">
+                        <Text className="text-[12px] font-medium text-[#16A34A]">
+                          Exact
+                        </Text>
+                      </View>
+                    )}
+                    {isPartial && (
+                      <View className="px-2 py-1 rounded-full bg-[#D97706]/15">
+                        <Text className="text-[12px] font-medium text-[#D97706]">
+                          Partial
+                        </Text>
+                      </View>
+                    )}
+                    {isExcess && (
+                      <View className="px-2 py-1 rounded-full bg-[#7C3AED]/15">
+                        <Text className="text-[12px] font-medium text-[#7C3AED]">
+                          Excess
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text className="text-[13px] text-[#64748B]">
+                    {`Ordered: ${orderedLabel}   •   Received: ${receivedQty} ${item.unit || 'Pcs'}`}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         )}
 

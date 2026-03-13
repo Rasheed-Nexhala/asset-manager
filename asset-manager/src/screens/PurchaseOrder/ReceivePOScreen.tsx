@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  TextInput,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -57,6 +58,8 @@ export const ReceivePOScreen: React.FC = () => {
   const [receivedNotes, setReceivedNotes] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [uploadingInvoice, setUploadingInvoice] = useState(false);
+  // Per-item received quantities — pre-filled with ordered qty, editable by user
+  const [receivedQtys, setReceivedQtys] = useState<Record<string, string>>({});
 
   useEffect(() => {
     dispatch(fetchItems());
@@ -68,6 +71,12 @@ export const ReceivePOScreen: React.FC = () => {
       .then((p) => {
         if (p) {
           setPo(p);
+          // Pre-fill each item with its ordered (inventory) quantity
+          const initial: Record<string, string> = {};
+          p.items.forEach((item) => {
+            initial[item.itemId] = String(item.quantity);
+          });
+          setReceivedQtys(initial);
           setLoadError(null);
         } else {
           setLoadError('Purchase order not found');
@@ -128,6 +137,25 @@ export const ReceivePOScreen: React.FC = () => {
   const handleConfirm = useCallback(async () => {
     if (!po || !userId || !userName) return;
 
+    // Validate all quantities are non-negative integers
+    for (const item of po.items) {
+      const raw = receivedQtys[item.itemId] ?? '';
+      const qty = parseInt(raw, 10);
+      if (isNaN(qty) || qty < 0 || !Number.isInteger(qty)) {
+        Alert.alert('Invalid Quantity', `Enter a valid quantity (0 or more) for "${item.itemName}".`);
+        return;
+      }
+    }
+
+    const atLeastOne = po.items.some((item) => {
+      const qty = parseInt(receivedQtys[item.itemId] ?? '0', 10);
+      return qty > 0;
+    });
+    if (!atLeastOne) {
+      Alert.alert('No Items', 'At least one item must have a received quantity greater than zero.');
+      return;
+    }
+
     setSaving(true);
     try {
       await dispatch(
@@ -136,7 +164,7 @@ export const ReceivePOScreen: React.FC = () => {
           receiveData: {
             receivedQuantities: po.items.map((item) => ({
               itemId: item.itemId,
-              receivedQuantity: item.quantity,
+              receivedQuantity: parseInt(receivedQtys[item.itemId] ?? '0', 10),
             })),
             documents: invoiceFile
               ? [
@@ -168,6 +196,7 @@ export const ReceivePOScreen: React.FC = () => {
     poId,
     userId,
     userName,
+    receivedQtys,
     invoiceFile,
     receivedDate,
     receivedNotes,
@@ -179,11 +208,13 @@ export const ReceivePOScreen: React.FC = () => {
     ? po.items.map((item) => {
         const invItem = allItems.find((i) => i.id === item.itemId);
         const current = invItem?.centralStoreQuantity ?? 0;
+        const receivedQty = parseInt(receivedQtys[item.itemId] ?? '0', 10) || 0;
         return {
           itemName: item.itemName,
+          orderedQty: item.quantity,
           currentQty: current,
-          receivedQty: item.quantity,
-          newQty: current + item.quantity,
+          receivedQty,
+          newQty: current + receivedQty,
         };
       })
     : [];
@@ -281,34 +312,112 @@ export const ReceivePOScreen: React.FC = () => {
         </View>
 
         <View className="mb-4">
-          <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">
-            ITEMS TO RECEIVE (FULL QUANTITY)
+          <Text className="text-[17px] font-semibold text-[#0F172A] mb-1">
+            ITEMS TO RECEIVE
           </Text>
           <Text className="text-[13px] text-[#64748B] mb-3">
-            All items must be received at full ordered quantity. Partial receiving is not allowed.
+            Enter the actual quantity received. Partial or excess delivery is allowed.
           </Text>
-          {po.items.map((item) => (
-            <View
-              key={item.itemId}
-              className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-3"
-            >
-              <View className="flex-row items-center justify-between">
-                <View className="flex-1 min-w-0">
-                  <Text className="text-[15px] font-medium text-[#0F172A]">
-                    {item.itemName}
-                  </Text>
-                  <Text className="text-[13px] text-[#64748B] mt-0.5">
-                    Order: {item.orderedQuantity ? `${item.orderedQuantity} ${item.orderedUnit}` : `${item.quantity} ${item.unit || 'Pcs'}`}
-                  </Text>
+          {po.items.map((item) => {
+            const raw = receivedQtys[item.itemId] ?? '';
+            const receivedQty = parseInt(raw, 10);
+            const orderedQty = item.quantity;
+            const orderedLabel = item.orderedQuantity
+              ? `${item.orderedQuantity} ${item.orderedUnit}`
+              : `${orderedQty} ${item.unit || 'Pcs'}`;
+
+            const isPartial = !isNaN(receivedQty) && receivedQty < orderedQty && receivedQty >= 0;
+            const isExcess = !isNaN(receivedQty) && receivedQty > orderedQty;
+            const isExact = !isNaN(receivedQty) && receivedQty === orderedQty;
+
+            return (
+              <View
+                key={item.itemId}
+                className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-3"
+              >
+                {/* Item name + status badge */}
+                <View className="flex-row items-start justify-between mb-3">
+                  <View className="flex-1 min-w-0 pr-2">
+                    <Text className="text-[15px] font-medium text-[#0F172A]" numberOfLines={2}>
+                      {item.itemName}
+                    </Text>
+                    <Text className="text-[13px] text-[#64748B] mt-0.5">
+                      Ordered: {orderedLabel}
+                    </Text>
+                  </View>
+                  {isExact && (
+                    <View className="px-2 py-1 rounded-full bg-[#16A34A]/15">
+                      <Text className="text-[12px] font-medium text-[#16A34A]">Exact</Text>
+                    </View>
+                  )}
+                  {isPartial && (
+                    <View className="px-2 py-1 rounded-full bg-[#D97706]/15">
+                      <Text className="text-[12px] font-medium text-[#D97706]">Partial</Text>
+                    </View>
+                  )}
+                  {isExcess && (
+                    <View className="px-2 py-1 rounded-full bg-[#7C3AED]/15">
+                      <Text className="text-[12px] font-medium text-[#7C3AED]">Excess</Text>
+                    </View>
+                  )}
                 </View>
-                <View className="items-end">
-                  <Text className="text-[15px] font-semibold text-[#16A34A]">
-                    + {item.quantity} {item.unit || 'Pcs'}
+
+                {/* Quantity input */}
+                <View className="flex-row items-center gap-3">
+                  <Text className="text-[14px] text-[#64748B] flex-1">
+                    Received qty ({item.unit || 'Pcs'})
                   </Text>
+                  <View className="flex-row items-center gap-2">
+                    <TouchableOpacity
+                      onPress={() => {
+                        const current = parseInt(receivedQtys[item.itemId] ?? '0', 10) || 0;
+                        if (current > 0) {
+                          setReceivedQtys((prev) => ({
+                            ...prev,
+                            [item.itemId]: String(current - 1),
+                          }));
+                        }
+                      }}
+                      className="w-12 h-12 rounded-lg border border-[#E2E8F0] items-center justify-center bg-[#F8FAFC]"
+                      accessibilityLabel={`Decrease ${item.itemName} quantity`}
+                      accessibilityRole="button"
+                    >
+                      <Ionicons name="remove" size={18} color="#64748B" />
+                    </TouchableOpacity>
+
+                    <TextInput
+                      value={raw}
+                      onChangeText={(text) => {
+                        const cleaned = text.replace(/[^0-9]/g, '');
+                        setReceivedQtys((prev) => ({
+                          ...prev,
+                          [item.itemId]: cleaned,
+                        }));
+                      }}
+                      keyboardType="number-pad"
+                      className="w-16 h-12 border border-[#E2E8F0] rounded-lg text-center text-[15px] font-semibold text-[#0F172A] bg-white"
+                      accessibilityLabel={`Received quantity for ${item.itemName}`}
+                    />
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        const current = parseInt(receivedQtys[item.itemId] ?? '0', 10) || 0;
+                        setReceivedQtys((prev) => ({
+                          ...prev,
+                          [item.itemId]: String(current + 1),
+                        }));
+                      }}
+                      className="w-12 h-12 rounded-lg border border-[#E2E8F0] items-center justify-center bg-[#F8FAFC]"
+                      accessibilityLabel={`Increase ${item.itemName} quantity`}
+                      accessibilityRole="button"
+                    >
+                      <Ionicons name="add" size={18} color="#64748B" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         <View className="mb-4">
@@ -352,13 +461,15 @@ export const ReceivePOScreen: React.FC = () => {
           )}
         </View>
 
-        <FormField
-          label="Notes (Optional)"
-          value={receivedNotes}
-          onChangeText={setReceivedNotes}
-          placeholder="Additional notes"
-          multiline
-        />
+        <View className="mb-6">
+          <FormField
+            label="Notes (Optional)"
+            value={receivedNotes}
+            onChangeText={setReceivedNotes}
+            placeholder="Additional notes"
+            multiline
+          />
+        </View>
 
         <POReceiptSummary updates={inventoryUpdates} />
 

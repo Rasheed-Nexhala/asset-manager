@@ -31,8 +31,8 @@ const statusConfig: Record<
     label: 'Ordered',
   },
   received: {
-    bg: 'bg-[#475569]/15',
-    text: 'text-[#475569]',
+    bg: 'bg-[#16A34A]/15',
+    text: 'text-[#16A34A]',
     label: 'Received',
   },
   rejected: {
