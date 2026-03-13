@@ -6,6 +6,7 @@ import type { DashboardStackParamList } from '../../navigation/DashboardStackPar
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { UserProfile } from '../../components/UserProfile/UserProfile';
+import { BrandFooter } from '../../components/BrandFooter';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { signOutUser } from '../../store/slices/authSlice';
 import {
@@ -72,6 +73,7 @@ export const ProfileScreen: React.FC = () => {
               showDeleteAccount={true}
             />
           </View>
+          <BrandFooter />
         </View>
       </ScrollView>
     </ScreenLayout>

@@ -47,15 +47,7 @@
         {
           "image": "./assets/splash.png",
           "backgroundColor": "#ffffff",
-          "resizeMode": "contain",
-          "imageWidth": 280,
-          "android": {
-            "imageWidth": 200
-          },
-          "ios": {
-            "imageWidth": 280,
-            "resizeMode": "contain"
-          }
+          "resizeMode": "contain"
         }
       ],
       [
