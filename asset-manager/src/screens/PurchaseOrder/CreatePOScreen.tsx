@@ -232,6 +232,7 @@ export const CreatePOScreen: React.FC = () => {
     0
   );
   const totalAmount = subtotal + gstAmount;
+  const hasAnyPrice = items.some((i) => (i.unitPrice ?? 0) > 0);
 
   const validate = useCallback((): boolean => {
     const e: Record<string, string> = {};
@@ -734,32 +735,34 @@ export const CreatePOScreen: React.FC = () => {
             })}
           </View>
 
-          {/* Summary */}
-          <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
-            <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">
-              SUMMARY
-            </Text>
-            <View className="flex-row justify-between mb-2">
-              <Text className="text-[15px] text-[#64748B]">Subtotal</Text>
-              <Text className="text-[15px] text-[#0F172A]">
-                {formatCurrencyOrOptional(subtotal)}
+          {/* Summary - only show when at least one item has price entered */}
+          {hasAnyPrice && (
+            <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
+              <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">
+                SUMMARY
               </Text>
+              <View className="flex-row justify-between mb-2">
+                <Text className="text-[15px] text-[#64748B]">Subtotal</Text>
+                <Text className="text-[15px] text-[#0F172A]">
+                  {formatCurrencyOrOptional(subtotal)}
+                </Text>
+              </View>
+              <View className="flex-row justify-between mb-2">
+                <Text className="text-[15px] text-[#64748B]">Total GST</Text>
+                <Text className="text-[15px] text-[#0F172A]">
+                  {formatCurrencyOrOptional(gstAmount)}
+                </Text>
+              </View>
+              <View className="flex-row justify-between pt-2 border-t border-[#E2E8F0]">
+                <Text className="text-[15px] font-semibold text-[#0F172A]">
+                  Total
+                </Text>
+                <Text className="text-[15px] font-semibold text-[#0F172A]">
+                  {formatCurrencyOrOptional(totalAmount)}
+                </Text>
+              </View>
             </View>
-            <View className="flex-row justify-between mb-2">
-              <Text className="text-[15px] text-[#64748B]">Total GST</Text>
-              <Text className="text-[15px] text-[#0F172A]">
-                {formatCurrencyOrOptional(gstAmount)}
-              </Text>
-            </View>
-            <View className="flex-row justify-between pt-2 border-t border-[#E2E8F0]">
-              <Text className="text-[15px] font-semibold text-[#0F172A]">
-                Total
-              </Text>
-              <Text className="text-[15px] font-semibold text-[#0F172A]">
-                {formatCurrencyOrOptional(totalAmount)}
-              </Text>
-            </View>
-          </View>
+          )}
 
           {/* Justification */}
           <FormField

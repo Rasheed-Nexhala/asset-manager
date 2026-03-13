@@ -97,6 +97,10 @@ export function generatePOHtml(po: PurchaseOrder, logoBase64?: string): string {
       </tr>`;
   }).join('');
 
+  const hasAnyPrice = (po.items ?? []).some(
+    (i) => (Number(i.unitPrice) || 0) > 0
+  );
+
   const footerParts: string[] = [];
   if (po.receivedByName) {
     footerParts.push(`Received by ${escapeHtml(po.receivedByName)} on ${formatDate(po.receivedAt)}`);
@@ -169,6 +173,7 @@ export function generatePOHtml(po: PurchaseOrder, logoBase64?: string): string {
     </table>
   </div>
 
+  ${hasAnyPrice ? `
   <div class="section">
     <div class="section-title">SUMMARY</div>
     <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
@@ -184,6 +189,7 @@ export function generatePOHtml(po: PurchaseOrder, logoBase64?: string): string {
       <span style="font-size: 17px; font-weight: 600; color: #0F172A;">${formatCurrencyOrOptional(Number(po.totalAmount) || 0)}</span>
     </div>
   </div>
+  ` : ''}
 
   <div class="section">
     <div class="section-title">JUSTIFICATION</div>

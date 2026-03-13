@@ -24,6 +24,9 @@ const formatCurrency = (amount: number): string => {
 
 export const POCard: React.FC<POCardProps> = ({ po, onPress }) => {
   const itemCount = Array.isArray(po?.items) ? po.items.length : 0;
+  const hasAnyPrice = (po?.items ?? []).some(
+    (i) => (Number(i.unitPrice) || 0) > 0
+  );
 
   return (
     <TouchableOpacity
@@ -57,9 +60,11 @@ export const POCard: React.FC<POCardProps> = ({ po, onPress }) => {
         <Text className="text-[13px] text-[#64748B]">
           {formatDate(po.createdAt)} • {po.createdByName ?? '—'}
         </Text>
-        <Text className="text-[15px] font-semibold text-[#0F172A]">
-          {formatCurrency(po.totalAmount ?? 0)}
-        </Text>
+        {hasAnyPrice && (
+          <Text className="text-[15px] font-semibold text-[#0F172A]">
+            {formatCurrency(po.totalAmount ?? 0)}
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );

@@ -220,7 +220,7 @@ export const POItemCard: React.FC<POItemCardProps> = ({
           ) : (
             <View className="h-12 justify-center">
               <Text className="text-[15px] text-[#0F172A]">
-                {formatCurrency(item.unitPrice)}
+                {(item.unitPrice ?? 0) > 0 ? formatCurrency(item.unitPrice!) : '—'}
               </Text>
             </View>
           )}

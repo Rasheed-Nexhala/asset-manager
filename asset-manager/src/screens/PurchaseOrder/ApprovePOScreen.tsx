@@ -271,6 +271,10 @@ export const ApprovePOScreen: React.FC = () => {
             ? 'Partially Received'
             : 'Rejected';
 
+  const hasAnyPrice = (po.items ?? []).some(
+    (i) => (Number(i.unitPrice) || 0) > 0
+  );
+
   return (
     <ScreenLayout edges={['top']}>
       <ScreenHeader
@@ -393,26 +397,28 @@ export const ApprovePOScreen: React.FC = () => {
           ))}
         </View>
 
-        <View className="mb-4">
-          <View className="flex-row justify-between mb-1">
-            <Text className="text-[15px] text-[#64748B]">Subtotal</Text>
-            <Text className="text-[15px] text-[#0F172A]">
-              {formatCurrencyOrOptional(po.subtotal)}
-            </Text>
+        {hasAnyPrice && (
+          <View className="mb-4">
+            <View className="flex-row justify-between mb-1">
+              <Text className="text-[15px] text-[#64748B]">Subtotal</Text>
+              <Text className="text-[15px] text-[#0F172A]">
+                {formatCurrencyOrOptional(po.subtotal)}
+              </Text>
+            </View>
+            <View className="flex-row justify-between mb-1">
+              <Text className="text-[15px] text-[#64748B]">Total GST</Text>
+              <Text className="text-[15px] text-[#0F172A]">
+                {formatCurrencyOrOptional(po.gstAmount)}
+              </Text>
+            </View>
+            <View className="flex-row justify-between pt-2 border-t border-[#E2E8F0]">
+              <Text className="text-[15px] font-semibold text-[#0F172A]">Total</Text>
+              <Text className="text-[15px] font-semibold text-[#0F172A]">
+                {formatCurrencyOrOptional(po.totalAmount)}
+              </Text>
+            </View>
           </View>
-          <View className="flex-row justify-between mb-1">
-            <Text className="text-[15px] text-[#64748B]">Total GST</Text>
-            <Text className="text-[15px] text-[#0F172A]">
-              {formatCurrencyOrOptional(po.gstAmount)}
-            </Text>
-          </View>
-          <View className="flex-row justify-between pt-2 border-t border-[#E2E8F0]">
-            <Text className="text-[15px] font-semibold text-[#0F172A]">Total</Text>
-            <Text className="text-[15px] font-semibold text-[#0F172A]">
-              {formatCurrencyOrOptional(po.totalAmount)}
-            </Text>
-          </View>
-        </View>
+        )}
 
         <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-4">
           <Text className="text-[13px] text-[#64748B] mb-1">Justification</Text>
