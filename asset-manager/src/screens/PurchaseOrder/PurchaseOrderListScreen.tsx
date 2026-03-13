@@ -24,7 +24,7 @@ import {
   setError,
   clearError,
 } from '../../store/slices/purchaseOrderSlice';
-import { loadMorePurchaseOrders } from '../../store/thunks/purchaseOrderThunks';
+import { loadMorePurchaseOrders, exportPurchaseOrdersThunk } from '../../store/thunks/purchaseOrderThunks';
 import { subscribeToPurchaseOrders } from '../../services/firebase/purchaseOrderService';
 import {
   selectFilteredPurchaseOrdersForViewer,
@@ -51,6 +51,7 @@ export const PurchaseOrderListScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [retryTrigger, setRetryTrigger] = useState(0);
+  const [isExporting, setIsExporting] = useState(false);
 
   const orders = useAppSelector((state) =>
     selectFilteredPurchaseOrdersForViewer(state, searchQuery)
@@ -105,6 +106,12 @@ export const PurchaseOrderListScreen: React.FC = () => {
     if (!hasMore || loadingMore) return;
     dispatch(loadMorePurchaseOrders());
   }, [dispatch, hasMore, loadingMore]);
+
+  const handleExport = useCallback(async () => {
+    setIsExporting(true);
+    await dispatch(exportPurchaseOrdersThunk());
+    setIsExporting(false);
+  }, [dispatch]);
 
   const handleSearchChange = useCallback((text: string) => {
     setSearchQuery(text);
@@ -171,11 +178,19 @@ export const PurchaseOrderListScreen: React.FC = () => {
       <ScreenLayout edges={['top']}>
         <ScreenHeader
           title="Purchase Orders"
-          rightAction={{
-            icon: 'add',
-            onPress: () => navigation.navigate('CreatePO', {}),
-            label: 'New',
-          }}
+          rightActions={[
+            {
+              icon: 'download-outline',
+              onPress: handleExport,
+              loading: isExporting,
+              accessibilityLabel: 'Export purchase orders',
+            },
+            {
+              icon: 'add',
+              onPress: () => navigation.navigate('CreatePO', {}),
+              label: 'New',
+            }
+          ]}
         />
         <View
           className="flex-1 items-center justify-center px-4"
@@ -195,11 +210,19 @@ export const PurchaseOrderListScreen: React.FC = () => {
     <ScreenLayout edges={['top']}>
       <ScreenHeader
         title="Purchase Orders"
-        rightAction={{
-          icon: 'add',
-          onPress: () => navigation.navigate('CreatePO', {}),
-          label: 'New',
-        }}
+        rightActions={[
+          {
+            icon: 'download-outline',
+            onPress: handleExport,
+            loading: isExporting,
+            accessibilityLabel: 'Export purchase orders',
+          },
+          {
+            icon: 'add',
+            onPress: () => navigation.navigate('CreatePO', {}),
+            label: 'New',
+          }
+        ]}
       />
 
       {error && (

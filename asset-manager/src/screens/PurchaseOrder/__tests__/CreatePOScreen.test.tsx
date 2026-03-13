@@ -277,7 +277,7 @@ describe('CreatePOScreen', () => {
     expect(screen.getByText('New Purchase Order')).toBeTruthy();
     expect(screen.getByText('VENDOR')).toBeTruthy();
     expect(screen.getByText('ITEMS')).toBeTruthy();
-    expect(screen.getByText('SUMMARY')).toBeTruthy();
+    // SUMMARY is only shown when at least one item has a price entered
     expect(screen.getByText('Justification')).toBeTruthy();
     expect(screen.getByText('Save Draft')).toBeTruthy();
     expect(screen.getByText('Submit for Approval')).toBeTruthy();

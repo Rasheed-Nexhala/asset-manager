@@ -15,7 +15,7 @@
 4. [Dashboard](#4-dashboard)
 5. [Inventory — Central Store (Admin / StoreIncharge)](#5-inventory--central-store-admin--storeincharge)
 6. [Inventory — Site View (SiteManager)](#6-inventory--site-view-sitemanager)
-7. [Steel Master](#7-steel-master)
+7. [Custom Items](#7-custom-items)
 8. [Categories](#8-categories)
 9. [Requests — Create & Manage (SiteManager)](#9-requests--create--manage-sitemanager)
 10. [Requests — Process & Transfer (Admin / StoreIncharge)](#10-requests--process--transfer-admin--storeincharge)
@@ -454,10 +454,10 @@
 **Expected:** Error: "Cannot delete item with active transactions"; item not deleted.
 
 ### TC-INV-024 — Weight-based item creation
-**Pre:** Steel master items exist.
+**Pre:** Custom items exist.
 **Steps:**
 1. Add Item → toggle "Weight-based" → enter Weight per Meter and Default Length.
-2. Link to a Steel Master item.
+2. Link to a Custom Item.
 3. Save.
 **Expected:** Item saved with weight config; item detail shows kg/m and length.
 
@@ -498,51 +498,51 @@
 
 ---
 
-## 7. Steel Master
+## 7. Custom Items
 
-### TC-STEEL-001 — View Steel Master list
-**Pre:** Logged in as Admin or StoreIncharge; steel master records exist.
-**Steps:** Navigate to Inventory → Steel Master section.
-**Expected:** List of steel master items with name, weight/meter, default length, HSN code, status.
+### TC-STEEL-001 — View Custom Items list
+**Pre:** Logged in as Admin or StoreIncharge; custom item records exist.
+**Steps:** Navigate to Inventory → Custom Items section.
+**Expected:** List of custom items with name, weight/meter, default length, HSN code, status.
 
-### TC-STEEL-002 — Create new Steel Master item
+### TC-STEEL-002 — Create new Custom Item
 **Pre:** Logged in as Admin or StoreIncharge.
 **Steps:**
-1. Tap **+ Add Steel Master**.
-2. Enter Name "MS Angle 50x50", Weight/Meter = 5.8, Default Length = 6, HSN = "7216".
+1. Tap **+ Add Custom Item**.
+2. Enter Name "Custom Item A", Weight/Meter = 5.8, Default Length = 6, HSN = "7216".
 3. Tap **Save**.
-**Expected:** Steel master item created; appears in list; activity logged (`steel_master_created`).
+**Expected:** Custom item created; appears in list; activity logged (`steel_master_created`).
 
-### TC-STEEL-003 — Create Steel Master with missing required fields
-**Pre:** Add Steel Master form open.
+### TC-STEEL-003 — Create Custom Item with missing required fields
+**Pre:** Add Custom Item form open.
 **Steps:** Leave Name blank → Tap **Save**.
 **Expected:** Inline validation error; form not submitted.
 
-### TC-STEEL-004 — Edit Steel Master item
-**Pre:** Steel master item "MS Angle 50x50" exists.
+### TC-STEEL-004 — Edit Custom Item
+**Pre:** Custom item "Custom Item A" exists.
 **Steps:**
 1. Tap item → tap **Edit**.
 2. Change weight/meter from 5.8 to 6.0.
 3. Save.
 **Expected:** Updated; activity log records `steel_master_updated`.
 
-### TC-STEEL-005 — Deactivate Steel Master item
-**Pre:** Active steel master item exists.
+### TC-STEEL-005 — Deactivate Custom Item
+**Pre:** Active custom item exists.
 **Steps:**
 1. Edit item → toggle Status to **Inactive**.
 2. Save.
 **Expected:** Item marked inactive; not available for linking in new items.
 
-### TC-STEEL-006 — Delete Steel Master item
-**Pre:** Steel master item not linked to any inventory item.
+### TC-STEEL-006 — Delete Custom Item
+**Pre:** Custom item not linked to any inventory item.
 **Steps:**
 1. Tap item → tap **Delete** → Confirm.
 **Expected:** Item removed from list.
 
-### TC-STEEL-007 — Cannot delete Steel Master linked to inventory item
-**Pre:** Steel master is linked to active inventory item.
+### TC-STEEL-007 — Cannot delete Custom Item linked to inventory item
+**Pre:** Custom item is linked to active inventory item.
 **Steps:**
-1. Try to delete linked steel master item.
+1. Try to delete linked custom item.
 **Expected:** Error: "Cannot delete — linked to existing item(s)".
 
 ---
@@ -1637,7 +1637,7 @@ Before starting manual testing, ensure the following data is in place:
 - [ ] At least 2 active sites (Site A, Site B)
 - [ ] SiteManager assigned to Site A
 - [ ] At least 2 vendors
-- [ ] At least 1 steel master record
+- [ ] At least 1 custom item record
 - [ ] Some items with stock < minimum stock (to test low-stock alerts)
 - [ ] At least 1 request in each status: Draft, Pending, Approved, Transferred, Partially Returned
 - [ ] At least 1 PO in each status: Draft, Pending Approval, Approved, Received

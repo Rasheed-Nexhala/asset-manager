@@ -274,7 +274,7 @@
 | **steelMasterSlice** | `has correct initial state` |
 | | `setSteelMasters sets steelMasters` |
 | | `setSelectedSteelMaster sets selectedSteelMaster` |
-| | `addSteelMaster adds new steel master` |
+| | `addSteelMaster adds new custom item` |
 | | `addSteelMaster does not add duplicate` |
 | | `updateSteelMasterInState updates existing` |
 | | `removeSteelMaster removes by id` |
@@ -440,7 +440,7 @@
 
 | Suite | Test Case |
 |-------|-----------|
-| **steelMasterSelectors** | `selectAllSteelMasters returns steel masters` |
+| **steelMasterSelectors** | `selectAllSteelMasters returns custom items` |
 | | `selectActiveSteelMasters filters active only` |
 | | `selectSteelMasterById finds master` |
 | | `selectSteelMasterById returns null when not found` |
@@ -948,7 +948,7 @@
 | `src/screens/Inventory/__tests__/CentralStoreInventoryScreen.test.tsx` | **CentralStoreInventoryScreen** | `renders Central Store header` |
 | | | `renders Add new item button for admin` |
 | | | `navigates to AddEditItem when Add button pressed` |
-| | | `navigates to SteelMaster when Steel Master button pressed` |
+| | | `navigates to SteelMaster when Custom Items button pressed` |
 | | | `renders search input` |
 | | | `shows empty state when no items` |
 | | | `shows Add First Item button when empty` |
@@ -987,7 +987,7 @@
 | | | `Edit category opens modal` |
 | | | `Back button calls goBack` |
 | `src/screens/Inventory/__tests__/SteelMasterScreen.test.tsx` | **SteelMasterScreen** | `shows loading when loading and no data` |
-| | | `renders steel master list when data in store` |
+| | | `renders custom items list when data in store` |
 | | | `Add button shows form` |
 | | | `Edit button opens form with master data` |
 | | | `Back button calls goBack` |

@@ -135,13 +135,13 @@ export const AddEditItemScreen: React.FC = () => {
 
         if (mode === 'create') {
           const createData = data as CreateItemData;
-          const categoryName = getCategoryName(createData.categoryId);
+          const categoryName = getCategoryName(createData.categoryId) || 'Uncategorized';
           
-          if (!categoryName) {
-            setError('Category not found');
-            setIsSubmitting(false);
-            return;
-          }
+          // if (!categoryName) {
+          //   setError('Category not found');
+          //   setIsSubmitting(false);
+          //   return;
+          // }
 
           // Create item first (without image)
           const createdItem = await dispatch(

@@ -64,14 +64,15 @@ export const CategorySelectScreen: React.FC = () => {
   const itemsByCategory = useMemo(() => {
     const map: Record<string, Item[]> = {};
     for (const item of allItems) {
-      if (!map[item.categoryId]) map[item.categoryId] = [];
-      map[item.categoryId].push(item);
+      const categoryKey = item.categoryId || 'uncategorized';
+      if (!map[categoryKey]) map[categoryKey] = [];
+      map[categoryKey].push(item);
     }
     return map;
   }, [allItems]);
 
   const getItemCount = useCallback(
-    (categoryId: string) => itemsByCategory[categoryId]?.length ?? 0,
+    (categoryKey: string) => itemsByCategory[categoryKey]?.length ?? 0,
     [itemsByCategory]
   );
 
@@ -157,23 +158,45 @@ export const CategorySelectScreen: React.FC = () => {
     navigation.goBack();
   }, [navigation]);
 
-  // Filter categories by search
+  // Filter categories by search and include "Uncategorized" if there are items without categories
   const filteredCategories = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return categories;
-    return categories.filter((c) => c.name.toLowerCase().includes(q));
-  }, [categories, searchQuery]);
+    let filtered = categories;
+    
+    if (q) {
+      filtered = categories.filter((c) => c.name.toLowerCase().includes(q));
+    }
+    
+    // Check if there are uncategorized items and if search matches "uncategorized"
+    const hasUncategorizedItems = itemsByCategory['uncategorized']?.length > 0;
+    const shouldShowUncategorized = hasUncategorizedItems && (!q || 'uncategorized'.includes(q));
+    
+    if (shouldShowUncategorized) {
+      const uncategorizedCategory = {
+        id: '',
+        name: 'Uncategorized',
+        createdAt: '',
+        updatedAt: '',
+      };
+      // Add uncategorized at the beginning
+      return [uncategorizedCategory, ...filtered];
+    }
+    
+    return filtered;
+  }, [categories, searchQuery, itemsByCategory]);
 
   const renderCategoryItem = useCallback(
     ({ item }: { item: Category }) => {
-      const isSelected = initialCategoryId === item.id;
-      const itemCount = getItemCount(item.id);
+      const isUncategorized = item.id === '';
+      const isSelected = isUncategorized ? !initialCategoryId : initialCategoryId === item.id;
+      const itemCount = isUncategorized ? getItemCount('uncategorized') : getItemCount(item.id);
+      
       return (
         <TouchableOpacity
           className={`bg-white rounded-[10px] p-4 border mb-3 min-h-[48px] ${
             isSelected ? 'border-[#1E40AF] bg-[#1E40AF]/5' : 'border-[#E2E8F0]'
           }`}
-          onPress={() => handleSelect(item.id)}
+          onPress={() => handleSelect(isUncategorized ? null : item.id)}
           activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel={`Select ${item.name}, ${itemCount} items`}

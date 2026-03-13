@@ -33,7 +33,7 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-let mockReturnFromMaintenanceResolve: () => void;
+let mockReturnFromMaintenanceResolve: (id?: string) => void;
 let mockReturnFromMaintenanceReject: (err: unknown) => void;
 
 jest.mock('../../../store/thunks/authThunks', () => {
@@ -285,7 +285,7 @@ describe('ReturnFromMaintenanceScreen', () => {
 
     fireEvent.press(screen.getByRole('button', { name: 'Return to inventory' }));
 
-    mockReturnFromMaintenanceResolve!();
+    mockReturnFromMaintenanceResolve!('m1');
 
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
@@ -303,7 +303,7 @@ describe('ReturnFromMaintenanceScreen', () => {
 
     fireEvent.press(screen.getByRole('button', { name: 'Return to inventory' }));
 
-    mockReturnFromMaintenanceResolve!();
+    mockReturnFromMaintenanceResolve!('m1');
 
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
@@ -319,7 +319,7 @@ describe('ReturnFromMaintenanceScreen', () => {
 
     fireEvent.press(screen.getByRole('button', { name: 'Return to inventory' }));
 
-    mockReturnFromMaintenanceResolve!();
+    mockReturnFromMaintenanceResolve!('m1');
 
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalled();

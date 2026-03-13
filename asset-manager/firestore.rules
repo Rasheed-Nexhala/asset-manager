@@ -287,7 +287,19 @@ service cloud.firestore {
     }
     
     /**
-     * Steel Master Collection
+     * SKUs Collection
+     *
+     * Purpose: Unique SKU registry for item creation/update. Prevents duplicate SKUs.
+     * Document ID = SKU; fields: itemId, createdAt.
+     *
+     * Access Rules: Same as items - Admin and Store Incharge only (hasInventoryAccess).
+     */
+    match /skus/{sku} {
+      allow read, write: if hasInventoryAccess();
+    }
+
+    /**
+     * Custom Items Collection
      *
      * Purpose: Standard steel item specifications for KG-to-pieces conversion
      * (name, code, type, weightPerMeter, standardLengths, defaultLength, hsnCode)

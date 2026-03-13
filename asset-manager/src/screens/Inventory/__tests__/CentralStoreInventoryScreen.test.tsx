@@ -197,6 +197,24 @@ const mockItem: Item = {
   updatedAt: '2025-01-01',
 };
 
+const mockUncategorizedItem: Item = {
+  id: 'item-2',
+  name: 'Uncategorized Tool',
+  sku: 'TOOL-001',
+  categoryId: null,
+  categoryName: null,
+  type: 'non_consumable',
+  unit: 'piece',
+  minStockLevel: 5,
+  status: 'active',
+  totalQuantity: 15,
+  centralStoreQuantity: 15,
+  atSitesQuantity: 0,
+  inMaintenanceQuantity: 0,
+  createdAt: '2025-01-01',
+  updatedAt: '2025-01-01',
+};
+
 const mockCategory: Category = {
   id: 'cat-1',
   name: 'Steel',
@@ -264,16 +282,20 @@ describe('CentralStoreInventoryScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('AddEditItem');
   });
 
-  it('navigates to SteelMaster when Steel Master button pressed', async () => {
+  it('navigates to SteelMaster when Custom Items button pressed', async () => {
     renderWithStore(<CentralStoreInventoryScreen />, {
       auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
       inventory: defaultInventoryState,
     });
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Steel Master' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'More options' })).toBeTruthy();
     });
-    fireEvent.press(screen.getByRole('button', { name: 'Steel Master' }));
+    fireEvent.press(screen.getByRole('button', { name: 'More options' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Custom Items' })).toBeTruthy();
+    });
+    fireEvent.press(screen.getByRole('button', { name: 'Custom Items' }));
     expect(mockNavigate).toHaveBeenCalledWith('SteelMaster');
   });
 
@@ -394,9 +416,64 @@ describe('CentralStoreInventoryScreen', () => {
     });
 
     await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'More options' })).toBeTruthy();
+    });
+    fireEvent.press(screen.getByRole('button', { name: 'More options' }));
+    await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Maintenance' })).toBeTruthy();
     });
     fireEvent.press(screen.getByRole('button', { name: 'Maintenance' }));
     expect(mockNavigate).toHaveBeenCalledWith('Maintenance');
+  });
+
+  it('renders uncategorized items correctly', async () => {
+    mockItemsToReturn = [mockUncategorizedItem];
+    mockCategoriesToReturn = [];
+    mockFetchCategoriesResult = [];
+
+    renderWithStore(<CentralStoreInventoryScreen />, {
+      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
+      inventory: defaultInventoryState,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Uncategorized Tool')).toBeTruthy();
+    });
+    expect(screen.getByText(/SKU: TOOL-001/)).toBeTruthy();
+  });
+
+  it('navigates to ItemDetail for uncategorized items', async () => {
+    mockItemsToReturn = [mockUncategorizedItem];
+    mockCategoriesToReturn = [];
+    mockFetchCategoriesResult = [];
+
+    renderWithStore(<CentralStoreInventoryScreen />, {
+      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
+      inventory: defaultInventoryState,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Uncategorized Tool')).toBeTruthy();
+    });
+    fireEvent.press(screen.getByText('Uncategorized Tool'));
+    expect(mockNavigate).toHaveBeenCalledWith('ItemDetail', { itemId: 'item-2' });
+  });
+
+  it('renders mixed categorized and uncategorized items', async () => {
+    mockItemsToReturn = [mockItem, mockUncategorizedItem];
+    mockCategoriesToReturn = [mockCategory];
+    mockFetchCategoriesResult = [mockCategory];
+
+    renderWithStore(<CentralStoreInventoryScreen />, {
+      auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
+      inventory: defaultInventoryState,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Steel Rod 12mm')).toBeTruthy();
+      expect(screen.getByText('Uncategorized Tool')).toBeTruthy();
+    });
+    expect(screen.getByText(/SKU: STL-001/)).toBeTruthy();
+    expect(screen.getByText(/SKU: TOOL-001/)).toBeTruthy();
   });
 });

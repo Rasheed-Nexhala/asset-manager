@@ -222,6 +222,24 @@ const mockItem: Item = {
   updatedAt: '2025-01-01',
 };
 
+const mockUncategorizedItem: Item = {
+  id: 'i2',
+  name: 'Uncategorized Tool',
+  sku: 'SKU-002',
+  categoryId: null,
+  categoryName: null,
+  type: 'non_consumable',
+  unit: 'Pcs',
+  minStockLevel: 5,
+  status: 'active',
+  totalQuantity: 20,
+  centralStoreQuantity: 10,
+  atSitesQuantity: 8,
+  inMaintenanceQuantity: 2,
+  createdAt: '2025-01-01',
+  updatedAt: '2025-01-01',
+};
+
 const defaultPreloadedState: Partial<RootState> = {
   auth: {
     user: { uid: 'user1', email: 'user@test.com', displayName: 'Test User' } as import('firebase/auth').User,
@@ -461,5 +479,72 @@ describe('AddEditItemScreen', () => {
     );
 
     consoleErrorSpy.mockRestore();
+  });
+
+  it('renders form with uncategorized item data when editing', async () => {
+    mockRouteParams = { itemId: 'i2' };
+    renderWithStore(<AddEditItemScreen />);
+
+    // Resolve fetchItemById with mock uncategorized item
+    mockFetchItemByIdResolve!(mockUncategorizedItem);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading item data...')).toBeNull();
+    });
+
+    // Edit form should work with uncategorized items
+    expect(screen.getByText('Edit Item')).toBeTruthy();
+    expect(screen.getByLabelText('Description input')).toBeTruthy();
+    expect(screen.getByLabelText('Minimum stock level input')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeTruthy();
+  });
+
+  it('submit create item without category (uncategorized)', async () => {
+    mockRouteParams = {}; // No selectedCategoryId - item should be created as uncategorized
+    const renderResult = renderWithStore(<AddEditItemScreen />);
+
+    // Fill form without selecting category
+    const nameInput = screen.getByLabelText('Item name input');
+    fireEvent.changeText(nameInput, 'Uncategorized Test Item');
+
+    const skuInput = screen.getByLabelText('SKU input');
+    fireEvent.changeText(skuInput, 'SKU-UNCAT');
+
+    // Skip category selection - leave as uncategorized
+    
+    fireEvent.press(screen.getByText('Select unit'));
+    fireEvent.press(screen.getByText('Pcs'));
+
+    const qtyInput = screen.getByLabelText('Initial quantity input');
+    fireEvent.changeText(qtyInput, '15');
+
+    const minInput = screen.getByLabelText('Minimum stock level input');
+    fireEvent.changeText(minInput, '3');
+
+    fireEvent.press(screen.getByRole('button', { name: 'Submit new item' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Saving, please wait' })).toBeTruthy();
+    });
+
+    // Resolve createItem - returns created uncategorized item
+    const createdUncategorizedItem: Item = { 
+      ...mockUncategorizedItem, 
+      id: 'new-uncat-id',
+      name: 'Uncategorized Test Item',
+      sku: 'SKU-UNCAT'
+    };
+    mockCreateItemResolve!(createdUncategorizedItem);
+
+    await waitFor(() => {
+      expect(screen.getByText('Item created successfully')).toBeTruthy();
+    });
+
+    // Advance timers for navigation timeout
+    jest.advanceTimersByTime(1000);
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('CentralStoreInventory');
+    });
   });
 });

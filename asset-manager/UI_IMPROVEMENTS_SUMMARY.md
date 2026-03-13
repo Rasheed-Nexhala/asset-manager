@@ -5,7 +5,7 @@
 ### 🎯 Overview
 1. **Removed Maintenance from Bottom Navigation** - Moved to Central Store header
 2. **Replaced all emojis with Expo Icons** - Better consistency and accessibility
-3. **Changed Steel Master icon** - Differentiated from Maintenance icon
+3. **Changed Custom Items icon** - Differentiated from Maintenance icon
 
 ---
 
@@ -70,13 +70,13 @@
 
 4. **Updated Header Icons:**
    - **Maintenance Button:** `build-outline` icon (new)
-   - **Steel Master Button:** Changed from `construct-outline` to `analytics-outline`
+   - **Custom Items Button:** Changed from `construct-outline` to `analytics-outline`
    - Both buttons only show for Admin/StoreIncharge
 
 **Header Button Order (Left to Right):**
 1. Filter button
 2. **Maintenance button** (build-outline) - NEW
-3. **Steel Master** (analytics-outline) - CHANGED ICON
+3. **Custom Items** (analytics-outline) - CHANGED ICON
 4. Add Item button (add-circle)
 
 ---
@@ -198,7 +198,7 @@
 |--------|-----------|-------|---------|
 | Filter | `filter-outline` / `filter` | #64748B / #1E40AF | Toggle filters |
 | Maintenance | `build-outline` | #1E40AF | Navigate to Maintenance |
-| Steel Master | `analytics-outline` | #1E40AF | Open Steel Master |
+| Custom Items | `analytics-outline` | #1E40AF | Open Custom Items |
 | Add Item | `add-circle` | #1E40AF | Add new item |
 
 ### Empty State Icons
@@ -232,7 +232,7 @@
 ### ✅ Cleaner Navigation
 - Bottom tab bar less cluttered
 - Maintenance accessed contextually from Central Store
-- Steel Master icon now distinct from Maintenance
+- Custom Items icon now distinct from Maintenance
 
 ### ✅ Professional Appearance
 - No emoji inconsistencies across platforms
@@ -244,12 +244,12 @@
 ## 6. Icon Differentiation
 
 ### Before (Problem)
-- **Steel Master:** `construct-outline` 🔧
+- **Custom Items:** `construct-outline` 🔧
 - **Maintenance:** `construct-outline` 🔧
 - ❌ **Both icons were identical!**
 
 ### After (Solution)
-- **Steel Master:** `analytics-outline` 📊
+- **Custom Items:** `analytics-outline` 📊
 - **Maintenance:** `build-outline` 🔨
 - ✅ **Now clearly different!**
 
@@ -259,7 +259,7 @@
 
 ### For Admin & StoreIncharge:
 1. **Access Maintenance** from Central Store header (new button)
-2. **Steel Master** icon changed but same location
+2. **Custom Items** icon changed but same location
 3. **Bottom navigation** has one less tab (cleaner)
 
 ### For Site Managers:
@@ -274,7 +274,7 @@
 - [x] No TypeScript errors
 - [x] All emojis replaced with icons
 - [x] Maintenance accessible from Central Store header
-- [x] Steel Master icon different from Maintenance
+- [x] Custom Items icon different from Maintenance
 - [x] Role-based visibility working (Admin/StoreIncharge only)
 - [x] Navigation working correctly
 - [x] Icons render properly on both iOS and Android
@@ -318,7 +318,7 @@
 
 ✅ **All emojis replaced** with semantic Expo icons  
 ✅ **Maintenance moved** from bottom nav to Central Store header  
-✅ **Steel Master icon changed** to `analytics-outline`  
+✅ **Custom Items icon changed** to `analytics-outline`  
 ✅ **Maintenance icon** uses `build-outline`  
 ✅ **Zero linter errors** after all changes  
 ✅ **Type-safe navigation** maintained  

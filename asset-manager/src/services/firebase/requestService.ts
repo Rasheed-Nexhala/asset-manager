@@ -1164,6 +1164,32 @@ export const getRequestsCount = async (
 };
 
 /**
+ * Fetch all requests matching filters without pagination for exporting
+ * 
+ * @param filters - Same filters as listRequestsPaginated
+ * @returns Array of requests
+ */
+export const exportRequestsData = async (
+  filters?: RequestListFilters
+): Promise<Request[]> => {
+  try {
+    const constraints = buildRequestQueryConstraints(filters);
+    const q = query(collection(db, REQUESTS_COLLECTION), ...constraints);
+    const snapshot = await getDocs(q);
+
+    const requests: Request[] = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    })) as Request[];
+
+    return requests;
+  } catch (error) {
+    console.error('Error exporting requests:', error);
+    throw error;
+  }
+};
+
+/**
  * Subscribe to requests (real-time)
  */
 export const subscribeToRequests = (
@@ -1295,6 +1321,7 @@ export const requestService = {
   cancelRequest,
   getRequestById,
   listRequestsPaginated,
+  exportRequestsData,
   getRequestsCount,
   subscribeToRequests,
   subscribeToRequest,

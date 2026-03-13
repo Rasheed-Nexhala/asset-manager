@@ -57,10 +57,17 @@ export const selectItemById = (itemId: string) =>
   );
 
 // Filtered items selectors
-export const selectItemsByCategory = (categoryId: string) =>
+export const selectItemsByCategory = (categoryId: string | null) =>
   createSelector(
     [selectAllItems],
-    (items) => items.filter((item) => item.categoryId === categoryId)
+    (items) => {
+      if (categoryId === null || categoryId === 'uncategorized') {
+        // Return items with no category (null, undefined, or empty string)
+        return items.filter((item) => !item.categoryId || item.categoryId === null);
+      }
+      // Return items with the specific category ID
+      return items.filter((item) => item.categoryId === categoryId);
+    }
   );
 
 export const selectItemsByType = (type: ItemType) =>
@@ -95,6 +102,12 @@ export const selectNonConsumableItems = createSelector(
   (items) => items.filter((item) => item.type === 'non_consumable')
 );
 
+// Uncategorized items selector
+export const selectUncategorizedItems = createSelector(
+  [selectAllItems],
+  (items) => items.filter((item) => !item.categoryId || item.categoryId === null)
+);
+
 // Low stock selectors
 export const selectLowStockItemIds = createSelector(
   [selectInventoryState],
@@ -123,10 +136,13 @@ export const selectCategoriesLoading = createSelector(
   (inventoryState) => inventoryState.loading
 );
 
-export const selectCategoryById = (categoryId: string) =>
+export const selectCategoryById = (categoryId: string | null | undefined) =>
   createSelector(
     [selectAllCategories],
-    (categories) => categories.find((cat) => cat.id === categoryId) || null
+    (categories) => {
+      if (!categoryId) return null;
+      return categories.find((cat) => cat.id === categoryId) || null;
+    }
   );
 
 // Inventory by location selectors
@@ -155,8 +171,14 @@ export const selectFilteredItems = createSelector(
     let filtered = items;
 
     // Filter by category
-    if (filters.categoryId) {
-      filtered = filtered.filter((item) => item.categoryId === filters.categoryId);
+    if (filters.categoryId !== undefined) {
+      if (filters.categoryId === null || filters.categoryId === 'uncategorized') {
+        // Show only items with no category
+        filtered = filtered.filter((item) => !item.categoryId || item.categoryId === null);
+      } else {
+        // Show items with the specific category ID
+        filtered = filtered.filter((item) => item.categoryId === filters.categoryId);
+      }
     }
 
     // Filter by type
@@ -197,13 +219,13 @@ export const selectItemsBySearchQuery = createSelector(
     }
 
     const lowerQuery = trimmedQuery.toLowerCase();
-    return items.filter(
-      (item) =>
-        (item.name ?? '').toLowerCase().includes(lowerQuery) ||
-        (item.sku ?? '').toLowerCase().includes(lowerQuery) ||
-        (item.description && item.description.toLowerCase().includes(lowerQuery)) ||
-        (item.categoryName ?? '').toLowerCase().includes(lowerQuery)
-    );
+      return items.filter(
+        (item) =>
+          (item.name ?? '').toLowerCase().includes(lowerQuery) ||
+          (item.sku ?? '').toLowerCase().includes(lowerQuery) ||
+          (item.description && item.description.toLowerCase().includes(lowerQuery)) ||
+          (item.categoryName && item.categoryName.toLowerCase().includes(lowerQuery))
+      );
   }
 );
 
@@ -224,7 +246,7 @@ export const selectItemsBySearchQueryFactory = (searchQuery: string) =>
           (item.name ?? '').toLowerCase().includes(lowerQuery) ||
           (item.sku ?? '').toLowerCase().includes(lowerQuery) ||
           (item.description && item.description.toLowerCase().includes(lowerQuery)) ||
-          (item.categoryName ?? '').toLowerCase().includes(lowerQuery)
+          (item.categoryName && item.categoryName.toLowerCase().includes(lowerQuery))
       );
     }
   );

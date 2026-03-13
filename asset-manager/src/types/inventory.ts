@@ -32,8 +32,8 @@ export interface FirestoreItem {
   name: string;                    // Required, unique item name
   sku: string;                    // Required, unique SKU code
   description?: string;            // Optional item description
-  categoryId: string;              // Reference to categories collection
-  categoryName: string;            // Denormalized category name
+  categoryId?: string | null;      // Optional reference to categories collection
+  categoryName?: string | null;    // Optional denormalized category name
   type: ItemType;                 // consumable or non_consumable
   unit: string;                   // Unit of measurement (piece, bag, set, etc.)
   imageUrl?: string;              // Optional image URL from Firebase Storage
@@ -66,8 +66,8 @@ export interface Item {
   name: string;
   sku: string;
   description?: string;
-  categoryId: string;
-  categoryName: string;
+  categoryId?: string | null;
+  categoryName?: string | null;
   type: ItemType;
   unit: string;
   imageUrl?: string;
@@ -144,7 +144,7 @@ export interface CreateItemData {
   name: string;
   sku: string;
   description?: string;
-  categoryId: string;
+  categoryId?: string | null;
   type: ItemType;
   unit: string;
   imageUrl?: string;
@@ -168,8 +168,8 @@ export interface UpdateItemData {
   name?: string;
   sku?: string;
   description?: string;
-  categoryId?: string;
-  categoryName?: string;
+  categoryId?: string | null;    // Optional category ID - can be null to uncategorize
+  categoryName?: string | null;
   type?: ItemType;  // Validated by service: cannot change after first transaction
   unit?: string;
   imageUrl?: string;
@@ -206,11 +206,79 @@ export interface AdjustmentData {
  * Filters for listing items
  */
 export interface ItemFilters {
-  categoryId?: string;             // Filter by category
+  categoryId?: string | null;      // Filter by category (null for uncategorized items)
   type?: ItemType;                 // Filter by item type
   lowStockOnly?: boolean;          // Show only items below minimum stock level
   status?: ItemStatus;             // Filter by status
 }
+
+/**
+ * Default category values for uncategorized items
+ */
+export const UNCATEGORIZED_CATEGORY = {
+  id: null,
+  name: 'Uncategorized',
+} as const;
+
+/**
+ * Helper function to get display category name
+ * Returns "Uncategorized" for null, undefined, or empty string categoryName
+ * 
+ * @param categoryName - The category name from the item
+ * @returns Display-ready category name (never null or empty)
+ */
+export const getDisplayCategoryName = (categoryName?: string | null): string => {
+  if (!categoryName || categoryName.trim() === '') {
+    return UNCATEGORIZED_CATEGORY.name;
+  }
+  return categoryName;
+};
+
+/**
+ * Helper function to normalize category ID
+ * Converts empty string to null for consistency
+ * 
+ * @param categoryId - The category ID to normalize
+ * @returns Normalized category ID (null for empty/whitespace strings)
+ */
+export const normalizeCategoryId = (categoryId?: string | null): string | null => {
+  if (!categoryId || categoryId.trim() === '') {
+    return null;
+  }
+  return categoryId;
+};
+
+/**
+ * Helper function to check if an item is uncategorized
+ * Returns true if categoryId is null, undefined, or empty string
+ * 
+ * @param categoryId - The category ID to check
+ * @returns True if the item is uncategorized
+ */
+export const isUncategorized = (categoryId?: string | null): boolean => {
+  return !categoryId || categoryId.trim() === '';
+};
+
+/**
+ * Helper function to prepare category data for Firestore
+ * Ensures consistent handling of null vs empty string cases
+ * 
+ * @param categoryId - The category ID
+ * @param categoryName - The category name
+ * @returns Normalized category data
+ */
+export const prepareCategoryData = (
+  categoryId?: string | null,
+  categoryName?: string | null
+): { categoryId: string | null; categoryName: string | null } => {
+  const normalizedId = normalizeCategoryId(categoryId);
+  const normalizedName = normalizedId ? categoryName || null : null;
+  
+  return {
+    categoryId: normalizedId,
+    categoryName: normalizedName,
+  };
+};
 
 /**
  * Helper function to convert Firestore timestamp to ISO string.

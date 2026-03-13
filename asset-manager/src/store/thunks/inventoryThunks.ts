@@ -1,5 +1,6 @@
 import type { DocumentSnapshot } from 'firebase/firestore';
 import { createAsyncThunk } from '@reduxjs/toolkit';
+import { saveCsvAndShare } from '../../utils/csvExport';
 import {
   listItems,
   listItemsPaginated,
@@ -20,6 +21,7 @@ import {
   createCategory as createCategoryService,
   updateCategory as updateCategoryService,
   deleteCategory as deleteCategoryService,
+  getCategoryById as getCategoryByIdService,
 } from '../../services/firebase/categoryService';
 import type {
   Item,
@@ -131,7 +133,7 @@ export const SKU_EXISTS_ERROR_MESSAGE =
 export const createItem = createAsyncThunk(
   'inventory/createItem',
   async (
-    { itemData, categoryName }: { itemData: CreateItemData; categoryName: string },
+    { itemData, categoryName }: { itemData: CreateItemData; categoryName?: string | null },
     { getState, rejectWithValue }
   ) => {
     try {
@@ -156,17 +158,20 @@ export const createItem = createAsyncThunk(
       }
       return createdItem;
     } catch (error: any) {
-      // Handle Firestore permission-denied (SKU uniqueness rule violation)
-      const code = error?.code ?? error?.error?.code;
-      if (code === 'permission-denied') {
-        return rejectWithValue(SKU_EXISTS_ERROR_MESSAGE);
-      }
-      // Handle service-level duplicate SKU error (checkSkuExists)
+      // Handle service-level duplicate SKU error (checkSkuExists throws before Firestore)
       if (
         error?.message?.includes('SKU') &&
         error?.message?.toLowerCase().includes('already exists')
       ) {
         return rejectWithValue(SKU_EXISTS_ERROR_MESSAGE);
+      }
+      // Permission-denied can mean: missing skus rules, user not Admin/StoreIncharge, or duplicate SKU (Firestore rule).
+      // Show the actual permission message instead of assuming "SKU exists".
+      const code = error?.code ?? error?.error?.code;
+      if (code === 'permission-denied') {
+        return rejectWithValue(
+          mapFirestoreErrorToUserMessage(error, 'Failed to create item')
+        );
       }
       return rejectWithValue(error?.message || 'Failed to create item');
     }
@@ -359,9 +364,8 @@ export const createCategory = createAsyncThunk(
   async (name: string, { rejectWithValue }) => {
     try {
       const categoryId = await createCategoryService(name);
-      // Fetch the created category to return full data
-      const categories = await listCategories();
-      const createdCategory = categories.find((cat) => cat.id === categoryId);
+      // Fetch the created category to return full data using ID to bypass query cache
+      const createdCategory = await getCategoryByIdService(categoryId);
       if (!createdCategory) {
         throw new Error('Failed to retrieve created category');
       }
@@ -379,10 +383,9 @@ export const updateCategory = createAsyncThunk(
   'inventory/updateCategory',
   async ({ categoryId, name }: { categoryId: string; name: string }, { rejectWithValue }) => {
     try {
-      await updateCategoryService(categoryId, name);
-      // Fetch the updated category to return full data
-      const categories = await listCategories();
-      const updatedCategory = categories.find((cat) => cat.id === categoryId);
+      const newCategoryId = await updateCategoryService(categoryId, name);
+      // Fetch the updated category to return full data using new ID
+      const updatedCategory = await getCategoryByIdService(newCategoryId);
       if (!updatedCategory) {
         throw new Error('Failed to retrieve updated category');
       }
@@ -404,6 +407,47 @@ export const deleteCategory = createAsyncThunk(
       return categoryId;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to delete category');
+    }
+  }
+);
+
+/**
+ * Export inventory to CSV
+ */
+export const exportInventoryThunk = createAsyncThunk(
+  'inventory/export',
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const state = getState() as RootState;
+      const { filters } = state.inventory;
+      
+      const items = await listItems(filters);
+      
+      const header = 'Item Name,SKU,Category,Type,Unit,Total Qty,Central Store Qty,Site Qty,Maintenance Qty,Status\n';
+      
+      const escapeCsvField = (value: string | number | null | undefined): string =>
+        `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+      const rows = items.map(item => {
+        return [
+          item.name,
+          item.sku,
+          item.categoryName || 'Uncategorized',  // Handle null categoryName
+          item.type,
+          item.unit,
+          item.totalQuantity,
+          item.centralStoreQuantity,
+          item.atSitesQuantity,
+          item.inMaintenanceQuantity,
+          item.status
+        ].map(escapeCsvField).join(',');
+      }).join('\n');
+
+      await saveCsvAndShare(header + rows, 'inventory');
+      return true;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to export inventory';
+      return rejectWithValue(errorMessage);
     }
   }
 );

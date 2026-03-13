@@ -1,6 +1,6 @@
 /**
  * UnitSelector component tests
- * Covers unit selection, common units, steel master restricted units, and accessibility
+ * Covers unit selection, common units, custom item restricted units, and accessibility
  */
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
@@ -45,7 +45,7 @@ describe('UnitSelector', () => {
     expect(onSelect).toHaveBeenCalledWith('Kg');
   });
 
-  it('shows steel master units only when steelMasterItem is true', () => {
+  it('shows custom item units only when steelMasterItem is true', () => {
     const onSelect = jest.fn();
     render(<UnitSelector onSelect={onSelect} steelMasterItem />);
 
@@ -67,10 +67,10 @@ describe('UnitSelector', () => {
 
   it('shows auto-filled indicator when autoFilled is true', () => {
     const onSelect = jest.fn();
-    render(<UnitSelector onSelect={onSelect} autoFilled autoFilledFrom="Steel Master" />);
+    render(<UnitSelector onSelect={onSelect} autoFilled autoFilledFrom="Custom Item" />);
 
     expect(screen.getByText(/Auto-filled/)).toBeTruthy();
-    expect(screen.getByText(/Steel Master/)).toBeTruthy();
+    expect(screen.getByText(/Custom Item/)).toBeTruthy();
   });
 
   it('does not open modal when disabled', () => {

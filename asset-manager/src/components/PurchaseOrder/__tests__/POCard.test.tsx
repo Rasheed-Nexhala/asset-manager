@@ -8,7 +8,7 @@ const mockPO = {
   status: 'pending_approval' as const,
   vendorId: 'v1',
   vendorName: 'Steel Suppliers Ltd',
-  items: [{ itemId: 'i1', itemName: 'Steel Bar', quantity: 10 }],
+  items: [{ itemId: 'i1', itemName: 'Steel Bar', quantity: 10, unitPrice: 5000 }],
   totalAmount: 50000,
   createdAt: '2024-02-15T10:00:00.000Z',
   createdByName: 'Admin User',

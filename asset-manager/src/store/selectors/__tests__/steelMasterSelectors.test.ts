@@ -30,7 +30,7 @@ const mockSteelMaster = (id: string, isActive = true) =>
   ({ id, name: `Steel ${id}`, hsnCode: 'HSN', weightPerMeter: 10, isActive }) as never;
 
 describe('steelMasterSelectors', () => {
-  it('selectAllSteelMasters returns steel masters', () => {
+  it('selectAllSteelMasters returns custom items', () => {
     const masters = [mockSteelMaster('1'), mockSteelMaster('2')];
     const state = createMockState({ steelMasters: masters });
     expect(selectAllSteelMasters(state)).toEqual(masters);

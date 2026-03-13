@@ -15,8 +15,9 @@ import type { RootState } from '../../../store';
 import type { SteelMaster } from '../../../types/steelMaster';
 
 const mockGoBack = jest.fn();
+const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: jest.fn(), goBack: mockGoBack }),
+  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -60,7 +61,7 @@ jest.mock('../../../store/thunks/steelMasterThunks', () => {
           await new Promise(() => {});
         }
         if (mockFetchSteelMastersResult === 'reject') {
-          return rejectWithValue('Failed to load steel masters');
+          return rejectWithValue('Failed to load custom items');
         }
         const result = (mockFetchSteelMastersResult as SteelMaster[]) ?? [];
         // Defer resolution so Redux fulfilled dispatch happens inside act()
@@ -165,7 +166,7 @@ function renderWithStore(ui: React.ReactElement, preloadedState: Partial<RootSta
 
 const mockSteelMaster: SteelMaster = {
   id: 'sm-1',
-  name: 'MS ANGLE 80x80x6',
+  name: 'Custom Item A',
   weightPerMeter: 7.2,
   defaultLength: 6,
   hsnCode: '7214',
@@ -184,6 +185,7 @@ const defaultSteelMasterState = {
 describe('SteelMasterScreen', () => {
   beforeEach(() => {
     mockGoBack.mockClear();
+    mockNavigate.mockClear();
     mockUnsubscribe.mockClear();
     mockMastersToReturn = null;
     mockFetchSteelMastersResult = [];
@@ -197,11 +199,11 @@ describe('SteelMasterScreen', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Loading steel masters...')).toBeTruthy();
+      expect(screen.getByText('Loading custom items...')).toBeTruthy();
     });
   });
 
-  it('renders steel master list when data in store', () => {
+  it('renders custom items list when data in store', () => {
     mockMastersToReturn = null;
     mockFetchSteelMastersResult = 'pending';
 
@@ -213,13 +215,13 @@ describe('SteelMasterScreen', () => {
       },
     });
 
-    expect(screen.getByText('MS ANGLE 80x80x6')).toBeTruthy();
+    expect(screen.getByText('Custom Item A')).toBeTruthy();
     expect(screen.getByText('7.2 kg/m')).toBeTruthy();
     expect(screen.getByText('6m')).toBeTruthy();
     expect(screen.getByText('7214')).toBeTruthy();
   });
 
-  it('Add button shows form', async () => {
+  it('Add button navigates to AddEditCustomItem screen', async () => {
     mockMastersToReturn = null;
     mockFetchSteelMastersResult = 'pending';
 
@@ -231,14 +233,12 @@ describe('SteelMasterScreen', () => {
       },
     });
 
-    fireEvent.press(screen.getByRole('button', { name: 'Add steel master' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Add custom item' }));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText('Steel master name input')).toBeTruthy();
-    });
+    expect(mockNavigate).toHaveBeenCalledWith('AddEditCustomItem');
   });
 
-  it('Edit button opens form with master data', async () => {
+  it('Edit button navigates to AddEditCustomItem with customItemId', async () => {
     mockMastersToReturn = null;
     mockFetchSteelMastersResult = 'pending';
 
@@ -250,15 +250,11 @@ describe('SteelMasterScreen', () => {
       },
     });
 
-    fireEvent.press(screen.getByRole('button', { name: 'Edit MS ANGLE 80x80x6' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Edit Custom Item A' }));
 
-    await waitFor(() => {
-      expect(screen.getByText('Edit Steel Master')).toBeTruthy();
+    expect(mockNavigate).toHaveBeenCalledWith('AddEditCustomItem', {
+      customItemId: 'sm-1',
     });
-    expect(screen.getByDisplayValue('MS ANGLE 80x80x6')).toBeTruthy();
-    expect(screen.getByDisplayValue('7.2')).toBeTruthy();
-    expect(screen.getByDisplayValue('6')).toBeTruthy();
-    expect(screen.getByDisplayValue('7214')).toBeTruthy();
   });
 
   it('Back button calls goBack', async () => {

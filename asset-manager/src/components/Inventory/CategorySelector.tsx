@@ -41,7 +41,11 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
     return categories.find((cat) => cat.id === selectedCategoryId) || null;
   }, [selectedCategoryId, categories]);
 
-  const displayText = selectedCategory ? selectedCategory.name : 'Select Category';
+  const displayText = selectedCategoryId === null 
+    ? 'Uncategorized' 
+    : selectedCategory 
+    ? selectedCategory.name 
+    : 'Select Category';
 
   const hasError = Boolean(error);
 
@@ -225,32 +229,57 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
                       </Text>
                     </View>
                   ) : (
-                    categories.map((category) => {
-                      const isSelected = selectedCategoryId === category.id;
-
-                      return (
-                        <TouchableOpacity
-                          key={category.id}
-                          className={`border border-[#E2E8F0] rounded-lg h-12 px-4 flex-row items-center justify-between ${
-                            isSelected ? 'bg-[#1E40AF]/10 border-[#1E40AF]' : 'bg-white'
+                    <>
+                      {/* Uncategorized Option */}
+                      <TouchableOpacity
+                        key="uncategorized"
+                        className={`border border-[#E2E8F0] rounded-lg h-12 px-4 flex-row items-center justify-between ${
+                          selectedCategoryId === null ? 'bg-[#1E40AF]/10 border-[#1E40AF]' : 'bg-white'
+                        }`}
+                        onPress={() => handleSelect(null)}
+                        activeOpacity={0.7}
+                        accessibilityLabel="Select uncategorized"
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: selectedCategoryId === null }}
+                      >
+                        <Text
+                          className={`text-[15px] font-medium ${
+                            selectedCategoryId === null ? 'text-[#1E40AF]' : 'text-[#0F172A]'
                           }`}
-                          onPress={() => handleSelect(category.id)}
-                          activeOpacity={0.7}
-                          accessibilityLabel={`Select category: ${category.name}`}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected: isSelected }}
                         >
-                          <Text
-                            className={`text-[15px] font-medium ${
-                              isSelected ? 'text-[#1E40AF]' : 'text-[#0F172A]'
+                          Uncategorized
+                        </Text>
+                        {selectedCategoryId === null && <Ionicons name="checkmark" size={20} color="#1E40AF" />}
+                      </TouchableOpacity>
+
+                      {/* Regular Categories */}
+                      {categories.map((category) => {
+                        const isSelected = selectedCategoryId === category.id;
+
+                        return (
+                          <TouchableOpacity
+                            key={category.id}
+                            className={`border border-[#E2E8F0] rounded-lg h-12 px-4 flex-row items-center justify-between ${
+                              isSelected ? 'bg-[#1E40AF]/10 border-[#1E40AF]' : 'bg-white'
                             }`}
+                            onPress={() => handleSelect(category.id)}
+                            activeOpacity={0.7}
+                            accessibilityLabel={`Select category: ${category.name}`}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: isSelected }}
                           >
-                            {category.name}
-                          </Text>
-                          {isSelected && <Ionicons name="checkmark" size={20} color="#1E40AF" />}
-                        </TouchableOpacity>
-                      );
-                    })
+                            <Text
+                              className={`text-[15px] font-medium ${
+                                isSelected ? 'text-[#1E40AF]' : 'text-[#0F172A]'
+                              }`}
+                            >
+                              {category.name}
+                            </Text>
+                            {isSelected && <Ionicons name="checkmark" size={20} color="#1E40AF" />}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </>
                   )}
 
                   {/* Add New Category Option */}

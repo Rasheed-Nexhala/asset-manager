@@ -9,6 +9,7 @@ import {
 import {
   CentralStoreInventoryScreen,
   AddEditItemScreen,
+  AddEditCustomItemScreen,
   ItemDetailScreen,
   MySiteInventoryScreen,
   OtherSiteInventoryScreen,
@@ -28,6 +29,7 @@ export type InventoryStackParamList = {
   AddEditItem: { itemId?: string; selectedCategoryId?: string } | undefined;
   ItemDetail: { itemId: string };
   SteelMaster: undefined;
+  AddEditCustomItem: { customItemId?: string } | undefined;
   Maintenance: undefined;
   InventoryUpdateRequests: undefined;
   CategorySelect: {
@@ -109,6 +111,14 @@ export const InventoryStackNavigator: React.FC = () => {
           <Stack.Screen
             name="SteelMaster"
             component={SteelMasterScreen}
+            options={{
+              presentation: 'card',
+              gestureEnabled: true,
+            }}
+          />
+          <Stack.Screen
+            name="AddEditCustomItem"
+            component={AddEditCustomItemScreen}
             options={{
               presentation: 'card',
               gestureEnabled: true,

@@ -71,10 +71,10 @@
 | Component | Path | Purpose |
 |-----------|------|---------|
 | **FormField** | `FormField.tsx` | Reusable labeled input: label, required asterisk, error state, right icon (e.g. password toggle) |
-| **ItemForm** | `Inventory/ItemForm.tsx` | Full item create/edit form with steel master, category, unit, image |
+| **ItemForm** | `Inventory/ItemForm.tsx` | Full item create/edit form with custom item, category, unit, image |
 | **VendorForm** | `PurchaseOrder/VendorForm.tsx` | Vendor fields using FormField; controlled via `data` + `onChange` |
 | **SiteForm** | `Sites/SiteForm.tsx` | Site create/edit with FormField, SiteManagerSelector, status toggle |
-| **SteelMasterForm** | `Inventory/SteelMasterForm.tsx` | Steel master create/edit |
+| **SteelMasterForm** | `Inventory/SteelMasterForm.tsx` | Custom item create/edit |
 | **UpdatePasswordForm** | `UpdatePasswordForm.tsx` | Password change using FormField with success/error banners |
 
 ### 2.3 Selector Components (Dropdown/Modal)
@@ -82,7 +82,7 @@
 |-----------|------|---------|
 | **CategorySelector** | `Inventory/CategorySelector.tsx` | Touchable trigger → bottom sheet modal with list + "Add New Category" |
 | **UnitSelector** | `Inventory/UnitSelector.tsx` | Unit of measurement picker |
-| **SteelMasterSelector** | `Inventory/SteelMasterSelector.tsx` | Steel master selection |
+| **SteelMasterSelector** | `Inventory/SteelMasterSelector.tsx` | Custom item selection |
 | **VendorSelector** | `PurchaseOrder/VendorSelector.tsx` | Vendor picker |
 | **SiteManagerSelector** | `Sites/SiteManagerSelector.tsx` | Site manager user picker |
 | **PrioritySelector** | `Requests/PrioritySelector.tsx` | High/Medium/Low priority |

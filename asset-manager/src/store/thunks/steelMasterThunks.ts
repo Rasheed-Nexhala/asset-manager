@@ -26,7 +26,7 @@ export const fetchSteelMasters = createAsyncThunk<
       return steelMasters;
     } catch (error: unknown) {
       const message =
-        error instanceof Error ? error.message : 'Failed to fetch steel masters';
+        error instanceof Error ? error.message : 'Failed to fetch custom items';
       return rejectWithValue(message);
     }
   }
@@ -41,14 +41,14 @@ export const fetchSteelMasterById = createAsyncThunk(
     try {
       const steelMaster = await getSteelMasterByIdService(id);
       if (!steelMaster) {
-        return rejectWithValue(`Steel master with ID ${id} not found`);
+        return rejectWithValue(`Custom item with ID ${id} not found`);
       }
       return steelMaster;
     } catch (error: unknown) {
       const message =
         error instanceof Error
           ? error.message
-          : 'Failed to fetch steel master';
+          : 'Failed to fetch custom item';
       return rejectWithValue(message);
     }
   }
@@ -77,14 +77,14 @@ export const createSteelMaster = createAsyncThunk(
       const id = await createSteelMasterService(dataWithAudit);
       const created = await getSteelMasterByIdService(id);
       if (!created) {
-        throw new Error('Failed to retrieve created steel master');
+        throw new Error('Failed to retrieve created custom item');
       }
       return created;
     } catch (error: unknown) {
       const message =
         error instanceof Error
           ? error.message
-          : 'Failed to create steel master';
+          : 'Failed to create custom item';
       return rejectWithValue(message);
     }
   }
@@ -116,14 +116,14 @@ export const updateSteelMaster = createAsyncThunk(
       await updateSteelMasterService(id, updatesWithAudit);
       const updated = await getSteelMasterByIdService(id);
       if (!updated) {
-        throw new Error('Failed to retrieve updated steel master');
+        throw new Error('Failed to retrieve updated custom item');
       }
       return updated;
     } catch (error: unknown) {
       const message =
         error instanceof Error
           ? error.message
-          : 'Failed to update steel master';
+          : 'Failed to update custom item';
       return rejectWithValue(message);
     }
   }
@@ -142,7 +142,7 @@ export const deleteSteelMaster = createAsyncThunk(
       const message =
         error instanceof Error
           ? error.message
-          : 'Failed to delete steel master';
+          : 'Failed to delete custom item';
       return rejectWithValue(message);
     }
   }

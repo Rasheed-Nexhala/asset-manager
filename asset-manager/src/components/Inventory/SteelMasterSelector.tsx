@@ -1,6 +1,6 @@
 /**
- * Steel Master Selector Component
- * Dropdown to select a steel master when configuring weight-based items
+ * Custom Item Selector Component
+ * Dropdown to select a custom item when configuring weight-based items
  */
 
 import React, { useState, useCallback } from 'react';
@@ -29,7 +29,7 @@ export const SteelMasterSelector: React.FC<SteelMasterSelectorProps> = ({
   steelMasters,
   selectedSteelMaster,
   onSelect,
-  label = 'Link to Steel Master',
+  label = 'Link to Custom Item',
   error,
   disabled = false,
   onManagePress,
@@ -59,7 +59,7 @@ export const SteelMasterSelector: React.FC<SteelMasterSelectorProps> = ({
 
   const displayText = selectedSteelMaster
     ? `${selectedSteelMaster.name} (${selectedSteelMaster.weightPerMeter} kg/m)`
-    : 'Select steel master';
+    : 'Select custom item';
 
   return (
     <View className="gap-1.5">
@@ -74,7 +74,7 @@ export const SteelMasterSelector: React.FC<SteelMasterSelectorProps> = ({
         activeOpacity={0.7}
         disabled={disabled}
         accessibilityRole="button"
-        accessibilityLabel={`Select steel master. Current: ${displayText}`}
+        accessibilityLabel={`Select custom item. Current: ${displayText}`}
       >
         <Text
           className={`text-[15px] flex-1 ${
@@ -108,10 +108,10 @@ export const SteelMasterSelector: React.FC<SteelMasterSelectorProps> = ({
           disabled={disabled}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="Manage steel masters"
+          accessibilityLabel="Manage custom items"
         >
           <Ionicons name="settings-outline" size={16} color="#1E40AF" />
-          <Text className="text-[13px] text-[#1E40AF]">Manage Steel Masters</Text>
+          <Text className="text-[13px] text-[#1E40AF]">Manage Custom Items</Text>
         </TouchableOpacity>
       )}
 
@@ -132,7 +132,7 @@ export const SteelMasterSelector: React.FC<SteelMasterSelectorProps> = ({
             
             <View className="p-4 border-b border-[#E2E8F0]">
               <Text className="text-[22px] font-semibold text-[#0F172A] mb-3">
-                Select Steel Master
+                Select Custom Item
               </Text>
               <View className="bg-[#F1F5F9] rounded-full h-12 px-4 flex-row items-center">
                 <Ionicons name="search" size={20} color="#94A3B8" />
@@ -142,7 +142,7 @@ export const SteelMasterSelector: React.FC<SteelMasterSelectorProps> = ({
                   placeholderTextColor="#94A3B8"
                   value={searchQuery}
                   onChangeText={setSearchQuery}
-                  accessibilityLabel="Search steel masters"
+                  accessibilityLabel="Search custom items"
                   accessibilityRole="search"
                 />
               </View>
@@ -153,7 +153,7 @@ export const SteelMasterSelector: React.FC<SteelMasterSelectorProps> = ({
                 <View className="py-8 items-center">
                   <Text className="text-6xl mb-4">🔍</Text>
                   <Text className="text-[15px] text-[#64748B] text-center">
-                    No steel masters match your search
+                    No custom items match your search
                   </Text>
                 </View>
               ) : (
@@ -169,7 +169,7 @@ export const SteelMasterSelector: React.FC<SteelMasterSelectorProps> = ({
                       onPress={() => handleSelect(m)}
                       activeOpacity={0.7}
                       accessibilityRole="button"
-                      accessibilityLabel={`Select steel master ${m.name}`}
+                      accessibilityLabel={`Select custom item ${m.name}`}
                     >
                       <Text className="text-[15px] font-semibold text-[#0F172A] mb-1">
                         {m.name}

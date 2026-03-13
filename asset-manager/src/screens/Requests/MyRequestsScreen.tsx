@@ -19,6 +19,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   fetchMyRequestsPaginated,
   loadMoreMyRequests,
+  exportRequestsThunk,
 } from '../../store/thunks/requestThunks';
 import { useMyRequestsSubscription } from '../../hooks/useRequestsSubscriptions';
 import {
@@ -59,6 +60,7 @@ export const MyRequestsScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const userId = useAppSelector(selectUserId);
@@ -127,6 +129,12 @@ export const MyRequestsScreen: React.FC = () => {
     navigation.navigate('CreateRequest', { siteId: currentSite.id });
   }, [navigation, currentSite]);
 
+  const handleExport = useCallback(async () => {
+    setIsExporting(true);
+    await dispatch(exportRequestsThunk());
+    setIsExporting(false);
+  }, [dispatch]);
+
   const handleRequestPress = useCallback(
     (request: Request) => {
       if (request.status === 'draft') {
@@ -187,7 +195,17 @@ export const MyRequestsScreen: React.FC = () => {
   if (authInitialized && !userId) {
     return (
       <ScreenLayout edges={['top']}>
-        <ScreenHeader title="My Requests" />
+        <ScreenHeader
+          title="My Requests"
+          rightActions={[
+            {
+              icon: 'download-outline',
+              onPress: handleExport,
+              loading: isExporting,
+              accessibilityLabel: 'Export Requests',
+            }
+          ]}
+        />
         <View className="flex-1 items-center justify-center px-4">
           <Ionicons name="person-outline" size={80} color="#64748B" />
           <Text className="text-[22px] font-semibold text-[#0F172A] text-center mb-2 mt-4">
@@ -204,7 +222,17 @@ export const MyRequestsScreen: React.FC = () => {
   if (showLoading) {
     return (
       <ScreenLayout edges={['top']}>
-        <ScreenHeader title="My Requests" />
+        <ScreenHeader
+          title="My Requests"
+          rightActions={[
+            {
+              icon: 'download-outline',
+              onPress: handleExport,
+              loading: isExporting,
+              accessibilityLabel: 'Export Requests',
+            }
+          ]}
+        />
         <View
           className="flex-1 items-center justify-center px-4"
           accessibilityLabel="Loading your requests"
@@ -223,15 +251,19 @@ export const MyRequestsScreen: React.FC = () => {
     <ScreenLayout edges={['top']}>
       <ScreenHeader
         title="My Requests"
-        rightAction={
-          isSiteManager && currentSite
-            ? {
-                icon: 'add-circle',
-                onPress: handleCreateRequest,
-                accessibilityLabel: 'Create new request',
-              }
-            : undefined
-        }
+        rightActions={[
+          {
+            icon: 'download-outline',
+            onPress: handleExport,
+            loading: isExporting,
+            accessibilityLabel: 'Export Requests',
+          },
+          ...(isSiteManager && currentSite ? [{
+            icon: 'add-circle' as any,
+            onPress: handleCreateRequest,
+            accessibilityLabel: 'Create new request',
+          }] : [])
+        ]}
       />
 
       {/* CIAMS Search Bar */}

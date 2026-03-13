@@ -49,7 +49,7 @@ describe('steelMasterSlice', () => {
     expect(state.selectedSteelMaster).toEqual(mockSteelMaster);
   });
 
-  it('addSteelMaster adds new steel master', () => {
+  it('addSteelMaster adds new custom item', () => {
     const state = steelMasterReducer(initialState, addSteelMaster(mockSteelMaster));
     expect(state.steelMasters).toHaveLength(1);
   });

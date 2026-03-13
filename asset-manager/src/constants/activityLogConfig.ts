@@ -97,12 +97,12 @@ export const ACTION_TYPE_CONFIG: Record<
     category: 'inventory',
   },
   steel_master_created: {
-    label: 'Steel Master Created',
+    label: 'Custom Item Created',
     icon: 'resize-outline',
     category: 'inventory',
   },
   steel_master_updated: {
-    label: 'Steel Master Updated',
+    label: 'Custom Item Updated',
     icon: 'create-outline',
     category: 'inventory',
   },

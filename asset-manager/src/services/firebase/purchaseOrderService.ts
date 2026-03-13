@@ -819,6 +819,71 @@ export const getPurchaseOrdersCount = async (
 };
 
 /**
+ * Fetch purchase orders without pagination for exporting
+ * 
+ * @param statusFilter - Optional status filter
+ * @returns Array of purchase orders
+ */
+export const exportPurchaseOrders = async (
+  statusFilter?: string
+): Promise<PurchaseOrder[]> => {
+  try {
+    const constraints = buildPOQueryConstraints(statusFilter);
+    const q = query(collection(db, PURCHASE_ORDERS_COLLECTION), ...constraints);
+    const snapshot = await getDocs(q);
+
+    const orders: PurchaseOrder[] = [];
+    snapshot.forEach((docSnap) => {
+      try {
+        const data = docSnap.data();
+        const items = normalizePOItemsForRead(data.items ?? []);
+        const firestorePO: PurchaseOrderFirestore = {
+          id: docSnap.id,
+          poNumber: data.poNumber,
+          vendorId: data.vendorId,
+          vendorName: data.vendorName,
+          vendorContact: data.vendorContact,
+          vendorEmail: data.vendorEmail,
+          vendorAddress: data.vendorAddress,
+          items,
+          subtotal: data.subtotal,
+          gstPercentage: data.gstPercentage ?? DEFAULT_GST_PERCENTAGE,
+          gstAmount: data.gstAmount,
+          totalAmount: data.totalAmount,
+          justification: data.justification,
+          expectedDeliveryDate: data.expectedDeliveryDate ?? null,
+          documents: data.documents ?? [],
+          pdfUrl: data.pdfUrl,
+          status: data.status,
+          createdBy: data.createdBy,
+          createdByName: data.createdByName,
+          createdByRole: data.createdByRole ?? undefined,
+          createdAt: data.createdAt,
+          reviewedBy: data.reviewedBy ?? null,
+          reviewedByName: data.reviewedByName ?? null,
+          reviewedAt: data.reviewedAt ?? null,
+          adminComments: data.adminComments ?? null,
+          rejectionReason: data.rejectionReason ?? null,
+          receivedAt: data.receivedAt ?? null,
+          receivedBy: data.receivedBy ?? null,
+          receivedByName: data.receivedByName ?? null,
+          receivedNotes: data.receivedNotes ?? null,
+          updatedAt: data.updatedAt,
+        };
+        orders.push(firestorePOToPO(firestorePO));
+      } catch (err) {
+        console.warn('Skipping malformed PO document:', docSnap.id, err);
+      }
+    });
+
+    return orders;
+  } catch (error) {
+    console.error('Error exporting purchase orders:', error);
+    throw error;
+  }
+};
+
+/**
  * Subscribe to purchase orders with optional status filter (real-time Firestore snapshot).
  * On error, callback receives ([], error). On success, callback receives (orders).
  * Used by PurchaseOrderListScreen for live updates. Loads full list (no pagination).

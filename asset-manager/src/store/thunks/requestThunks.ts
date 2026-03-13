@@ -1,5 +1,6 @@
 import type { DocumentSnapshot } from 'firebase/firestore';
 import { createAsyncThunk } from '@reduxjs/toolkit';
+import { saveCsvAndShare, formatDateForCsv } from '../../utils/csvExport';
 import {
   requestService,
   listRequestsPaginated,
@@ -488,5 +489,64 @@ export const loadMoreMyRequests = createAsyncThunk(
       lastDoc
     );
     return { requests, lastDoc: newLastDoc };
+  }
+);
+
+/**
+ * Export requests to CSV
+ */
+export const exportRequestsThunk = createAsyncThunk(
+  'requests/export',
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const state = getState() as RootState;
+      const { filters } = state.requests;
+      
+      const requests = await requestService.exportRequestsData({
+        status: filters.status,
+        siteId: filters.siteId,
+      });
+
+      const header = 'Request Number,Date,Site Name,Requested By,Status,Priority,Purpose,Item Name,SKU,Category,Requested Qty,Approved Qty,Returned Qty,Item Status\n';
+      
+      const escapeCsvField = (value: string | number | null | undefined): string =>
+        `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+      const rows = requests.flatMap(req => {
+        const reqDate = formatDateForCsv(req.createdAt);
+        const reqBase = [
+          req.requestNumber,
+          reqDate,
+          req.siteName,
+          req.requestedByName,
+          req.status,
+          req.priority,
+          req.purpose
+        ].map(escapeCsvField);
+
+        if (!req.items || req.items.length === 0) {
+          return [reqBase.concat(Array(7).fill('""')).join(',')];
+        }
+
+        return req.items.map(item => {
+          const itemBase = [
+            item.itemName,
+            item.itemSku,
+            item.categoryName,
+            item.quantityRequested,
+            item.quantityApproved,
+            item.quantityReturned ?? 0,
+            item.status
+          ].map(escapeCsvField);
+          return [...reqBase, ...itemBase].join(',');
+        });
+      }).join('\n');
+
+      await saveCsvAndShare(header + rows, 'requests');
+      return true;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to export requests';
+      return rejectWithValue(errorMessage);
+    }
   }
 );

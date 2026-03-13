@@ -1,5 +1,6 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import * as purchaseOrderService from '../../services/firebase/purchaseOrderService';
+import { saveCsvAndShare, formatDateForCsv } from '../../utils/csvExport';
 import type {
   CreatePurchaseOrderData,
   ReceivePOData,
@@ -300,3 +301,59 @@ export {
   fetchPurchaseOrdersPaginated,
   loadMorePurchaseOrders,
 } from './purchaseOrderPaginationThunks';
+
+/**
+ * Export purchase orders to CSV
+ */
+export const exportPurchaseOrdersThunk = createAsyncThunk(
+  'purchaseOrders/export',
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const state = getState() as RootState;
+      const { filters } = state.purchaseOrders;
+      
+      const orders = await purchaseOrderService.exportPurchaseOrders(filters.status);
+      
+      const header = 'PO Number,Date,Vendor Name,Vendor Contact,PO Status,Justification,Total PO Amount,Item Name,SKU,Ordered Qty,Unit Price,GST %,Total Item Amount,Received Qty\n';
+      
+      const escapeCsvField = (value: string | number | null | undefined): string =>
+        `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+      const rows = orders.flatMap(po => {
+        const poDate = formatDateForCsv(po.createdAt);
+        const poBase = [
+          po.poNumber,
+          poDate,
+          po.vendorName,
+          po.vendorContact,
+          po.status,
+          po.justification,
+          po.totalAmount
+        ].map(escapeCsvField);
+
+        if (!po.items || po.items.length === 0) {
+          return [poBase.concat(Array(7).fill('""')).join(',')];
+        }
+
+        return po.items.map(item => {
+          const itemBase = [
+            item.itemName,
+            item.itemSku,
+            item.orderedQuantity ?? item.quantity,
+            item.unitPrice,
+            item.gstPercentage,
+            item.amount,
+            item.receivedQuantity ?? 0
+          ].map(escapeCsvField);
+          return [...poBase, ...itemBase].join(',');
+        });
+      }).join('\n');
+      
+      await saveCsvAndShare(header + rows, 'purchase-orders');
+      return true;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to export purchase orders';
+      return rejectWithValue(errorMessage);
+    }
+  }
+);

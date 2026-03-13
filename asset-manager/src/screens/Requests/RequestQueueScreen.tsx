@@ -20,6 +20,7 @@ import { setFilters } from '../../store/slices/requestsSlice';
 import {
   fetchRequestsPaginated,
   loadMoreRequests,
+  exportRequestsThunk,
 } from '../../store/thunks/requestThunks';
 import { useRequestQueueSubscription } from '../../hooks/useRequestsSubscriptions';
 import {
@@ -46,6 +47,7 @@ export const RequestQueueScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const requests = useAppSelector((state) =>
     selectFilteredAndSearchedRequestsSortedByDate(state, searchQuery)
@@ -94,6 +96,12 @@ export const RequestQueueScreen: React.FC = () => {
   const handleToggleFilters = useCallback(() => {
     setShowFilters((prev) => !prev);
   }, []);
+
+  const handleExport = useCallback(async () => {
+    setIsExporting(true);
+    await dispatch(exportRequestsThunk());
+    setIsExporting(false);
+  }, [dispatch]);
 
   const handleRequestPress = useCallback(
     (request: Request) => {
@@ -164,7 +172,17 @@ export const RequestQueueScreen: React.FC = () => {
   if (isInitialOrRefetching || (isLoading && requests.length === 0)) {
     return (
       <ScreenLayout edges={['top']}>
-        <ScreenHeader title="Request Queue" />
+        <ScreenHeader
+          title="Request Queue"
+          rightActions={[
+            {
+              icon: 'download-outline',
+              onPress: handleExport,
+              loading: isExporting,
+              accessibilityLabel: 'Export Requests',
+            }
+          ]}
+        />
         <View
           className="flex-1 items-center justify-center px-4"
           accessibilityLabel="Loading requests"
@@ -183,12 +201,20 @@ export const RequestQueueScreen: React.FC = () => {
     <ScreenLayout edges={['top']}>
       <ScreenHeader
         title="Request Queue"
-        rightAction={{
-          icon: showFilters ? 'filter' : 'filter-outline',
-          iconColor: showFilters ? '#1E40AF' : '#64748B',
-          onPress: handleToggleFilters,
-          accessibilityLabel: 'Toggle filters',
-        }}
+        rightActions={[
+          {
+            icon: 'download-outline',
+            onPress: handleExport,
+            loading: isExporting,
+            accessibilityLabel: 'Export Requests',
+          },
+          {
+            icon: showFilters ? 'filter' : 'filter-outline',
+            iconColor: showFilters ? '#1E40AF' : '#64748B',
+            onPress: handleToggleFilters,
+            accessibilityLabel: 'Toggle filters',
+          }
+        ]}
       />
 
       {/* CIAMS Search Bar */}

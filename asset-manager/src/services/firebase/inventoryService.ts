@@ -36,7 +36,12 @@ import type {
   ItemFilters,
   LocationType,
 } from '../../types/inventory';
-import { timestampToISO } from '../../types/inventory';
+import { 
+  timestampToISO, 
+  prepareCategoryData, 
+  getDisplayCategoryName,
+  normalizeCategoryId 
+} from '../../types/inventory';
 import { getLocationId, getLocationTypeFromId } from '../../utils/locationUtils';
 import { isLowStock } from '../../utils/inventoryUtils';
 
@@ -49,6 +54,7 @@ const getInventoryDocId = (itemId: string, locationId: string): string =>
 
 const isDiscreteUnit = (unit: string): boolean =>
   ['Pieces', 'Bags', 'Sets', 'Boxes', 'Rolls'].includes(unit);
+
 
 /**
  * Convert FirestoreItem to Item (for Redux store)
@@ -84,10 +90,17 @@ export const listItems = async (filters?: ItemFilters): Promise<Item[]> => {
   try {
     let q = query(collection(db, ITEMS_COLLECTION));
 
-    // Apply filters
-    if (filters?.categoryId) {
-      q = query(q, where('categoryId', '==', filters.categoryId));
+    // Apply categoryId filter with support for null/uncategorized items
+    if (filters?.categoryId !== undefined) {
+      if (filters.categoryId === null || filters.categoryId === 'uncategorized' || filters.categoryId === '') {
+        // Filter for items without categories (null categoryId)
+        q = query(q, where('categoryId', '==', null));
+      } else {
+        // Filter for items with the specific categoryId
+        q = query(q, where('categoryId', '==', filters.categoryId));
+      }
     }
+    // If no categoryId filter is provided, return all items regardless of category status
     if (filters?.type) {
       q = query(q, where('type', '==', filters.type));
     }
@@ -148,9 +161,19 @@ export const listItems = async (filters?: ItemFilters): Promise<Item[]> => {
  */
 const buildItemsQueryConstraints = (filters?: ItemFilters): QueryConstraint[] => {
   const constraints: QueryConstraint[] = [];
-  if (filters?.categoryId) {
-    constraints.push(where('categoryId', '==', filters.categoryId));
+  
+  // Handle categoryId filtering with support for null/uncategorized items
+  if (filters?.categoryId !== undefined) {
+    if (filters.categoryId === null || filters.categoryId === 'uncategorized' || filters.categoryId === '') {
+      // Filter for items without categories (null categoryId)
+      constraints.push(where('categoryId', '==', null));
+    } else {
+      // Filter for items with the specific categoryId
+      constraints.push(where('categoryId', '==', filters.categoryId));
+    }
   }
+  // If no categoryId filter is provided, return all items regardless of category status
+  
   if (filters?.type) {
     constraints.push(where('type', '==', filters.type));
   }
@@ -742,12 +765,12 @@ export const checkSkuExists = async (
  * 3. Updates the item's denormalized stock totals
  * 
  * @param itemData - Item data including initial quantity
- * @param categoryName - Category name for denormalization
+ * @param categoryName - Category name for denormalization (optional, defaults to "Uncategorized")
  * @returns The created item ID
  */
 export const createItem = async (
   itemData: CreateItemData,
-  categoryName: string
+  categoryName?: string
 ): Promise<string> => {
   try {
     if (isDiscreteUnit(itemData.unit)) {
@@ -786,12 +809,18 @@ export const createItem = async (
       const steelMasterId = itemData.steelMasterId;
       const steelMasterName = itemData.steelMasterName ?? undefined;
 
+      // Handle optional categories using helper functions
+      const { categoryId: finalCategoryId, categoryName: finalCategoryName } = prepareCategoryData(
+        itemData.categoryId,
+        categoryName
+      );
+
       const itemDocData: Record<string, unknown> = {
         name: itemData.name,
         sku: itemData.sku,
         description: itemData.description || '',
-        categoryId: itemData.categoryId,
-        categoryName: categoryName,
+        categoryId: finalCategoryId,
+        categoryName: finalCategoryName,
         type: itemData.type,
         unit: itemData.unit,
         imageUrl: itemData.imageUrl || '',
@@ -924,8 +953,14 @@ export const updateItem = async (
         ...updates,
         updatedAt: serverTimestamp(),
       };
-      if (updates.categoryId && categoryName) {
-        rawData.categoryName = categoryName;
+      // Handle category updates using helper functions
+      if (updates.categoryId !== undefined) {
+        const { categoryId: finalCategoryId, categoryName: finalCategoryName } = prepareCategoryData(
+          updates.categoryId,
+          categoryName
+        );
+        rawData.categoryId = finalCategoryId;
+        rawData.categoryName = finalCategoryName;
       }
       if (updates.updatedBy) rawData.updatedBy = updates.updatedBy;
       if (updates.updatedByName) rawData.updatedByName = updates.updatedByName;
@@ -1202,10 +1237,17 @@ export const subscribeItems = (
 ): Unsubscribe => {
   let q = query(collection(db, ITEMS_COLLECTION));
 
-  // Apply filters
-  if (filters?.categoryId) {
-    q = query(q, where('categoryId', '==', filters.categoryId));
+  // Apply categoryId filter with support for null/uncategorized items
+  if (filters?.categoryId !== undefined) {
+    if (filters.categoryId === null || filters.categoryId === 'uncategorized' || filters.categoryId === '') {
+      // Filter for items without categories (null categoryId)
+      q = query(q, where('categoryId', '==', null));
+    } else {
+      // Filter for items with the specific categoryId
+      q = query(q, where('categoryId', '==', filters.categoryId));
+    }
   }
+  // If no categoryId filter is provided, return all items regardless of category status
   if (filters?.type) {
     q = query(q, where('type', '==', filters.type));
   }

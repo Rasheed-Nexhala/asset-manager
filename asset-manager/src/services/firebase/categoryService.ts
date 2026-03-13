@@ -162,7 +162,7 @@ export const createCategory = async (name: string): Promise<string> => {
  * @param id - Category document ID
  * @param name - New category name (must be unique)
  */
-export const updateCategory = async (id: string, name: string): Promise<void> => {
+export const updateCategory = async (id: string, name: string): Promise<string> => {
   try {
     const trimmedName = name.trim();
     const newDocId = trimmedName.toLowerCase().replace(/\s+/g, '');
@@ -204,6 +204,7 @@ export const updateCategory = async (id: string, name: string): Promise<void> =>
         name: trimmedName,
       });
     }
+    return newDocId;
   } catch (error) {
     console.error('Error updating category:', error);
     throw error;
@@ -256,6 +257,27 @@ export const checkItemsUsingCategory = async (categoryId: string): Promise<numbe
     return itemsSnapshot.size;
   } catch (error) {
     console.error('Error checking items using category:', error);
+    throw error;
+  }
+};
+
+/**
+ * Check how many items have no category assigned (uncategorized)
+ *
+ * @returns Number of items with null/undefined categoryId
+ */
+export const checkUncategorizedItemsCount = async (): Promise<number> => {
+  try {
+    const itemsSnapshot = await getDocs(
+      query(
+        collection(db, 'items'),
+        where('categoryId', '==', null)
+      )
+    );
+
+    return itemsSnapshot.size;
+  } catch (error) {
+    console.error('Error checking uncategorized items count:', error);
     throw error;
   }
 };

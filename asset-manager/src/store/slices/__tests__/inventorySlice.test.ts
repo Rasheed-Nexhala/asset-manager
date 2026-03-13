@@ -35,6 +35,8 @@ const mockItem = {
   id: 'item1',
   name: 'Steel Bar',
   sku: 'SKU-001',
+  categoryId: 'cat1',
+  categoryName: 'Steel',
   totalQuantity: 100,
   minStockLevel: 10,
 } as import('../../types/inventory').Item;
@@ -43,8 +45,20 @@ const lowStockItem = {
   id: 'item2',
   name: 'Low Stock Item',
   sku: 'SKU-002',
+  categoryId: 'cat2',
+  categoryName: 'Tools',
   totalQuantity: 5,
   minStockLevel: 10,
+} as import('../../types/inventory').Item;
+
+const uncategorizedItem = {
+  id: 'item3',
+  name: 'Uncategorized Item',
+  sku: 'SKU-003',
+  categoryId: null,
+  categoryName: null,
+  totalQuantity: 25,
+  minStockLevel: 8,
 } as import('../../types/inventory').Item;
 
 describe('inventorySlice', () => {
@@ -142,5 +156,43 @@ describe('inventorySlice', () => {
     );
     const state = inventoryReducer(withLoc, clearInventoryForLocation('site_1'));
     expect(state.inventoryByLocation['site_1']).toBeUndefined();
+  });
+
+  it('setItems handles uncategorized items correctly', () => {
+    const state = inventoryReducer(
+      initialState,
+      setItems([mockItem, uncategorizedItem, lowStockItem])
+    );
+    expect(state.items).toHaveLength(3);
+    
+    // Verify uncategorized item is included with null categoryId
+    const uncatItem = state.items.find(item => item.id === 'item3');
+    expect(uncatItem?.categoryId).toBeNull();
+    expect(uncatItem?.categoryName).toBeNull();
+    
+    // Low stock detection should still work for uncategorized items
+    expect(state.lowStockItemIds).toContain('item2');
+    expect(state.lowStockItemIds).not.toContain('item1');
+    expect(state.lowStockItemIds).not.toContain('item3');
+  });
+
+  it('updateItemInState handles category changes including null', () => {
+    const withItems = inventoryReducer(initialState, setItems([mockItem]));
+    
+    // Update item to remove category (make it uncategorized)
+    const updated = { ...mockItem, categoryId: null, categoryName: null };
+    const state = inventoryReducer(withItems, updateItemInState(updated));
+    
+    const updatedItem = state.items.find(item => item.id === 'item1');
+    expect(updatedItem?.categoryId).toBeNull();
+    expect(updatedItem?.categoryName).toBeNull();
+  });
+
+  it('addItem handles uncategorized items', () => {
+    const state = inventoryReducer(initialState, addItem(uncategorizedItem));
+    expect(state.items).toHaveLength(1);
+    expect(state.items[0].id).toBe('item3');
+    expect(state.items[0].categoryId).toBeNull();
+    expect(state.items[0].categoryName).toBeNull();
   });
 });

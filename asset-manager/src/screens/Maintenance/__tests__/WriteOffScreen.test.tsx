@@ -34,7 +34,7 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-let mockWriteOffResolve: () => void;
+let mockWriteOffResolve: (id?: string) => void;
 let mockWriteOffReject: (err: unknown) => void;
 
 jest.mock('../../../store/thunks/authThunks', () => {
@@ -295,7 +295,7 @@ describe('WriteOffScreen', () => {
     // Submit without filling explanation
     fireEvent.press(screen.getByRole('button', { name: 'Write off item' }));
 
-    mockWriteOffResolve!();
+    mockWriteOffResolve!('m1');
 
     await waitFor(() => {
       expect(dispatchSpy).toHaveBeenCalled();
@@ -351,7 +351,7 @@ describe('WriteOffScreen', () => {
       expect.any(Array)
     );
 
-    mockWriteOffResolve!();
+    mockWriteOffResolve!('m1');
 
     await waitFor(() => {
       expect(dispatchSpy).toHaveBeenCalled();
@@ -495,7 +495,7 @@ describe('WriteOffScreen', () => {
     fireEvent.press(screen.getByText('Beyond Repair'));
     fireEvent.press(screen.getByRole('button', { name: 'Write off item' }));
 
-    mockWriteOffResolve!();
+    mockWriteOffResolve!('m1');
 
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalledWith(

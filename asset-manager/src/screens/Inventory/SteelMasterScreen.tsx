@@ -1,6 +1,6 @@
 /**
- * Steel Master Screen
- * Manage standard steel item specifications for weight-based conversion
+ * Custom Items Screen
+ * Manage standard custom item specifications for weight-based conversion
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -16,39 +16,26 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
-import { SteelMasterForm } from '../../components/Inventory/SteelMasterForm';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   fetchSteelMasters,
-  createSteelMaster,
   updateSteelMaster,
   deleteSteelMaster,
 } from '../../store/thunks/steelMasterThunks';
-import { clearSteelMasterError } from '../../store/slices/steelMasterSlice';
 import {
   selectActiveSteelMasters,
   selectSteelMasterLoading,
-  selectSteelMasterError,
 } from '../../store/selectors/steelMasterSelectors';
 import { subscribeSteelMasters } from '../../services/firebase/steelMasterService';
 import { setSteelMasters } from '../../store/slices/steelMasterSlice';
-import type {
-  SteelMaster,
-  CreateSteelMasterData,
-  UpdateSteelMasterData,
-} from '../../types/steelMaster';
-
+import type { SteelMaster } from '../../types/steelMaster';
 export const SteelMasterScreen: React.FC = () => {
   const navigation = useNavigation();
   const dispatch = useAppDispatch();
   const [refreshing, setRefreshing] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [editingMaster, setEditingMaster] = useState<SteelMaster | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const steelMasters = useAppSelector(selectActiveSteelMasters);
   const isLoading = useAppSelector(selectSteelMasterLoading);
-  const error = useAppSelector(selectSteelMasterError);
 
   useEffect(() => {
     dispatch(fetchSteelMasters(true));
@@ -69,19 +56,20 @@ export const SteelMasterScreen: React.FC = () => {
   }, [dispatch]);
 
   const handleAdd = useCallback(() => {
-    setEditingMaster(null);
-    setShowForm(true);
-  }, []);
+    navigation.navigate('AddEditCustomItem');
+  }, [navigation]);
 
-  const handleEdit = useCallback((master: SteelMaster) => {
-    setEditingMaster(master);
-    setShowForm(true);
-  }, []);
+  const handleEdit = useCallback(
+    (master: SteelMaster) => {
+      navigation.navigate('AddEditCustomItem', { customItemId: master.id });
+    },
+    [navigation]
+  );
 
   const handleDelete = useCallback(
     (master: SteelMaster) => {
       Alert.alert(
-        'Deactivate Steel Master',
+        'Deactivate Custom Item',
         `Are you sure you want to deactivate "${master.name}"? It will no longer appear in the list but linked items will keep their configuration.`,
         [
           { text: 'Cancel', style: 'cancel' },
@@ -103,38 +91,6 @@ export const SteelMasterScreen: React.FC = () => {
     },
     [dispatch]
   );
-
-  const handleFormSubmit = useCallback(
-    async (data: CreateSteelMasterData | UpdateSteelMasterData) => {
-      setIsSubmitting(true);
-      dispatch(clearSteelMasterError());
-      try {
-        if (editingMaster) {
-          await dispatch(
-            updateSteelMaster({
-              id: editingMaster.id,
-              updates: data as UpdateSteelMasterData,
-            })
-          ).unwrap();
-        } else {
-          await dispatch(createSteelMaster(data as CreateSteelMasterData)).unwrap();
-        }
-        setShowForm(false);
-        setEditingMaster(null);
-      } catch (err) {
-        // Error shown in form via Redux
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [dispatch, editingMaster]
-  );
-
-  const handleFormCancel = useCallback(() => {
-    setShowForm(false);
-    setEditingMaster(null);
-    dispatch(clearSteelMasterError());
-  }, [dispatch]);
 
   const renderItem = useCallback(
     ({ item }: { item: SteelMaster }) => (
@@ -200,7 +156,7 @@ export const SteelMasterScreen: React.FC = () => {
         accessibilityRole="header"
         numberOfLines={1}
       >
-        Steel Master
+        Custom Items
       </Text>
       
       <TouchableOpacity
@@ -208,7 +164,7 @@ export const SteelMasterScreen: React.FC = () => {
         onPress={handleAdd}
         activeOpacity={0.7}
         accessibilityRole="button"
-        accessibilityLabel="Add steel master"
+        accessibilityLabel="Add custom item"
       >
         <Ionicons name="add-circle" size={24} color="#1E40AF" />
       </TouchableOpacity>
@@ -223,27 +179,27 @@ export const SteelMasterScreen: React.FC = () => {
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#1E40AF" />
           <Text className="text-[15px] text-[#64748B] mt-4">
-            Loading steel masters...
+            Loading custom items...
           </Text>
         </View>
       ) : steelMasters.length === 0 ? (
         <View className="flex-1 items-center justify-center px-4">
           <Ionicons name="construct-outline" size={80} color="#64748B" />
           <Text className="text-[22px] font-semibold text-[#0F172A] text-center mb-2 mt-4">
-            No Steel Masters
+            No Custom Items
           </Text>
           <Text className="text-[15px] text-[#64748B] text-center mb-6">
-            Add standard steel item specifications for KG-to-pieces conversion.
+            Add standard custom item specifications for KG-to-pieces conversion.
           </Text>
           <TouchableOpacity
             className="bg-[#1E40AF] rounded-[10px] h-[50px] px-6 items-center justify-center flex-row gap-2"
             onPress={handleAdd}
             accessibilityRole="button"
-            accessibilityLabel="Add first steel master"
+            accessibilityLabel="Add first custom item"
           >
             <Ionicons name="add-circle" size={22} color="#FFFFFF" />
             <Text className="text-[15px] font-semibold text-white">
-              Add Steel Master
+              Add Custom Item
             </Text>
           </TouchableOpacity>
         </View>
@@ -262,16 +218,6 @@ export const SteelMasterScreen: React.FC = () => {
           }
         />
       )}
-
-      <SteelMasterForm
-        visible={showForm}
-        mode={editingMaster ? 'edit' : 'create'}
-        initialData={editingMaster}
-        onSubmit={handleFormSubmit}
-        onCancel={handleFormCancel}
-        loading={isSubmitting}
-        error={error}
-      />
     </ScreenLayout>
   );
 };

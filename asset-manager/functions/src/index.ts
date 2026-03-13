@@ -695,7 +695,7 @@ export const onItemUpdated = onDocumentUpdated(
 );
 
 /**
- * Firestore Trigger: Log Steel Master Creation
+ * Firestore Trigger: Log Custom Item Creation
  */
 export const onSteelMasterCreated = onDocumentCreated(
   'steelMaster/{steelMasterId}',
@@ -718,7 +718,7 @@ export const onSteelMasterCreated = onDocumentCreated(
       targetType: 'item',
       targetId: steelMasterId,
       targetDisplay: steel.name ?? steelMasterId,
-      summary: `Steel master created: ${steel.name ?? steelMasterId}`,
+      summary: `Custom item created: ${steel.name ?? steelMasterId}`,
       details: `Weight: ${steel.weightPerMeter ?? 0} kg/m`,
       changes: [],
     });
@@ -726,7 +726,7 @@ export const onSteelMasterCreated = onDocumentCreated(
 );
 
 /**
- * Firestore Trigger: Log Steel Master Updates
+ * Firestore Trigger: Log Custom Item Updates
  */
 export const onSteelMasterUpdated = onDocumentUpdated(
   'steelMaster/{steelMasterId}',
@@ -765,7 +765,7 @@ export const onSteelMasterUpdated = onDocumentUpdated(
       targetType: 'item',
       targetId: steelMasterId,
       targetDisplay: after.name ?? steelMasterId,
-      summary: `Steel master updated: ${after.name ?? steelMasterId}`,
+      summary: `Custom item updated: ${after.name ?? steelMasterId}`,
       details: `Modified ${changes.length} field(s)`,
       changes,
     });

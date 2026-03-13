@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   ScrollView,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -22,6 +24,7 @@ import {
   setItemsFromSubscription,
   setLoading,
 } from '../../store/slices/inventorySlice';
+import { exportInventoryThunk } from '../../store/thunks/inventoryThunks';
 import {
   selectAllItems,
   selectItemsBySearchQuery,
@@ -71,6 +74,16 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     stock: 'all',
   });
   const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [showMoreMenu, setShowMoreMenu] = useState<boolean>(false);
+
+  const handleToggleMoreMenu = useCallback(() => {
+    setShowMoreMenu(prev => !prev);
+  }, []);
+
+  const handleCloseMoreMenu = useCallback(() => {
+    setShowMoreMenu(false);
+  }, []);
 
   // Ref to hold unsubscribe for items subscription (used for refresh and cleanup)
   const unsubscribeItemsRef = useRef<(() => void) | null>(null);
@@ -96,7 +109,12 @@ export const CentralStoreInventoryScreen: React.FC = () => {
 
     // Apply local filters
     if (filters.categoryId) {
-      items = items.filter((item) => item.categoryId === filters.categoryId);
+      if (filters.categoryId === '') {
+        // Filter for uncategorized items (null or undefined categoryId)
+        items = items.filter((item) => !item.categoryId);
+      } else {
+        items = items.filter((item) => item.categoryId === filters.categoryId);
+      }
     }
     if (filters.type) {
       items = items.filter((item) => item.type === filters.type);
@@ -211,6 +229,12 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     setShowFilters(prev => !prev);
   }, []);
 
+  const handleExport = useCallback(async () => {
+    setIsExporting(true);
+    await dispatch(exportInventoryThunk());
+    setIsExporting(false);
+  }, [dispatch]);
+
   const renderItemCard = useCallback(
     ({ item }: { item: Item }) => (
       <ItemCard item={item} onPress={() => handleItemPress(item)} />
@@ -264,6 +288,20 @@ export const CentralStoreInventoryScreen: React.FC = () => {
       <View className="flex-row items-center ml-2">
         <TouchableOpacity
           className="w-12 h-12 items-center justify-center rounded-[10px]"
+          onPress={handleExport}
+          activeOpacity={0.7}
+          disabled={isExporting}
+          accessibilityRole="button"
+          accessibilityLabel="Export inventory"
+        >
+          {isExporting ? (
+            <ActivityIndicator size="small" color="#1E40AF" />
+          ) : (
+            <Ionicons name="download-outline" size={22} color="#1E40AF" />
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          className="w-12 h-12 items-center justify-center rounded-[10px]"
           onPress={handleToggleFilters}
           activeOpacity={0.7}
           accessibilityRole="button"
@@ -275,46 +313,6 @@ export const CentralStoreInventoryScreen: React.FC = () => {
             color={showFilters ? "#1E40AF" : "#64748B"} 
           />
         </TouchableOpacity>
-        {isAdmin && (
-          <TouchableOpacity
-            className="w-12 h-12 items-center justify-center rounded-[10px]"
-            onPress={handleInventoryUpdateRequests}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Inventory update requests"
-          >
-            <Ionicons name="document-text-outline" size={22} color="#1E40AF" />
-          </TouchableOpacity>
-        )}
-        {(isAdmin || isStoreIncharge) && (
-          <TouchableOpacity
-            className="w-12 h-12 items-center justify-center rounded-[10px]"
-            onPress={handleMaintenance}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Maintenance"
-          >
-            <Ionicons name="build-outline" size={22} color="#1E40AF" />
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          className="w-12 h-12 items-center justify-center rounded-[10px]"
-          onPress={handleSteelMaster}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="Steel Master"
-        >
-          <Ionicons name="analytics-outline" size={22} color="#1E40AF" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          className="w-12 h-12 items-center justify-center rounded-[10px]"
-          onPress={handleCategoryManagement}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="Manage categories"
-        >
-          <Ionicons name="pricetags-outline" size={22} color="#1E40AF" />
-        </TouchableOpacity>
         <TouchableOpacity
           className="w-12 h-12 items-center justify-center rounded-[10px]"
           onPress={handleAddItem}
@@ -323,6 +321,15 @@ export const CentralStoreInventoryScreen: React.FC = () => {
           accessibilityLabel="Add new item"
         >
           <Ionicons name="add-circle" size={22} color="#1E40AF" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          className="w-12 h-12 items-center justify-center rounded-[10px]"
+          onPress={handleToggleMoreMenu}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="More options"
+        >
+          <Ionicons name="ellipsis-vertical" size={22} color="#1E40AF" />
         </TouchableOpacity>
       </View>
     </View>
@@ -426,6 +433,13 @@ export const CentralStoreInventoryScreen: React.FC = () => {
                     () => handleCategoryFilter(undefined),
                     'Filter by all categories',
                     'category-all'
+                  )}
+                  {renderFilterChip(
+                    'Uncategorized',
+                    filters.categoryId === '',
+                    () => handleCategoryFilter(''),
+                    'Filter by uncategorized items',
+                    'category-uncategorized'
                   )}
                   {categories.map((category) =>
                     renderFilterChip(
@@ -595,6 +609,85 @@ export const CentralStoreInventoryScreen: React.FC = () => {
           </View>
         </View>
       )}
+
+      {/* More Options Modal */}
+      <Modal
+        visible={showMoreMenu}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={handleCloseMoreMenu}
+      >
+        <TouchableWithoutFeedback onPress={handleCloseMoreMenu}>
+          <View className="flex-1 bg-black/50 justify-end">
+            <TouchableWithoutFeedback>
+              <View className="bg-white rounded-t-2xl p-4 pb-8">
+                <View className="w-10 h-1 bg-gray-300 rounded-full self-center mb-4" />
+                <Text className="text-[22px] font-semibold text-[#0F172A] mb-4 px-2">
+                  More Options
+                </Text>
+                
+                <View className="gap-2">
+                  {isAdmin && (
+                    <TouchableOpacity
+                      className="flex-row items-center px-4 py-3 rounded-xl bg-[#F8FAFC]"
+                      onPress={() => {
+                        handleCloseMoreMenu();
+                        handleInventoryUpdateRequests();
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="document-text-outline" size={24} color="#1E40AF" />
+                      <Text className="text-[15px] font-medium text-[#0F172A] ml-3">Inventory Update Requests</Text>
+                    </TouchableOpacity>
+                  )}
+                  
+                  {(isAdmin || isStoreIncharge) && (
+                    <TouchableOpacity
+                      className="flex-row items-center px-4 py-3 rounded-xl bg-[#F8FAFC]"
+                      onPress={() => {
+                        handleCloseMoreMenu();
+                        handleMaintenance();
+                      }}
+                      activeOpacity={0.7}
+                      accessibilityLabel="Maintenance"
+                      accessibilityRole="button"
+                    >
+                      <Ionicons name="build-outline" size={24} color="#1E40AF" />
+                      <Text className="text-[15px] font-medium text-[#0F172A] ml-3">Maintenance</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity
+                    className="flex-row items-center px-4 py-3 rounded-xl bg-[#F8FAFC]"
+                    onPress={() => {
+                      handleCloseMoreMenu();
+                      handleSteelMaster();
+                    }}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Custom Items"
+                    accessibilityRole="button"
+                  >
+                    <Ionicons name="analytics-outline" size={24} color="#1E40AF" />
+                    <Text className="text-[15px] font-medium text-[#0F172A] ml-3">Custom Items</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    className="flex-row items-center px-4 py-3 rounded-xl bg-[#F8FAFC]"
+                    onPress={() => {
+                      handleCloseMoreMenu();
+                      handleCategoryManagement();
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="pricetags-outline" size={24} color="#1E40AF" />
+                    <Text className="text-[15px] font-medium text-[#0F172A] ml-3">Manage Categories</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </ScreenLayout>
   );
 };

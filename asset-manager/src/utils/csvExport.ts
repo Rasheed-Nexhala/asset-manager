@@ -2,6 +2,58 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
 /**
+ * Safely format a timestamp for CSV export.
+ * Handles Firestore Timestamp, ISO string, Date, or plain {seconds, nanoseconds}.
+ * Returns a readable date string or empty string if invalid.
+ */
+export function formatDateForCsv(
+  value: unknown
+): string {
+  if (value == null) return '';
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toLocaleString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+  if (typeof value === 'string') {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+  const obj = value as { toDate?: () => Date; seconds?: number; nanoseconds?: number };
+  if (typeof obj.toDate === 'function') {
+    const d = obj.toDate();
+    return d && !Number.isNaN(d.getTime()) ? d.toLocaleString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }) : '';
+  }
+  if (typeof obj.seconds === 'number') {
+    const d = new Date(obj.seconds * 1000 + (obj.nanoseconds ?? 0) / 1e6);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+  return '';
+}
+
+/**
  * Save CSV string to device and share via native share dialog
  *
  * @param csvString - CSV content

@@ -158,6 +158,24 @@ const mockItem: Item = {
   updatedAt: '2024-01-01T00:00:00.000Z',
 };
 
+const mockUncategorizedItem: Item = {
+  id: 'i2',
+  name: 'Uncategorized Tool',
+  sku: 'SKU-002',
+  categoryId: null,
+  categoryName: null,
+  type: 'non_consumable',
+  unit: 'piece',
+  minStockLevel: 5,
+  status: 'active',
+  totalQuantity: 20,
+  centralStoreQuantity: 12,
+  atSitesQuantity: 6,
+  inMaintenanceQuantity: 2,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+};
+
 const defaultAuthState: AuthState = {
   user: { uid: 'user1', email: 'user@test.com', displayName: 'Test User' } as import('firebase/auth').User,
   userRole: null,
@@ -323,5 +341,53 @@ describe('ItemDetailScreen', () => {
     expect(screen.queryByRole('button', { name: 'Add stock' })).toBeNull();
     expect(screen.queryByText('Stock Level & Status')).toBeNull();
     expect(screen.getByText('Steel Bar 12mm')).toBeTruthy();
+  });
+
+  it('renders uncategorized item details correctly', () => {
+    mockRouteParams = { itemId: 'i2' };
+    renderWithStore(<ItemDetailScreen />, {
+      inventory: { ...baseInventoryState, items: [mockUncategorizedItem] },
+    });
+
+    expect(screen.getByText('Uncategorized Tool')).toBeTruthy();
+    expect(screen.getByText(/SKU: SKU-002/)).toBeTruthy();
+    expect(screen.getByText('Basic Information')).toBeTruthy();
+    expect(screen.getByText('Stock Distribution')).toBeTruthy();
+    expect(screen.getByText('Total Stock')).toBeTruthy();
+    expect(screen.getByText('Central Store')).toBeTruthy();
+  });
+
+  it('edit button works for uncategorized items', () => {
+    mockRouteParams = { itemId: 'i2' };
+    const adminAuth: AuthState = {
+      ...defaultAuthState,
+      userRole: { role: 'Admin' as const, isActive: true, permissions: [] },
+    };
+    renderWithStore(<ItemDetailScreen />, {
+      auth: adminAuth,
+      inventory: { ...baseInventoryState, items: [mockUncategorizedItem] },
+    });
+
+    const editButtons = screen.getAllByRole('button', { name: 'Edit item' });
+    fireEvent.press(editButtons[0]);
+
+    expect(mockNavigate).toHaveBeenCalledWith('AddEditItem', { itemId: 'i2' });
+  });
+
+  it('add stock works for uncategorized items', () => {
+    mockRouteParams = { itemId: 'i2' };
+    const adminAuth: AuthState = {
+      ...defaultAuthState,
+      userRole: { role: 'Admin' as const, isActive: true, permissions: [] },
+    };
+    renderWithStore(<ItemDetailScreen />, {
+      auth: adminAuth,
+      inventory: { ...baseInventoryState, items: [mockUncategorizedItem] },
+    });
+
+    const addStockButtons = screen.getAllByRole('button', { name: 'Add stock' });
+    fireEvent.press(addStockButtons[0]);
+
+    expect(screen.getByLabelText('Amount input')).toBeTruthy();
   });
 });

@@ -7,7 +7,7 @@ const mockOnCancel = jest.fn();
 
 const mockSteelMaster = {
   id: 'sm1',
-  name: 'MS ANGLE 80x80x6',
+  name: 'Custom Item A',
   weightPerMeter: 7.2,
   defaultLength: 6,
   hsnCode: 'HSN7214',
@@ -28,7 +28,7 @@ describe('SteelMasterForm', () => {
         onCancel={mockOnCancel}
       />
     );
-    expect(queryByText('Add Steel Master')).toBeNull();
+    expect(queryByText('Add Custom Item')).toBeNull();
   });
 
   it('renders create mode title when visible', () => {
@@ -40,7 +40,7 @@ describe('SteelMasterForm', () => {
         onCancel={mockOnCancel}
       />
     );
-    expect(screen.getAllByText('Add Steel Master').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Add Custom Item').length).toBeGreaterThan(0);
   });
 
   it('renders edit mode title when in edit mode', () => {
@@ -53,7 +53,7 @@ describe('SteelMasterForm', () => {
         onCancel={mockOnCancel}
       />
     );
-    expect(screen.getByText('Edit Steel Master')).toBeTruthy();
+    expect(screen.getByText('Edit Custom Item')).toBeTruthy();
   });
 
   it('prefills form in edit mode', () => {
@@ -66,7 +66,7 @@ describe('SteelMasterForm', () => {
         onCancel={mockOnCancel}
       />
     );
-    expect(screen.getByDisplayValue('MS ANGLE 80x80x6')).toBeTruthy();
+    expect(screen.getByDisplayValue('Custom Item A')).toBeTruthy();
     expect(screen.getByDisplayValue('7.2')).toBeTruthy();
     expect(screen.getByDisplayValue('6')).toBeTruthy();
     expect(screen.getByDisplayValue('HSN7214')).toBeTruthy();
@@ -107,7 +107,7 @@ describe('SteelMasterForm', () => {
         onCancel={mockOnCancel}
       />
     );
-    fireEvent.press(screen.getByRole('button', { name: /Add Steel Master/i }));
+    fireEvent.press(screen.getByRole('button', { name: /Add Custom Item/i }));
 
     expect(screen.getByText('Item name is required')).toBeTruthy();
     expect(screen.getByText('Weight per meter must be a positive number')).toBeTruthy();
@@ -128,15 +128,15 @@ describe('SteelMasterForm', () => {
       />
     );
 
-    fireEvent.changeText(screen.getByLabelText('Steel master name input'), 'MS ANGLE 80x80x6');
+    fireEvent.changeText(screen.getByLabelText('Custom item name input'), 'Custom Item A');
     fireEvent.changeText(screen.getByLabelText('Default length input'), '6');
     fireEvent.changeText(screen.getByLabelText('Weight per meter input'), '7.2');
     fireEvent.changeText(screen.getByLabelText('SKU input'), 'HSN7214');
 
-    fireEvent.press(screen.getByRole('button', { name: /Add Steel Master/i }));
+    fireEvent.press(screen.getByRole('button', { name: /Add Custom Item/i }));
 
     expect(mockOnSubmit).toHaveBeenCalledWith({
-      name: 'MS ANGLE 80x80x6',
+      name: 'Custom Item A',
       weightPerMeter: 7.2,
       defaultLength: 6,
       hsnCode: 'HSN7214',

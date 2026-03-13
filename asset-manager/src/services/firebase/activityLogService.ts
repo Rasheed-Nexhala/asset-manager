@@ -24,6 +24,7 @@ import type {
   ActivityLogExportOptions,
 } from '../../types/activityLog';
 import { isoToDate } from '../../utils/dateSerialization';
+import { formatDateForCsv } from '../../utils/csvExport';
 
 const ACTIVITY_LOGS_COLLECTION = 'activityLogs';
 
@@ -254,13 +255,7 @@ export async function exportActivityLogs(
 
     const rows = logs
       .map((log) => {
-        const timestamp = new Date(log.timestamp).toLocaleString('en-IN', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        });
+        const timestamp = formatDateForCsv(log.timestamp);
 
         return [
           timestamp,

@@ -25,6 +25,7 @@ import { selectCanStoreInchargeAdjustInventory, selectMyAccessGrantedUntil } fro
 import { updateItemInState, clearError } from '../../store/slices/inventorySlice';
 import { subscribeItemById, subscribeInventoryByItemId } from '../../services/firebase/inventoryService';
 import type { Item, AdjustmentData, AdjustmentType, InventoryEntry } from '../../types/inventory';
+import { getDisplayCategoryName } from '../../types/inventory';
 
 type NavigationProp = StackNavigationProp<InventoryStackParamList, 'ItemDetail'>;
 
@@ -373,7 +374,7 @@ export const ItemDetailScreen: React.FC = () => {
             {/* Category */}
             <View className="flex-row justify-between items-center">
               <Text className="text-[13px] text-[#64748B]">Category</Text>
-              <Text className="text-[15px] text-[#0F172A]">{item.categoryName}</Text>
+              <Text className="text-[15px] text-[#0F172A]">{getDisplayCategoryName(item.categoryName)}</Text>
             </View>
 
             {/* Unit */}

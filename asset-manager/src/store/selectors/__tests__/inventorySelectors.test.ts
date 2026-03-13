@@ -120,6 +120,28 @@ const mockItem = (
     centralStoreQuantity: 5,
     atSitesQuantity: 3,
     inMaintenanceQuantity: 2,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+    ...overrides,
+  }) as Item;
+
+const mockUncategorizedItem = (id: string, overrides: Partial<Item> = {}): Item =>
+  ({
+    id,
+    name: `Uncategorized Item ${id}`,
+    sku: `UNCAT-${id}`,
+    categoryId: null,
+    categoryName: null,
+    type: 'non_consumable',
+    unit: 'piece',
+    minStockLevel: 5,
+    status: 'active',
+    totalQuantity: 10,
+    centralStoreQuantity: 5,
+    atSitesQuantity: 3,
+    inMaintenanceQuantity: 2,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
     ...overrides,
   }) as Item;
 
@@ -378,5 +400,90 @@ describe('inventorySelectors', () => {
     const state = createMockState({ categories: [mockCategory('cat1', 'Steel')] });
     const selector = selectCategoryById('missing');
     expect(selector(state)).toBeNull();
+  });
+
+  it('selectFilteredItems filters uncategorized items with null categoryId', () => {
+    const items = [
+      mockItem('1', { categoryId: 'cat1', categoryName: 'Steel' }),
+      mockUncategorizedItem('2'),
+      mockItem('3', { categoryId: 'cat2', categoryName: 'Tools' }),
+    ];
+    const state = createMockState({
+      items,
+      filters: { categoryId: null }, // Filter for uncategorized items
+    });
+    const result = selectFilteredItems(state);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('2');
+    expect(result[0].categoryId).toBeNull();
+  });
+
+  it('selectItemsByCategory returns uncategorized items when filtering by null', () => {
+    const items = [
+      mockItem('1', { categoryId: 'cat1' }),
+      mockUncategorizedItem('2'),
+      mockUncategorizedItem('3'),
+      mockItem('4', { categoryId: 'cat2' }),
+    ];
+    const state = createMockState({ items });
+    const selector = selectItemsByCategory(null); // Select uncategorized items
+    const result = selector(state);
+    expect(result).toHaveLength(2);
+    expect(result.every((i) => i.categoryId === null)).toBe(true);
+  });
+
+  it('selectLowStockItems includes uncategorized items in low stock calculation', () => {
+    const lowUncategorized = mockUncategorizedItem('low1', {
+      centralStoreQuantity: 2,
+      totalQuantity: 10,
+      minStockLevel: 5,
+    });
+    const okUncategorized = mockUncategorizedItem('ok1', {
+      centralStoreQuantity: 10,
+      totalQuantity: 10,
+      minStockLevel: 5,
+    });
+    const lowCategorized = mockItem('low2', {
+      centralStoreQuantity: 1,
+      totalQuantity: 8,
+      minStockLevel: 5,
+    });
+    
+    const state = createMockState({
+      items: [lowUncategorized, okUncategorized, lowCategorized],
+    });
+    
+    const result = selectLowStockItems(state);
+    expect(result).toHaveLength(2);
+    expect(result.map(i => i.id).sort()).toEqual(['low1', 'low2']);
+  });
+
+  it('selectItemsBySearchQuery finds uncategorized items by name and sku', () => {
+    const items = [
+      mockItem('1', { name: 'Steel Bar', categoryId: 'cat1' }),
+      mockUncategorizedItem('2', { name: 'Steel Tool' }),
+      mockUncategorizedItem('3', { sku: 'STL-999' }),
+    ];
+    const state = createMockState({ items });
+    const result = selectItemsBySearchQuery(state, 'steel');
+    expect(result).toHaveLength(2);
+    expect(result.some(i => i.categoryId === 'cat1')).toBe(true);
+    expect(result.some(i => i.categoryId === null)).toBe(true);
+  });
+
+  it('selectFilteredAndSearchedItems works with uncategorized items', () => {
+    const items = [
+      mockUncategorizedItem('1', { name: 'Steel Tool' }),
+      mockUncategorizedItem('2', { name: 'Concrete Tool' }),
+      mockItem('3', { name: 'Steel Bar', categoryId: 'cat1' }),
+    ];
+    const state = createMockState({
+      items,
+      filters: { categoryId: null }, // Filter for uncategorized
+    });
+    const result = selectFilteredAndSearchedItems(state, 'steel');
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('1');
+    expect(result[0].categoryId).toBeNull();
   });
 });

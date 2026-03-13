@@ -1,7 +1,7 @@
 import { Timestamp } from 'firebase/firestore';
 
 /**
- * Steel Master document structure in Firestore (with Firebase Timestamps)
+ * Custom Item document structure in Firestore (with Firebase Timestamps)
  * Stores standard steel item specifications for weight-based conversion
  */
 export interface FirestoreSteelMaster {
@@ -16,7 +16,7 @@ export interface FirestoreSteelMaster {
 }
 
 /**
- * Steel Master document structure for Redux store (serialized timestamps)
+ * Custom Item document structure for Redux store (serialized timestamps)
  */
 export interface SteelMaster {
   id: string;

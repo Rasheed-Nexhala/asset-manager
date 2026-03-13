@@ -348,7 +348,7 @@ Notification payloads map to screens:
 | sites | Sites, manager assignments, validation state |
 | inventory | Items, categories, inventoryByLocation, lowStockItemIds, filters |
 | requests | Requests, myRequests, selectedRequest, filters |
-| steelMaster | Steel master records |
+| steelMaster | Custom item records |
 | maintenance | Maintenance records, filters |
 | activityLog | Logs, myRecentActivity, hasMore, filters |
 | purchaseOrders | Purchase orders, vendors, filters |
@@ -358,7 +358,7 @@ Notification payloads map to screens:
 - **No RTK Query** — Uses `createAsyncThunk` + Firebase services
 - **Real-time subscriptions** via Firestore listeners
 - **useDashboardSubscriptions** — Role-based subscriptions for dashboard data
-- **Thunks** — Auth, inventory, sites, requests, POs, maintenance, activity log, steel master, manager validation
+- **Thunks** — Auth, inventory, sites, requests, POs, maintenance, activity log, custom items, manager validation
 
 ### 8.3 Custom Hooks
 
@@ -462,7 +462,7 @@ Notification payloads map to screens:
 - **CRUD:** Name, SKU, category, type, unit, minStockLevel, image
 - **Adjustments:** Mandatory reason and notes
 - **Low-stock alerts:** When quantity ≤ minStockLevel
-- **Categories & Steel Master** management
+- **Categories & Custom Items** management
 
 ### 10.2 Request Management
 

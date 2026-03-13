@@ -169,8 +169,8 @@ export const createSteelMaster = async (
 
     // Pre-check for uniqueness
     const { nameExists, hsnExists } = await checkSteelMasterExists(name, hsnCode);
-    if (nameExists) throw new Error(`Steel master with name "${name}" already exists`);
-    if (hsnExists) throw new Error(`Steel master with HSN code "${hsnCode}" already exists`);
+    if (nameExists) throw new Error(`Custom item with name "${name}" already exists`);
+    if (hsnExists) throw new Error(`Custom item with HSN code "${hsnCode}" already exists`);
 
     const docRef = doc(collection(db, STEEL_MASTER_COLLECTION));
     const docData: Record<string, unknown> = {
@@ -208,7 +208,7 @@ export const updateSteelMaster = async (
     const steelMasterRef = doc(db, STEEL_MASTER_COLLECTION, id);
     const docSnap = await getDoc(steelMasterRef);
     if (!docSnap.exists()) {
-      throw new Error('Steel master not found');
+      throw new Error('Custom item not found');
     }
 
     const currentData = docSnap.data();
@@ -222,10 +222,10 @@ export const updateSteelMaster = async (
     ) {
       const { nameExists, hsnExists } = await checkSteelMasterExists(newName, newHsnCode, id);
       if (updates.name !== undefined && newName !== currentData.name && nameExists) {
-        throw new Error(`Steel master with name "${newName}" already exists`);
+        throw new Error(`Custom item with name "${newName}" already exists`);
       }
       if (updates.hsnCode !== undefined && newHsnCode !== currentData.hsnCode && hsnExists) {
-        throw new Error(`Steel master with HSN code "${newHsnCode}" already exists`);
+        throw new Error(`Custom item with HSN code "${newHsnCode}" already exists`);
       }
     }
 
@@ -244,7 +244,7 @@ export const updateSteelMaster = async (
 
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(steelMasterRef);
-      if (!snap.exists()) throw new Error('Steel master not found');
+      if (!snap.exists()) throw new Error('Custom item not found');
       transaction.update(steelMasterRef, updateData);
     });
   } catch (error) {

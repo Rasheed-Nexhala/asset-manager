@@ -1,6 +1,6 @@
 /**
- * Steel Master Form Component
- * Form for adding/editing steel master specifications
+ * Custom Item Form Component
+ * Form for adding/editing custom item specifications
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -12,58 +12,45 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
-  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { KeyboardToolbar } from '../KeyboardToolbar';
 import type { SteelMaster, CreateSteelMasterData, UpdateSteelMasterData } from '../../types/steelMaster';
 
-const STEEL_MASTER_TOOLBAR_NEXT = 'steelMasterToolbarNext';
-const STEEL_MASTER_TOOLBAR_DONE = 'steelMasterToolbarDone';
-
 export interface SteelMasterFormProps {
-  visible: boolean;
+  /** When false (modal mode), form is hidden when visible=false. When true (screen mode), form always renders. */
+  visible?: boolean;
   mode: 'create' | 'edit';
   initialData?: SteelMaster | null;
   onSubmit: (data: CreateSteelMasterData | UpdateSteelMasterData) => Promise<void>;
   onCancel: () => void;
   loading?: boolean;
   error?: string | null;
+  /** When true, renders as screen content (no Modal). Used by AddEditCustomItemScreen. */
+  asScreen?: boolean;
 }
 
 export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
-  visible,
+  visible = true,
   mode,
   initialData,
   onSubmit,
   onCancel,
   loading = false,
   error = null,
+  asScreen = false,
 }) => {
   const [name, setName] = useState('');
   const [weightPerMeter, setWeightPerMeter] = useState('');
   const [defaultLength, setDefaultLength] = useState('');
   const [hsnCode, setHsnCode] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [focusedField, setFocusedField] = useState<'name' | 'defaultLength' | 'weightPerMeter' | 'hsnCode' | null>(null);
 
   const defaultLengthRef = useRef<TextInput>(null);
   const weightPerMeterRef = useRef<TextInput>(null);
   const hsnCodeRef = useRef<TextInput>(null);
 
-  const handleToolbarNext = useCallback(() => {
-    if (focusedField === 'name') defaultLengthRef.current?.focus();
-    else if (focusedField === 'defaultLength') weightPerMeterRef.current?.focus();
-    else if (focusedField === 'weightPerMeter') hsnCodeRef.current?.focus();
-    else Keyboard.dismiss();
-  }, [focusedField]);
-
-  const handleToolbarDone = useCallback(() => {
-    Keyboard.dismiss();
-  }, []);
-
   useEffect(() => {
-    if (visible) {
+    if (visible || asScreen) {
       if (mode === 'edit' && initialData) {
         setName(initialData.name);
         setWeightPerMeter(initialData.weightPerMeter.toString());
@@ -77,7 +64,7 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
       }
       setErrors({});
     }
-  }, [visible, mode, initialData]);
+  }, [visible, asScreen, mode, initialData]);
 
   const validate = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
@@ -129,65 +116,27 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
     onSubmit,
   ]);
 
-  if (!visible) return null;
+  if (!visible && !asScreen) return null;
 
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onCancel}
-    >
-      <KeyboardToolbar
-        nativeID={STEEL_MASTER_TOOLBAR_NEXT}
-        onDone={handleToolbarDone}
-        onNext={handleToolbarNext}
-        showNext
-      />
-      <KeyboardToolbar
-        nativeID={STEEL_MASTER_TOOLBAR_DONE}
-        onDone={handleToolbarDone}
-      />
-      <View className="flex-1 bg-black/50 justify-end">
-        <View className="bg-white rounded-t-2xl max-h-[90%]">
-          {/* Handle Bar */}
-          <View className="w-10 h-1 bg-[#E2E8F0] rounded-full self-center mt-3" />
-          
-          <View className="p-4 border-b border-[#E2E8F0] flex-row items-center justify-between">
-            <Text className="text-[22px] font-semibold text-[#0F172A]">
-              {mode === 'create' ? 'Add Steel Master' : 'Edit Steel Master'}
-            </Text>
-            <TouchableOpacity
-              onPress={onCancel}
-              className="min-w-[48px] min-h-[48px] w-12 h-12 items-center justify-center"
-              disabled={loading}
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-            >
-              <Ionicons name="close" size={24} color="#64748B" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView className="p-4" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+  const formContent = (
+    <ScrollView className="p-4" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View className="gap-4">
               {/* Name */}
               <View className="gap-1.5">
-                <Text className="text-[15px] text-[#0F172A]">Steel Master Name <Text className="text-[#DC2626]">*</Text></Text>
+                <Text className="text-[15px] text-[#0F172A]">Custom Item Name <Text className="text-[#DC2626]">*</Text></Text>
                 <TextInput
                   className={`border rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A] ${
                     errors.name ? 'border-[#DC2626]' : 'border-[#E2E8F0]'
                   }`}
-                  placeholder="e.g. MS ANGLE 80x80x6"
+                  placeholder="e.g. Custom Item Name"
                   placeholderTextColor="#94A3B8"
                   value={name}
                   onChangeText={(t) => {
                     setName(t);
                     if (errors.name) setErrors((e) => ({ ...e, name: '' }));
                   }}
-                  onFocus={() => setFocusedField('name')}
-                  inputAccessoryViewID={STEEL_MASTER_TOOLBAR_NEXT}
                   editable={!loading}
-                  accessibilityLabel="Steel master name input"
+                  accessibilityLabel="Custom item name input"
                 />
                 {errors.name && (
                   <Text className="text-[13px] text-[#DC2626]" accessibilityLiveRegion="polite">
@@ -214,8 +163,6 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
                     if (errors.defaultLength)
                       setErrors((e) => ({ ...e, defaultLength: '' }));
                   }}
-                  onFocus={() => setFocusedField('defaultLength')}
-                  inputAccessoryViewID={STEEL_MASTER_TOOLBAR_NEXT}
                   keyboardType="decimal-pad"
                   editable={!loading}
                   accessibilityLabel="Default length input"
@@ -245,8 +192,6 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
                     if (errors.weightPerMeter)
                       setErrors((e) => ({ ...e, weightPerMeter: '' }));
                   }}
-                  onFocus={() => setFocusedField('weightPerMeter')}
-                  inputAccessoryViewID={STEEL_MASTER_TOOLBAR_NEXT}
                   keyboardType="decimal-pad"
                   editable={!loading}
                   accessibilityLabel="Weight per meter input"
@@ -275,8 +220,6 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
                     setHsnCode(t);
                     if (errors.hsnCode) setErrors((e) => ({ ...e, hsnCode: '' }));
                   }}
-                  onFocus={() => setFocusedField('hsnCode')}
-                  inputAccessoryViewID={STEEL_MASTER_TOOLBAR_DONE}
                   editable={!loading}
                   accessibilityLabel="SKU input"
                 />
@@ -305,7 +248,7 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
                 disabled={loading}
                 activeOpacity={0.7}
                 accessibilityRole="button"
-                accessibilityLabel={loading ? 'Saving, please wait' : mode === 'create' ? 'Add Steel Master' : 'Save changes'}
+                accessibilityLabel={loading ? 'Saving, please wait' : mode === 'create' ? 'Add Custom Item' : 'Save changes'}
                 accessibilityState={{ disabled: loading, busy: loading }}
               >
                 {loading ? (
@@ -317,7 +260,7 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
                   <>
                     <Ionicons name="checkmark" size={22} color="#FFFFFF" />
                     <Text className="text-[15px] font-semibold text-white">
-                      {mode === 'create' ? 'Add Steel Master' : 'Save Changes'}
+                      {mode === 'create' ? 'Add Custom Item' : 'Save Changes'}
                     </Text>
                   </>
                 )}
@@ -338,6 +281,42 @@ export const SteelMasterForm: React.FC<SteelMasterFormProps> = ({
               </TouchableOpacity>
             </View>
           </ScrollView>
+  );
+
+  if (asScreen) {
+    return (
+      <View className="flex-1">
+        {formContent}
+      </View>
+    );
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onCancel}
+    >
+      <View className="flex-1 bg-black/50 justify-end">
+        <View className="bg-white rounded-t-2xl max-h-[90%]">
+          {/* Handle Bar */}
+          <View className="w-10 h-1 bg-[#E2E8F0] rounded-full self-center mt-3" />
+          <View className="p-4 border-b border-[#E2E8F0] flex-row items-center justify-between">
+            <Text className="text-[22px] font-semibold text-[#0F172A]">
+              {mode === 'create' ? 'Add Custom Item' : 'Edit Custom Item'}
+            </Text>
+            <TouchableOpacity
+              onPress={onCancel}
+              className="min-w-[48px] min-h-[48px] w-12 h-12 items-center justify-center"
+              disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
+              <Ionicons name="close" size={24} color="#64748B" />
+            </TouchableOpacity>
+          </View>
+          {formContent}
         </View>
       </View>
     </Modal>
