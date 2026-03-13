@@ -2,9 +2,7 @@ import {
   collection,
   addDoc,
   doc,
-  getDoc,
   getDocs,
-  updateDoc,
   query,
   where,
   orderBy,
@@ -13,6 +11,7 @@ import {
   Timestamp,
   Unsubscribe,
   QuerySnapshot,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import { auth } from '../../../config/firebase';
@@ -112,26 +111,29 @@ export const approveRequest = async (
   }
 
   const requestRef = doc(db, COLLECTION, requestId);
-  const requestSnap = await getDoc(requestRef);
-  if (!requestSnap.exists()) {
-    throw new Error(`Request ${requestId} not found`);
-  }
 
-  const data = requestSnap.data();
-  if (data.status !== 'pending') {
-    throw new Error(`Request ${requestId} is not pending (status: ${data.status})`);
-  }
+  await runTransaction(db, async (transaction) => {
+    const requestSnap = await transaction.get(requestRef);
+    if (!requestSnap.exists()) {
+      throw new Error(`Request ${requestId} not found`);
+    }
 
-  const expiresAt = new Date();
-  expiresAt.setHours(expiresAt.getHours() + expiresInHours);
+    const data = requestSnap.data();
+    if (data.status !== 'pending') {
+      throw new Error(`Request ${requestId} is not pending (status: ${data.status})`);
+    }
 
-  await updateDoc(requestRef, {
-    status: 'approved',
-    approvedBy: adminId,
-    approvedByName: adminName,
-    approvedAt: serverTimestamp(),
-    accessExpiresAt: Timestamp.fromDate(expiresAt),
-    updatedAt: serverTimestamp(),
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + expiresInHours);
+
+    transaction.update(requestRef, {
+      status: 'approved',
+      approvedBy: adminId,
+      approvedByName: adminName,
+      approvedAt: serverTimestamp(),
+      accessExpiresAt: Timestamp.fromDate(expiresAt),
+      updatedAt: serverTimestamp(),
+    });
   });
 };
 
@@ -146,19 +148,22 @@ export const revokeAccess = async (requestId: string): Promise<void> => {
   }
 
   const requestRef = doc(db, COLLECTION, requestId);
-  const requestSnap = await getDoc(requestRef);
-  if (!requestSnap.exists()) {
-    throw new Error(`Request ${requestId} not found`);
-  }
 
-  const data = requestSnap.data();
-  if (data.status !== 'approved') {
-    throw new Error(`Request ${requestId} is not approved (status: ${data.status})`);
-  }
+  await runTransaction(db, async (transaction) => {
+    const requestSnap = await transaction.get(requestRef);
+    if (!requestSnap.exists()) {
+      throw new Error(`Request ${requestId} not found`);
+    }
 
-  await updateDoc(requestRef, {
-    accessRevoked: true,
-    updatedAt: serverTimestamp(),
+    const data = requestSnap.data();
+    if (data.status !== 'approved') {
+      throw new Error(`Request ${requestId} is not approved (status: ${data.status})`);
+    }
+
+    transaction.update(requestRef, {
+      accessRevoked: true,
+      updatedAt: serverTimestamp(),
+    });
   });
 };
 
@@ -210,23 +215,26 @@ export const rejectRequest = async (
   }
 
   const requestRef = doc(db, COLLECTION, requestId);
-  const requestSnap = await getDoc(requestRef);
-  if (!requestSnap.exists()) {
-    throw new Error(`Request ${requestId} not found`);
-  }
 
-  const data = requestSnap.data();
-  if (data.status !== 'pending') {
-    throw new Error(`Request ${requestId} is not pending (status: ${data.status})`);
-  }
+  await runTransaction(db, async (transaction) => {
+    const requestSnap = await transaction.get(requestRef);
+    if (!requestSnap.exists()) {
+      throw new Error(`Request ${requestId} not found`);
+    }
 
-  await updateDoc(requestRef, {
-    status: 'rejected',
-    approvedBy: adminId,
-    approvedByName: adminName,
-    approvedAt: serverTimestamp(),
-    rejectionReason: rejectionReason.trim() || 'Rejected by Admin',
-    updatedAt: serverTimestamp(),
+    const data = requestSnap.data();
+    if (data.status !== 'pending') {
+      throw new Error(`Request ${requestId} is not pending (status: ${data.status})`);
+    }
+
+    transaction.update(requestRef, {
+      status: 'rejected',
+      approvedBy: adminId,
+      approvedByName: adminName,
+      approvedAt: serverTimestamp(),
+      rejectionReason: rejectionReason.trim() || 'Rejected by Admin',
+      updatedAt: serverTimestamp(),
+    });
   });
 };
 

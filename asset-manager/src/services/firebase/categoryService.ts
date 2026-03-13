@@ -13,6 +13,7 @@ import {
   onSnapshot,
   Unsubscribe,
   QuerySnapshot,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import type {
@@ -131,18 +132,24 @@ export const checkCategoryNameExists = async (
  */
 export const createCategory = async (name: string): Promise<string> => {
   try {
-    // Check if category name already exists
-    const nameExists = await checkCategoryNameExists(name);
-    if (nameExists) {
-      throw new Error(`Category "${name}" already exists`);
-    }
+    const trimmedName = name.trim();
+    // Use normalized category name as the Firestore document ID to natively prevent duplicates
+    const docId = trimmedName.toLowerCase().replace(/\s+/g, '');
+    const docRef = doc(db, CATEGORIES_COLLECTION, docId);
 
-    const docRef = await addDoc(collection(db, CATEGORIES_COLLECTION), {
-      name: name.trim(),
-      createdAt: serverTimestamp(),
+    await runTransaction(db, async (transaction) => {
+      const docSnap = await transaction.get(docRef);
+      if (docSnap.exists()) {
+        throw new Error(`Category "${trimmedName}" already exists`);
+      }
+
+      transaction.set(docRef, {
+        name: trimmedName,
+        createdAt: serverTimestamp(),
+      });
     });
 
-    return docRef.id;
+    return docId;
   } catch (error) {
     console.error('Error creating category:', error);
     throw error;
@@ -157,15 +164,46 @@ export const createCategory = async (name: string): Promise<string> => {
  */
 export const updateCategory = async (id: string, name: string): Promise<void> => {
   try {
-    // Check if new category name already exists
-    const nameExists = await checkCategoryNameExists(name, id);
-    if (nameExists) {
-      throw new Error(`Category "${name}" already exists`);
-    }
+    const trimmedName = name.trim();
+    const newDocId = trimmedName.toLowerCase().replace(/\s+/g, '');
 
-    await updateDoc(doc(db, CATEGORIES_COLLECTION, id), {
-      name: name.trim(),
-    });
+    if (id !== newDocId) {
+      // Check if items are using this category before allowing an ID change
+      const itemCount = await checkItemsUsingCategory(id);
+      if (itemCount > 0) {
+        throw new Error(
+          `Cannot rename category because ${itemCount} item(s) are currently using it. Please create a new category instead.`
+        );
+      }
+
+      const oldDocRef = doc(db, CATEGORIES_COLLECTION, id);
+      const newDocRef = doc(db, CATEGORIES_COLLECTION, newDocId);
+
+      await runTransaction(db, async (transaction) => {
+        const oldDocSnap = await transaction.get(oldDocRef);
+        if (!oldDocSnap.exists()) {
+          throw new Error('Category not found');
+        }
+
+        const newDocSnap = await transaction.get(newDocRef);
+        if (newDocSnap.exists()) {
+          throw new Error(`Category "${trimmedName}" already exists`);
+        }
+
+        // Migrate to new document ID and delete old
+        transaction.set(newDocRef, {
+          name: trimmedName,
+          createdAt: oldDocSnap.data().createdAt,
+        });
+        transaction.delete(oldDocRef);
+      });
+    } else {
+      // Only case changed, ID remains the same
+      const docRef = doc(db, CATEGORIES_COLLECTION, id);
+      await updateDoc(docRef, {
+        name: trimmedName,
+      });
+    }
   } catch (error) {
     console.error('Error updating category:', error);
     throw error;

@@ -706,6 +706,17 @@ export const checkSkuExists = async (
   excludeId?: string
 ): Promise<boolean> => {
   try {
+    const skuRef = doc(db, 'skus', sku);
+    const skuDoc = await getDoc(skuRef);
+    if (skuDoc.exists()) {
+      if (excludeId && skuDoc.data()?.itemId === excludeId) {
+        // Continue checking legacy in case it also exists there
+      } else {
+        return true;
+      }
+    }
+
+    // Fallback to checking items collection in case some SKUs aren't in `skus` collection yet
     const itemsSnapshot = await getDocs(
       query(collection(db, ITEMS_COLLECTION), where('sku', '==', sku))
     );
@@ -752,76 +763,80 @@ export const createItem = async (
       throw new Error('User must be authenticated to create items');
     }
 
-    // Check if SKU already exists
+    // Pre-check SKU existence outside transaction
     const skuExists = await checkSkuExists(itemData.sku);
     if (skuExists) {
       throw new Error(`SKU "${itemData.sku}" already exists`);
     }
 
-    const batch = writeBatch(db);
+    return await runTransaction(db, async (transaction) => {
+      // Re-check SKU uniqueness safely inside transaction via the 'skus' collection
+      const skuRef = doc(db, 'skus', itemData.sku);
+      const skuDoc = await transaction.get(skuRef);
+      if (skuDoc.exists()) {
+        throw new Error(`SKU "${itemData.sku}" already exists`);
+      }
 
-    // Create item document with SKU as document ID (enables Firestore rule for SKU uniqueness)
-    const itemRef = doc(db, ITEMS_COLLECTION, itemData.sku);
-    const now = serverTimestamp();
-    
-    const isWeightBased = Boolean(itemData.weightPerMeter);
-    const lengthPerPiece = itemData.lengthPerPiece;
-    const steelMasterId = itemData.steelMasterId;
-    const steelMasterName = itemData.steelMasterName ?? undefined;
+      // Create item document with auto-generated ID
+      const itemRef = doc(collection(db, ITEMS_COLLECTION));
+      const now = serverTimestamp();
+      
+      const isWeightBased = Boolean(itemData.weightPerMeter);
+      const lengthPerPiece = itemData.lengthPerPiece;
+      const steelMasterId = itemData.steelMasterId;
+      const steelMasterName = itemData.steelMasterName ?? undefined;
 
-    const itemDocData: Record<string, unknown> = {
-      name: itemData.name,
-      sku: itemData.sku,
-      description: itemData.description || '',
-      categoryId: itemData.categoryId,
-      categoryName: categoryName,
-      type: itemData.type,
-      unit: itemData.unit,
-      imageUrl: itemData.imageUrl || '',
-      minStockLevel: itemData.minStockLevel,
-      status: 'active' as const,
-      totalQuantity: itemData.initialQuantity,
-      centralStoreQuantity: itemData.initialQuantity,
-      atSitesQuantity: 0,
-      inMaintenanceQuantity: 0,
-      createdAt: now,
-      updatedAt: now,
-    };
-    if (itemData.createdBy) itemDocData.createdBy = itemData.createdBy;
-    if (itemData.createdByName) itemDocData.createdByName = itemData.createdByName;
-    if (itemData.createdByRole) itemDocData.createdByRole = itemData.createdByRole;
-    if (itemData.weightPerMeter != null) itemDocData.weightPerMeter = itemData.weightPerMeter;
-    if (lengthPerPiece != null) itemDocData.lengthPerPiece = lengthPerPiece;
-    if (steelMasterId) itemDocData.steelMasterId = steelMasterId;
-    if (steelMasterName) itemDocData.steelMasterName = steelMasterName;
-    if (isWeightBased) itemDocData.isWeightBased = true;
+      const itemDocData: Record<string, unknown> = {
+        name: itemData.name,
+        sku: itemData.sku,
+        description: itemData.description || '',
+        categoryId: itemData.categoryId,
+        categoryName: categoryName,
+        type: itemData.type,
+        unit: itemData.unit,
+        imageUrl: itemData.imageUrl || '',
+        minStockLevel: itemData.minStockLevel,
+        status: 'active' as const,
+        totalQuantity: itemData.initialQuantity,
+        centralStoreQuantity: itemData.initialQuantity,
+        atSitesQuantity: 0,
+        inMaintenanceQuantity: 0,
+        createdAt: now,
+        updatedAt: now,
+      };
+      if (itemData.createdBy) itemDocData.createdBy = itemData.createdBy;
+      if (itemData.createdByName) itemDocData.createdByName = itemData.createdByName;
+      if (itemData.createdByRole) itemDocData.createdByRole = itemData.createdByRole;
+      if (itemData.weightPerMeter != null) itemDocData.weightPerMeter = itemData.weightPerMeter;
+      if (lengthPerPiece != null) itemDocData.lengthPerPiece = lengthPerPiece;
+      if (steelMasterId) itemDocData.steelMasterId = steelMasterId;
+      if (steelMasterName) itemDocData.steelMasterName = steelMasterName;
+      if (isWeightBased) itemDocData.isWeightBased = true;
 
-    batch.set(itemRef, itemDocData);
+      // Create initial inventory entry for central store
+      const inventoryRef = doc(
+        db,
+        INVENTORY_COLLECTION,
+        getInventoryDocId(itemRef.id, getLocationId('store'))
+      );
+      const inventoryDocData: Record<string, unknown> = {
+        itemId: itemRef.id,
+        itemName: itemData.name,
+        itemSku: itemData.sku,
+        locationId: getLocationId('store'),
+        locationType: 'store' as LocationType,
+        locationName: 'Central Store',
+        quantity: itemData.initialQuantity,
+        updatedAt: now,
+      };
+      if (lengthPerPiece != null) inventoryDocData.lengthPerPiece = lengthPerPiece;
 
-    // Create initial inventory entry for central store
-    const inventoryRef = doc(
-      db,
-      INVENTORY_COLLECTION,
-      getInventoryDocId(itemRef.id, getLocationId('store'))
-    );
-    const inventoryDocData: Record<string, unknown> = {
-      itemId: itemRef.id,
-      itemName: itemData.name,
-      itemSku: itemData.sku,
-      locationId: getLocationId('store'),
-      locationType: 'store' as LocationType,
-      locationName: 'Central Store',
-      quantity: itemData.initialQuantity,
-      updatedAt: now,
-    };
-    if (lengthPerPiece != null) inventoryDocData.lengthPerPiece = lengthPerPiece;
+      transaction.set(skuRef, { itemId: itemRef.id, createdAt: now });
+      transaction.set(itemRef, itemDocData);
+      transaction.set(inventoryRef, inventoryDocData);
 
-    batch.set(inventoryRef, inventoryDocData);
-
-    // Commit batch
-    await batch.commit();
-
-    return itemRef.id;
+      return itemRef.id;
+    });
   } catch (error) {
     console.error('Error creating item:', error);
     throw error;
@@ -849,34 +864,7 @@ export const updateItem = async (
       throw new Error('User must be authenticated to update items');
     }
 
-    // Fetch current item for validation (before any database operations)
-    const itemDoc = await getDoc(doc(db, ITEMS_COLLECTION, id));
-    if (!itemDoc.exists()) {
-      throw new Error(`Item with ID ${id} not found`);
-    }
-    const itemData = itemDoc.data();
-
-    const resolvedUnit = updates.unit ?? itemData.unit;
-    if (updates.minStockLevel != null && isDiscreteUnit(resolvedUnit) && !Number.isInteger(updates.minStockLevel)) {
-      throw new Error(`${resolvedUnit} minimum stock must be a whole number`);
-    }
-
-    // Enforce business rule: type cannot be changed after first transaction
-    if (updates.type !== undefined && updates.type !== itemData.type) {
-      const hasTransactions =
-        (itemData.totalQuantity ?? 0) > 0 ||
-        (itemData.centralStoreQuantity ?? 0) > 0 ||
-        (itemData.atSitesQuantity ?? 0) > 0 ||
-        (itemData.inMaintenanceQuantity ?? 0) > 0;
-
-      if (hasTransactions) {
-        throw new Error(
-          'Item type cannot be changed after inventory transactions have occurred'
-        );
-      }
-    }
-
-    // If SKU is being updated, check if new SKU already exists
+    // Pre-check SKU existence outside transaction
     if (updates.sku) {
       const skuExists = await checkSkuExists(updates.sku, id);
       if (skuExists) {
@@ -884,23 +872,71 @@ export const updateItem = async (
       }
     }
 
-    // Build update payload — Firestore rejects undefined; omit undefined fields
-    const rawData: Record<string, unknown> = {
-      ...updates,
-      updatedAt: serverTimestamp(),
-    };
-    if (updates.categoryId && categoryName) {
-      rawData.categoryName = categoryName;
-    }
-    if (updates.updatedBy) rawData.updatedBy = updates.updatedBy;
-    if (updates.updatedByName) rawData.updatedByName = updates.updatedByName;
-    if (updates.updatedByRole) rawData.updatedByRole = updates.updatedByRole;
+    await runTransaction(db, async (transaction) => {
+      // Fetch current item for validation
+      const itemRef = doc(db, ITEMS_COLLECTION, id);
+      const itemDoc = await transaction.get(itemRef);
+      if (!itemDoc.exists()) {
+        throw new Error(`Item with ID ${id} not found`);
+      }
+      const itemData = itemDoc.data();
 
-    const updateData = Object.fromEntries(
-      Object.entries(rawData).filter(([, v]) => v !== undefined)
-    ) as Record<string, unknown>;
+      const resolvedUnit = updates.unit ?? itemData.unit;
+      if (updates.minStockLevel != null && isDiscreteUnit(resolvedUnit) && !Number.isInteger(updates.minStockLevel)) {
+        throw new Error(`${resolvedUnit} minimum stock must be a whole number`);
+      }
 
-    await updateDoc(doc(db, ITEMS_COLLECTION, id), updateData);
+      // Enforce business rule: type cannot be changed after first transaction
+      if (updates.type !== undefined && updates.type !== itemData.type) {
+        const hasTransactions =
+          (itemData.totalQuantity ?? 0) > 0 ||
+          (itemData.centralStoreQuantity ?? 0) > 0 ||
+          (itemData.atSitesQuantity ?? 0) > 0 ||
+          (itemData.inMaintenanceQuantity ?? 0) > 0;
+
+        if (hasTransactions) {
+          throw new Error(
+            'Item type cannot be changed after inventory transactions have occurred'
+          );
+        }
+      }
+
+      // If SKU is being updated, check if new SKU already exists safely inside transaction
+      if (updates.sku && updates.sku !== itemData.sku) {
+        const newSkuRef = doc(db, 'skus', updates.sku);
+        const newSkuDoc = await transaction.get(newSkuRef);
+        if (newSkuDoc.exists() && newSkuDoc.data()?.itemId !== id) {
+          throw new Error(`SKU "${updates.sku}" already exists`);
+        }
+        
+        // Write the new SKU doc
+        transaction.set(newSkuRef, { itemId: id, updatedAt: serverTimestamp() });
+        
+        // Delete the old SKU doc
+        if (itemData.sku) {
+          const oldSkuRef = doc(db, 'skus', itemData.sku);
+          transaction.delete(oldSkuRef);
+        }
+      }
+
+      // Build update payload — Firestore rejects undefined; omit undefined fields
+      const rawData: Record<string, unknown> = {
+        ...updates,
+        updatedAt: serverTimestamp(),
+      };
+      if (updates.categoryId && categoryName) {
+        rawData.categoryName = categoryName;
+      }
+      if (updates.updatedBy) rawData.updatedBy = updates.updatedBy;
+      if (updates.updatedByName) rawData.updatedByName = updates.updatedByName;
+      if (updates.updatedByRole) rawData.updatedByRole = updates.updatedByRole;
+
+      const updateData = Object.fromEntries(
+        Object.entries(rawData).filter(([, v]) => v !== undefined)
+      ) as Record<string, unknown>;
+
+      transaction.update(itemRef, updateData);
+    });
   } catch (error) {
     console.error('Error updating item:', error);
     throw error;
@@ -926,37 +962,54 @@ export const deleteItem = async (id: string): Promise<void> => {
       throw new Error('User must be authenticated to delete items');
     }
 
-    // Get item to retrieve imageUrl for storage cleanup
-    const itemDoc = await getDoc(doc(db, ITEMS_COLLECTION, id));
-    if (!itemDoc.exists()) {
-      throw new Error(`Item with ID ${id} not found`);
-    }
-
-    const itemData = itemDoc.data();
-    const imageUrl = itemData?.imageUrl;
-
-    // Delete image from storage first (prevents orphaned files)
-    if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim()) {
-      await deleteItemImageByUrl(imageUrl);
-    }
-
-    // Get all inventory entries for this item
+    // Pre-fetch inventory entries for this item since we can't query inside transaction
     const inventoryQuery = query(
       collection(db, INVENTORY_COLLECTION),
       where('itemId', '==', id)
     );
     const inventorySnapshot = await getDocs(inventoryQuery);
+    const inventoryRefs = inventorySnapshot.docs.map((docSnap) => docSnap.ref);
 
-    // Use batch for atomic delete (inventory entries + item document)
-    const batch = writeBatch(db);
+    let imageUrl: string | undefined;
 
-    inventorySnapshot.docs.forEach((docSnap) => {
-      batch.delete(doc(db, INVENTORY_COLLECTION, docSnap.id));
+    await runTransaction(db, async (transaction) => {
+      const itemRef = doc(db, ITEMS_COLLECTION, id);
+      const itemDoc = await transaction.get(itemRef);
+
+      if (!itemDoc.exists()) {
+        throw new Error(`Item with ID ${id} not found`);
+      }
+
+      const itemData = itemDoc.data();
+
+      // Ensure totalQuantity is zero before deleting
+      if ((itemData.totalQuantity || 0) > 0) {
+        throw new Error('Cannot delete item with active stock. Please reduce stock to zero first.');
+      }
+
+      imageUrl = itemData.imageUrl;
+
+      // Delete the sku document if one exists for this item
+      if (itemData.sku) {
+        const skuRef = doc(db, 'skus', itemData.sku);
+        transaction.delete(skuRef);
+      }
+
+      // Delete all inventory entries
+      for (const invRef of inventoryRefs) {
+        transaction.delete(invRef);
+      }
+
+      // Delete the item document itself
+      transaction.delete(itemRef);
     });
 
-    batch.delete(doc(db, ITEMS_COLLECTION, id));
-
-    await batch.commit();
+    // Delete image from storage after successful database deletion
+    if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim()) {
+      await deleteItemImageByUrl(imageUrl).catch((err) => {
+        console.error('Error deleting item image:', err);
+      });
+    }
   } catch (error) {
     console.error('Error deleting item:', error);
     throw error;
@@ -1083,6 +1136,20 @@ export const adjustQuantity = async (
 
       updatedTotals.totalQuantity = currentTotals.totalQuantity + quantityChange;
       updatedTotals.updatedAt = serverTimestamp();
+
+      // Defensive checks to prevent any denormalized stock from dropping below zero
+      if (typeof updatedTotals.totalQuantity === 'number' && updatedTotals.totalQuantity < 0) {
+        throw new Error('Total quantity cannot drop below zero.');
+      }
+      if (typeof updatedTotals.centralStoreQuantity === 'number' && updatedTotals.centralStoreQuantity < 0) {
+        throw new Error('Central store quantity cannot drop below zero.');
+      }
+      if (typeof updatedTotals.atSitesQuantity === 'number' && updatedTotals.atSitesQuantity < 0) {
+        throw new Error('Site quantity cannot drop below zero.');
+      }
+      if (typeof updatedTotals.inMaintenanceQuantity === 'number' && updatedTotals.inMaintenanceQuantity < 0) {
+        throw new Error('Maintenance quantity cannot drop below zero.');
+      }
 
       transaction.update(itemRef, updatedTotals);
         return { oldQuantity: currentQty, newQuantity };

@@ -43,6 +43,17 @@
     },
     "plugins": [
       [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "backgroundColor": "#ffffff",
+          "resizeMode": "contain",
+          "android": {
+            "imageWidth": 200
+          }
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Asset Manager uses your photo library to attach images to maintenance records (e.g. photos of damaged equipment), inventory items, and purchase order receipts. For example, when you add an item to maintenance, you can select photos from your device to document the damage."

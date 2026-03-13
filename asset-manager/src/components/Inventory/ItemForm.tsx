@@ -494,7 +494,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
     }
 
     // Min stock level validation
-    const MIN_STOCK_MAX = 1_000_000;
     const minStock = parseFloat(formData.minStockLevel);
     if (!formData.minStockLevel.trim()) {
       newErrors.minStockLevel = 'Minimum stock level is required';
@@ -502,8 +501,6 @@ export const ItemForm: React.FC<ItemFormProps> = ({
       newErrors.minStockLevel = 'Must be a valid number';
     } else if (minStock < 0) {
       newErrors.minStockLevel = 'Minimum stock level cannot be negative';
-    } else if (minStock > MIN_STOCK_MAX) {
-      newErrors.minStockLevel = `Minimum stock level seems unreasonably high (max ${MIN_STOCK_MAX.toLocaleString()})`;
     } else if (!isWeightBased && isDiscreteUnit(formData.unit) && !Number.isInteger(minStock)) {
       newErrors.minStockLevel = `${formData.unit} must be a whole number`;
     } else if (mode === 'create') {

@@ -13,6 +13,7 @@ import {
   Unsubscribe,
   QuerySnapshot,
   Timestamp,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import type {
@@ -111,17 +112,72 @@ export const getSteelMasterById = async (
 };
 
 /**
+ * Check if a steel master name or HSN code already exists
+ * Used for validation before creating/updating steel masters
+ * 
+ * @param name - Steel master name to check
+ * @param hsnCode - HSN code to check
+ * @param excludeId - Optional ID to exclude (for updates)
+ * @returns Object indicating if name or HSN exists
+ */
+export const checkSteelMasterExists = async (
+  name: string,
+  hsnCode: string,
+  excludeId?: string
+): Promise<{ nameExists: boolean; hsnExists: boolean }> => {
+  try {
+    const nameQuery = query(
+      collection(db, STEEL_MASTER_COLLECTION),
+      where('name', '==', name.trim())
+    );
+    const hsnQuery = query(
+      collection(db, STEEL_MASTER_COLLECTION),
+      where('hsnCode', '==', hsnCode.trim())
+    );
+
+    const [nameSnap, hsnSnap] = await Promise.all([
+      getDocs(nameQuery),
+      getDocs(hsnQuery),
+    ]);
+
+    const nameExists = excludeId
+      ? nameSnap.docs.some((doc) => doc.id !== excludeId)
+      : !nameSnap.empty;
+
+    const hsnExists = hsnCode.trim() !== ''
+      ? excludeId
+        ? hsnSnap.docs.some((doc) => doc.id !== excludeId)
+        : !hsnSnap.empty
+      : false;
+
+    return { nameExists, hsnExists };
+  } catch (error) {
+    console.error('Error checking steel master existence:', error);
+    throw error;
+  }
+};
+
+/**
  * Create a new steel master
  */
 export const createSteelMaster = async (
   data: CreateSteelMasterData
 ): Promise<string> => {
   try {
+    const name = data.name.trim();
+    const hsnCode = data.hsnCode.trim();
+
+    // Pre-check for uniqueness
+    const { nameExists, hsnExists } = await checkSteelMasterExists(name, hsnCode);
+    if (nameExists) throw new Error(`Steel master with name "${name}" already exists`);
+    if (hsnExists) throw new Error(`Steel master with HSN code "${hsnCode}" already exists`);
+
+    const docRef = doc(collection(db, STEEL_MASTER_COLLECTION));
     const docData: Record<string, unknown> = {
-      name: data.name.trim(),
+      name,
       weightPerMeter: data.weightPerMeter,
       defaultLength: data.defaultLength,
-      hsnCode: data.hsnCode.trim(),
+      hsnCode,
       isActive: true,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -130,7 +186,9 @@ export const createSteelMaster = async (
     if (data.createdByName) docData.createdByName = data.createdByName;
     if (data.createdByRole) docData.createdByRole = data.createdByRole;
 
-    const docRef = await addDoc(collection(db, STEEL_MASTER_COLLECTION), docData);
+    await runTransaction(db, async (transaction) => {
+      transaction.set(docRef, docData);
+    });
 
     return docRef.id;
   } catch (error) {
@@ -147,23 +205,48 @@ export const updateSteelMaster = async (
   updates: UpdateSteelMasterData
 ): Promise<void> => {
   try {
+    const steelMasterRef = doc(db, STEEL_MASTER_COLLECTION, id);
+    const docSnap = await getDoc(steelMasterRef);
+    if (!docSnap.exists()) {
+      throw new Error('Steel master not found');
+    }
+
+    const currentData = docSnap.data();
+    const newName = updates.name !== undefined ? updates.name.trim() : currentData.name;
+    const newHsnCode = updates.hsnCode !== undefined ? updates.hsnCode.trim() : currentData.hsnCode;
+
+    // Pre-check for uniqueness if name or HSN changed
+    if (
+      (updates.name !== undefined && newName !== currentData.name) ||
+      (updates.hsnCode !== undefined && newHsnCode !== currentData.hsnCode)
+    ) {
+      const { nameExists, hsnExists } = await checkSteelMasterExists(newName, newHsnCode, id);
+      if (updates.name !== undefined && newName !== currentData.name && nameExists) {
+        throw new Error(`Steel master with name "${newName}" already exists`);
+      }
+      if (updates.hsnCode !== undefined && newHsnCode !== currentData.hsnCode && hsnExists) {
+        throw new Error(`Steel master with HSN code "${newHsnCode}" already exists`);
+      }
+    }
+
     const updateData: Record<string, unknown> = {
       updatedAt: serverTimestamp(),
     };
 
-    if (updates.name !== undefined) updateData.name = updates.name.trim();
-    if (updates.weightPerMeter !== undefined)
-      updateData.weightPerMeter = updates.weightPerMeter;
-    if (updates.defaultLength !== undefined)
-      updateData.defaultLength = updates.defaultLength;
-    if (updates.hsnCode !== undefined)
-      updateData.hsnCode = updates.hsnCode.trim();
+    if (updates.name !== undefined) updateData.name = newName;
+    if (updates.weightPerMeter !== undefined) updateData.weightPerMeter = updates.weightPerMeter;
+    if (updates.defaultLength !== undefined) updateData.defaultLength = updates.defaultLength;
+    if (updates.hsnCode !== undefined) updateData.hsnCode = newHsnCode;
     if (updates.isActive !== undefined) updateData.isActive = updates.isActive;
     if (updates.updatedBy) updateData.updatedBy = updates.updatedBy;
     if (updates.updatedByName) updateData.updatedByName = updates.updatedByName;
     if (updates.updatedByRole) updateData.updatedByRole = updates.updatedByRole;
 
-    await updateDoc(doc(db, STEEL_MASTER_COLLECTION, id), updateData);
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(steelMasterRef);
+      if (!snap.exists()) throw new Error('Steel master not found');
+      transaction.update(steelMasterRef, updateData);
+    });
   } catch (error) {
     console.error('Error updating steel master:', error);
     throw error;
