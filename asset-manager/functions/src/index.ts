@@ -447,6 +447,47 @@ export const onUserUpdated = onDocumentUpdated(
         newValue: after.isActive,
       });
     }
+    if (before.isDeleted !== after.isDeleted) {
+      changes.push({
+        field: 'isDeleted',
+        fieldLabel: 'Deleted Status',
+        oldValue: before.isDeleted,
+        newValue: after.isDeleted,
+      });
+    }
+
+    const isDeactivated = before.isActive !== false && after.isActive === false;
+    const isDeleted = before.isDeleted !== true && after.isDeleted === true;
+    const isRoleChanged = before.role === 'SiteManager' && after.role !== 'SiteManager';
+
+    if (isDeactivated || isDeleted || isRoleChanged) {
+      try {
+        const sitesSnapshot = await db.collection('sites').where('managerId', '==', userId).get();
+        if (!sitesSnapshot.empty) {
+          const batch = db.batch();
+          sitesSnapshot.docs.forEach((doc) => {
+            batch.update(doc.ref, {
+              managerId: null,
+              managerName: null,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          });
+          await batch.commit();
+          logger.info(`Cleaned up ${sitesSnapshot.size} sites for deactivated/deleted user ${userId}`);
+        }
+      } catch (error) {
+        logger.error('Failed to cleanup manager assignments', { error, userId });
+      }
+    }
+
+    if (isDeleted) {
+      try {
+        await admin.auth().deleteUser(userId);
+        logger.info(`Deleted Auth user for deleted Firestore user ${userId}`);
+      } catch (error) {
+        logger.error('Failed to delete Auth account', { error, userId });
+      }
+    }
 
     if (changes.length === 0) {
       return;

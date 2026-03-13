@@ -84,10 +84,13 @@ const sitesSlice = createSlice({
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(createSite.fulfilled, (state) => {
+      .addCase(createSite.fulfilled, (state, action) => {
         state.isLoading = false;
-        // Don't manually add the site here - the real-time listener will handle it
-        // to avoid duplicate entries when subscribeToSites triggers
+        // Optimistic update to prevent stale data when navigating back
+        const exists = state.sites.some((site) => site.id === action.payload.id);
+        if (!exists) {
+          state.sites.push(action.payload);
+        }
         state.error = null;
       })
       .addCase(createSite.rejected, (state, action) => {
@@ -99,10 +102,13 @@ const sitesSlice = createSlice({
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(updateSite.fulfilled, (state) => {
+      .addCase(updateSite.fulfilled, (state, action) => {
         state.isLoading = false;
-        // Don't manually update the site here - the real-time listener will handle it
-        // to ensure consistency and avoid race conditions
+        // Optimistic update to prevent stale data when navigating back
+        const index = state.sites.findIndex((site) => site.id === action.payload.id);
+        if (index !== -1) {
+          state.sites[index] = action.payload;
+        }
         state.error = null;
       })
       .addCase(updateSite.rejected, (state, action) => {

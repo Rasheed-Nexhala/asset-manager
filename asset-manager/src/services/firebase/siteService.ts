@@ -12,6 +12,7 @@ import {
   Unsubscribe,
   QuerySnapshot,
   writeBatch,
+  runTransaction
 } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import type { Site, CreateSiteData, UpdateSiteData } from '../../types/sites';
@@ -19,16 +20,38 @@ import type { Site, CreateSiteData, UpdateSiteData } from '../../types/sites';
 const SITES_COLLECTION = 'sites';
 
 /**
- * Create a new site with Firebase-generated ID
+ * Create a new site with a normalized name as document ID
+ * Enforces uniqueness through a transaction
  */
 export const createSite = async (siteData: CreateSiteData): Promise<string> => {
   try {
-    const docRef = await addDoc(collection(db, SITES_COLLECTION), {
-      ...siteData,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+    const normalizedName = siteData.name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    if (!normalizedName) {
+      throw new Error('Site name must contain alphanumeric characters');
+    }
+
+    const siteRef = doc(db, SITES_COLLECTION, normalizedName);
+
+    await runTransaction(db, async (transaction) => {
+      const siteDoc = await transaction.get(siteRef);
+      if (siteDoc.exists() && siteDoc.data().status !== 'deleted') {
+        throw new Error('A site with this name already exists.');
+      }
+
+      transaction.set(siteRef, {
+        ...siteData,
+        status: siteData.status || 'active',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
     });
-    return docRef.id;
+
+    return normalizedName;
   } catch (error) {
     console.error('Error creating site:', error);
     throw error;
@@ -49,6 +72,21 @@ export const updateSite = async (
     });
   } catch (error) {
     console.error('Error updating site:', error);
+    throw error;
+  }
+};
+
+/**
+ * Soft-delete an existing site by setting its status to 'deleted'
+ */
+export const deleteSite = async (siteId: string): Promise<void> => {
+  try {
+    await updateDoc(doc(db, SITES_COLLECTION, siteId), {
+      status: 'deleted',
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error deleting site:', error);
     throw error;
   }
 };
@@ -84,11 +122,13 @@ export const getSite = async (siteId: string): Promise<Site | null> => {
 };
 
 /**
- * Get all sites from Firestore
+ * Get all sites from Firestore (excluding deleted)
  */
 export const getSites = async (): Promise<Site[]> => {
   try {
-    const sitesSnapshot = await getDocs(collection(db, SITES_COLLECTION));
+    const sitesSnapshot = await getDocs(
+      query(collection(db, SITES_COLLECTION), where('status', '!=', 'deleted'))
+    );
     const sites: Site[] = [];
     
     sitesSnapshot.forEach((doc) => {
@@ -124,7 +164,11 @@ export const checkSiteNameExists = async (
 ): Promise<boolean> => {
   try {
     const sitesSnapshot = await getDocs(
-      query(collection(db, SITES_COLLECTION), where('name', '==', name))
+      query(
+        collection(db, SITES_COLLECTION),
+        where('name', '==', name),
+        where('status', '!=', 'deleted')
+      )
     );
     
     // If checking for update, exclude the current site
@@ -149,7 +193,11 @@ export const findSiteByManagerId = async (
 ): Promise<Site | null> => {
   try {
     const sitesSnapshot = await getDocs(
-      query(collection(db, SITES_COLLECTION), where('managerId', '==', managerId))
+      query(
+        collection(db, SITES_COLLECTION),
+        where('managerId', '==', managerId),
+        where('status', '!=', 'deleted')
+      )
     );
     
     // Find first site with this manager (excluding current site if updating)
@@ -189,10 +237,13 @@ export const findSiteByManagerId = async (
 export const subscribeToSites = (
   callback: (sites: Site[]) => void
 ): Unsubscribe => {
-  const sitesCollectionRef = collection(db, SITES_COLLECTION);
+  const sitesQuery = query(
+    collection(db, SITES_COLLECTION),
+    where('status', '!=', 'deleted')
+  );
 
   return onSnapshot(
-    sitesCollectionRef,
+    sitesQuery,
     (snapshot: QuerySnapshot) => {
       const sites: Site[] = [];
 
@@ -226,7 +277,11 @@ export const subscribeToSites = (
 export const getSitesByManagerId = async (managerId: string): Promise<Site[]> => {
   try {
     const sitesSnapshot = await getDocs(
-      query(collection(db, SITES_COLLECTION), where('managerId', '==', managerId))
+      query(
+        collection(db, SITES_COLLECTION),
+        where('managerId', '==', managerId),
+        where('status', '!=', 'deleted')
+      )
     );
     
     const sites: Site[] = [];
@@ -305,7 +360,9 @@ export const findSitesWithInvalidManagers = async (
   validManagerIds: Set<string>
 ): Promise<Site[]> => {
   try {
-    const sitesSnapshot = await getDocs(collection(db, SITES_COLLECTION));
+    const sitesSnapshot = await getDocs(
+      query(collection(db, SITES_COLLECTION), where('status', '!=', 'deleted'))
+    );
     const invalidSites: Site[] = [];
 
     sitesSnapshot.forEach((doc) => {

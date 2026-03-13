@@ -199,9 +199,25 @@ const maintenanceSlice = createSlice({
         state.error = null;
         state.errorTimestamp = null;
       })
-      .addCase(returnFromMaintenanceThunk.fulfilled, (state) => {
+      .addCase(returnFromMaintenanceThunk.fulfilled, (state, action) => {
         state.loading = false;
-        // Don't manually update the record here - the real-time listener will handle it
+        
+        // Optimistic update to prevent stale data when navigating back
+        const id = action.payload;
+        const index = state.maintenanceRecords.findIndex((m) => m.id === id);
+        if (index !== -1) {
+          state.maintenanceRecords[index].status = 'returned';
+          if (action.meta.arg.returnData.returnedQuantity !== undefined) {
+            state.maintenanceRecords[index].returnedQuantity = action.meta.arg.returnData.returnedQuantity;
+          }
+        }
+        if (state.selectedMaintenance?.id === id) {
+          state.selectedMaintenance.status = 'returned';
+          if (action.meta.arg.returnData.returnedQuantity !== undefined) {
+            state.selectedMaintenance.returnedQuantity = action.meta.arg.returnData.returnedQuantity;
+          }
+        }
+        
         state.error = null;
         state.errorTimestamp = null;
       })
@@ -216,9 +232,19 @@ const maintenanceSlice = createSlice({
         state.error = null;
         state.errorTimestamp = null;
       })
-      .addCase(writeOffItemThunk.fulfilled, (state) => {
+      .addCase(writeOffItemThunk.fulfilled, (state, action) => {
         state.loading = false;
-        // Don't manually update the record here - the real-time listener will handle it
+        
+        // Optimistic update to prevent stale data when navigating back
+        const id = action.payload;
+        const index = state.maintenanceRecords.findIndex((m) => m.id === id);
+        if (index !== -1) {
+          state.maintenanceRecords[index].status = 'written_off';
+        }
+        if (state.selectedMaintenance?.id === id) {
+          state.selectedMaintenance.status = 'written_off';
+        }
+        
         state.error = null;
         state.errorTimestamp = null;
       })
@@ -233,9 +259,33 @@ const maintenanceSlice = createSlice({
         state.error = null;
         state.errorTimestamp = null;
       })
-      .addCase(addMaintenanceUpdateThunk.fulfilled, (state) => {
+      .addCase(addMaintenanceUpdateThunk.fulfilled, (state, action) => {
         state.loading = false;
-        // Don't manually update the record here - the real-time listener will handle it
+        
+        // Optimistic update to prevent stale data when navigating back
+        const id = action.payload;
+        const noteObj = {
+          note: action.meta.arg.note,
+          addedBy: action.meta.arg.userId,
+          addedByName: action.meta.arg.userName,
+          createdAt: new Date().toISOString()
+        };
+        
+        const index = state.maintenanceRecords.findIndex((m) => m.id === id);
+        if (index !== -1) {
+          if (!state.maintenanceRecords[index].updates) {
+            state.maintenanceRecords[index].updates = [];
+          }
+          state.maintenanceRecords[index].updates.push(noteObj as any);
+        }
+        
+        if (state.selectedMaintenance?.id === id) {
+          if (!state.selectedMaintenance.updates) {
+            state.selectedMaintenance.updates = [];
+          }
+          state.selectedMaintenance.updates.push(noteObj as any);
+        }
+        
         state.error = null;
         state.errorTimestamp = null;
       })

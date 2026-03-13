@@ -301,6 +301,7 @@ export async function returnFromMaintenance(
           quantity: returnData.returnQuantity,
           updatedAt: Timestamp.now(),
         };
+        if (itemData.unit != null) newEntry.unit = itemData.unit;
         if (itemData.lengthPerPiece != null) newEntry.lengthPerPiece = itemData.lengthPerPiece;
         if (itemData.weightPerMeter != null) newEntry.weightPerMeter = itemData.weightPerMeter;
         transaction.set(inventoryDocRef, newEntry);
@@ -317,7 +318,12 @@ export async function returnFromMaintenance(
       // 6. Update maintenance record
       const remainingQuantity = maintenanceData.quantity - returnData.returnQuantity;
       const isFullReturn = remainingQuantity === 0;
-      const newStatus = isFullReturn ? 'returned' : 'partial_return';
+      const hasWriteOffs = maintenanceData.writtenOffAt !== null;
+      
+      let newStatus = 'partial_return';
+      if (isFullReturn) {
+        newStatus = hasWriteOffs ? 'partially_returned_and_written_off' : 'returned';
+      }
 
       const noteSuffix = returnData.repairSummary?.trim()
         ? ` ${returnData.repairSummary}`
@@ -422,7 +428,12 @@ export async function writeOffItem(
       // 4. Update maintenance record
       const remainingQuantity = maintenanceData.quantity - writeOffData.writeOffQuantity;
       const isFullWriteOff = remainingQuantity === 0;
-      const newStatus = isFullWriteOff ? 'written_off' : 'partial_return';
+      const hasReturns = (maintenanceData.returnedQuantity || 0) > 0;
+      
+      let newStatus = 'partial_return';
+      if (isFullWriteOff) {
+        newStatus = hasReturns ? 'partially_returned_and_written_off' : 'written_off';
+      }
 
       const explanationText = writeOffData.explanation?.trim() || null;
       transaction.update(maintenanceRef, {

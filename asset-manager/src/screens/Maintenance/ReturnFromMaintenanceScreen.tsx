@@ -96,9 +96,9 @@ export const ReturnFromMaintenanceScreen: React.FC = () => {
 
     // Validate repair cost (if provided)
     if (repairCost.trim()) {
-      const cost = parseFloat(repairCost);
-      if (isNaN(cost) || cost < 0) {
-        newErrors.repairCost = 'Invalid repair cost';
+      const isValid = /^\d+(\.\d{1,2})?$/.test(repairCost.trim());
+      if (!isValid) {
+        newErrors.repairCost = 'Invalid repair cost format (e.g., 123.45)';
       }
     }
 

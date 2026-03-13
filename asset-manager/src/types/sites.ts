@@ -3,7 +3,7 @@ import { Timestamp } from 'firebase/firestore';
 /**
  * Site status types
  */
-export type SiteStatus = 'active' | 'inactive';
+export type SiteStatus = 'active' | 'inactive' | 'deleted';
 
 /**
  * Site document structure in Firestore (with Firebase Timestamps)

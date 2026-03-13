@@ -12,7 +12,8 @@ export type MaintenanceStatus =
   | 'pending'
   | 'partial_return'
   | 'returned'
-  | 'written_off';
+  | 'written_off'
+  | 'partially_returned_and_written_off';
 
 /**
  * Issue Type Categories

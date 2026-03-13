@@ -329,7 +329,8 @@ service cloud.firestore {
      * - Read, Create, Update, Delete: Admin and Store Incharge only
      */
     match /maintenance/{maintenanceId} {
-      allow read, create, update, delete: if hasInventoryAccess();
+      allow read, update, delete: if hasInventoryAccess();
+      allow create: if hasInventoryAccess() && request.resource.data.addedBy == request.auth.uid;
     }
 
     /**

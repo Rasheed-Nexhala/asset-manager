@@ -67,33 +67,28 @@ async function logAuthEventToCloud(
   } catch (error: unknown) {
     const code = (error as { code?: string })?.code ?? '';
     const message = (error as { message?: string })?.message ?? String(error);
-    // Not-found/unavailable = Cloud Function not deployed or unreachable; avoid noisy ERROR
+    
+    // Log as error instead of silently swallowing or just info logging
+    console.error('Failed to log auth event to cloud:', { code, message, error });
+    
+    // Not-found/unavailable = Cloud Function not deployed or unreachable
     if (code === 'functions/not-found' || code === 'functions/unavailable' || message.includes('not-found')) {
-      if (__DEV__) {
-        console.info(
-          'Activity log (logAuthEvent) unavailable. Deploy Cloud Functions to enable auth event logging.'
-        );
-      }
+      console.error(
+        'Activity log (logAuthEvent) unavailable. Deploy Cloud Functions to enable auth event logging.'
+      );
       return;
     }
-    // Unauthenticated = token not ready or expired when request was sent; avoid noisy ERROR
+    // Unauthenticated = token not ready or expired when request was sent
     if (code === 'unauthenticated' || message.includes('unauthenticated')) {
-      if (__DEV__) {
-        console.info('Activity log (logAuthEvent): request was unauthenticated; event not logged.');
-      }
+      console.error('Activity log (logAuthEvent): request was unauthenticated; event not logged.');
       return;
     }
-    // Permission-denied = Firestore/Cloud Function rules block the call; avoid noisy ERROR
+    // Permission-denied = Firestore/Cloud Function rules block the call
     if (code === 'permission-denied' || message.includes('permission-denied')) {
-      if (__DEV__) {
-        console.info('Activity log (logAuthEvent): permission denied; event not logged.');
-      }
+      console.error('Activity log (logAuthEvent): permission denied; event not logged.');
       return;
     }
-    if (__DEV__) {
-      console.info('Failed to log auth event:', error);
-    }
-    // Don't throw - logging failure should not block auth
+    // Don't throw - logging failure should not block auth, but we have correctly logged the error
   }
 }
 
