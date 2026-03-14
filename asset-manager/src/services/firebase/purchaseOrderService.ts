@@ -6,7 +6,6 @@ import {
   getDocs,
   getDocsFromServer,
   getCountFromServer,
-  addDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -17,12 +16,12 @@ import {
   onSnapshot,
   serverTimestamp,
   runTransaction,
-  writeBatch,
   increment,
   Timestamp,
   DocumentSnapshot,
   QueryConstraint,
 } from 'firebase/firestore';
+import type { DocumentData } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import { getLocationId } from '../../utils/locationUtils';
 import type {
@@ -34,7 +33,10 @@ import type {
   RejectPOData,
 } from '../../types/purchaseOrder';
 import { firestorePOToPO } from '../../types/purchaseOrder';
-import { incrementVendorPoCount, updateVendorLastPoDate } from './vendorService';
+import {
+  incrementVendorPoCountInTransaction,
+  updateVendorLastPoDateInTransaction,
+} from './vendorService';
 
 const PURCHASE_ORDERS_COLLECTION = 'purchaseOrders';
 const PO_COUNTERS_COLLECTION = 'poCounters';
@@ -113,6 +115,30 @@ const ensureAdminUser = async (userId: string): Promise<void> => {
   }
 };
 
+const ensureCanMarkOrdered = async (userId: string): Promise<void> => {
+  const userRef = doc(db, USERS_COLLECTION, userId);
+  const userSnap = await getDocFromServer(userRef);
+  if (!userSnap.exists()) {
+    throw new Error('User not found');
+  }
+  const role = userSnap.data()?.role;
+  if (role !== 'Admin' && role !== 'StoreIncharge') {
+    throw new Error('Only Admin or Store Incharge can mark POs as ordered');
+  }
+};
+
+const ensureCanReceive = async (userId: string): Promise<void> => {
+  const userRef = doc(db, USERS_COLLECTION, userId);
+  const userSnap = await getDocFromServer(userRef);
+  if (!userSnap.exists()) {
+    throw new Error('User not found');
+  }
+  const role = userSnap.data()?.role;
+  if (role !== 'Admin' && role !== 'StoreIncharge') {
+    throw new Error('Only Admin or Store Incharge can receive POs');
+  }
+};
+
 /**
  * Normalize items when reading from Firestore (backward compat for old POs without per-item GST)
  */
@@ -148,7 +174,7 @@ const normalizePOItemsForRead = (
  */
 const mapFirestoreDocToPOFirestore = (
   id: string,
-  data: any
+  data: DocumentData
 ): PurchaseOrderFirestore => {
   const items = normalizePOItemsForRead(data.items ?? []);
   return {
@@ -223,8 +249,7 @@ const generatePoNumber = async (): Promise<string> => {
     return result;
   } catch (error) {
     console.error('Error generating PO number:', error);
-    const fallback = `${prefix}${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
-    return fallback;
+    throw new Error('Failed to generate PO number. Please try again.');
   }
 };
 
@@ -244,7 +269,7 @@ const buildPOItems = (
       itemId: item.itemId,
       itemName: item.itemName,
       itemSku: item.itemSku,
-      unit: item.unit ?? null,
+      unit: item.unit ?? undefined,
       isExistingItem: item.isExistingItem,
       quantity: item.quantity,
       unitPrice,
@@ -252,9 +277,9 @@ const buildPOItems = (
       gstPercentage: gstPct,
       gstAmount,
       receivedQuantity: null,
-      orderedUnit: item.orderedUnit ?? null,
-      orderedQuantity: item.orderedQuantity ?? null,
-      remarks: item.remarks ?? null,
+      orderedUnit: item.orderedUnit ?? undefined,
+      orderedQuantity: item.orderedQuantity ?? undefined,
+      remarks: item.remarks ?? undefined,
     };
   });
 
@@ -340,16 +365,20 @@ export const createPO = async (
       updatedAt: serverTimestamp(),
     };
 
-    const docRef = await addDoc(
-      collection(db, PURCHASE_ORDERS_COLLECTION),
-      newPO
-    );
+    const docId = await runTransaction(db, async (transaction) => {
+      const docRef = doc(collection(db, PURCHASE_ORDERS_COLLECTION));
+      transaction.set(docRef, newPO);
+      if (!isDraft) {
+        incrementVendorPoCountInTransaction(
+          transaction,
+          data.vendorId,
+          Timestamp.now()
+        );
+      }
+      return docRef.id;
+    });
 
-    if (!isDraft) {
-      await incrementVendorPoCount(data.vendorId, Timestamp.now());
-    }
-
-    return docRef.id;
+    return docId;
   } catch (error) {
     console.error('Error creating PO:', error);
     if (error instanceof Error && error.message.includes('already in use')) {
@@ -424,7 +453,14 @@ export const updatePO = async (
 ): Promise<PurchaseOrder | null> => {
   try {
     validatePoItemQuantities(data.items);
-    const newPoNumber = data.poNumber.trim();
+    if (!userId) {
+      throw new Error('User ID is required to update a purchase order');
+    }
+    const trimmed = data.poNumber?.trim();
+    if (!trimmed) {
+      throw new Error('PO number is required.');
+    }
+    const newPoNumber = trimmed;
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
 
     const existingSnap = await getDoc(poRef);
@@ -460,6 +496,9 @@ export const updatePO = async (
           `Cannot update PO with status "${poData.status}". Only draft POs can be updated.`
         );
       }
+      if (poData.createdBy !== userId) {
+        throw new Error('Only the creator can update this draft');
+      }
 
       const updatePayload: Record<string, unknown> = {
         vendorId: data.vendorId,
@@ -484,13 +523,17 @@ export const updatePO = async (
         reviewedAt,
         updatedAt: serverTimestamp(),
       };
-      updatePayload.poNumber = data.poNumber.trim();
+      updatePayload.poNumber = newPoNumber;
       transaction.update(poRef, updatePayload);
-    });
 
-    if (!isDraft) {
-      await incrementVendorPoCount(data.vendorId, Timestamp.now());
-    }
+      if (!isDraft) {
+        incrementVendorPoCountInTransaction(
+          transaction,
+          data.vendorId,
+          Timestamp.now()
+        );
+      }
+    });
 
     return getPOById(poId);
   } catch (error) {
@@ -541,9 +584,11 @@ export const recordPODownloadForSigning = async (
  */
 export const setSignedPdfUrl = async (
   poId: string,
+  adminId: string,
   signedPdfUrl: string
 ): Promise<PurchaseOrder | null> => {
   try {
+    await ensureAdminUser(adminId);
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
     const poSnap = await getDoc(poRef);
 
@@ -663,8 +708,9 @@ export const rejectPO = async (
 /**
  * Mark PO as ordered (Admin/Store Incharge)
  */
-export const markPOOrdered = async (poId: string): Promise<void> => {
+export const markPOOrdered = async (poId: string, userId: string): Promise<void> => {
   try {
+    await ensureCanMarkOrdered(userId);
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
 
     await runTransaction(db, async (transaction) => {
@@ -701,6 +747,7 @@ export const receivePO = async (
   userName: string
 ): Promise<void> => {
   const storeLocationId = getLocationId('store');
+  await ensureCanReceive(userId);
   const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
 
   // Pre-fetch PO to know which items to look up
@@ -736,6 +783,13 @@ export const receivePO = async (
       throw new Error(
         `Cannot receive PO with status "${poData.status}". Only approved, ordered, or partially received POs can be received.`
       );
+    }
+
+    const poItemIds = new Set(poData.items.map((i: { itemId: string }) => i.itemId));
+    for (const r of receiveData.receivedQuantities) {
+      if (r.receivedQuantity > 0 && !poItemIds.has(r.itemId)) {
+        throw new Error(`Item ${r.itemId} is not part of this purchase order`);
+      }
     }
 
     for (const item of poData.items) {
@@ -856,10 +910,13 @@ export const receivePO = async (
       items: updatedItems,
       updatedAt: serverTimestamp(),
     });
-  });
 
-  const receivedAtTs = Timestamp.fromDate(new Date(receiveData.receivedDate));
-  await updateVendorLastPoDate(initialPoData.vendorId, receivedAtTs);
+    updateVendorLastPoDateInTransaction(
+      transaction,
+      initialPoData.vendorId,
+      receivedAtTimestamp
+    );
+  });
 };
 
 /**
@@ -931,17 +988,22 @@ export const getPurchaseOrdersCount = async (
   return snapshot.data().count;
 };
 
+const EXPORT_MAX_LIMIT = 1000;
+
 /**
  * Fetch purchase orders without pagination for exporting
- * 
+ *
  * @param statusFilter - Optional status filter
+ * @param maxLimit - Maximum number of POs to export (default 1000)
  * @returns Array of purchase orders
  */
 export const exportPurchaseOrders = async (
-  statusFilter?: string
+  statusFilter?: string,
+  maxLimit?: number
 ): Promise<PurchaseOrder[]> => {
   try {
     const constraints = buildPOQueryConstraints(statusFilter);
+    constraints.push(limit(maxLimit ?? EXPORT_MAX_LIMIT));
     const q = query(collection(db, PURCHASE_ORDERS_COLLECTION), ...constraints);
     const snapshot = await getDocs(q);
 
@@ -967,17 +1029,12 @@ export const exportPurchaseOrders = async (
  * Get count of pending purchase orders for the dashboard widget
  */
 export const getPendingPOCount = async (): Promise<number> => {
-  try {
-    const q = query(
-      collection(db, PURCHASE_ORDERS_COLLECTION),
-      where('status', '==', 'pending_approval')
-    );
-    const snapshot = await getCountFromServer(q);
-    return snapshot.data().count;
-  } catch (error) {
-    console.error('Error getting pending PO count:', error);
-    return 0;
-  }
+  const q = query(
+    collection(db, PURCHASE_ORDERS_COLLECTION),
+    where('status', '==', 'pending_approval')
+  );
+  const snapshot = await getCountFromServer(q);
+  return snapshot.data().count;
 };
 
 /**

@@ -12,7 +12,7 @@ import {
   increment,
   onSnapshot,
 } from 'firebase/firestore';
-import type { Timestamp, QuerySnapshot } from 'firebase/firestore';
+import type { Transaction, Timestamp, QuerySnapshot } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import type {
   FirestoreVendor,
@@ -214,6 +214,47 @@ export const updateVendorLastPoDate = async (
     console.error('Error updating vendor lastPoDate:', error);
     // Do not throw - vendor may have been deleted; PO is source of truth
   }
+};
+
+/**
+ * Increment vendor poCount and set lastPoDate within a Firestore transaction.
+ * Use when creating/updating a PO atomically with vendor stats.
+ *
+ * @param transaction - Firestore transaction object
+ * @param vendorId - Vendor document ID
+ * @param lastPoDate - Timestamp of the PO date
+ */
+export const incrementVendorPoCountInTransaction = (
+  transaction: Transaction,
+  vendorId: string,
+  lastPoDate: Timestamp
+): void => {
+  const vendorRef = doc(db, VENDORS_COLLECTION, vendorId);
+  transaction.update(vendorRef, {
+    poCount: increment(1),
+    lastPoDate,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+/**
+ * Update vendor lastPoDate within a Firestore transaction.
+ * Use when receiving a PO atomically with vendor stats.
+ *
+ * @param transaction - Firestore transaction object
+ * @param vendorId - Vendor document ID
+ * @param lastPoDate - Timestamp of the PO received date
+ */
+export const updateVendorLastPoDateInTransaction = (
+  transaction: Transaction,
+  vendorId: string,
+  lastPoDate: Timestamp
+): void => {
+  const vendorRef = doc(db, VENDORS_COLLECTION, vendorId);
+  transaction.update(vendorRef, {
+    lastPoDate,
+    updatedAt: serverTimestamp(),
+  });
 };
 
 /**

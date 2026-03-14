@@ -175,11 +175,32 @@ export const recordPODownloadForSigning = createAsyncThunk(
 export const uploadSignedPO = createAsyncThunk(
   'purchaseOrders/uploadSignedPO',
   async (
-    { poId, signedPdfUrl }: { poId: string; signedPdfUrl: string },
-    { dispatch, rejectWithValue }
+    {
+      poId,
+      signedPdfUrl,
+      adminId: payloadAdminId,
+      adminName: payloadAdminName,
+    }: {
+      poId: string;
+      signedPdfUrl: string;
+      adminId?: string;
+      adminName?: string;
+    },
+    { dispatch, rejectWithValue, getState }
   ) => {
+    const adminId = payloadAdminId ?? selectUserId(getState() as RootState);
+    const adminName = payloadAdminName ?? selectUserDisplayName(getState() as RootState);
+
+    if (!adminId || !adminName) {
+      return rejectWithValue('Admin credentials required to upload signed document');
+    }
+
     try {
-      const updatedPO = await purchaseOrderService.setSignedPdfUrl(poId, signedPdfUrl);
+      const updatedPO = await purchaseOrderService.setSignedPdfUrl(
+        poId,
+        adminId,
+        signedPdfUrl
+      );
       if (updatedPO) {
         dispatch(addOrUpdatePO(updatedPO));
       }
@@ -279,12 +300,17 @@ export const rejectPO = createAsyncThunk(
  */
 export const markPOOrdered = createAsyncThunk(
   'purchaseOrders/markPOOrdered',
-  async ({ poId }: { poId: string }, { dispatch, rejectWithValue }) => {
+  async ({ poId }: { poId: string }, { dispatch, rejectWithValue, getState }) => {
+    const userId = selectUserId(getState() as RootState);
+    if (!userId) {
+      return rejectWithValue('User ID is required to mark PO as ordered');
+    }
+
     try {
       dispatch(setLoading(true));
       dispatch(clearError());
 
-      await purchaseOrderService.markPOOrdered(poId);
+      await purchaseOrderService.markPOOrdered(poId, userId);
 
       const updatedPO = await purchaseOrderService.getPOById(poId);
       if (updatedPO) {
