@@ -252,70 +252,34 @@ export function DashboardPage() {
         </div>
       )}
 
-      <div className="flex flex-col gap-6 lg:gap-8">
+      <div className="flex flex-col gap-4 lg:gap-6">
         <DashboardGreeting
           displayName={displayName}
           role={role}
           siteName={siteName ?? undefined}
         />
 
-        {isAdmin && (
-          <>
-            <QuickStatsRow
-              stats={[
-                { icon: 'cube', value: itemsCount, label: 'Items' },
-                { icon: 'clock', value: pendingPOCount, label: 'Pending POs' },
-                { icon: 'building-office-2', value: sites.length, label: 'Sites' },
-              ]}
-              isLoading={isInitialLoad || dashboardLoading}
-            />
-            <Link
-              to="/activity"
-              className="bg-white rounded-[10px] p-4 lg:p-6 border border-slate-200 shadow-sm flex items-center justify-between hover:bg-slate-50 transition-colors"
-            >
-              <h3 className="text-[17px] font-semibold text-slate-900">Activity Log</h3>
-              <Icon name="chevron-right" className="h-5 w-5 text-slate-500" />
-            </Link>
-            <div className="grid gap-6 lg:grid-cols-2">
-              {(lowStockItemsWidget.length > 0 || isInitialLoad || dashboardLoading) && (
-                <LowStockAlertWidget
-                  items={lowStockItemsWidget}
-                  onViewAll={() => navigate('/inventory?lowStockFilter=true')}
-                  onCreatePO={(itemId) => {
-                    const item = lowStockItemsWidget.find((i) => i.id === itemId);
-                    if (!item) return;
-                    const shortfall = Math.max(1, (item.minQty ?? 0) - (item.currentQty ?? 0));
-                    navigate('/purchase-orders/new', {
-                      state: {
-                        selectedItems: [{ id: item.id, name: item.name }],
-                        initialQuantities: { [item.id]: shortfall },
-                      },
-                    });
-                  }}
-                  loading={isInitialLoad || dashboardLoading}
-                />
-              )}
-              {(recentPendingRequests.length > 0 || isInitialLoad || dashboardLoading) && (
-                <PendingRequestsWidget
-                  requests={recentPendingRequests}
-                  onViewAll={() => navigate('/requests/queue')}
-                  showApprove
-                  loading={isInitialLoad || dashboardLoading}
-                />
-              )}
-            </div>
-            <MyRecentActivityWidget onViewAll={() => navigate('/activity/my-activity')} />
-          </>
+        {/* KPI Section - Full Width */}
+        {(isAdmin || (isStoreIncharge && statsForStore.length > 0)) && (
+          <QuickStatsRow
+            stats={isAdmin ? [
+              { icon: 'cube', value: itemsCount, label: 'Items' },
+              { icon: 'clock', value: pendingPOCount, label: 'Pending POs' },
+              { icon: 'building-office-2', value: sites.length, label: 'Sites' },
+            ] : statsForStore}
+            isLoading={isInitialLoad || dashboardLoading}
+          />
         )}
 
-        {isStoreIncharge && !isAdmin && (
-          <>
-            {statsForStore.length > 0 && (
-              <QuickStatsRow stats={statsForStore} isLoading={isInitialLoad || dashboardLoading} />
-            )}
-            <div className="grid gap-6 lg:grid-cols-2">
-              {showInventory &&
-                (lowStockItemsWidget.length > 0 || isInitialLoad || dashboardLoading) && (
+        {/* Main Dashboard Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          
+          {/* Main Content Area (2/3 width on desktop) */}
+          <div className="lg:col-span-2 space-y-6">
+            
+            {(isAdmin || isStoreIncharge) && (
+              <>
+                {(lowStockItemsWidget.length > 0 || isInitialLoad || dashboardLoading) && (
                   <LowStockAlertWidget
                     items={lowStockItemsWidget}
                     onViewAll={() => navigate('/inventory?lowStockFilter=true')}
@@ -333,55 +297,49 @@ export function DashboardPage() {
                     loading={isInitialLoad || dashboardLoading}
                   />
                 )}
-              {showOrders &&
-                (recentPendingRequests.length > 0 || isInitialLoad || dashboardLoading) && (
+                {(recentPendingRequests.length > 0 || isInitialLoad || dashboardLoading) && (
                   <PendingRequestsWidget
                     requests={recentPendingRequests}
-                    onViewAll={() => navigate('/requests/queue')}
-                    showApprove
+                    onViewAll={() => navigate(isAdmin || isStoreIncharge ? '/requests/queue' : '/requests/my-requests')}
+                    showApprove={isAdmin || isStoreIncharge}
                     loading={isInitialLoad || dashboardLoading}
                   />
                 )}
-            </div>
-            <MyRecentActivityWidget onViewAll={() => navigate('/activity/my-activity')} />
-          </>
-        )}
-
-        {isSiteManager && !isAdmin && !isStoreIncharge && (
-          <>
-            <div className="bg-white rounded-[10px] p-4 lg:p-6 border border-slate-200 shadow-sm">
-              <h3 className="text-[17px] font-semibold text-slate-900 mb-3">
-                My Inventory Summary
-              </h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-[15px] text-slate-500">Total items</span>
-                  <span className="text-[15px] font-semibold text-slate-900">
-                    {siteInventory.length}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[15px] text-slate-500">Total quantity</span>
-                  <span className="text-[15px] font-semibold text-slate-900">
-                    {siteInventory.reduce((s, e) => s + e.quantity, 0)}
-                  </span>
-                </div>
-              </div>
-            </div>
-            {(recentPendingRequests.length > 0 || isInitialLoad || dashboardLoading) && (
-              <PendingRequestsWidget
-                requests={recentPendingRequests}
-                onViewAll={() => navigate('/requests/my-requests')}
-                loading={isInitialLoad || dashboardLoading}
-              />
+              </>
             )}
-            <MyRecentActivityWidget onViewAll={() => navigate('/activity/my-activity')} />
-          </>
-        )}
 
-        {!isAdmin && !isStoreIncharge && !isSiteManager && (
-          <>
-            {!isActive && roleType === 'Unassigned' && (
+            {isSiteManager && !isAdmin && !isStoreIncharge && (
+              <>
+                <div className="bg-white rounded-[10px] p-4 lg:p-6 border border-slate-200 shadow-sm">
+                  <h3 className="text-[17px] font-semibold text-slate-900 mb-3">
+                    My Inventory Summary
+                  </h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-[15px] text-slate-500">Total items</span>
+                      <span className="text-[15px] font-semibold text-slate-900">
+                        {siteInventory.length}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[15px] text-slate-500">Total quantity</span>
+                      <span className="text-[15px] font-semibold text-slate-900">
+                        {siteInventory.reduce((s, e) => s + e.quantity, 0)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                {(recentPendingRequests.length > 0 || isInitialLoad || dashboardLoading) && (
+                  <PendingRequestsWidget
+                    requests={recentPendingRequests}
+                    onViewAll={() => navigate('/requests/my-requests')}
+                    loading={isInitialLoad || dashboardLoading}
+                  />
+                )}
+              </>
+            )}
+
+            {!isAdmin && !isStoreIncharge && !isSiteManager && !isActive && roleType === 'Unassigned' && (
               <div
                 className="bg-amber-600/15 rounded-[10px] p-4 border border-amber-600/30 flex items-center"
                 role="alert"
@@ -392,9 +350,40 @@ export function DashboardPage() {
                 </p>
               </div>
             )}
+          </div>
+
+          {/* Side Content Area (1/3 width on desktop) */}
+          <div className="lg:col-span-1 space-y-6">
+            {isAdmin && (
+              <Link
+                to="/activity"
+                className="bg-white rounded-[10px] p-4 lg:p-6 border border-slate-200 shadow-sm flex items-center justify-between hover:bg-slate-50 transition-colors group"
+              >
+                <div>
+                  <h3 className="text-[17px] font-semibold text-slate-900">Activity Log</h3>
+                  <p className="text-[13px] text-slate-500 mt-1">Audit all system changes</p>
+                </div>
+                <Icon name="chevron-right" className="h-5 w-5 text-slate-400 group-hover:text-blue-800 transition-colors" />
+              </Link>
+            )}
+            
             <MyRecentActivityWidget onViewAll={() => navigate('/activity/my-activity')} />
-          </>
-        )}
+
+            <div className="bg-white rounded-[10px] p-4 lg:p-6 border border-slate-200 shadow-sm">
+              <h3 className="text-[17px] font-semibold text-slate-900 mb-4">Quick Links</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <Link to="/inventory" className="flex flex-col items-center justify-center p-3 rounded-lg border border-slate-100 hover:border-blue-300 hover:bg-blue-50 transition-all text-center">
+                  <Icon name="cube" className="h-6 w-6 text-blue-800 mb-2" />
+                  <span className="text-[13px] font-medium text-slate-700">Inventory</span>
+                </Link>
+                <Link to="/profile" className="flex flex-col items-center justify-center p-3 rounded-lg border border-slate-100 hover:border-blue-300 hover:bg-blue-50 transition-all text-center">
+                  <Icon name="user-circle" className="h-6 w-6 text-blue-800 mb-2" />
+                  <span className="text-[13px] font-medium text-slate-700">My Profile</span>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

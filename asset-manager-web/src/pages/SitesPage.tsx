@@ -22,6 +22,7 @@ import type { Site } from '../types/sites';
 import type { SiteFormData } from '../types/sites';
 import { Icon } from '../components/shared/Icon';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
+import { clsx } from 'clsx';
 
 export function SitesPage() {
   const dispatch = useAppDispatch();
@@ -243,10 +244,100 @@ export function SitesPage() {
               {searchQuery ? 'No sites match your search' : 'No sites found'}
             </p>
           ) : (
-            <>
-              {renderSection('ACTIVE SITES', activeSites)}
-              {renderSection('INACTIVE SITES', inactiveSites)}
-            </>
+            <div className="space-y-8">
+              {/* Desktop Table View */}
+              <div className="hidden md:block space-y-8">
+                {activeSites.length > 0 && (
+                  <div>
+                    <h2 className="mb-4 text-[13px] font-bold text-slate-400 uppercase tracking-widest px-1">
+                      Active Sites ({activeSites.length})
+                    </h2>
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50/50">
+                            <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider">Site Name</th>
+                            <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {activeSites.map((site) => (
+                            <tr key={site.id} className="hover:bg-slate-50/50 transition-colors group">
+                              <td className="px-6 py-4">
+                                <span className="text-[15px] font-semibold text-slate-900">{site.name}</span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-[12px] font-medium text-green-700 uppercase">
+                                  Active
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditSite(site)}
+                                  className="text-blue-800 font-semibold text-[14px] hover:text-blue-900 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-all"
+                                >
+                                  Edit Site
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {inactiveSites.length > 0 && (
+                  <div>
+                    <h2 className="mb-4 text-[13px] font-bold text-slate-400 uppercase tracking-widest px-1">
+                      Inactive Sites ({inactiveSites.length})
+                    </h2>
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm grayscale-[0.5] opacity-80">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50/50">
+                            <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider">Site Name</th>
+                            <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {inactiveSites.map((site) => (
+                            <tr key={site.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-6 py-4">
+                                <span className="text-[15px] font-semibold text-slate-600 line-through decoration-slate-400">{site.name}</span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[12px] font-medium text-slate-500 uppercase">
+                                  Inactive
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditSite(site)}
+                                  className="text-slate-500 font-semibold text-[14px] hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-all"
+                                >
+                                  Edit Site
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile Card Grid View */}
+              <div className="md:hidden space-y-6">
+                {renderSection('ACTIVE SITES', activeSites)}
+                {renderSection('INACTIVE SITES', inactiveSites)}
+              </div>
+            </div>
           )}
         </main>
       )}

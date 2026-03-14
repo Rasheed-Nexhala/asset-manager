@@ -159,34 +159,34 @@ export function MaintenancePage() {
       ) : (
         <>
           {/* Desktop: Table */}
-          <div className="hidden md:block overflow-hidden rounded-[10px] border border-slate-200 bg-white">
-            <table className="w-full">
+          <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="px-4 py-3 text-left text-[13px] font-semibold text-slate-900">
+                <tr className="border-b border-slate-200 bg-slate-50/50">
+                  <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider">
                     Item
                   </th>
-                  <th className="px-4 py-3 text-left text-[13px] font-semibold text-slate-900">
+                  <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider">
                     SKU
                   </th>
-                  <th className="px-4 py-3 text-left text-[13px] font-semibold text-slate-900">
+                  <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider">
                     Qty
                   </th>
-                  <th className="px-4 py-3 text-left text-[13px] font-semibold text-slate-900">
+                  <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider">
                     Issue Type
                   </th>
-                  <th className="px-4 py-3 text-left text-[13px] font-semibold text-slate-900">
+                  <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider text-center">
                     Status
                   </th>
-                  <th className="px-4 py-3 text-left text-[13px] font-semibold text-slate-900">
+                  <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider">
                     Added
                   </th>
-                  <th className="px-4 py-3 text-right text-[13px] font-semibold text-slate-900">
+                  <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider text-right">
                     Action
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {displayedRecords.map((record: Maintenance) => {
                   const issueLabels: Record<string, string> = {
                     motor_electrical: 'Motor/Electrical',
@@ -203,31 +203,33 @@ export function MaintenancePage() {
                   return (
                     <tr
                       key={record.id}
-                      className="border-b border-slate-100 hover:bg-slate-50 transition-colors"
+                      className="hover:bg-slate-50/50 transition-colors"
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-6 py-4">
                         <Link
                           to={`/maintenance/${record.id}`}
-                          className="text-[15px] font-semibold text-blue-800 hover:underline"
+                          className="text-[15px] font-semibold text-blue-800 hover:text-blue-900 transition-colors"
                         >
                           {record.itemName}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 text-[15px] text-slate-700">{record.itemSku}</td>
-                      <td className="px-4 py-3 text-[15px] text-slate-700">
+                      <td className="px-6 py-4 text-[15px] text-slate-600 font-mono text-xs">{record.itemSku}</td>
+                      <td className="px-6 py-4 text-[15px] text-slate-700">
                         {record.quantity} {record.unit || 'Pcs'}
                       </td>
-                      <td className="px-4 py-3 text-[15px] text-slate-700">
+                      <td className="px-6 py-4 text-[15px] text-slate-700">
                         {issueLabels[record.issueType] || 'Unknown'}
                       </td>
-                      <td className="px-4 py-3">
-                        <MaintenanceStatusBadge status={record.status} />
+                      <td className="px-6 py-4">
+                        <div className="flex justify-center">
+                          <MaintenanceStatusBadge status={record.status} />
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-[13px] text-slate-500">{addedStr}</td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-6 py-4 text-[13px] text-slate-500">{addedStr}</td>
+                      <td className="px-6 py-4 text-right">
                         <Link
                           to={`/maintenance/${record.id}`}
-                          className="rounded-[10px] bg-blue-800 px-4 py-2 text-[13px] font-semibold text-white hover:bg-blue-900 transition-colors inline-block"
+                          className="inline-flex items-center justify-center rounded-lg bg-blue-800 px-4 py-2 text-[14px] font-semibold text-white hover:bg-blue-900 shadow-sm transition-all"
                         >
                           View
                         </Link>

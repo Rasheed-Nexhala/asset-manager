@@ -10,6 +10,7 @@ import { selectIsSuperAdmin, selectUserId } from '../store/selectors/authSelecto
 import type { UserListItem, UserRole } from '../types/roles';
 import { Icon } from '../components/shared/Icon';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
+import { clsx } from 'clsx';
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: 'Admin', label: 'Admin' },
@@ -239,8 +240,111 @@ export function UsersPage() {
         </div>
       )}
 
-      <main className="flex-1 overflow-y-auto p-4">
-        <div className="space-y-3">
+      <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50/50">
+                <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider">User</th>
+                <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider">Role</th>
+                <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider text-center">Active Status</th>
+                <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {sortedUsers.map((user) => {
+                const isReadOnly = isUserReadOnly(user);
+                const isSaving = savingUserId === user.id;
+                const hasChanges = hasPendingChanges(user.id);
+                const currentRole = getCurrentUserValue(user.id, 'role') as UserRole;
+                const currentIsActive = getCurrentUserValue(user.id, 'isActive') as boolean;
+                const effectiveIsActive = user.isDeleted ? false : currentIsActive;
+                const displayName = user.displayName || user.email || 'Unknown User';
+                const email = user.email && user.displayName ? user.email : null;
+
+                return (
+                  <tr key={user.id} className={clsx("hover:bg-slate-50/50 transition-colors", hasChanges && "bg-blue-50/30")}>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-[15px] font-semibold text-slate-900 line-clamp-1">{displayName}</span>
+                        {email && <span className="text-[13px] text-slate-500 line-clamp-1">{email}</span>}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <button
+                        type="button"
+                        onClick={() => handleRoleSelectPress(user)}
+                        disabled={isSaving || isReadOnly}
+                        className={clsx(
+                          "flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[14px] text-slate-900 transition-all",
+                          (isSaving || isReadOnly) ? "opacity-50 cursor-not-allowed" : "hover:border-blue-300 hover:shadow-sm"
+                        )}
+                      >
+                        {currentRole}
+                        {!isReadOnly && <Icon name="chevron-down" className="h-4 w-4 text-slate-400" />}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex justify-center">
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={effectiveIsActive}
+                          disabled={isSaving || isReadOnly}
+                          onClick={() => handleActiveStatusChange(user, !effectiveIsActive)}
+                          className={clsx(
+                            "relative h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-800 focus:ring-offset-2",
+                            effectiveIsActive ? 'bg-blue-800' : 'bg-slate-200',
+                            (isSaving || isReadOnly) && "opacity-50"
+                          )}
+                        >
+                          <span
+                            className={clsx(
+                              "absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform",
+                              effectiveIsActive ? 'left-6' : 'left-1'
+                            )}
+                          />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      {hasChanges && !isReadOnly ? (
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleCancelChanges(user.id)}
+                            disabled={isSaving}
+                            className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
+                            title="Cancel changes"
+                          >
+                            <Icon name="x-mark" className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleSaveChanges(user)}
+                            disabled={isSaving}
+                            className="flex items-center gap-2 rounded-lg bg-blue-800 px-4 py-2 text-[14px] font-semibold text-white hover:bg-blue-900 shadow-sm"
+                          >
+                            {isSaving ? <LoadingSpinner size="sm" /> : 'Save'}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className={clsx(
+                          "inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium",
+                          user.isDeleted ? "bg-slate-100 text-slate-500" : effectiveIsActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                        )}>
+                          {user.isDeleted ? 'Deleted' : effectiveIsActive ? 'Active' : 'Inactive'}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-3">
           {sortedUsers.map((user) => {
             const isReadOnly = isUserReadOnly(user);
             const isTargetDeleted = user.isDeleted === true;
@@ -259,9 +363,11 @@ export function UsersPage() {
             return (
               <div
                 key={user.id}
-                className={`rounded-[10px] border p-4 ${
-                  hasChanges ? 'border-blue-800' : 'border-slate-200'
-                } bg-white ${isReadOnly ? 'opacity-90' : ''}`}
+                className={clsx(
+                  "rounded-[10px] border p-4 bg-white transition-all",
+                  hasChanges ? 'border-blue-800 ring-1 ring-blue-800' : 'border-slate-200',
+                  isReadOnly && 'opacity-90'
+                )}
               >
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex-1">
