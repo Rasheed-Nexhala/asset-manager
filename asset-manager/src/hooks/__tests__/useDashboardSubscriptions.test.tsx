@@ -9,10 +9,6 @@ jest.mock('../../utils/nonCriticalTask', () => ({
   runNonCriticalTask: jest.fn().mockResolvedValue(undefined),
 }));
 
-const mockUnsubRequests = jest.fn();
-const mockUnsubPOs = jest.fn();
-const mockUnsubMaintenance = jest.fn();
-const mockUnsubItems = jest.fn();
 const mockUnsubSites = jest.fn();
 const mockUnsubCategories = jest.fn();
 const mockUnsubInventory = jest.fn();
@@ -93,19 +89,7 @@ jest.mock('../../store/thunks/activityLogThunks', () => {
   };
 });
 
-jest.mock('../../services/firebase/requestService', () => ({
-  requestService: {
-    subscribeToRequests: jest.fn(() => mockUnsubRequests),
-  },
-}));
-jest.mock('../../services/firebase/purchaseOrderService', () => ({
-  subscribeToPurchaseOrders: jest.fn(() => mockUnsubPOs),
-}));
-jest.mock('../../services/firebase/maintenanceService', () => ({
-  subscribeToMaintenance: jest.fn(() => mockUnsubMaintenance),
-}));
 jest.mock('../../services/firebase/inventoryService', () => ({
-  subscribeItems: jest.fn(() => mockUnsubItems),
   subscribeInventoryByLocation: jest.fn(() => mockUnsubInventory),
   getInventoryByLocation: jest.fn().mockResolvedValue([]),
 }));
@@ -125,9 +109,8 @@ import steelMasterReducer from '../../store/slices/steelMasterSlice';
 import maintenanceReducer from '../../store/slices/maintenanceSlice';
 import activityLogReducer from '../../store/slices/activityLogSlice';
 import purchaseOrderReducer from '../../store/slices/purchaseOrderSlice';
-import type { RootState } from '../../store';
 
-function createStore(preloadedState: Partial<RootState> = {}) {
+function createStore() {
   return configureStore({
     reducer: {
       auth: authReducer,
@@ -139,14 +122,13 @@ function createStore(preloadedState: Partial<RootState> = {}) {
       activityLog: activityLogReducer,
       purchaseOrders: purchaseOrderReducer,
     },
-    preloadedState: preloadedState as Partial<RootState>,
   });
 }
 
-function createWrapper(preloadedState: Partial<RootState> = {}) {
-  const store = createStore(preloadedState);
+function createWrapper() {
+  const store = createStore();
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return React.createElement(Provider, { store }, children);
+    return React.createElement(Provider, { store, children });
   };
 }
 
@@ -156,6 +138,7 @@ describe('useDashboardSubscriptions', () => {
   });
 
   it('returns isInitialLoad true and does not subscribe when userId is null', () => {
+    const { subscribeToSites } = require('../../services/firebase/siteService');
     const wrapper = createWrapper();
     const { result } = renderHook(
       () =>
@@ -171,13 +154,13 @@ describe('useDashboardSubscriptions', () => {
     expect(result.current.isInitialLoad).toBe(true);
     expect(result.current.isRefreshing).toBe(false);
 
-    const { requestService } = require('../../services/firebase/requestService');
-    expect(requestService.subscribeToRequests).not.toHaveBeenCalled();
+    expect(subscribeToSites).not.toHaveBeenCalled();
   });
 
   it('returns early when role is null', () => {
+    const { subscribeToSites } = require('../../services/firebase/siteService');
     const wrapper = createWrapper();
-    const { result } = renderHook(
+    renderHook(
       () =>
         useDashboardSubscriptions({
           userId: 'user-1',
@@ -188,11 +171,11 @@ describe('useDashboardSubscriptions', () => {
       { wrapper }
     );
 
-    const { requestService } = require('../../services/firebase/requestService');
-    expect(requestService.subscribeToRequests).not.toHaveBeenCalled();
+    expect(subscribeToSites).not.toHaveBeenCalled();
   });
 
   it('returns early when isVisible is false', () => {
+    const { subscribeToSites } = require('../../services/firebase/siteService');
     const wrapper = createWrapper();
     renderHook(
       () =>
@@ -205,19 +188,16 @@ describe('useDashboardSubscriptions', () => {
       { wrapper }
     );
 
-    const { requestService } = require('../../services/firebase/requestService');
-    expect(requestService.subscribeToRequests).not.toHaveBeenCalled();
+    expect(subscribeToSites).not.toHaveBeenCalled();
   });
 
   it('subscribes for Admin role and sets isInitialLoad false when callback fires', async () => {
-    const { requestService } = require('../../services/firebase/requestService');
-    let requestsCallback: ((req: unknown[]) => void) | null = null;
-    requestService.subscribeToRequests.mockImplementation(
-      (_opts: unknown, cb: (req: unknown[]) => void) => {
-        requestsCallback = cb;
-        return mockUnsubRequests;
-      }
-    );
+    const { subscribeToSites } = require('../../services/firebase/siteService');
+    let sitesCallback: ((sites: unknown[]) => void) | null = null;
+    subscribeToSites.mockImplementation((cb: (sites: unknown[]) => void) => {
+      sitesCallback = cb;
+      return mockUnsubSites;
+    });
 
     const wrapper = createWrapper();
     const { result } = renderHook(
@@ -234,7 +214,7 @@ describe('useDashboardSubscriptions', () => {
     expect(result.current.isInitialLoad).toBe(true);
 
     await act(async () => {
-      requestsCallback?.([]);
+      sitesCallback?.([]);
       await Promise.resolve();
     });
 
@@ -269,7 +249,7 @@ describe('useDashboardSubscriptions', () => {
   });
 
   it('triggerRefresh re-subscribes to fetch fresh data', () => {
-    const { requestService } = require('../../services/firebase/requestService');
+    const { subscribeToSites } = require('../../services/firebase/siteService');
     const wrapper = createWrapper();
     const { result } = renderHook(
       () =>
@@ -282,15 +262,15 @@ describe('useDashboardSubscriptions', () => {
       { wrapper }
     );
 
-    expect(requestService.subscribeToRequests).toHaveBeenCalledTimes(1);
+    expect(subscribeToSites).toHaveBeenCalledTimes(1);
 
     act(() => {
       result.current.triggerRefresh();
     });
 
     // Effect re-runs: cleanup unsubscribes, then new subscriptions
-    expect(mockUnsubRequests).toHaveBeenCalledTimes(1);
-    expect(requestService.subscribeToRequests).toHaveBeenCalledTimes(2);
+    expect(mockUnsubSites).toHaveBeenCalledTimes(1);
+    expect(subscribeToSites).toHaveBeenCalledTimes(2);
   });
 
   it('calls all unsubscribes on unmount for Admin', () => {
@@ -308,10 +288,6 @@ describe('useDashboardSubscriptions', () => {
 
     unmount();
 
-    expect(mockUnsubRequests).toHaveBeenCalledTimes(1);
-    expect(mockUnsubPOs).toHaveBeenCalledTimes(1);
-    expect(mockUnsubMaintenance).toHaveBeenCalledTimes(1);
-    expect(mockUnsubItems).toHaveBeenCalledTimes(1);
     expect(mockUnsubSites).toHaveBeenCalledTimes(1);
     expect(mockUnsubCategories).toHaveBeenCalledTimes(1);
   });

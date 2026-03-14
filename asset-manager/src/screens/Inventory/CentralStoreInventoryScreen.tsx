@@ -93,6 +93,18 @@ export const CentralStoreInventoryScreen: React.FC = () => {
 
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
 
+  // Sync route.params.lowStockFilter to local state when it changes (e.g. "View All Alerts"
+  // navigation). Handles both: (a) screen already mounted when params arrive, (b) params
+  // undefined on first navigation from another tab.
+  useEffect(() => {
+    const lowStockFilter = route.params?.lowStockFilter ?? false;
+    setLocalFilters((prev) => ({
+      ...prev,
+      stock: lowStockFilter ? 'low_stock' : 'all',
+    }));
+    setShowFilters(lowStockFilter);
+  }, [route.params?.lowStockFilter]);
+
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchQuery);

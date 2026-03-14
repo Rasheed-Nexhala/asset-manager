@@ -93,7 +93,7 @@ const mockUnsubscribe = jest.fn();
 let usersCallback: ((users: unknown[]) => void) | null = null;
 
 jest.mock('../../services/firebase/userRoleService', () => ({
-  subscribeToAllUsers: jest.fn((callback: (users: unknown[]) => void) => {
+  subscribeToSiteManagers: jest.fn((callback: (users: unknown[]) => void) => {
     usersCallback = callback;
     return mockUnsubscribe;
   }),
@@ -148,7 +148,7 @@ describe('useManagerValidationSync', () => {
   });
 
   it('does not subscribe when user is not authenticated', () => {
-    const { subscribeToAllUsers } = require('../../services/firebase/userRoleService');
+    const { subscribeToSiteManagers } = require('../../services/firebase/userRoleService');
     const wrapper = createWrapper({
       auth: {
         user: null,
@@ -163,11 +163,11 @@ describe('useManagerValidationSync', () => {
 
     renderHook(() => useManagerValidationSync(), { wrapper });
 
-    expect(subscribeToAllUsers).not.toHaveBeenCalled();
+    expect(subscribeToSiteManagers).not.toHaveBeenCalled();
   });
 
   it('does not subscribe when user is not admin', () => {
-    const { subscribeToAllUsers } = require('../../services/firebase/userRoleService');
+    const { subscribeToSiteManagers } = require('../../services/firebase/userRoleService');
     const wrapper = createWrapper({
       auth: {
         user: mockUser as unknown as import('firebase/auth').User,
@@ -182,11 +182,11 @@ describe('useManagerValidationSync', () => {
 
     renderHook(() => useManagerValidationSync(), { wrapper });
 
-    expect(subscribeToAllUsers).not.toHaveBeenCalled();
+    expect(subscribeToSiteManagers).not.toHaveBeenCalled();
   });
 
   it('subscribes when user is authenticated admin with role loaded', () => {
-    const { subscribeToAllUsers } = require('../../services/firebase/userRoleService');
+    const { subscribeToSiteManagers } = require('../../services/firebase/userRoleService');
     const wrapper = createWrapper({
       auth: {
         user: mockUser as unknown as import('firebase/auth').User,
@@ -201,7 +201,7 @@ describe('useManagerValidationSync', () => {
 
     renderHook(() => useManagerValidationSync(), { wrapper });
 
-    expect(subscribeToAllUsers).toHaveBeenCalledTimes(1);
+    expect(subscribeToSiteManagers).toHaveBeenCalledTimes(1);
   });
 
   it('calls unsubscribe on unmount', () => {

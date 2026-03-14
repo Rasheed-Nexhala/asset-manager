@@ -20,7 +20,11 @@ jest.mock('../../../navigation/navigationUtils', () => ({
   navigateToProcessRequest: jest.fn(),
 }));
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: mockNavigate, goBack: jest.fn() }),
+  useNavigation: () => ({
+    navigate: mockNavigate,
+    goBack: jest.fn(),
+    canGoBack: () => true,
+  }),
   useFocusEffect: (cb: () => void | (() => void)) => cb(),
 }));
 

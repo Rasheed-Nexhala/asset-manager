@@ -139,6 +139,12 @@ export const MyRequestsScreen: React.FC = () => {
     setIsExporting(false);
   }, [dispatch]);
 
+  const handleBack = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    }
+  }, [navigation]);
+
   const handleRequestPress = useCallback(
     (request: Request) => {
       if (request.status === 'draft') {
@@ -152,7 +158,7 @@ export const MyRequestsScreen: React.FC = () => {
 
   const renderRequestCard = useCallback(
     ({ item }: { item: Request }) => (
-      <View className="px-4 pb-3">
+      <View className="px-4">
         <RequestCard
           request={item}
           onPress={() => handleRequestPress(item)}
@@ -201,6 +207,8 @@ export const MyRequestsScreen: React.FC = () => {
       <ScreenLayout edges={['top']}>
         <ScreenHeader
           title="My Requests"
+          showBack={navigation.canGoBack()}
+          onBackPress={handleBack}
           rightActions={[
             {
               icon: 'download-outline',
@@ -228,6 +236,8 @@ export const MyRequestsScreen: React.FC = () => {
       <ScreenLayout edges={['top']}>
         <ScreenHeader
           title="My Requests"
+          showBack={navigation.canGoBack()}
+          onBackPress={handleBack}
           rightActions={[
             {
               icon: 'download-outline',
@@ -255,6 +265,8 @@ export const MyRequestsScreen: React.FC = () => {
     <ScreenLayout edges={['top']}>
       <ScreenHeader
         title="My Requests"
+        showBack={navigation.canGoBack()}
+        onBackPress={handleBack}
         rightActions={[
           {
             icon: 'download-outline',
@@ -286,7 +298,7 @@ export const MyRequestsScreen: React.FC = () => {
           {searchQuery.length > 0 && (
             <TouchableOpacity
               onPress={() => handleSearchChange('')}
-              className="w-8 h-8 items-center justify-center"
+              className="min-w-[48px] min-h-[48px] w-12 h-12 items-center justify-center"
               accessibilityLabel="Clear search"
               accessibilityRole="button"
             >
@@ -301,16 +313,16 @@ export const MyRequestsScreen: React.FC = () => {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8 }}
+          contentContainerStyle={{ gap: 12 }}
         >
           {TABS.map(renderTab)}
         </ScrollView>
       </View>
 
       {filteredRequests.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-4">
-          <Ionicons name="document-text-outline" size={80} color="#64748B" />
-          <Text className="text-[22px] font-semibold text-[#0F172A] text-center mb-2 mt-4">
+        <View className="flex-1 items-center justify-center px-4 bg-[#F8FAFC]">
+          <Text className="text-6xl mb-4">📋</Text>
+          <Text className="text-[22px] font-semibold text-[#0F172A] text-center mb-2">
             No Requests Yet
           </Text>
           <Text className="text-[15px] text-[#64748B] text-center mb-6">
@@ -338,7 +350,7 @@ export const MyRequestsScreen: React.FC = () => {
       ) : (
         <>
           {totalCount != null && (
-            <View className="bg-white px-4 py-2 border-b border-[#E2E8F0]">
+            <View className="bg-[#F8FAFC] px-4 py-3 border-b border-[#E2E8F0]">
               <Text className="text-[13px] text-[#64748B]">
                 Showing {filteredRequests.length} of {totalCount}
               </Text>
@@ -348,7 +360,7 @@ export const MyRequestsScreen: React.FC = () => {
             data={filteredRequests}
             renderItem={renderRequestCard}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={{ paddingVertical: 16, paddingBottom: 80 }}
+            contentContainerStyle={{ paddingVertical: 16, paddingBottom: 80, gap: 12 }}
             onEndReached={hasMore && !loadingMore ? handleLoadMore : undefined}
             onEndReachedThreshold={0.5}
             refreshControl={

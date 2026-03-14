@@ -338,6 +338,7 @@ describe('CentralStoreInventoryScreen', () => {
     mockItemsToReturn = [mockItem];
     mockCategoriesToReturn = [mockCategory];
     mockFetchCategoriesResult = [mockCategory];
+    mockFetchItemsPaginatedResult = { items: [mockItem], totalCount: 1, lastDoc: null };
 
     renderWithStore(<CentralStoreInventoryScreen />, {
       auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
@@ -354,6 +355,7 @@ describe('CentralStoreInventoryScreen', () => {
     mockItemsToReturn = [mockItem];
     mockCategoriesToReturn = [mockCategory];
     mockFetchCategoriesResult = [mockCategory];
+    mockFetchItemsPaginatedResult = { items: [mockItem], totalCount: 1, lastDoc: null };
 
     renderWithStore(<CentralStoreInventoryScreen />, {
       auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
@@ -431,6 +433,7 @@ describe('CentralStoreInventoryScreen', () => {
     mockItemsToReturn = [mockUncategorizedItem];
     mockCategoriesToReturn = [];
     mockFetchCategoriesResult = [];
+    mockFetchItemsPaginatedResult = { items: [mockUncategorizedItem], totalCount: 1, lastDoc: null };
 
     renderWithStore(<CentralStoreInventoryScreen />, {
       auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
@@ -447,6 +450,7 @@ describe('CentralStoreInventoryScreen', () => {
     mockItemsToReturn = [mockUncategorizedItem];
     mockCategoriesToReturn = [];
     mockFetchCategoriesResult = [];
+    mockFetchItemsPaginatedResult = { items: [mockUncategorizedItem], totalCount: 1, lastDoc: null };
 
     renderWithStore(<CentralStoreInventoryScreen />, {
       auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
@@ -464,6 +468,7 @@ describe('CentralStoreInventoryScreen', () => {
     mockItemsToReturn = [mockItem, mockUncategorizedItem];
     mockCategoriesToReturn = [mockCategory];
     mockFetchCategoriesResult = [mockCategory];
+    mockFetchItemsPaginatedResult = { items: [mockItem, mockUncategorizedItem], totalCount: 2, lastDoc: null };
 
     renderWithStore(<CentralStoreInventoryScreen />, {
       auth: { user: mockAdminUser, userRole: mockAdminRole, isAuthenticated: true, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
