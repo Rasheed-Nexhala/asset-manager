@@ -507,21 +507,31 @@ export const exportRequestsThunk = createAsyncThunk(
         siteId: filters.siteId,
       });
 
-      const header = 'Request Number,Date,Site Name,Requested By,Status,Priority,Purpose,Item Name,SKU,Category,Requested Qty,Approved Qty,Returned Qty,Item Status\n';
+      const header = 'Request Number,Date,Type,Site Name,Source Site,Requested By,Status,Priority,Purpose,Processed By,Store Notes,Rejection Reason,Returned At,Return Notes,Item Name,SKU,Category,Requested Qty,Approved Qty,Returned Qty,Item Status\n';
       
       const escapeCsvField = (value: string | number | null | undefined): string =>
         `"${String(value ?? '').replace(/"/g, '""')}"`;
 
       const rows = requests.flatMap(req => {
         const reqDate = formatDateForCsv(req.createdAt);
+        const processedAt = formatDateForCsv(req.processedAt);
+        const returnedAt = req.returnedAt ? formatDateForCsv(req.returnedAt) : '';
+
         const reqBase = [
           req.requestNumber,
           reqDate,
+          req.requestType || 'standard',
           req.siteName,
+          req.sourceSiteName || '',
           req.requestedByName,
           req.status,
           req.priority,
-          req.purpose
+          req.purpose,
+          req.processedByName || '',
+          req.storeNotes || '',
+          req.rejectionReason || '',
+          returnedAt,
+          req.returnNotes || ''
         ].map(escapeCsvField);
 
         if (!req.items || req.items.length === 0) {

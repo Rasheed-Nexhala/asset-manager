@@ -361,25 +361,41 @@ export const exportPurchaseOrdersThunk = createAsyncThunk(
       
       const orders = await purchaseOrderService.exportPurchaseOrders(filters.status);
       
-      const header = 'PO Number,Date,Vendor Name,Vendor Contact,PO Status,Justification,Total PO Amount,Item Name,SKU,Ordered Qty,Unit Price,GST %,Total Item Amount,Received Qty\n';
+      const header = 'PO Number,Date,Vendor Name,Vendor Contact,Vendor Email,Vendor Address,Vendor GSTIN,Location,Job No,PO Status,Justification,Total PO Amount,Expected Delivery,Created By,Approved By,Rejection Reason,Admin Comments,Received At,Received By,Received Notes,Item Name,SKU,Ordered Qty,Unit,Unit Price,GST %,Total Item Amount,Received Qty,Item Remarks\n';
       
       const escapeCsvField = (value: string | number | null | undefined): string =>
         `"${String(value ?? '').replace(/"/g, '""')}"`;
 
       const rows = orders.flatMap(po => {
         const poDate = formatDateForCsv(po.createdAt);
+        const expectedDelivery = formatDateForCsv(po.expectedDeliveryDate);
+        const receivedAt = formatDateForCsv(po.receivedAt);
+        
         const poBase = [
           po.poNumber,
           poDate,
           po.vendorName,
           po.vendorContact,
+          po.vendorEmail,
+          po.vendorAddress,
+          po.vendorGstin,
+          po.location,
+          po.jobNo,
           po.status,
           po.justification,
-          po.totalAmount
+          po.totalAmount,
+          expectedDelivery,
+          po.createdByName,
+          po.reviewedByName,
+          po.rejectionReason,
+          po.adminComments,
+          receivedAt,
+          po.receivedByName,
+          po.receivedNotes
         ].map(escapeCsvField);
 
         if (!po.items || po.items.length === 0) {
-          return [poBase.concat(Array(7).fill('""')).join(',')];
+          return [poBase.concat(Array(9).fill('""')).join(',')];
         }
 
         return po.items.map(item => {
@@ -387,10 +403,12 @@ export const exportPurchaseOrdersThunk = createAsyncThunk(
             item.itemName,
             item.itemSku,
             item.orderedQuantity ?? item.quantity,
+            item.orderedUnit ?? item.unit,
             item.unitPrice,
             item.gstPercentage,
             item.amount,
-            item.receivedQuantity ?? 0
+            item.receivedQuantity ?? 0,
+            item.remarks
           ].map(escapeCsvField);
           return [...poBase, ...itemBase].join(',');
         });

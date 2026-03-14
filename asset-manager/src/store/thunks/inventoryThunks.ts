@@ -150,7 +150,7 @@ export const createItem = createAsyncThunk(
         createdByRole: userId ? userRoleType : undefined,
       };
 
-      const itemId = await createItemService(dataWithAudit, categoryName);
+      const itemId = await createItemService(dataWithAudit, categoryName ?? undefined);
       // Fetch the created item to return full data
       const createdItem = await getItemByIdService(itemId);
       if (!createdItem) {
@@ -421,9 +421,9 @@ export const exportInventoryThunk = createAsyncThunk(
       const state = getState() as RootState;
       const { filters } = state.inventory;
       
-      const items = await listItems(filters);
+      const items = await listItems(filters ?? undefined);
       
-      const header = 'Item Name,SKU,Category,Type,Unit,Total Qty,Central Store Qty,Site Qty,Maintenance Qty,Status\n';
+      const header = 'Item Name,SKU,Category,Type,Unit,Total Quantity,Central Store Quantity,Site Quantity,Maintenance Quantity,Status\n';
       
       const escapeCsvField = (value: string | number | null | undefined): string =>
         `"${String(value ?? '').replace(/"/g, '""')}"`;

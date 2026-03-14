@@ -247,7 +247,7 @@ export async function exportActivityLogs(
 
     // CSV Header
     const header =
-      'Timestamp,User,Role,Action,Category,Target,Summary,Details\n';
+      'Timestamp,User Name,User Role,Action,Category,Target,Summary,Details\n';
 
     // CSV Rows - escape quotes in summary and details
     const escapeCsvField = (value: string): string =>
