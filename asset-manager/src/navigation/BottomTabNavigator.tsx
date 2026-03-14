@@ -53,6 +53,10 @@ export const BottomTabNavigator: React.FC = () => {
   // Initial screen for Requests stack (role-based)
   const requestsInitialScreen = isAdmin || isStoreIncharge ? 'RequestQueue' : 'MyRequests';
 
+  // Initial screen for Inventory stack (role-based)
+  const inventoryInitialScreen =
+    isAdmin || isStoreIncharge ? 'CentralStoreInventory' : 'MySiteInventory';
+
   // When Requests tab is pressed, pop to initial screen so user always sees RequestQueue/MyRequests
   const requestsTabListeners = useCallback(
     ({ navigation }: { navigation: { navigate: (name: string, params?: object) => void } }) => ({
@@ -63,6 +67,54 @@ export const BottomTabNavigator: React.FC = () => {
       },
     }),
     [requestsInitialScreen]
+  );
+
+  // When Inventory tab is pressed, pop to initial screen so user always sees list (not ItemDetail/Maintenance)
+  const inventoryTabListeners = useCallback(
+    ({ navigation }: { navigation: { navigate: (name: string, params?: object) => void } }) => ({
+      tabPress: () => {
+        navigation.navigate('Inventory', {
+          screen: inventoryInitialScreen,
+        });
+      },
+    }),
+    [inventoryInitialScreen]
+  );
+
+  // When Dashboard tab is pressed, pop to DashboardHome so user always sees main dashboard
+  const dashboardTabListeners = useCallback(
+    ({ navigation }: { navigation: { navigate: (name: string, params?: object) => void } }) => ({
+      tabPress: () => {
+        navigation.navigate('Dashboard', {
+          screen: 'DashboardHome',
+        });
+      },
+    }),
+    []
+  );
+
+  // When Purchase Orders tab is pressed, pop to list so user always sees PurchaseOrderList
+  const purchaseOrdersTabListeners = useCallback(
+    ({ navigation }: { navigation: { navigate: (name: string, params?: object) => void } }) => ({
+      tabPress: () => {
+        navigation.navigate('PurchaseOrders', {
+          screen: 'PurchaseOrderList',
+        });
+      },
+    }),
+    []
+  );
+
+  // When Sites tab is pressed, pop to list so user always sees SiteManagement
+  const sitesTabListeners = useCallback(
+    ({ navigation }: { navigation: { navigate: (name: string, params?: object) => void } }) => ({
+      tabPress: () => {
+        navigation.navigate('Sites', {
+          screen: 'SiteManagement',
+        });
+      },
+    }),
+    []
   );
 
   return (
@@ -97,6 +149,7 @@ export const BottomTabNavigator: React.FC = () => {
           ),
           tabBarLabel: 'Dashboard',
         }}
+        listeners={dashboardTabListeners}
       />
       {showInventoryTab && (
         <Tab.Screen
@@ -108,6 +161,7 @@ export const BottomTabNavigator: React.FC = () => {
             ),
             tabBarLabel: 'Inventory',
           }}
+          listeners={inventoryTabListeners}
         />
       )}
       {showRequestsTab && (
@@ -135,6 +189,7 @@ export const BottomTabNavigator: React.FC = () => {
             tabBarLabel: 'Purchase',
             tabBarBadge: isAdmin && pendingApprovalCount > 0 ? pendingApprovalCount : undefined,
           }}
+          listeners={purchaseOrdersTabListeners}
         />
       )}
       {isAdmin && (
@@ -147,6 +202,7 @@ export const BottomTabNavigator: React.FC = () => {
             ),
             tabBarLabel: 'Sites',
           }}
+          listeners={sitesTabListeners}
         />
       )}
     </Tab.Navigator>
