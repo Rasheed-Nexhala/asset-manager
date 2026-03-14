@@ -437,22 +437,64 @@ export function ItemDetailPage() {
         {canEditItem && (
           <div className="bg-white rounded-[10px] p-4 border border-slate-200 mb-3">
             <h3 className="text-[17px] font-semibold text-slate-900 mb-4">Stock Level & Status</h3>
-            <InfoRow
-              label="Minimum Stock Level"
-              value={
-                isSteelItem ? (
-                  <WeightDisplay
-                    quantity={item.minStockLevel}
-                    weightPerMeter={item.weightPerMeter}
-                    lengthPerPiece={item.lengthPerPiece}
-                    viewMode={viewMode}
-                    unit={item.unit}
+            <div className="flex flex-col gap-4">
+              <InfoRow
+                label="Minimum Stock Level"
+                value={
+                  isSteelItem ? (
+                    <WeightDisplay
+                      quantity={item.minStockLevel}
+                      weightPerMeter={item.weightPerMeter}
+                      lengthPerPiece={item.lengthPerPiece}
+                      viewMode={viewMode}
+                      unit={item.unit}
+                    />
+                  ) : (
+                    `${item.minStockLevel} ${item.unit}`
+                  )
+                }
+              />
+              <InfoRow
+                label="Status"
+                value={
+                  <span className={`px-2 py-1 rounded-full text-[12px] font-medium ${statusBadgeClass}`}>
+                    {statusLabel}
+                  </span>
+                }
+              />
+              {/* Stock level progress bar */}
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="text-[13px] text-slate-500">Stock Level</span>
+                  <span className="text-[13px] text-slate-500">
+                    {`${item.centralStoreQuantity ?? item.totalQuantity ?? 0} / ${item.minStockLevel} ${item.unit}`}
+                  </span>
+                </div>
+                <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${
+                      stockStatus === 'low_stock'
+                        ? 'bg-red-600'
+                        : (item.centralStoreQuantity ?? item.totalQuantity ?? 0) <=
+                          (item.minStockLevel ?? 0) * 1.5
+                        ? 'bg-amber-500'
+                        : 'bg-green-600'
+                    }`}
+                    style={{
+                      width: (() => {
+                        const qty = item.centralStoreQuantity ?? item.totalQuantity ?? 0;
+                        const min = item.minStockLevel ?? 0;
+                        const pct =
+                          min === 0
+                            ? qty > 0 ? 100 : 0
+                            : Math.min((qty / (min * 2)) * 100, 100);
+                        return `${pct}%`;
+                      })(),
+                    }}
                   />
-                ) : (
-                  `${item.minStockLevel} ${item.unit}`
-                )
-              }
-            />
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
