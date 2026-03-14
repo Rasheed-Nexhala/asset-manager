@@ -17,13 +17,14 @@ import { isWeightViewSupported } from '../../utils/weightConversionUtils';
 import { isLowStock, getItemTypeDetails } from '../../utils/inventoryUtils';
 import type { InventoryStackParamList } from '../../navigation/InventoryStackNavigator';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { fetchItemById, adjustQuantity } from '../../store/thunks/inventoryThunks';
+import { fetchItemById, adjustQuantity, deleteItem } from '../../store/thunks/inventoryThunks';
 import { createInventoryUpdateRequest } from '../../store/thunks/inventoryUpdateRequestThunks';
 import { selectItemById, selectItemsLoading, selectItemsError } from '../../store/selectors/inventorySelectors';
 import { selectIsAdmin, selectIsStoreIncharge, selectRoleLoading, selectIsRoleLoaded } from '../../store/selectors/authSelectors';
 import { selectCanStoreInchargeAdjustInventory, selectMyAccessGrantedUntil } from '../../store/selectors/inventoryUpdateRequestSelectors';
 import { updateItemInState, clearError } from '../../store/slices/inventorySlice';
 import { subscribeItemById, subscribeInventoryByItemId } from '../../services/firebase/inventoryService';
+import { checkCanDeleteItem } from '../../services/firebase/inventoryDeletionService';
 import type { Item, AdjustmentData, AdjustmentType, InventoryEntry } from '../../types/inventory';
 import { getDisplayCategoryName } from '../../types/inventory';
 
@@ -144,7 +145,15 @@ export const ItemDetailScreen: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRequestingAccess, setIsRequestingAccess] = useState(false);
   const [inventoryByLocation, setInventoryByLocation] = useState<InventoryEntry[]>([]);
+  const [isCheckingDelete, setIsCheckingDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const isSteelItem = item ? isWeightViewSupported(item) : false;
+
+  // Deletable when: can edit AND (no stock at sites/maintenance)
+  const canDeleteItem =
+    canEditItem &&
+    (item?.atSitesQuantity ?? 0) === 0 &&
+    (item?.inMaintenanceQuantity ?? 0) === 0;
 
   // Fetch item if not in store
   useEffect(() => {
@@ -238,6 +247,49 @@ export const ItemDetailScreen: React.FC = () => {
     },
     [dispatch]
   );
+
+  const handleDeletePress = useCallback(async () => {
+    if (!itemId || !item) return;
+    setIsCheckingDelete(true);
+    try {
+      const result = await checkCanDeleteItem(itemId, {
+        totalQuantity: item.totalQuantity,
+        atSitesQuantity: item.atSitesQuantity,
+        inMaintenanceQuantity: item.inMaintenanceQuantity,
+      });
+      if (!result.canDelete) {
+        Alert.alert('Cannot Delete', result.reason ?? 'This item cannot be deleted.');
+        return;
+      }
+      Alert.alert(
+      'Delete Item',
+      `Delete ${item.name}? This cannot be undone. Historical POs and maintenance records will keep the item name for reference.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setIsDeleting(true);
+            try {
+              await dispatch(deleteItem(itemId)).unwrap();
+              Alert.alert('Success', 'Item deleted.', [
+                { text: 'OK', onPress: () => navigation.goBack() },
+              ]);
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : 'Failed to delete item';
+              Alert.alert('Error', msg);
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+    } finally {
+      setIsCheckingDelete(false);
+    }
+  }, [itemId, item, dispatch, navigation]);
 
   useAutoClearError(error, () => dispatch(clearError()));
 
@@ -688,6 +740,36 @@ export const ItemDetailScreen: React.FC = () => {
             >
               <Ionicons name="pencil-outline" size={20} color="#1E40AF" />
               <Text className="text-[15px] font-semibold text-[#1E40AF]">Edit Item</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Danger Zone: Delete Item - only when deletable (no stock at sites/maintenance) */}
+        {canDeleteItem && (
+          <View className="mb-6 mt-2 bg-white rounded-[10px] p-4 border border-[#DC2626]/30">
+            <Text className="text-[17px] font-semibold text-[#0F172A] mb-2">Danger Zone</Text>
+            <Text className="text-[13px] text-[#64748B] mb-4">
+              Delete this item permanently. Historical POs and maintenance records will keep the item name for reference.
+            </Text>
+            <TouchableOpacity
+              className="border border-[#DC2626] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2 bg-[#DC2626]/5"
+              onPress={handleDeletePress}
+              disabled={isCheckingDelete || isDeleting}
+              activeOpacity={0.7}
+              accessibilityLabel={
+                isCheckingDelete ? 'Checking if item can be deleted' : isDeleting ? 'Deleting item' : 'Delete item'
+              }
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isCheckingDelete || isDeleting, busy: isCheckingDelete || isDeleting }}
+            >
+              {isCheckingDelete || isDeleting ? (
+                <ActivityIndicator size="small" color="#DC2626" />
+              ) : (
+                <Ionicons name="trash-outline" size={20} color="#DC2626" />
+              )}
+              <Text className="text-[15px] font-semibold text-[#DC2626]">
+                {isCheckingDelete ? 'Checking...' : isDeleting ? 'Deleting...' : 'Delete Item'}
+              </Text>
             </TouchableOpacity>
           </View>
         )}

@@ -117,6 +117,9 @@ jest.mock('../../../services/firebase/inventoryService', () => ({
   getItemById: jest.fn(),
   listItems: jest.fn(),
 }));
+jest.mock('../../../services/firebase/inventoryDeletionService', () => ({
+  checkCanDeleteItem: jest.fn().mockResolvedValue({ canDelete: true }),
+}));
 jest.mock('../../../store/thunks/inventoryUpdateRequestThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
@@ -172,6 +175,25 @@ const mockUncategorizedItem: Item = {
   centralStoreQuantity: 12,
   atSitesQuantity: 6,
   inMaintenanceQuantity: 2,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+};
+
+/** Item with all stock in central store - deletable */
+const mockDeletableItem: Item = {
+  id: 'i3',
+  name: 'Deletable Item',
+  sku: 'SKU-003',
+  categoryId: 'cat1',
+  categoryName: 'Steel',
+  type: 'consumable',
+  unit: 'Pcs',
+  minStockLevel: 0,
+  status: 'active',
+  totalQuantity: 10,
+  centralStoreQuantity: 10,
+  atSitesQuantity: 0,
+  inMaintenanceQuantity: 0,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
 };
@@ -389,5 +411,50 @@ describe('ItemDetailScreen', () => {
     fireEvent.press(addStockButtons[0]);
 
     expect(screen.getByLabelText('Amount input')).toBeTruthy();
+  });
+
+  it('Delete button is visible when Admin and item has no stock at sites or maintenance', () => {
+    mockRouteParams = { itemId: 'i3' };
+    const adminAuth: AuthState = {
+      ...defaultAuthState,
+      userRole: { role: 'Admin' as const, isActive: true, permissions: [] },
+    };
+    renderWithStore(<ItemDetailScreen />, {
+      auth: adminAuth,
+      inventory: { ...baseInventoryState, items: [mockDeletableItem] },
+    });
+
+    expect(screen.getByText('Danger Zone')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Delete item' })).toBeTruthy();
+  });
+
+  it('Delete button is NOT visible when item has stock at sites', () => {
+    mockRouteParams = { itemId: 'i1' };
+    const adminAuth: AuthState = {
+      ...defaultAuthState,
+      userRole: { role: 'Admin' as const, isActive: true, permissions: [] },
+    };
+    renderWithStore(<ItemDetailScreen />, {
+      auth: adminAuth,
+      inventory: { ...baseInventoryState, items: [mockItem] },
+    });
+
+    expect(screen.queryByText('Danger Zone')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete item' })).toBeNull();
+  });
+
+  it('Delete button is NOT visible when user is Site Manager', () => {
+    mockRouteParams = { itemId: 'i3' };
+    const siteManagerAuth: AuthState = {
+      ...defaultAuthState,
+      userRole: { role: 'SiteManager' as const, isActive: true, permissions: [] },
+    };
+    renderWithStore(<ItemDetailScreen />, {
+      auth: siteManagerAuth,
+      inventory: { ...baseInventoryState, items: [mockDeletableItem] },
+    });
+
+    expect(screen.queryByText('Danger Zone')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete item' })).toBeNull();
   });
 });

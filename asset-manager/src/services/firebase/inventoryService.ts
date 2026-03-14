@@ -1029,9 +1029,16 @@ export const deleteItem = async (id: string): Promise<void> => {
 
       const itemData = itemDoc.data();
 
-      // Ensure totalQuantity is zero before deleting
-      if ((itemData.totalQuantity || 0) > 0) {
-        throw new Error('Cannot delete item with active stock. Please reduce stock to zero first.');
+      // Allow delete when: totalQuantity === 0 OR (atSitesQuantity === 0 AND inMaintenanceQuantity === 0)
+      // Block when stock is at sites or in maintenance (physical assets elsewhere)
+      const totalQty = itemData.totalQuantity || 0;
+      const atSites = itemData.atSitesQuantity || 0;
+      const inMaint = itemData.inMaintenanceQuantity || 0;
+      const hasStockAtSitesOrMaint = atSites > 0 || inMaint > 0;
+      if (hasStockAtSitesOrMaint) {
+        throw new Error(
+          'Cannot delete item with stock at sites or in maintenance. Reduce stock to zero or move all to central store first.'
+        );
       }
 
       imageUrl = itemData.imageUrl;
