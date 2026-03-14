@@ -22,7 +22,6 @@ import {
   loadMoreRequests,
   exportRequestsThunk,
 } from '../../store/thunks/requestThunks';
-import { useRequestQueueSubscription } from '../../hooks/useRequestsSubscriptions';
 import {
   selectFilteredAndSearchedRequestsSortedByDate,
   selectRequestsLoading,
@@ -46,6 +45,7 @@ export const RequestQueueScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -60,8 +60,12 @@ export const RequestQueueScreen: React.FC = () => {
   const sites = useAppSelector(selectAllSites);
   const allItems = useAppSelector(selectAllItems);
 
-  // Real-time Firestore snapshot updates when screen is focused
-  useRequestQueueSubscription();
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   // Ensure inventory is loaded for availability display (isAllSufficient on RequestCard).
   useEffect(() => {
@@ -74,6 +78,8 @@ export const RequestQueueScreen: React.FC = () => {
   }, [dispatch]);
 
   useEffect(() => {
+    // Frontend search filters the currently loaded pages in memory.
+    // We only refetch when status or siteId filters change.
     dispatch(fetchRequestsPaginated());
   }, [dispatch, filters.status, filters.siteId]);
 

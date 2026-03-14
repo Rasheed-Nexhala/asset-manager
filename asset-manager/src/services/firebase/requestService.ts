@@ -1190,6 +1190,43 @@ export const exportRequestsData = async (
 };
 
 /**
+ * Get recent pending requests for the dashboard
+ */
+export const getRecentPendingRequests = async (
+  filters: {
+    siteId?: string;
+    userId?: string;
+  },
+  limitCount: number = 5
+): Promise<Request[]> => {
+  try {
+    let q = query(collection(db, REQUESTS_COLLECTION), where('status', '==', 'pending'));
+
+    if (filters.siteId && filters.siteId !== 'all') {
+      q = query(q, where('siteId', '==', filters.siteId));
+    }
+
+    if (filters.userId) {
+      q = query(q, where('requestedBy', '==', filters.userId));
+    }
+
+    q = query(q, orderBy('createdAt', 'desc'), limit(limitCount));
+
+    const snapshot = await getDocs(q);
+    const requests = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    })) as Request[];
+
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    return requests.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+  } catch (error) {
+    console.error('Error getting recent pending requests:', error);
+    return [];
+  }
+};
+
+/**
  * Subscribe to requests (real-time)
  */
 export const subscribeToRequests = (
@@ -1323,6 +1360,7 @@ export const requestService = {
   listRequestsPaginated,
   exportRequestsData,
   getRequestsCount,
+  getRecentPendingRequests,
   subscribeToRequests,
   subscribeToRequest,
 };

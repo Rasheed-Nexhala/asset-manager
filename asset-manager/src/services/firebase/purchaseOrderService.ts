@@ -143,6 +143,56 @@ const normalizePOItemsForRead = (
   });
 
 /**
+ * Map a raw Firestore document data to a PurchaseOrderFirestore object.
+ * Centralizes defaults and type safety for fields across different fetch methods.
+ */
+const mapFirestoreDocToPOFirestore = (
+  id: string,
+  data: any
+): PurchaseOrderFirestore => {
+  const items = normalizePOItemsForRead(data.items ?? []);
+  return {
+    id,
+    poNumber: data.poNumber,
+    vendorId: data.vendorId,
+    vendorName: data.vendorName,
+    vendorContact: data.vendorContact,
+    vendorEmail: data.vendorEmail,
+    vendorAddress: data.vendorAddress,
+    vendorGstin: data.vendorGstin,
+    location: data.location,
+    jobNo: data.jobNo,
+    items,
+    subtotal: data.subtotal,
+    gstPercentage: data.gstPercentage ?? DEFAULT_GST_PERCENTAGE,
+    gstAmount: data.gstAmount ?? 0,
+    totalAmount: data.totalAmount ?? 0,
+    justification: data.justification,
+    expectedDeliveryDate: data.expectedDeliveryDate ?? null,
+    documents: data.documents ?? [],
+    pdfUrl: data.pdfUrl,
+    status: data.status,
+    createdBy: data.createdBy,
+    createdByName: data.createdByName,
+    createdByRole: data.createdByRole ?? undefined,
+    createdAt: data.createdAt,
+    reviewedBy: data.reviewedBy ?? null,
+    reviewedByName: data.reviewedByName ?? null,
+    reviewedAt: data.reviewedAt ?? null,
+    adminComments: data.adminComments ?? null,
+    rejectionReason: data.rejectionReason ?? null,
+    signedPdfUrl: data.signedPdfUrl ?? undefined,
+    downloadedBy: data.downloadedBy ?? undefined,
+    downloadedByName: data.downloadedByName ?? undefined,
+    receivedAt: data.receivedAt ?? null,
+    receivedBy: data.receivedBy ?? null,
+    receivedByName: data.receivedByName ?? null,
+    receivedNotes: data.receivedNotes ?? null,
+    updatedAt: data.updatedAt,
+  };
+};
+
+/**
  * Generate unique PO number using a counter document.
  * Format: PO-YYYY-NNNN
  */
@@ -321,46 +371,7 @@ export const getPOById = async (poId: string): Promise<PurchaseOrder | null> => 
     }
 
     const data = poDoc.data();
-    const items = normalizePOItemsForRead(data.items ?? []);
-    const firestorePO: PurchaseOrderFirestore = {
-      id: poDoc.id,
-      poNumber: data.poNumber,
-      vendorId: data.vendorId,
-      vendorName: data.vendorName,
-      vendorContact: data.vendorContact,
-      vendorEmail: data.vendorEmail,
-      vendorAddress: data.vendorAddress,
-      vendorGstin: data.vendorGstin,
-      location: data.location,
-      jobNo: data.jobNo,
-      items,
-      subtotal: data.subtotal,
-      gstPercentage: data.gstPercentage ?? DEFAULT_GST_PERCENTAGE,
-      gstAmount: data.gstAmount,
-      totalAmount: data.totalAmount,
-      justification: data.justification,
-      expectedDeliveryDate: data.expectedDeliveryDate ?? null,
-      documents: data.documents ?? [],
-      pdfUrl: data.pdfUrl,
-      status: data.status,
-      createdBy: data.createdBy,
-      createdByName: data.createdByName,
-      createdByRole: data.createdByRole ?? undefined,
-      createdAt: data.createdAt,
-      reviewedBy: data.reviewedBy ?? null,
-      reviewedByName: data.reviewedByName ?? null,
-      reviewedAt: data.reviewedAt ?? null,
-      adminComments: data.adminComments ?? null,
-      rejectionReason: data.rejectionReason ?? null,
-      signedPdfUrl: data.signedPdfUrl ?? undefined,
-      downloadedBy: data.downloadedBy ?? undefined,
-      downloadedByName: data.downloadedByName ?? undefined,
-      receivedAt: data.receivedAt ?? null,
-      receivedBy: data.receivedBy ?? null,
-      receivedByName: data.receivedByName ?? null,
-      receivedNotes: data.receivedNotes ?? null,
-      updatedAt: data.updatedAt,
-    };
+    const firestorePO = mapFirestoreDocToPOFirestore(poDoc.id, data);
 
     return firestorePOToPO(firestorePO);
   } catch (error) {
@@ -891,46 +902,7 @@ export const listPurchaseOrdersPaginated = async (
   snapshot.forEach((docSnap) => {
     try {
       const data = docSnap.data();
-      const items = normalizePOItemsForRead(data.items ?? []);
-      const firestorePO: PurchaseOrderFirestore = {
-        id: docSnap.id,
-        poNumber: data.poNumber,
-        vendorId: data.vendorId,
-        vendorName: data.vendorName,
-        vendorContact: data.vendorContact,
-        vendorEmail: data.vendorEmail,
-        vendorAddress: data.vendorAddress,
-        vendorGstin: data.vendorGstin,
-        location: data.location,
-        jobNo: data.jobNo,
-        items,
-        subtotal: data.subtotal,
-        gstPercentage: data.gstPercentage ?? DEFAULT_GST_PERCENTAGE,
-        gstAmount: data.gstAmount,
-        totalAmount: data.totalAmount,
-        justification: data.justification,
-        expectedDeliveryDate: data.expectedDeliveryDate ?? null,
-        documents: data.documents ?? [],
-        pdfUrl: data.pdfUrl,
-        status: data.status,
-        createdBy: data.createdBy,
-        createdByName: data.createdByName,
-        createdByRole: data.createdByRole ?? undefined,
-        createdAt: data.createdAt,
-        reviewedBy: data.reviewedBy ?? null,
-        reviewedByName: data.reviewedByName ?? null,
-        reviewedAt: data.reviewedAt ?? null,
-        adminComments: data.adminComments ?? null,
-        rejectionReason: data.rejectionReason ?? null,
-        signedPdfUrl: data.signedPdfUrl ?? undefined,
-        downloadedBy: data.downloadedBy ?? undefined,
-        downloadedByName: data.downloadedByName ?? undefined,
-        receivedAt: data.receivedAt ?? null,
-        receivedBy: data.receivedBy ?? null,
-        receivedByName: data.receivedByName ?? null,
-        receivedNotes: data.receivedNotes ?? null,
-        updatedAt: data.updatedAt,
-      };
+      const firestorePO = mapFirestoreDocToPOFirestore(docSnap.id, data);
       orders.push(firestorePOToPO(firestorePO));
     } catch (err) {
       console.warn('Skipping malformed PO document:', docSnap.id, err);
@@ -977,46 +949,7 @@ export const exportPurchaseOrders = async (
     snapshot.forEach((docSnap) => {
       try {
         const data = docSnap.data();
-        const items = normalizePOItemsForRead(data.items ?? []);
-        const firestorePO: PurchaseOrderFirestore = {
-          id: docSnap.id,
-          poNumber: data.poNumber,
-          vendorId: data.vendorId,
-          vendorName: data.vendorName,
-          vendorContact: data.vendorContact,
-          vendorEmail: data.vendorEmail,
-          vendorAddress: data.vendorAddress,
-          vendorGstin: data.vendorGstin,
-          location: data.location,
-          jobNo: data.jobNo,
-          items,
-          subtotal: data.subtotal,
-          gstPercentage: data.gstPercentage ?? DEFAULT_GST_PERCENTAGE,
-          gstAmount: data.gstAmount,
-          totalAmount: data.totalAmount,
-          justification: data.justification,
-          expectedDeliveryDate: data.expectedDeliveryDate ?? null,
-          documents: data.documents ?? [],
-          pdfUrl: data.pdfUrl,
-          status: data.status,
-          createdBy: data.createdBy,
-          createdByName: data.createdByName,
-          createdByRole: data.createdByRole ?? undefined,
-          createdAt: data.createdAt,
-          reviewedBy: data.reviewedBy ?? null,
-          reviewedByName: data.reviewedByName ?? null,
-          reviewedAt: data.reviewedAt ?? null,
-          adminComments: data.adminComments ?? null,
-          rejectionReason: data.rejectionReason ?? null,
-          signedPdfUrl: data.signedPdfUrl ?? undefined,
-          downloadedBy: data.downloadedBy ?? undefined,
-          downloadedByName: data.downloadedByName ?? undefined,
-          receivedAt: data.receivedAt ?? null,
-          receivedBy: data.receivedBy ?? null,
-          receivedByName: data.receivedByName ?? null,
-          receivedNotes: data.receivedNotes ?? null,
-          updatedAt: data.updatedAt,
-        };
+        const firestorePO = mapFirestoreDocToPOFirestore(docSnap.id, data);
         orders.push(firestorePOToPO(firestorePO));
       } catch (err) {
         console.warn('Skipping malformed PO document:', docSnap.id, err);
@@ -1027,6 +960,23 @@ export const exportPurchaseOrders = async (
   } catch (error) {
     console.error('Error exporting purchase orders:', error);
     throw error;
+  }
+};
+
+/**
+ * Get count of pending purchase orders for the dashboard widget
+ */
+export const getPendingPOCount = async (): Promise<number> => {
+  try {
+    const q = query(
+      collection(db, PURCHASE_ORDERS_COLLECTION),
+      where('status', '==', 'pending_approval')
+    );
+    const snapshot = await getCountFromServer(q);
+    return snapshot.data().count;
+  } catch (error) {
+    console.error('Error getting pending PO count:', error);
+    return 0;
   }
 };
 
@@ -1057,46 +1007,7 @@ export const subscribeToPurchaseOrders = (
       snapshot.forEach((docSnap) => {
         try {
           const data = docSnap.data();
-          const items = normalizePOItemsForRead(data.items ?? []);
-          const firestorePO: PurchaseOrderFirestore = {
-            id: docSnap.id,
-            poNumber: data.poNumber,
-            vendorId: data.vendorId,
-            vendorName: data.vendorName,
-            vendorContact: data.vendorContact,
-            vendorEmail: data.vendorEmail,
-            vendorAddress: data.vendorAddress,
-            vendorGstin: data.vendorGstin,
-            location: data.location,
-            jobNo: data.jobNo,
-            items,
-            subtotal: data.subtotal,
-            gstPercentage: data.gstPercentage ?? DEFAULT_GST_PERCENTAGE,
-            gstAmount: data.gstAmount,
-            totalAmount: data.totalAmount,
-            justification: data.justification,
-            expectedDeliveryDate: data.expectedDeliveryDate ?? null,
-            documents: data.documents ?? [],
-            pdfUrl: data.pdfUrl,
-            status: data.status,
-            createdBy: data.createdBy,
-            createdByName: data.createdByName,
-            createdByRole: data.createdByRole ?? undefined,
-            createdAt: data.createdAt,
-            reviewedBy: data.reviewedBy ?? null,
-            reviewedByName: data.reviewedByName ?? null,
-            reviewedAt: data.reviewedAt ?? null,
-            adminComments: data.adminComments ?? null,
-            rejectionReason: data.rejectionReason ?? null,
-            signedPdfUrl: data.signedPdfUrl ?? undefined,
-            downloadedBy: data.downloadedBy ?? undefined,
-            downloadedByName: data.downloadedByName ?? undefined,
-            receivedAt: data.receivedAt ?? null,
-            receivedBy: data.receivedBy ?? null,
-            receivedByName: data.receivedByName ?? null,
-            receivedNotes: data.receivedNotes ?? null,
-            updatedAt: data.updatedAt,
-          };
+          const firestorePO = mapFirestoreDocToPOFirestore(docSnap.id, data);
           orders.push(firestorePOToPO(firestorePO));
         } catch (err) {
           console.warn('Skipping malformed PO document:', docSnap.id, err);

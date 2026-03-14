@@ -24,8 +24,11 @@ import {
   setError,
   clearError,
 } from '../../store/slices/purchaseOrderSlice';
-import { loadMorePurchaseOrders, exportPurchaseOrdersThunk } from '../../store/thunks/purchaseOrderThunks';
-import { subscribeToPurchaseOrders } from '../../services/firebase/purchaseOrderService';
+import {
+  fetchPurchaseOrdersPaginated,
+  loadMorePurchaseOrders,
+  exportPurchaseOrdersThunk
+} from '../../store/thunks/purchaseOrderThunks';
 import {
   selectFilteredPurchaseOrdersForViewer,
   selectPurchaseOrderLoading,
@@ -64,29 +67,10 @@ export const PurchaseOrderListScreen: React.FC = () => {
   const error = useAppSelector(selectPurchaseOrderError);
   const filters = useAppSelector(selectPurchaseOrderFilters);
 
-  // Real-time Firestore subscription when screen is focused
+  // Fetch purchase orders with pagination when screen is focused or filters change
   useEffect(() => {
     if (!isFocused) return;
-
-    dispatch(setLoading(true));
-    dispatch(clearError());
-
-    const statusFilter =
-      filters.status !== 'all' ? filters.status : undefined;
-
-    const unsubscribe = subscribeToPurchaseOrders(
-      (ordersData, err) => {
-        if (err) {
-          dispatch(setLoading(false));
-          dispatch(setError(err.message));
-        } else {
-          dispatch(setPurchaseOrdersFromSubscription(ordersData));
-        }
-      },
-      statusFilter
-    );
-
-    return () => unsubscribe();
+    dispatch(fetchPurchaseOrdersPaginated());
   }, [isFocused, filters.status, dispatch, retryTrigger]);
 
   const handleRefresh = useCallback(() => {

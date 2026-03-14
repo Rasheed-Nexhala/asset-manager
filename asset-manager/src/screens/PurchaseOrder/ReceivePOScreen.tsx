@@ -20,6 +20,7 @@ import { FormField } from '../../components/FormField';
 import { InvoiceUploadField, POReceiptSummary } from '../../components/PurchaseOrder';
 import { printPurchaseOrder } from '../../utils/poPdfUtils';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
+import { getItemById } from '../../services/firebase/inventoryService';
 import { uploadPOInvoice } from '../../services/firebase/storageService';
 import { receivePO } from '../../store/thunks/purchaseOrderThunks';
 import {
@@ -27,8 +28,7 @@ import {
   selectUserDisplayName,
 } from '../../store/selectors/authSelectors';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { selectAllItems } from '../../store/selectors/inventorySelectors';
-import { fetchItems } from '../../store/thunks/inventoryThunks';
+
 import type { PurchaseOrder } from '../../types/purchaseOrder';
 import type { PurchaseOrderStackParamList } from '../../navigation/PurchaseOrderStackParamList';
 
@@ -46,7 +46,6 @@ export const ReceivePOScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
-  const allItems = useAppSelector(selectAllItems);
 
   const [po, setPo] = useState<PurchaseOrder | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,10 +59,32 @@ export const ReceivePOScreen: React.FC = () => {
   const [uploadingInvoice, setUploadingInvoice] = useState(false);
   // Per-item received quantities — pre-filled with ordered qty, editable by user
   const [receivedQtys, setReceivedQtys] = useState<Record<string, string>>({});
+  const [inventoryItemsMap, setInventoryItemsMap] = useState<Record<string, any>>({});
 
+  // Helper to fetch details for multiple items
+  const fetchInventoryDetails = useCallback(async (itemIds: string[]) => {
+    const missingIds = itemIds.filter(id => !inventoryItemsMap[id]);
+    if (missingIds.length === 0) return;
+
+    try {
+      const results = await Promise.all(missingIds.map(id => getItemById(id)));
+      const updates: Record<string, any> = {};
+      results.forEach((item, index) => {
+        if (item) updates[missingIds[index]] = item;
+      });
+      setInventoryItemsMap(prev => ({ ...prev, ...updates }));
+    } catch (err) {
+      console.error('Error fetching inventory details:', err);
+    }
+  }, [inventoryItemsMap]);
+
+  // Fetch details when items in PO change
   useEffect(() => {
-    dispatch(fetchItems());
-  }, [dispatch]);
+    if (po) {
+      const ids = po.items.map(i => i.itemId);
+      fetchInventoryDetails(ids);
+    }
+  }, [po, fetchInventoryDetails]);
 
   useEffect(() => {
     setLoadError(null);
@@ -208,7 +229,7 @@ export const ReceivePOScreen: React.FC = () => {
 
   const inventoryUpdates = po
     ? po.items.map((item) => {
-        const invItem = allItems.find((i) => i.id === item.itemId);
+        const invItem = inventoryItemsMap[item.itemId];
         const current = invItem?.centralStoreQuantity ?? 0;
         const receivedQty = parseInt(receivedQtys[item.itemId] ?? '0', 10) || 0;
         return {

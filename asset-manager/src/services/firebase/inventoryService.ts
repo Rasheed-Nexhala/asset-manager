@@ -182,6 +182,13 @@ const buildItemsQueryConstraints = (filters?: ItemFilters): QueryConstraint[] =>
   if (filters?.status) {
     constraints.push(where('status', '==', filters.status));
   }
+
+  const trimmed = filters?.searchTerm?.trim();
+  if (trimmed) {
+    constraints.push(where('name', '>=', trimmed));
+    constraints.push(where('name', '<=', trimmed + '\uf8ff'));
+  }
+
   constraints.push(orderBy('name', 'asc'));
   return constraints;
 };

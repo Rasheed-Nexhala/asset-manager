@@ -220,6 +220,7 @@ export interface ItemFilters {
   type?: ItemType;                 // Filter by item type
   lowStockOnly?: boolean;          // Show only items below minimum stock level
   status?: ItemStatus;             // Filter by status
+  searchTerm?: string;             // Optional search prefix for item name
 }
 
 /**

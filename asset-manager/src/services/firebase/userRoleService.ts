@@ -7,6 +7,8 @@ import {
   collection,
   getDocs,
   onSnapshot,
+  query,
+  where,
   Unsubscribe,
   QuerySnapshot,
   DocumentSnapshot,
@@ -283,6 +285,45 @@ export const subscribeToAllUsers = (
     },
     (error) => {
       console.error('Error in all users subscription:', error);
+    }
+  );
+};
+
+/**
+ * Subscribe to real-time updates for SiteManager users only (to prevent massive global reads)
+ *
+ * @param callback - Function called whenever the site managers list changes
+ * @returns Unsubscribe function to stop listening
+ */
+export const subscribeToSiteManagers = (
+  callback: (users: UserListItem[]) => void
+): Unsubscribe => {
+  const usersCollectionRef = collection(db, USERS_COLLECTION);
+  const q = query(usersCollectionRef, where('role', '==', 'SiteManager'));
+
+  return onSnapshot(
+    q,
+    (snapshot: QuerySnapshot) => {
+      const users: UserListItem[] = [];
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        users.push({
+          id: doc.id,
+          email: data.email || null,
+          displayName: data.displayName || null,
+          role: data.role as UserRole,
+          isActive: data.isActive ?? false,
+          permissions: Array.isArray(data.permissions) ? data.permissions : [],
+          isDeleted: data.isDeleted ?? false,
+          isSuperadmin: data.isSuperadmin ?? false,
+        });
+      });
+
+      callback(users);
+    },
+    (error) => {
+      console.error('Error in site managers subscription:', error);
     }
   );
 };

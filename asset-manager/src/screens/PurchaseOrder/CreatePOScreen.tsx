@@ -30,7 +30,8 @@ import {
   deleteVendor,
 } from '../../services/firebase/vendorService';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
-import { fetchItems } from '../../store/thunks/inventoryThunks';
+import { getItemById } from '../../services/firebase/inventoryService';
+
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { setVendors, clearError, setError } from '../../store/slices/purchaseOrderSlice';
 import {
@@ -43,7 +44,7 @@ import {
   selectPOById,
   selectPurchaseOrderError,
 } from '../../store/selectors/purchaseOrderSelectors';
-import { selectAllItems } from '../../store/selectors/inventorySelectors';
+
 import type {
   CreatePurchaseOrderData,
   PurchaseOrder,
@@ -76,7 +77,7 @@ export const CreatePOScreen: React.FC = () => {
   const userName = useAppSelector(selectUserDisplayName);
   const isAdmin = useAppSelector(selectIsAdmin);
   const vendors = useAppSelector(selectVendors);
-  const allItems = useAppSelector(selectAllItems);
+
   const poFromStore = useAppSelector((state) =>
     poId ? selectPOById(poId)(state) : null
   );
@@ -106,22 +107,39 @@ export const CreatePOScreen: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [initialStateHash, setInitialStateHash] = useState<string | null>(null);
+  const [inventoryItemsMap, setInventoryItemsMap] = useState<Record<string, any>>({});
 
   useEffect(() => {
     const unsub = subscribeToVendors((v) => dispatch(setVendors(v)));
     return unsub;
   }, [dispatch]);
 
-  useFocusEffect(
-    useCallback(() => {
-      dispatch(clearError());
-      return () => {};
-    }, [dispatch])
-  );
+  // Helper to fetch details for multiple items
+  const fetchInventoryDetails = useCallback(async (itemIds: string[]) => {
+    const missingIds = itemIds.filter(id => !inventoryItemsMap[id]);
+    if (missingIds.length === 0) return;
 
+    try {
+      const results = await Promise.all(missingIds.map(id => getItemById(id)));
+      const updates: Record<string, any> = {};
+      results.forEach((item, index) => {
+        if (item) updates[missingIds[index]] = item;
+      });
+      setInventoryItemsMap(prev => ({ ...prev, ...updates }));
+    } catch (err) {
+      console.error('Error fetching inventory details:', err);
+    }
+  }, [inventoryItemsMap]);
+
+  // Fetch details when items change
   useEffect(() => {
-    dispatch(fetchItems());
-  }, [dispatch]);
+    const ids = items.map(i => i.itemId);
+    if (ids.length > 0) {
+      fetchInventoryDetails(ids);
+    }
+  }, [items, fetchInventoryDetails]);
+
+
 
   useEffect(() => {
     if (selectedVendorId) {
@@ -811,7 +829,7 @@ export const CreatePOScreen: React.FC = () => {
               </Text>
             )}
             {items.map((item) => {
-              const invItem = allItems.find(i => i.id === item.itemId);
+              const invItem = inventoryItemsMap[item.itemId];
               return (
                 <View key={item.itemId} className="mb-3">
                   <POItemCard

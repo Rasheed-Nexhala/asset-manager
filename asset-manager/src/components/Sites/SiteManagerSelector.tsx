@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { subscribeToAllUsers } from '../../services/firebase/userRoleService';
+import { subscribeToSiteManagers } from '../../services/firebase/userRoleService';
 import { findSiteByManagerId } from '../../services/firebase/siteService';
 import { ManagerReassignmentConfirmationModal } from './ManagerReassignmentConfirmationModal';
 import type { UserListItem } from '../../types/roles';
@@ -31,13 +31,10 @@ export const SiteManagerSelector: React.FC<SiteManagerSelectorProps> = ({
   useEffect(() => {
     setLoading(true);
 
-    const unsubscribe = subscribeToAllUsers((allUsers) => {
+    const unsubscribe = subscribeToSiteManagers((managersList) => {
       try {
-        const siteManagers = allUsers.filter(
-          (user) =>
-            user.role === 'SiteManager' &&
-            user.isActive &&
-            !user.isDeleted
+        const siteManagers = managersList.filter(
+          (user) => user.isActive && !user.isDeleted
         );
         setManagers(siteManagers);
         setLoading(false);

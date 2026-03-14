@@ -21,7 +21,6 @@ import {
   loadMoreMyRequests,
   exportRequestsThunk,
 } from '../../store/thunks/requestThunks';
-import { useMyRequestsSubscription } from '../../hooks/useRequestsSubscriptions';
 import {
   selectMyRequestsByStatusAndSearch,
   selectRequestsLoading,
@@ -59,6 +58,7 @@ export const MyRequestsScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -81,8 +81,12 @@ export const MyRequestsScreen: React.FC = () => {
     return sites.find((site) => site.managerId === userId) || null;
   }, [userId, sites]);
 
-  // Real-time Firestore snapshot updates when screen is focused
-  useMyRequestsSubscription();
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   // Ensure sites are loaded for currentSite (used by Create Request button).
   useEffect(() => {

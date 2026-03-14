@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { subscribeToAllUsers } from '../services/firebase/userRoleService';
+import { subscribeToSiteManagers } from '../services/firebase/userRoleService';
 import { cleanupManagerAssignments } from '../store/thunks/managerValidationThunks';
 import { selectIsAuthenticated, selectIsAdmin, selectIsRoleLoaded } from '../store/selectors/authSelectors';
 import type { UserListItem } from '../types/roles';
@@ -104,8 +104,8 @@ export const useManagerValidationSync = (): void => {
       return;
     }
 
-    // Subscribe to all users for real-time updates
-    const unsubscribe = subscribeToAllUsers((currentUsers) => {
+    // Subscribe to SiteManagers only to prevent downloading all users
+    const unsubscribe = subscribeToSiteManagers((currentUsers) => {
       const currentUsersMap = new Map<string, UserListItem>();
       currentUsers.forEach((user) => {
         currentUsersMap.set(user.id, user);

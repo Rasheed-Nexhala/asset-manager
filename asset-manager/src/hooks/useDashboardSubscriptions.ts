@@ -58,7 +58,6 @@ export function useDashboardSubscriptions({
       return;
     }
 
-    // Only show full loading on first run; refresh uses pull indicator only
     if (isFirstRun.current) {
       setIsInitialLoad(true);
       isFirstRun.current = false;
@@ -72,76 +71,7 @@ export function useDashboardSubscriptions({
       if (receivedCount >= 1) setIsInitialLoad(false);
     };
 
-    if (role === 'Admin') {
-      // Admin: all requests, POs, maintenance, items, sites, categories
-      const unsubRequests = requestService.subscribeToRequests(
-        { status: 'all' },
-        (requests) => {
-          dispatch(setRequests(requests));
-          markReceived();
-        }
-      );
-      unsubscribes.push(unsubRequests);
-
-      const unsubPOs = subscribeToPurchaseOrders((orders) => {
-        dispatch(setPurchaseOrders(orders));
-        markReceived();
-      });
-      unsubscribes.push(unsubPOs);
-
-      const unsubMaintenance = subscribeToMaintenance((records) => {
-        dispatch(setMaintenanceRecords(records));
-        markReceived();
-      });
-      unsubscribes.push(unsubMaintenance);
-
-      const unsubItems = subscribeItems((items) => {
-        dispatch(setItems(items));
-        markReceived();
-      });
-      unsubscribes.push(unsubItems);
-
-      const unsubSites = subscribeToSites((sites) => {
-        dispatch(setSites(sites));
-        markReceived();
-      });
-      unsubscribes.push(unsubSites);
-
-      const unsubCategories = subscribeCategories((categories) => {
-        dispatch(setCategories(categories));
-        markReceived();
-      });
-      unsubscribes.push(unsubCategories);
-    } else if (role === 'StoreIncharge') {
-      // StoreIncharge: same as Admin minus subscribeToSites (or include for site names in requests)
-      const unsubRequests = requestService.subscribeToRequests(
-        { status: 'all' },
-        (requests) => {
-          dispatch(setRequests(requests));
-          markReceived();
-        }
-      );
-      unsubscribes.push(unsubRequests);
-
-      const unsubPOs = subscribeToPurchaseOrders((orders) => {
-        dispatch(setPurchaseOrders(orders));
-        markReceived();
-      });
-      unsubscribes.push(unsubPOs);
-
-      const unsubMaintenance = subscribeToMaintenance((records) => {
-        dispatch(setMaintenanceRecords(records));
-        markReceived();
-      });
-      unsubscribes.push(unsubMaintenance);
-
-      const unsubItems = subscribeItems((items) => {
-        dispatch(setItems(items));
-        markReceived();
-      });
-      unsubscribes.push(unsubItems);
-
-      // Include sites for site names in requests
+    if (role === 'Admin' || role === 'StoreIncharge') {
       const unsubSites = subscribeToSites((sites) => {
         dispatch(setSites(sites));
         markReceived();
@@ -154,17 +84,6 @@ export function useDashboardSubscriptions({
       });
       unsubscribes.push(unsubCategories);
     } else if (role === 'SiteManager') {
-      // SiteManager: requests filtered by assignedSiteId, sites, inventory for assigned site
-      const unsubRequests = requestService.subscribeToRequests(
-        { siteId: assignedSiteId ?? undefined, userId },
-        (requests) => {
-          dispatch(setRequests(requests));
-          dispatch(setMyRequests(requests));
-          markReceived();
-        }
-      );
-      unsubscribes.push(unsubRequests);
-
       const unsubSites = subscribeToSites((sites) => {
         dispatch(setSites(sites));
         markReceived();
@@ -198,9 +117,7 @@ export function useDashboardSubscriptions({
             dispatch(setInventoryForLocation({ locationId, inventory }));
             markReceived();
           })
-          .catch(() => {
-            // runNonCriticalTask handles capture internally; this guard prevents unhandled rejections.
-          });
+          .catch(() => {});
       }
     }
 

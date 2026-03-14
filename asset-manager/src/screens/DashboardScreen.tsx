@@ -60,6 +60,10 @@ import { runNonCriticalTask } from '../utils/nonCriticalTask';
 import type { DashboardStackParamList } from '../navigation/DashboardStackParamList';
 import { navigateToProcessRequest } from '../navigation/navigationUtils';
 import type { Request } from '../types/request';
+import { getRecentPendingRequests } from '../services/firebase/requestService';
+import { getPendingPOCount } from '../services/firebase/purchaseOrderService';
+import { listItems } from '../services/firebase/inventoryService';
+import { isLowStock } from '../utils/inventoryUtils';
 
 /** Fallback when authSelectors fails to load (e.g. circular deps, hot reload) */
 const selectIsStoreInchargeSafe = selectIsStoreIncharge ?? ((_state: RootState) => false);
@@ -114,19 +118,18 @@ export const DashboardScreen: React.FC = () => {
   const assignedSite = useAppSelector(assignedSiteSelector);
   const siteName = assignedSite?.name ?? null;
 
-  const requests = useAppSelector(selectAllRequests);
-  const myRequests = useAppSelector(selectMyRequests);
-  const lowStockItems = useAppSelector(selectLowStockItems);
-  const purchaseOrders = useAppSelector(selectPurchaseOrders);
   const sites = useAppSelector(selectAllSites);
-  const items = useAppSelector(selectAllItems);
   const activityLogError = useAppSelector(selectActivityLogError);
-  const requestsLoading = useAppSelector(selectRequestsLoading);
   const requestsError = useAppSelector(selectRequestsError);
-  const purchaseOrderLoading = useAppSelector(selectPurchaseOrderLoading);
   const purchaseOrderError = useAppSelector(selectPurchaseOrderError);
   const maintenanceError = useAppSelector(selectMaintenanceError);
-  const itemsLoading = useAppSelector(selectItemsLoading);
+
+  // Local state for dashboard widgets to prevent unbounded Redux memory overhead
+  const [itemsCount, setItemsCount] = useState<number>(0);
+  const [pendingPOCount, setPendingPOCount] = useState<number>(0);
+  const [recentPendingRequests, setRecentPendingRequests] = useState<ReturnType<typeof toPendingRequest>[]>([]);
+  const [lowStockItemsWidget, setLowStockItemsWidget] = useState<{id: string, name: string, currentQty: number, minQty: number}[]>([]);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
 
   const permissions = useAppSelector(selectUserPermissions);
   const canManageInventory = useAppSelector(selectHasPermission('canManageInventory'));
@@ -151,6 +154,46 @@ export const DashboardScreen: React.FC = () => {
     assignedSiteId,
     isVisible: isFocused,
   });
+
+  const loadDashboardWidgetData = useCallback(async () => {
+    if (!userId || roleType === 'Unassigned') return;
+    setDashboardLoading(true);
+    try {
+      if (isAdmin || isStoreIncharge) {
+        const poCountUrl = getPendingPOCount();
+        const pendingReqUrl = getRecentPendingRequests({}, 5);
+        // Using getDocs one-time fetch to avoid onSnapshot memory leaks
+        const allItemsUrl = listItems();
+
+        const [posCount, reqs, allItems] = await Promise.all([poCountUrl, pendingReqUrl, allItemsUrl]);
+
+        setPendingPOCount(posCount);
+        setRecentPendingRequests(reqs.map(toPendingRequest));
+        setItemsCount(allItems.length);
+
+        const lowStock = allItems.filter(isLowStock).map(i => ({
+          id: i.id,
+          name: i.name ?? i.id,
+          currentQty: i.centralStoreQuantity ?? i.totalQuantity ?? 0,
+          minQty: i.minStockLevel ?? 0,
+        }));
+        setLowStockItemsWidget(lowStock);
+      } else if (isSiteManager) {
+        const reqs = await getRecentPendingRequests({ siteId: assignedSiteId ?? undefined, userId }, 5);
+        setRecentPendingRequests(reqs.map(toPendingRequest));
+      }
+    } catch (err) {
+      console.error('Error loading dashboard widget data:', err);
+    } finally {
+      setDashboardLoading(false);
+    }
+  }, [userId, roleType, isAdmin, isStoreIncharge, isSiteManager, assignedSiteId]);
+
+  useEffect(() => {
+    if (isFocused || isRefreshing) {
+      loadDashboardWidgetData();
+    }
+  }, [isFocused, isRefreshing, loadDashboardWidgetData]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
@@ -218,20 +261,10 @@ export const DashboardScreen: React.FC = () => {
   useAutoClearError(activityLogError, () => dispatch(clearError()));
   useAutoClearError(dashboardDataError, clearDashboardError);
 
-  const pendingRequests = isSiteManager ? myRequests : requests;
-  const pendingForWidget = pendingRequests
-    .filter((r) => r.status === 'pending')
-    .slice(0, 5)
-    .map(toPendingRequest);
-
-  const poAwaitingApproval = purchaseOrders.filter((o) => o.status === 'pending_approval');
-  const poApprovedReady = purchaseOrders.filter((o) => o.status === 'approved');
-  const poOrderedAwaiting = purchaseOrders.filter((o) => o.status === 'ordered' || o.status === 'partially_received');
-
   const statsForStore = [
-    ...(showInventory ? [{ icon: '📦', value: items.length, label: 'Items' }] : []),
-    ...(showOrders ? [{ icon: '⏳', value: poAwaitingApproval.length, label: 'Pending POs' }] : []),
-    ...(showOrders ? [{ icon: '📥', value: pendingForWidget.length, label: 'Pending Requests' }] : []),
+    ...(showInventory ? [{ icon: '📦', value: itemsCount, label: 'Items' }] : []),
+    ...(showOrders ? [{ icon: '⏳', value: pendingPOCount, label: 'Pending POs' }] : []),
+    ...(showOrders ? [{ icon: '📥', value: recentPendingRequests.length, label: 'Pending Requests' }] : []),
   ];
 
   const tabNav = navigation.getParent() as
@@ -315,11 +348,11 @@ export const DashboardScreen: React.FC = () => {
             <>
               <QuickStatsRow
                 stats={[
-                  { icon: '📦', value: items.length, label: 'Items' },
-                  { icon: '⏳', value: poAwaitingApproval.length, label: 'Pending POs' },
+                  { icon: '📦', value: itemsCount, label: 'Items' },
+                  { icon: '⏳', value: pendingPOCount, label: 'Pending POs' },
                   { icon: '🏗️', value: sites.length, label: 'Sites' },
                 ]}
-                isLoading={isInitialLoad}
+                isLoading={isInitialLoad || dashboardLoading}
               />
               <TouchableOpacity
                 className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] flex-row items-center justify-between"
@@ -331,14 +364,9 @@ export const DashboardScreen: React.FC = () => {
                 <Text className="text-[17px] font-semibold text-[#0F172A]">Activity Log</Text>
                 <Ionicons name="chevron-forward" size={20} color="#64748B" />
               </TouchableOpacity>
-              {(lowStockItems.length > 0 || isInitialLoad || itemsLoading) && (
+              {(lowStockItemsWidget.length > 0 || isInitialLoad || dashboardLoading) && (
                 <LowStockAlertWidget
-                  items={lowStockItems.map((i) => ({
-                    id: i.id,
-                    name: i.name ?? i.id,
-                    currentQty: i.centralStoreQuantity ?? i.totalQuantity ?? 0,
-                    minQty: i.minStockLevel ?? 0,
-                  }))}
+                  items={lowStockItemsWidget}
                   onViewAll={() =>
                     tabNav?.navigate('Inventory', {
                       screen: 'CentralStoreInventory',
@@ -346,27 +374,27 @@ export const DashboardScreen: React.FC = () => {
                     })
                   }
                   onCreatePO={(itemId) => {
-                    const item = lowStockItems.find((i) => i.id === itemId);
+                    const item = lowStockItemsWidget.find((i) => i.id === itemId);
                     if (!item) return;
-                    const shortfall = Math.max(1, (item.minStockLevel ?? 0) - (item.centralStoreQuantity ?? 0));
+                    const shortfall = Math.max(1, (item.minQty ?? 0) - (item.currentQty ?? 0));
                     tabNav?.navigate('PurchaseOrders', {
                       screen: 'CreatePO',
                       params: {
-                        selectedItems: [item],
+                        selectedItems: [{ id: item.id, name: item.name }],
                         initialQuantities: { [item.id]: shortfall },
                       },
                     });
                   }}
-                  loading={isInitialLoad || itemsLoading}
+                  loading={isInitialLoad || dashboardLoading}
                 />
               )}
-              {(pendingForWidget.length > 0 || isInitialLoad || requestsLoading) && (
+              {(recentPendingRequests.length > 0 || isInitialLoad || dashboardLoading) && (
                 <PendingRequestsWidget
-                  requests={pendingForWidget}
+                  requests={recentPendingRequests}
                   onViewAll={() => tabNav?.navigate('Requests', { screen: 'RequestQueue' })}
                   onViewRequest={(id) => navigateToProcessRequest(id)}
                   onApprove={(id) => navigateToProcessRequest(id)}
-                  loading={isInitialLoad || requestsLoading}
+                  loading={isInitialLoad || dashboardLoading}
                 />
               )}
               <MyRecentActivityWidget onViewAll={() => navigation.navigate('MyActivity')} />
@@ -376,16 +404,11 @@ export const DashboardScreen: React.FC = () => {
           {isStoreIncharge && (
             <>
               {statsForStore.length > 0 && (
-                <QuickStatsRow stats={statsForStore} isLoading={isInitialLoad} />
+                <QuickStatsRow stats={statsForStore} isLoading={isInitialLoad || dashboardLoading} />
               )}
-              {showInventory && (lowStockItems.length > 0 || isInitialLoad || itemsLoading) && (
+              {showInventory && (lowStockItemsWidget.length > 0 || isInitialLoad || dashboardLoading) && (
                 <LowStockAlertWidget
-                  items={lowStockItems.map((i) => ({
-                    id: i.id,
-                    name: i.name ?? i.id,
-                    currentQty: i.centralStoreQuantity ?? i.totalQuantity ?? 0,
-                    minQty: i.minStockLevel ?? 0,
-                  }))}
+                  items={lowStockItemsWidget}
                   onViewAll={() =>
                     tabNav?.navigate('Inventory', {
                       screen: 'CentralStoreInventory',
@@ -393,27 +416,27 @@ export const DashboardScreen: React.FC = () => {
                     })
                   }
                   onCreatePO={(itemId) => {
-                    const item = lowStockItems.find((i) => i.id === itemId);
+                    const item = lowStockItemsWidget.find((i) => i.id === itemId);
                     if (!item) return;
-                    const shortfall = Math.max(1, (item.minStockLevel ?? 0) - (item.centralStoreQuantity ?? 0));
+                    const shortfall = Math.max(1, (item.minQty ?? 0) - (item.currentQty ?? 0));
                     tabNav?.navigate('PurchaseOrders', {
                       screen: 'CreatePO',
                       params: {
-                        selectedItems: [item],
+                        selectedItems: [{ id: item.id, name: item.name }],
                         initialQuantities: { [item.id]: shortfall },
                       },
                     });
                   }}
-                  loading={isInitialLoad || itemsLoading}
+                  loading={isInitialLoad || dashboardLoading}
                 />
               )}
-              {showOrders && (pendingForWidget.length > 0 || isInitialLoad || requestsLoading) && (
+              {showOrders && (recentPendingRequests.length > 0 || isInitialLoad || dashboardLoading) && (
                 <PendingRequestsWidget
-                  requests={pendingForWidget}
+                  requests={recentPendingRequests}
                   onViewAll={() => tabNav?.navigate('Requests', { screen: 'RequestQueue' })}
                   onViewRequest={(id) => navigateToProcessRequest(id)}
                   onApprove={(id) => navigateToProcessRequest(id)}
-                  loading={isInitialLoad || requestsLoading}
+                  loading={isInitialLoad || dashboardLoading}
                 />
               )}
               <MyRecentActivityWidget onViewAll={() => navigation.navigate('MyActivity')} />
@@ -441,12 +464,12 @@ export const DashboardScreen: React.FC = () => {
                   </View>
                 </View>
               </View>
-              {(pendingForWidget.length > 0 || isInitialLoad || requestsLoading) && (
+              {(recentPendingRequests.length > 0 || isInitialLoad || dashboardLoading) && (
                 <PendingRequestsWidget
-                  requests={pendingForWidget}
+                  requests={recentPendingRequests}
                   onViewAll={() => tabNav?.navigate('Requests', { screen: 'MyRequests' })}
                   onViewRequest={(id) => navigateToProcessRequest(id)}
-                  loading={isInitialLoad || requestsLoading}
+                  loading={isInitialLoad || dashboardLoading}
                 />
               )}
               <MyRecentActivityWidget onViewAll={() => navigation.navigate('MyActivity')} />

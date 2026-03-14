@@ -21,10 +21,13 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   fetchCategories,
   setFilters,
-  setItemsFromSubscription,
   setLoading,
 } from '../../store/slices/inventorySlice';
-import { exportInventoryThunk } from '../../store/thunks/inventoryThunks';
+import { 
+  fetchItemsPaginated, 
+  loadMoreItems, 
+  exportInventoryThunk 
+} from '../../store/thunks/inventoryThunks';
 import {
   selectAllItems,
   selectItemsBySearchQuery,
@@ -39,7 +42,6 @@ import {
 } from '../../store/selectors/authSelectors';
 import { useInventoryError } from '../../hooks/useInventoryError';
 import { subscribeCategories } from '../../services/firebase/categoryService';
-import { subscribeItems } from '../../services/firebase/inventoryService';
 import { setCategories } from '../../store/slices/inventorySlice';
 import type { ItemFilters } from '../../types/inventory';
 import { isLowStock } from '../../utils/inventoryUtils';
@@ -60,10 +62,11 @@ type NavigationProp = StackNavigationProp<
 type RouteParams = RouteProp<InventoryStackParamList, 'CentralStoreInventory'>;
 
 /** Convert local filter state to Redux ItemFilters (for Firestore queries) */
-const toItemFilters = (f: FilterState): ItemFilters => ({
+const toItemFilters = (f: FilterState, searchTerm?: string): ItemFilters => ({
   categoryId: f.categoryId,
   type: f.type,
   lowStockOnly: f.stock === 'low_stock',
+  searchTerm: searchTerm || undefined,
 });
 
 export const CentralStoreInventoryScreen: React.FC = () => {
@@ -88,8 +91,14 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     setShowMoreMenu(false);
   }, []);
 
-  // Ref to hold unsubscribe for items subscription (used for refresh and cleanup)
-  const unsubscribeItemsRef = useRef<(() => void) | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   // Redux selectors
   const allItems = useAppSelector(selectAllItems);
@@ -101,55 +110,24 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   const isAdmin = useAppSelector(selectIsAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
 
-  // Apply search filter using optimized selector
-  const searchedItems = useAppSelector((state) => 
-    selectItemsBySearchQuery(state, searchQuery)
-  );
-
-  // Combine filters and search
+  // Apply filters locally that the backend paginator doesn't handle natively
   const filteredItems = useMemo(() => {
-    let items = searchedItems;
-
-    // Apply local filters
-    if (filters.categoryId) {
-      if (filters.categoryId === '') {
-        // Filter for uncategorized items (null or undefined categoryId)
-        items = items.filter((item) => !item.categoryId);
-      } else {
-        items = items.filter((item) => item.categoryId === filters.categoryId);
-      }
-    }
-    if (filters.type) {
-      items = items.filter((item) => item.type === filters.type);
-    }
+    let items = allItems;
     if (filters.stock === 'low_stock') {
       items = items.filter((item) => isLowStock(item));
     }
-
     return items;
-  }, [searchedItems, filters]);
+  }, [allItems, filters.stock]);
 
-  // Calculate counts for filtered items
   const filteredLowStockCount = useMemo(() => {
     return filteredItems.filter((item) => isLowStock(item)).length;
   }, [filteredItems]);
 
-  // Snapshot-based real-time subscription: items auto-update when added/edited/deleted
   useEffect(() => {
-    const itemFilters = toItemFilters(filters);
+    const itemFilters = toItemFilters(filters, debouncedSearch);
     dispatch(setFilters(itemFilters));
-    dispatch(setLoading(true));
-
-    const unsubscribe = subscribeItems((items: Item[]) => {
-      dispatch(setItemsFromSubscription(items));
-    }, itemFilters);
-    unsubscribeItemsRef.current = unsubscribe;
-
-    return () => {
-      unsubscribeItemsRef.current?.();
-      unsubscribeItemsRef.current = null;
-    };
-  }, [dispatch, filters]);
+    dispatch(fetchItemsPaginated());
+  }, [dispatch, filters, debouncedSearch]);
 
   // Subscribe to categories for real-time updates
   useEffect(() => {
@@ -162,16 +140,15 @@ export const CentralStoreInventoryScreen: React.FC = () => {
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    // Re-subscribe to force a fresh snapshot from Firestore
-    unsubscribeItemsRef.current?.();
-    const itemFilters = toItemFilters(filters);
-    const unsubscribe = subscribeItems((items: Item[]) => {
-      dispatch(setItemsFromSubscription(items));
-      setRefreshing(false);
-    }, itemFilters);
-    unsubscribeItemsRef.current = unsubscribe;
+    dispatch(fetchItemsPaginated()).finally(() => setRefreshing(false));
     dispatch(fetchCategories());
-  }, [dispatch, filters]);
+  }, [dispatch]);
+
+  const handleLoadMore = useCallback(() => {
+    if (!isLoading && allItems.length < (totalCount ?? 0)) {
+      dispatch(loadMoreItems());
+    }
+  }, [isLoading, allItems.length, totalCount, dispatch]);
 
   const handleAddItem = useCallback(() => {
     navigation.navigate('AddEditItem');
@@ -581,6 +558,15 @@ export const CentralStoreInventoryScreen: React.FC = () => {
                 onRefresh={handleRefresh}
                 tintColor="#1E40AF"
               />
+            }
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={
+              isLoading && allItems.length > 0 ? (
+                <View className="py-4 items-center justify-center">
+                  <ActivityIndicator size="small" color="#1E40AF" />
+                </View>
+              ) : null
             }
             showsVerticalScrollIndicator={false}
           />
