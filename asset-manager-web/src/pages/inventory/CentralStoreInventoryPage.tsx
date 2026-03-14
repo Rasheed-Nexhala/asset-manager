@@ -27,6 +27,7 @@ import type { Category } from '../../types/inventory';
 import { InventorySubNav } from '../../components/inventory';
 import { ItemCard } from '../../components/inventory/ItemCard';
 import { Icon } from '../../components/shared/Icon';
+import { InventoryLoadingState } from '../../components/shared/InventoryLoadingState';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 
 type StockFilter = 'all' | 'low_stock';
@@ -127,12 +128,9 @@ export function CentralStoreInventoryPage() {
     allItems.length === 0 && totalCount === null && !error;
   if (isInitialOrRefetching || (isLoading && allItems.length === 0)) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex min-h-0 flex-1 flex-col">
         <InventorySubNav />
-        <div className="flex-1 flex items-center justify-center px-4">
-          <LoadingSpinner />
-          <p className="text-[15px] text-slate-500 mt-4">Loading items...</p>
-        </div>
+        <InventoryLoadingState message="Loading items..." />
       </div>
     );
   }

@@ -21,7 +21,7 @@ import type { InventoryEntry, Item } from '../../types/inventory';
 import { InventorySubNav } from '../../components/inventory';
 import { InventoryListItem } from '../../components/inventory/InventoryListItem';
 import { Icon } from '../../components/shared/Icon';
-import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
+import { InventoryLoadingState } from '../../components/shared/InventoryLoadingState';
 
 export function OtherSiteInventoryPage() {
   const { siteId } = useParams<{ siteId: string }>();
@@ -147,7 +147,7 @@ export function OtherSiteInventoryPage() {
 
   if (siteLoading || isLoading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex min-h-0 flex-1 flex-col">
         <InventorySubNav />
         <header className="bg-white border-b border-slate-200 px-4 flex items-center h-14">
           <button
@@ -160,10 +160,7 @@ export function OtherSiteInventoryPage() {
           </button>
           <h1 className="text-[22px] font-semibold text-slate-900 flex-1">Loading...</h1>
         </header>
-        <div className="flex-1 flex flex-col items-center justify-center px-4">
-          <LoadingSpinner />
-          <p className="text-[15px] text-slate-500 mt-4">Loading site inventory...</p>
-        </div>
+        <InventoryLoadingState message="Loading site inventory..." />
       </div>
     );
   }

@@ -12,6 +12,7 @@ import { useInventoryError } from '../../hooks/useInventoryError';
 import { uploadItemImageFromBlob, deleteItemImageByUrl } from '../../services/firebase/storageService';
 import type { Item, CreateItemData, UpdateItemData } from '../../types/inventory';
 import { Icon } from '../../components/shared/Icon';
+import { InventoryLoadingState } from '../../components/shared/InventoryLoadingState';
 import { ItemForm } from '../../components/inventory/ItemForm';
 
 function getCategoryName(categories: { id: string; name: string }[], categoryId: string | null): string {
@@ -154,7 +155,7 @@ export function AddEditItemPage() {
 
   if (loadingItem) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex min-h-0 flex-1 flex-col">
         <header className="bg-white border-b border-slate-200 px-4 flex items-center h-14">
           <button type="button" onClick={handleCancel} className="w-12 h-12 -ml-2 flex items-center justify-center" aria-label="Go back">
             <Icon name="arrow-left" className="w-6 h-6" />
@@ -163,9 +164,7 @@ export function AddEditItemPage() {
             {mode === 'create' ? 'Add New Item' : 'Edit Item'}
           </h1>
         </header>
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-[15px] text-slate-500">Loading item data...</p>
-        </div>
+        <InventoryLoadingState message="Loading item data..." />
       </div>
     );
   }

@@ -13,6 +13,7 @@ export function LoadingSpinner({ size = 'md', className = '' }: LoadingSpinnerPr
   return (
     <div
       className={`
+        flex-shrink-0
         ${sizeMap[size]}
         rounded-full
         border-slate-200

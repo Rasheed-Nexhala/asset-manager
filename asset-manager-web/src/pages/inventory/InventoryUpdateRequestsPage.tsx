@@ -20,6 +20,7 @@ import type { InventoryUpdateRequest } from '../../types/inventoryUpdateRequest'
 import { Icon } from '../../components/shared/Icon';
 import { InventoryUpdateRequestCard } from '../../components/inventory/InventoryUpdateRequestCard';
 import { ActiveAccessCard } from '../../components/inventory/ActiveAccessCard';
+import { InventoryLoadingState } from '../../components/shared/InventoryLoadingState';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 
 export function InventoryUpdateRequestsPage() {
@@ -171,10 +172,7 @@ export function InventoryUpdateRequestsPage() {
       )}
 
       {isLoading && pendingRequests.length === 0 && activeApprovedRequests.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-4">
-          <LoadingSpinner />
-          <p className="text-[15px] text-slate-500 mt-4">Loading requests...</p>
-        </div>
+        <InventoryLoadingState message="Loading requests..." />
       ) : pendingRequests.length === 0 && activeApprovedRequests.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center px-4">
           <Icon name="document-text" className="w-20 h-20 text-slate-400" />

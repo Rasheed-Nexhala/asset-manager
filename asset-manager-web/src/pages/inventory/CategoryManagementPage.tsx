@@ -17,6 +17,7 @@ import { subscribeCategories, checkItemsUsingCategory } from '../../services/fir
 import { setCategories } from '../../store/slices/inventorySlice';
 import type { Category, Item } from '../../types/inventory';
 import { Icon } from '../../components/shared/Icon';
+import { InventoryLoadingState } from '../../components/shared/InventoryLoadingState';
 
 export function CategoryManagementPage() {
   const navigate = useNavigate();
@@ -115,16 +116,14 @@ export function CategoryManagementPage() {
 
   if (isLoading && safeCategories.length === 0 && !refreshing) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex min-h-0 flex-1 flex-col">
         <header className="bg-white border-b border-slate-200 px-4 flex items-center h-14">
           <button type="button" onClick={handleCancel} className="w-12 h-12 -ml-2 flex items-center justify-center" aria-label="Cancel">
             <Icon name="x-mark" className="w-6 h-6" />
           </button>
           <h1 className="text-[22px] font-semibold text-slate-900 flex-1">Category Management</h1>
         </header>
-        <div className="flex-1 flex flex-col items-center justify-center">
-          <p className="text-[15px] text-slate-500 mt-4">Loading categories...</p>
-        </div>
+        <InventoryLoadingState message="Loading categories..." />
       </div>
     );
   }

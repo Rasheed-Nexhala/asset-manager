@@ -15,7 +15,7 @@ import { setSteelMasters } from '../../store/slices/steelMasterSlice';
 import type { SteelMaster } from '../../types/steelMaster';
 import { InventorySubNav } from '../../components/inventory';
 import { Icon } from '../../components/shared/Icon';
-import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
+import { InventoryLoadingState } from '../../components/shared/InventoryLoadingState';
 
 export function SteelMasterPage() {
   const navigate = useNavigate();
@@ -89,10 +89,7 @@ export function SteelMasterPage() {
       </header>
 
       {isLoading && steelMasters.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center">
-          <LoadingSpinner />
-          <p className="text-[15px] text-slate-500 mt-4">Loading custom items...</p>
-        </div>
+        <InventoryLoadingState message="Loading custom items..." />
       ) : steelMasters.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center px-4">
           <Icon name="chart-bar-square" className="w-20 h-20 text-slate-400" />

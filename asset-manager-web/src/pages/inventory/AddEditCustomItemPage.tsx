@@ -13,6 +13,7 @@ import {
 } from '../../store/selectors/steelMasterSelectors';
 import type { SteelMaster, CreateSteelMasterData, UpdateSteelMasterData } from '../../types/steelMaster';
 import { Icon } from '../../components/shared/Icon';
+import { InventoryLoadingState } from '../../components/shared/InventoryLoadingState';
 import { SteelMasterForm } from '../../components/inventory/SteelMasterForm';
 
 export function AddEditCustomItemPage() {
@@ -79,9 +80,7 @@ export function AddEditCustomItemPage() {
       </header>
 
       {loadingItem ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-4">
-          <p className="text-[15px] text-slate-500">Loading custom item...</p>
-        </div>
+        <InventoryLoadingState message="Loading custom item..." />
       ) : (
         <SteelMasterForm
           mode={mode}

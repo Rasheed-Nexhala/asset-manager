@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectUserId } from '../../store/selectors/authSelectors';
 import { selectAllSites, selectSitesLoading } from '../../store/selectors/sitesSelectors';
@@ -22,11 +21,10 @@ import type { Site } from '../../types/sites';
 import { InventorySubNav } from '../../components/inventory';
 import { InventoryListItem } from '../../components/inventory/InventoryListItem';
 import { Icon } from '../../components/shared/Icon';
-import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
+import { InventoryLoadingState } from '../../components/shared/InventoryLoadingState';
 
 export function MySiteInventoryPage() {
   const dispatch = useAppDispatch();
-  const navigate = useNavigate();
   const userId = useAppSelector(selectUserId);
   const sites = useAppSelector(selectAllSites);
   const items = useAppSelector(selectAllItems);
@@ -36,7 +34,6 @@ export function MySiteInventoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentSite, setCurrentSite] = useState<Site | null>(null);
   const [isLoadingSite, setIsLoadingSite] = useState(true);
-  const [showOtherSitesModal, setShowOtherSitesModal] = useState(false);
 
   useEffect(() => {
     dispatch(fetchSites());
@@ -110,21 +107,11 @@ export function MySiteInventoryPage() {
     });
   }, [enrichedInventory, searchQuery]);
 
-  // Other active sites (excluding current site)
-  const otherSites = useMemo(() => {
-    const safeSites = Array.isArray(sites) ? sites : [];
-    if (!currentSite) return safeSites.filter((s) => s.status === 'active');
-    return safeSites.filter((s) => s.id !== currentSite.id && s.status === 'active');
-  }, [sites, currentSite]);
-
   if (isLoadingSite || sitesLoading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex min-h-0 flex-1 flex-col">
         <InventorySubNav />
-        <div className="flex-1 flex items-center justify-center px-4">
-          <LoadingSpinner />
-          <p className="text-[15px] text-slate-500 mt-4">Loading site information...</p>
-        </div>
+        <InventoryLoadingState message="Loading site information..." />
       </div>
     );
   }
@@ -174,37 +161,9 @@ export function MySiteInventoryPage() {
           </div>
         </div>
 
-        {/* View Other Sites Banner */}
-        {otherSites.length > 0 && (
-          <div className="px-4 pb-4">
-            <button
-              type="button"
-              onClick={() => setShowOtherSitesModal(true)}
-              className="w-full bg-white rounded-[10px] p-4 border border-slate-200 flex items-center justify-between min-h-[48px] hover:bg-slate-50 transition-colors text-left"
-              aria-label="View inventory at other sites"
-            >
-              <div className="flex items-center flex-1">
-                <div className="w-10 h-10 rounded-full bg-blue-800/10 flex items-center justify-center mr-3 flex-shrink-0">
-                  <Icon name="building-office-2" className="w-5 h-5 text-blue-800" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-[15px] font-semibold text-slate-900">View Other Sites</p>
-                  <p className="text-[13px] text-slate-500 mt-0.5">
-                    Browse inventory at {otherSites.length} other site{otherSites.length !== 1 ? 's' : ''}
-                  </p>
-                </div>
-              </div>
-              <Icon name="chevron-right" className="w-5 h-5 text-slate-400 flex-shrink-0" />
-            </button>
-          </div>
-        )}
-
         <div className="px-4 pb-6">
           {isLoading ? (
-            <div className="py-8 flex flex-col items-center">
-              <LoadingSpinner />
-              <p className="text-[15px] text-slate-500 mt-4">Loading inventory...</p>
-            </div>
+            <InventoryLoadingState message="Loading inventory..." fullHeight={false} />
           ) : filteredInventory.length === 0 ? (
             <div className="py-12 flex flex-col items-center">
               <Icon name="cube" className="w-16 h-16 text-slate-400" />
@@ -293,60 +252,6 @@ export function MySiteInventoryPage() {
           )}
         </div>
       </div>
-
-      {/* Other Sites Modal */}
-      {showOtherSitesModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50"
-          onClick={(e) => e.target === e.currentTarget && setShowOtherSitesModal(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Other Sites"
-        >
-          <div
-            className="w-full max-w-lg bg-white rounded-t-2xl md:rounded-2xl max-h-[80vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-10 h-1 bg-slate-200 rounded-full self-center mt-3 mb-1 md:hidden" />
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-              <div>
-                <h2 className="text-[22px] font-semibold text-slate-900">Other Sites</h2>
-                <p className="text-[13px] text-slate-500 mt-0.5">View inventory at other sites</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowOtherSitesModal(false)}
-                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-slate-100"
-                aria-label="Close"
-              >
-                <Icon name="x-mark" className="w-6 h-6 text-slate-500" />
-              </button>
-            </div>
-            <div className="overflow-y-auto">
-              {otherSites.map((site) => (
-                <button
-                  key={site.id}
-                  type="button"
-                  onClick={() => {
-                    setShowOtherSitesModal(false);
-                    navigate(`/inventory/other-sites/${site.id}`);
-                  }}
-                  className="w-full px-4 py-4 border-b border-slate-100 flex items-center justify-between min-h-[56px] hover:bg-slate-50 transition-colors text-left"
-                  aria-label={`View inventory for ${site.name}`}
-                >
-                  <div className="flex-1">
-                    <p className="text-[15px] font-semibold text-slate-900">{site.name}</p>
-                    {site.address && (
-                      <p className="text-[13px] text-slate-500 mt-0.5 truncate">{site.address}</p>
-                    )}
-                  </div>
-                  <Icon name="chevron-right" className="w-5 h-5 text-slate-400 flex-shrink-0" />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
