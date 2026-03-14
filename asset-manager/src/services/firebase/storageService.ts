@@ -20,6 +20,12 @@ const MAINTENANCE_PHOTOS_PATH = 'maintenancePhotos';
 const PO_INVOICES_PATH = 'poInvoices';
 
 /**
+ * Storage path pattern for signed PO documents (uploaded before approval)
+ * Format: poSignedDocs/{poId}/{fileName}
+ */
+const PO_SIGNED_DOCS_PATH = 'poSignedDocs';
+
+/**
  * ## Orphaned Image Cleanup
  *
  * To prevent storage costs from accumulating orphaned files:
@@ -278,6 +284,59 @@ export const uploadPOInvoice = async (
     return { url: downloadURL, fileName: finalFileName };
   } catch (error) {
     console.error('Error uploading PO invoice:', error);
+    throw error;
+  }
+};
+
+/**
+ * Result of uploading a signed PO document
+ */
+export interface POSignedDocUploadResult {
+  url: string;
+  fileName: string;
+}
+
+/**
+ * Upload a signed PO document (PDF or image) to Firebase Storage.
+ * Used when admin has manually signed the PO and uploads it before approval.
+ * Path: poSignedDocs/{poId}/signed_{timestamp}.{ext}
+ *
+ * @param fileUri - Local file URI (from document picker or image picker)
+ * @param poId - Purchase Order ID
+ * @param fileName - Optional custom file name
+ */
+export const uploadPOSignedDocument = async (
+  fileUri: string,
+  poId: string,
+  fileName?: string
+): Promise<POSignedDocUploadResult> => {
+  try {
+    const response = await fetch(fileUri);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch file: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+
+    const contentType = resolveInvoiceContentType(blob, fileUri);
+    const validation = validateInvoiceFile(blob, contentType);
+    if (!validation.isValid) {
+      throw new Error(validation.error);
+    }
+
+    const extension = contentType === 'application/pdf' ? 'pdf' : contentType.split('/')[1] || 'jpg';
+    const finalFileName = fileName || `signed_${Date.now()}.${extension}`;
+    const storageRef = ref(storage, `${PO_SIGNED_DOCS_PATH}/${poId}/${finalFileName}`);
+
+    const snapshot = await uploadBytes(storageRef, blob, {
+      contentType,
+    });
+
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    return { url: downloadURL, fileName: finalFileName };
+  } catch (error) {
+    console.error('Error uploading signed PO document:', error);
     throw error;
   }
 };

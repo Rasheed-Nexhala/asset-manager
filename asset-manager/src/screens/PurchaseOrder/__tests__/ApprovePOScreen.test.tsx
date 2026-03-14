@@ -20,11 +20,20 @@ import type { RootState } from '../../../store';
 import type { PurchaseOrder } from '../../../types/purchaseOrder';
 
 const mockGoBack = jest.fn();
-jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: jest.fn(), goBack: mockGoBack }),
-  useRoute: () => ({ params: { poId: 'po-123' } }),
-  useIsFocused: () => true,
-}));
+jest.mock('@react-navigation/native', () => {
+  const React = require('react');
+  return {
+    useNavigation: () => ({ navigate: jest.fn(), goBack: mockGoBack }),
+    useRoute: () => ({ params: { poId: 'po-123' } }),
+    useIsFocused: () => true,
+    useFocusEffect: (cb: () => void | (() => void)) => {
+      React.useEffect(() => {
+        cb();
+        return () => {};
+      }, []);
+    },
+  };
+});
 
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
@@ -141,6 +150,14 @@ jest.mock('../../../store/thunks/activityLogThunks', () => {
 jest.mock('../../../store/thunks/purchaseOrderThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
+    recordPODownloadForSigning: createAsyncThunk(
+      'purchaseOrders/recordDownload',
+      async () => null
+    ),
+    uploadSignedPO: createAsyncThunk(
+      'purchaseOrders/uploadSigned',
+      async () => null
+    ),
     approvePO: createAsyncThunk(
       'purchaseOrders/approve',
       async () =>
@@ -285,14 +302,14 @@ describe('ApprovePOScreen — PO Approval flow', () => {
     expect(screen.getByText('ABC Suppliers')).toBeTruthy();
     expect(screen.getByText('Steel Bar')).toBeTruthy();
     expect(screen.getByText(/PENDING APPROVAL/)).toBeTruthy();
-    expect(screen.getByText('Approve')).toBeTruthy();
+    expect(screen.getByText('Upload signed PO first')).toBeTruthy();
     expect(screen.getByText('Reject')).toBeTruthy();
   });
 
   it('approves PO and navigates back on success', async () => {
     renderWithStore(<ApprovePOScreen />, defaultPreloadedState);
 
-    mockGetPOByIdResolve!(createMockPO());
+    mockGetPOByIdResolve!(createMockPO({ signedPdfUrl: 'https://example.com/signed.pdf' }));
 
     await waitFor(() => {
       expect(screen.getByText('Approve')).toBeTruthy();

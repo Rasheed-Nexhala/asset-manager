@@ -90,6 +90,12 @@ export interface PurchaseOrderFirestore {
   adminComments: string | null;
   rejectionReason: string | null;
 
+  /** URL of the signed PO document (PDF/image) uploaded before approval */
+  signedPdfUrl?: string | null;
+  /** Admin who downloaded the PO for signing (used as "Approved By" on document) */
+  downloadedBy?: string | null;
+  downloadedByName?: string | null;
+
   receivedAt: Timestamp | null;
   receivedBy: string | null;
   receivedByName: string | null;
@@ -140,6 +146,12 @@ export interface PurchaseOrder {
   adminComments: string | null;
   rejectionReason: string | null;
 
+  /** URL of the signed PO document (PDF/image) uploaded before approval */
+  signedPdfUrl?: string | null;
+  /** Admin who downloaded the PO for signing (used as "Approved By" on document) */
+  downloadedBy?: string | null;
+  downloadedByName?: string | null;
+
   receivedAt: string | null;
   receivedBy: string | null;
   receivedByName: string | null;
@@ -170,6 +182,8 @@ export const firestorePOToPO = (doc: PurchaseOrderFirestore): PurchaseOrder => (
  * Data for creating a new PO
  */
 export interface CreatePurchaseOrderData {
+  /** Required PO number (manual entry). */
+  poNumber: string;
   vendorId: string;
   vendorName: string;
   vendorContact: string;

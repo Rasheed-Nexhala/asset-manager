@@ -122,6 +122,25 @@ service firebase.storage {
     }
     
     /**
+     * Signed PO Documents Path
+     *
+     * Purpose: Store signed PO documents (PDF/image) uploaded by admin before approval
+     * Path pattern: poSignedDocs/{poId}/{fileName}
+     *
+     * Access Rules:
+     * - Read/Write: Admin only (approval workflow)
+     * - Allowed types: PDF and images
+     */
+    match /poSignedDocs/{poId}/{fileName} {
+      allow read: if isAuthenticated() && isUserActive() && isAdmin();
+      allow write: if isAuthenticated() && isUserActive() && isAdmin()
+        && request.resource.size < 5 * 1024 * 1024 // Max 5MB
+        && (request.resource.contentType == 'application/pdf'
+            || request.resource.contentType.matches('image/(jpeg|jpg|png|webp|gif)'));
+      allow delete: if isAuthenticated() && isUserActive() && isAdmin();
+    }
+    
+    /**
      * Default rule: Deny all other paths
      * Add additional paths above this rule as needed
      */

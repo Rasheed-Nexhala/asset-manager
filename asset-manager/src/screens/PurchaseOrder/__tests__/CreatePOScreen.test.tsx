@@ -26,12 +26,20 @@ let mockRouteParams: Record<string, unknown> = {};
 const mockSetParams = jest.fn((params: Record<string, unknown>) => {
   Object.assign(mockRouteParams, params);
 });
-jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack, setParams: mockSetParams }),
-  useRoute: () => ({ params: mockRouteParams }),
-  useIsFocused: () => true,
-  useFocusEffect: (cb: () => void) => cb(),
-}));
+jest.mock('@react-navigation/native', () => {
+  const React = require('react');
+  return {
+    useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack, setParams: mockSetParams }),
+    useRoute: () => ({ params: mockRouteParams }),
+    useIsFocused: () => true,
+    useFocusEffect: (cb: () => void | (() => void)) => {
+      React.useEffect(() => {
+        cb();
+        return () => {};
+      }, []);
+    },
+  };
+});
 
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,

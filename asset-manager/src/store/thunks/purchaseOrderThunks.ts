@@ -146,6 +146,53 @@ export const updatePO = createAsyncThunk(
 );
 
 /**
+ * Record that admin downloaded PO for signing (sets "Approved By" name)
+ */
+export const recordPODownloadForSigning = createAsyncThunk(
+  'purchaseOrders/recordPODownloadForSigning',
+  async (
+    { poId, adminId, adminName }: { poId: string; adminId: string; adminName: string },
+    { dispatch, rejectWithValue }
+  ) => {
+    try {
+      await purchaseOrderService.recordPODownloadForSigning(poId, adminId, adminName);
+      const updatedPO = await purchaseOrderService.getPOById(poId);
+      if (updatedPO) {
+        dispatch(addOrUpdatePO(updatedPO));
+      }
+      return updatedPO;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to record download';
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * Upload signed PO document and update PO
+ */
+export const uploadSignedPO = createAsyncThunk(
+  'purchaseOrders/uploadSignedPO',
+  async (
+    { poId, signedPdfUrl }: { poId: string; signedPdfUrl: string },
+    { dispatch, rejectWithValue }
+  ) => {
+    try {
+      const updatedPO = await purchaseOrderService.setSignedPdfUrl(poId, signedPdfUrl);
+      if (updatedPO) {
+        dispatch(addOrUpdatePO(updatedPO));
+      }
+      return updatedPO;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to upload signed document';
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
  * Approve a PO (Admin only)
  */
 export const approvePO = createAsyncThunk(

@@ -1,5 +1,6 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Asset } from 'expo-asset';
 import * as ImageManipulator from 'expo-image-manipulator';
 import type { PurchaseOrder, PurchaseOrderItem } from '../types/purchaseOrder';
@@ -68,8 +69,15 @@ function escapeHtml(text: string | null | undefined): string {
  * Generate HTML string for a Purchase Order PDF.
  * Matches IBF document layout: two-column address blocks, right-side PO metadata,
  * simplified items table (Sl No, ITEM, Qty, Remarks), blank signature area.
+ * @param approvedByName - Override for "Approved by" (e.g. admin who downloads for signing)
  */
-export function generatePOHtml(po: PurchaseOrder, logoBase64?: string): string {
+export function generatePOHtml(
+  po: PurchaseOrder,
+  logoBase64?: string,
+  approvedByName?: string
+): string {
+  const approvedByDisplay =
+    approvedByName ?? po.downloadedByName ?? po.reviewedByName ?? '—';
   const itemRows = (po.items ?? []).map((item, index) => {
     const slNo = index + 1;
     const qtyDisplay = formatQtyDisplay(item);
@@ -175,7 +183,7 @@ export function generatePOHtml(po: PurchaseOrder, logoBase64?: string): string {
 
       <!-- Approved by -->
       <div style="border: 2px solid #000; padding: 12px 16px; text-align: center;">
-        <div style="font-size: 16px; font-weight: 900; color: #000;">Approved by: ${escapeHtml(po.reviewedByName ?? '—')}</div>
+        <div style="font-size: 16px; font-weight: 900; color: #000;">Approved by: ${escapeHtml(approvedByDisplay)}</div>
       </div>
     </div>
   </div>
@@ -279,23 +287,47 @@ export function buildDraftPOForPrint(
 
 /**
  * Generate PDF from PO HTML and share via native share dialog.
- * User can print or save to files.
+ * If po.signedPdfUrl exists (approved PO with uploaded signed doc), shares that file instead.
+ * @param approvedByName - Override for "Approved by" when generating (e.g. admin downloading for signing)
  */
-export async function printPurchaseOrder(po: PurchaseOrder): Promise<void> {
+export async function printPurchaseOrder(
+  po: PurchaseOrder,
+  approvedByName?: string
+): Promise<void> {
   try {
-    const logoBase64 = await loadLogoBase64();
-    const html = generatePOHtml(po, logoBase64);
-    const { uri } = await Print.printToFileAsync({
-      html,
-      width: 612,
-      height: 792,
-    });
+    const signedUrl = po.signedPdfUrl?.trim();
+    let uri: string;
+
+    if (signedUrl) {
+      const documentDir = FileSystem.documentDirectory;
+      if (!documentDir) {
+        throw new Error('Document directory is not available');
+      }
+      const pathBeforeQuery = signedUrl.split('?')[0];
+      const ext = pathBeforeQuery.toLowerCase().endsWith('.pdf') ? 'pdf' : 'jpg';
+      const localPath = `${documentDir}signed_${po.poNumber}_${Date.now()}.${ext}`;
+      const result = await FileSystem.downloadAsync(signedUrl, localPath);
+      if (result.status !== 200) {
+        throw new Error('Failed to download signed document');
+      }
+      uri = result.uri;
+    } else {
+      const logoBase64 = await loadLogoBase64();
+      const html = generatePOHtml(po, logoBase64, approvedByName);
+      const printResult = await Print.printToFileAsync({
+        html,
+        width: 612,
+        height: 792,
+      });
+      uri = printResult.uri;
+    }
 
     if (await Sharing.isAvailableAsync()) {
+      const isPdf = uri.toLowerCase().endsWith('.pdf');
       await Sharing.shareAsync(uri, {
-        mimeType: 'application/pdf',
+        mimeType: isPdf ? 'application/pdf' : 'image/jpeg',
         dialogTitle: `Print ${po.poNumber}`,
-        UTI: '.pdf',
+        UTI: isPdf ? '.pdf' : '.jpg',
       });
     } else {
       throw new Error('Sharing is not available on this device');
@@ -307,10 +339,11 @@ export async function printPurchaseOrder(po: PurchaseOrder): Promise<void> {
     if (
       err.message?.includes('expo-print') ||
       err.message?.includes('expo-sharing') ||
+      err.message?.includes('expo-file-system') ||
       err.message?.includes('Cannot find module')
     ) {
       throw new Error(
-        'PDF printing requires expo-print and expo-sharing. Install with: npx expo install expo-print expo-sharing'
+        'PDF printing requires expo-print, expo-sharing, and expo-file-system. Install with: npx expo install expo-print expo-sharing expo-file-system'
       );
     }
 

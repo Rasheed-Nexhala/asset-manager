@@ -78,6 +78,29 @@ const validatePoItemQuantities = (
   }
 };
 
+/**
+ * Check if a PO number is already used by another PO.
+ * @param poNumber - The PO number to check (trimmed)
+ * @param excludePoId - When updating, the current PO's ID to exclude from the check
+ */
+const isPoNumberTaken = async (
+  poNumber: string,
+  excludePoId?: string
+): Promise<boolean> => {
+  const q = query(
+    collection(db, PURCHASE_ORDERS_COLLECTION),
+    where('poNumber', '==', poNumber),
+    limit(2)
+  );
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return false;
+  if (excludePoId) {
+    const other = snapshot.docs.find((d) => d.id !== excludePoId);
+    return other != null;
+  }
+  return true;
+};
+
 const ensureAdminUser = async (userId: string): Promise<void> => {
   const userRef = doc(db, USERS_COLLECTION, userId);
   const userSnap = await getDocFromServer(userRef);
@@ -171,7 +194,7 @@ const buildPOItems = (
       itemId: item.itemId,
       itemName: item.itemName,
       itemSku: item.itemSku,
-      unit: item.unit,
+      unit: item.unit ?? null,
       isExistingItem: item.isExistingItem,
       quantity: item.quantity,
       unitPrice,
@@ -179,9 +202,9 @@ const buildPOItems = (
       gstPercentage: gstPct,
       gstAmount,
       receivedQuantity: null,
-      orderedUnit: item.orderedUnit,
-      orderedQuantity: item.orderedQuantity,
-      remarks: item.remarks,
+      orderedUnit: item.orderedUnit ?? null,
+      orderedQuantity: item.orderedQuantity ?? null,
+      remarks: item.remarks ?? null,
     };
   });
 
@@ -211,7 +234,14 @@ export const createPO = async (
 ): Promise<string> => {
   try {
     validatePoItemQuantities(data.items);
-    const poNumber = await generatePoNumber();
+    const trimmed = data.poNumber?.trim();
+    if (!trimmed) {
+      throw new Error('PO number is required.');
+    }
+    if (await isPoNumberTaken(trimmed)) {
+      throw new Error(`PO number "${trimmed}" is already in use.`);
+    }
+    const poNumber = trimmed;
     const items = buildPOItems(data.items);
     const { subtotal, gstAmount, totalAmount, gstPercentage } = calculateTotals(items);
 
@@ -219,11 +249,11 @@ export const createPO = async (
       ? Timestamp.fromDate(new Date(data.expectedDeliveryDate))
       : null;
 
-    const isAdminAutoApprove = !isDraft && createdByRole === 'Admin';
-    const status = isDraft ? 'draft' : isAdminAutoApprove ? 'approved' : 'pending_approval';
-    const reviewedBy = isAdminAutoApprove ? userId : null;
-    const reviewedByName = isAdminAutoApprove ? userName : null;
-    const reviewedAt = isAdminAutoApprove ? serverTimestamp() : null;
+    // All non-draft POs go to pending_approval; Admin must upload signed PO and approve like others
+    const status = isDraft ? 'draft' : 'pending_approval';
+    const reviewedBy = null;
+    const reviewedByName = null;
+    const reviewedAt = null;
 
     const newPO = {
       poNumber,
@@ -272,6 +302,9 @@ export const createPO = async (
     return docRef.id;
   } catch (error) {
     console.error('Error creating PO:', error);
+    if (error instanceof Error && error.message.includes('already in use')) {
+      throw error;
+    }
     throw new Error('Failed to create purchase order. Please try again.');
   }
 };
@@ -319,6 +352,9 @@ export const getPOById = async (poId: string): Promise<PurchaseOrder | null> => 
       reviewedAt: data.reviewedAt ?? null,
       adminComments: data.adminComments ?? null,
       rejectionReason: data.rejectionReason ?? null,
+      signedPdfUrl: data.signedPdfUrl ?? undefined,
+      downloadedBy: data.downloadedBy ?? undefined,
+      downloadedByName: data.downloadedByName ?? undefined,
       receivedAt: data.receivedAt ?? null,
       receivedBy: data.receivedBy ?? null,
       receivedByName: data.receivedByName ?? null,
@@ -377,7 +413,16 @@ export const updatePO = async (
 ): Promise<PurchaseOrder | null> => {
   try {
     validatePoItemQuantities(data.items);
+    const newPoNumber = data.poNumber.trim();
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
+
+    const existingSnap = await getDoc(poRef);
+    if (existingSnap.exists()) {
+      const currentPoNumber = existingSnap.data()?.poNumber as string | undefined;
+      if (currentPoNumber !== newPoNumber && (await isPoNumberTaken(newPoNumber, poId))) {
+        throw new Error(`PO number "${newPoNumber}" is already in use.`);
+      }
+    }
 
     const items = buildPOItems(data.items);
     const { subtotal, gstAmount, totalAmount, gstPercentage } = calculateTotals(items);
@@ -386,11 +431,11 @@ export const updatePO = async (
       ? Timestamp.fromDate(new Date(data.expectedDeliveryDate))
       : null;
 
-    const isAdminAutoApprove = !isDraft && createdByRole === 'Admin' && userId && userName;
-    const status = isDraft ? 'draft' : isAdminAutoApprove ? 'approved' : 'pending_approval';
-    const reviewedBy = isAdminAutoApprove ? userId : null;
-    const reviewedByName = isAdminAutoApprove ? userName : null;
-    const reviewedAt = isAdminAutoApprove ? serverTimestamp() : null;
+    // All non-draft POs go to pending_approval; Admin must upload signed PO and approve like others
+    const status = isDraft ? 'draft' : 'pending_approval';
+    const reviewedBy = null;
+    const reviewedByName = null;
+    const reviewedAt = null;
 
     await runTransaction(db, async (transaction) => {
       const poSnap = await transaction.get(poRef);
@@ -405,7 +450,7 @@ export const updatePO = async (
         );
       }
 
-      transaction.update(poRef, {
+      const updatePayload: Record<string, unknown> = {
         vendorId: data.vendorId,
         vendorName: data.vendorName,
         vendorContact: data.vendorContact,
@@ -427,7 +472,9 @@ export const updatePO = async (
         reviewedByName,
         reviewedAt,
         updatedAt: serverTimestamp(),
-      });
+      };
+      updatePayload.poNumber = data.poNumber.trim();
+      transaction.update(poRef, updatePayload);
     });
 
     if (!isDraft) {
@@ -437,12 +484,82 @@ export const updatePO = async (
     return getPOById(poId);
   } catch (error) {
     console.error('Error updating PO:', error);
+    if (error instanceof Error && error.message.includes('already in use')) {
+      throw error;
+    }
     throw error;
   }
 };
 
 /**
- * Approve a PO (Admin only)
+ * Record that an admin downloaded the PO for signing.
+ * Sets downloadedBy/downloadedByName so "Approved By" shows the correct admin.
+ */
+export const recordPODownloadForSigning = async (
+  poId: string,
+  adminId: string,
+  adminName: string
+): Promise<void> => {
+  try {
+    await ensureAdminUser(adminId);
+    const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
+    const poSnap = await getDoc(poRef);
+
+    if (!poSnap.exists()) {
+      throw new Error('Purchase order not found');
+    }
+
+    const poData = poSnap.data();
+    if (poData.status !== 'pending_approval') {
+      throw new Error('Only pending approval POs can be downloaded for signing');
+    }
+
+    await updateDoc(poRef, {
+      downloadedBy: adminId,
+      downloadedByName: adminName,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error recording PO download for signing:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update a PO with the signed document URL (after admin uploads signed PDF/image).
+ */
+export const setSignedPdfUrl = async (
+  poId: string,
+  signedPdfUrl: string
+): Promise<PurchaseOrder | null> => {
+  try {
+    const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
+    const poSnap = await getDoc(poRef);
+
+    if (!poSnap.exists()) {
+      throw new Error('Purchase order not found');
+    }
+
+    const poData = poSnap.data();
+    if (poData.status !== 'pending_approval') {
+      throw new Error('Signed document can only be uploaded for pending approval POs');
+    }
+
+    await updateDoc(poRef, {
+      signedPdfUrl,
+      updatedAt: serverTimestamp(),
+    });
+
+    return getPOById(poId);
+  } catch (error) {
+    console.error('Error setting signed PDF URL:', error);
+    throw error;
+  }
+};
+
+/**
+ * Approve a PO (Admin only).
+ * Requires signedPdfUrl to be set (admin must upload signed PO before approving).
  */
 export const approvePO = async (
   poId: string,
@@ -464,6 +581,13 @@ export const approvePO = async (
       if (poData.status !== 'pending_approval') {
         throw new Error(
           `Cannot approve PO with status "${poData.status}". Only pending approval POs can be approved.`
+        );
+      }
+
+      const signedUrl = poData.signedPdfUrl?.trim();
+      if (!signedUrl) {
+        throw new Error(
+          'Please upload the signed PO document before approving. Download the PO, sign it, then upload it here.'
         );
       }
 
@@ -798,6 +922,9 @@ export const listPurchaseOrdersPaginated = async (
         reviewedAt: data.reviewedAt ?? null,
         adminComments: data.adminComments ?? null,
         rejectionReason: data.rejectionReason ?? null,
+        signedPdfUrl: data.signedPdfUrl ?? undefined,
+        downloadedBy: data.downloadedBy ?? undefined,
+        downloadedByName: data.downloadedByName ?? undefined,
         receivedAt: data.receivedAt ?? null,
         receivedBy: data.receivedBy ?? null,
         receivedByName: data.receivedByName ?? null,
@@ -881,6 +1008,9 @@ export const exportPurchaseOrders = async (
           reviewedAt: data.reviewedAt ?? null,
           adminComments: data.adminComments ?? null,
           rejectionReason: data.rejectionReason ?? null,
+          signedPdfUrl: data.signedPdfUrl ?? undefined,
+          downloadedBy: data.downloadedBy ?? undefined,
+          downloadedByName: data.downloadedByName ?? undefined,
           receivedAt: data.receivedAt ?? null,
           receivedBy: data.receivedBy ?? null,
           receivedByName: data.receivedByName ?? null,
@@ -958,6 +1088,9 @@ export const subscribeToPurchaseOrders = (
             reviewedAt: data.reviewedAt ?? null,
             adminComments: data.adminComments ?? null,
             rejectionReason: data.rejectionReason ?? null,
+            signedPdfUrl: data.signedPdfUrl ?? undefined,
+            downloadedBy: data.downloadedBy ?? undefined,
+            downloadedByName: data.downloadedByName ?? undefined,
             receivedAt: data.receivedAt ?? null,
             receivedBy: data.receivedBy ?? null,
             receivedByName: data.receivedByName ?? null,

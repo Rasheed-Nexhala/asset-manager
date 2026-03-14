@@ -32,7 +32,7 @@ import {
 import { getPOById } from '../../services/firebase/purchaseOrderService';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { setVendors } from '../../store/slices/purchaseOrderSlice';
+import { setVendors, clearError, setError } from '../../store/slices/purchaseOrderSlice';
 import {
   selectUserId,
   selectUserDisplayName,
@@ -41,6 +41,7 @@ import {
 import {
   selectVendors,
   selectPOById,
+  selectPurchaseOrderError,
 } from '../../store/selectors/purchaseOrderSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import type {
@@ -79,6 +80,7 @@ export const CreatePOScreen: React.FC = () => {
   const poFromStore = useAppSelector((state) =>
     poId ? selectPOById(poId)(state) : null
   );
+  const reduxError = useAppSelector(selectPurchaseOrderError);
 
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
   const [vendorName, setVendorName] = useState('');
@@ -88,6 +90,7 @@ export const CreatePOScreen: React.FC = () => {
   const [vendorGstin, setVendorGstin] = useState('');
   const [location, setLocation] = useState('');
   const [jobNo, setJobNo] = useState('');
+  const [poNumber, setPoNumber] = useState('');
   const [items, setItems] = useState<PurchaseOrderItem[]>([]);
   const [justification, setJustification] = useState('');
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState<Date | null>(
@@ -108,6 +111,13 @@ export const CreatePOScreen: React.FC = () => {
     const unsub = subscribeToVendors((v) => dispatch(setVendors(v)));
     return unsub;
   }, [dispatch]);
+
+  useFocusEffect(
+    useCallback(() => {
+      dispatch(clearError());
+      return () => {};
+    }, [dispatch])
+  );
 
   useEffect(() => {
     dispatch(fetchItems());
@@ -145,6 +155,7 @@ export const CreatePOScreen: React.FC = () => {
       setVendorGstin(po.vendorGstin ?? '');
       setLocation(po.location ?? '');
       setJobNo(po.jobNo ?? '');
+      setPoNumber(po.poNumber ?? '');
       setItems(po.items);
       setJustification(po.justification);
       setExpectedDeliveryDate(
@@ -161,6 +172,7 @@ export const CreatePOScreen: React.FC = () => {
         vendorGstin: po.vendorGstin ?? '',
         location: po.location ?? '',
         jobNo: po.jobNo ?? '',
+        poNumber: po.poNumber ?? '',
         items: po.items.map(i => ({
           itemId: i.itemId,
           quantity: i.quantity,
@@ -210,6 +222,7 @@ export const CreatePOScreen: React.FC = () => {
         vendorGstin: '',
         location: '',
         jobNo: '',
+        poNumber: '',
         items: [],
         justification: '',
         expectedDeliveryDate: null,
@@ -226,6 +239,7 @@ export const CreatePOScreen: React.FC = () => {
     vendorGstin: vendorGstin.trim(),
     location: location.trim(),
     jobNo: jobNo.trim(),
+    poNumber: poNumber.trim(),
     items: items.map(i => ({
       itemId: i.itemId,
       quantity: i.quantity,
@@ -256,12 +270,13 @@ export const CreatePOScreen: React.FC = () => {
     const e: Record<string, string> = {};
     const vName = vendorName.trim();
     const vContact = vendorContact.trim();
+    if (!poNumber.trim()) e.poNumber = 'P.O. No. is required';
     if (!vName) e.vendorName = 'Vendor name is required';
     if (!vContact) e.vendorContact = 'Contact number is required';
     if (items.length === 0) e.items = 'At least one item is required';
     setErrors(e);
     return Object.keys(e).length === 0;
-  }, [vendorName, vendorContact, items.length]);
+  }, [poNumber, vendorName, vendorContact, items.length]);
 
   // Handle selectedItems when returning from SelectItemsScreen or ProcessRequestScreen
   useFocusEffect(
@@ -410,6 +425,7 @@ export const CreatePOScreen: React.FC = () => {
         }
 
         const data: CreatePurchaseOrderData = {
+          poNumber: poNumber.trim(),
           vendorId,
           vendorName: vName,
           vendorContact: vContact,
@@ -489,14 +505,13 @@ export const CreatePOScreen: React.FC = () => {
           } catch (deleteErr) {
             console.error('Failed to clean up orphaned vendor', deleteErr);
           }
-          Alert.alert(
-            'Error',
-            `Failed to create purchase order. Vendor creation rolled back. ${msg}`,
-            [{ text: 'OK' }]
+          dispatch(
+            setError(
+              `Failed to create purchase order. Vendor creation rolled back. ${msg}`
+            )
           );
-        } else {
-          Alert.alert('Error', msg);
         }
+        // Thunk already dispatches setError for other failures; banner will show
       } finally {
         setIsSubmitting(false);
       }
@@ -513,6 +528,7 @@ export const CreatePOScreen: React.FC = () => {
       vendorGstin,
       location,
       jobNo,
+      poNumber,
       items,
       justification,
       expectedDeliveryDate,
@@ -561,6 +577,10 @@ export const CreatePOScreen: React.FC = () => {
   }, [poId, editingPOStatus, userId, dispatch, navigation]);
 
   const handlePrintDraft = useCallback(async () => {
+    if (!poNumber.trim()) {
+      Alert.alert('Error', 'P.O. No. is required to print.');
+      return;
+    }
     if (!vendorName.trim() || !vendorContact.trim()) {
       Alert.alert('Error', 'Vendor name and contact are required to print.');
       return;
@@ -584,7 +604,7 @@ export const CreatePOScreen: React.FC = () => {
           expectedDeliveryDate,
           userName: userName ?? '—',
         },
-        poId && editingPOStatus === 'draft' ? poFromStore?.poNumber ?? 'DRAFT' : 'DRAFT'
+        poNumber.trim()
       );
       await printPurchaseOrder(draftPO);
     } catch (err) {
@@ -605,9 +625,7 @@ export const CreatePOScreen: React.FC = () => {
     justification,
     expectedDeliveryDate,
     userName,
-    poId,
-    editingPOStatus,
-    poFromStore?.poNumber,
+    poNumber,
   ]);
 
   if (poId && (isLoadingPO || loadPOError)) {
@@ -668,6 +686,21 @@ export const CreatePOScreen: React.FC = () => {
         onBackPress={handleBack}
       />
 
+      {reduxError && (
+        <View className="bg-[#DC2626]/15 px-4 py-3 border-b border-[#DC2626]/30 flex-row items-center gap-2">
+          <Ionicons name="alert-circle" size={20} color="#DC2626" />
+          <Text className="text-[14px] text-[#DC2626] flex-1">{reduxError}</Text>
+          <TouchableOpacity
+            onPress={() => dispatch(clearError())}
+            className="px-3 py-1.5 bg-[#DC2626] rounded-lg"
+            accessibilityLabel="Dismiss error"
+            accessibilityRole="button"
+          >
+            <Text className="text-[13px] font-medium text-white">Dismiss</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <ScrollView
         className="flex-1 bg-[#F8FAFC]"
         contentContainerStyle={{ paddingBottom: 40 }}
@@ -675,6 +708,18 @@ export const CreatePOScreen: React.FC = () => {
         keyboardShouldPersistTaps="handled"
       >
         <View className="px-4 py-4 gap-6">
+          {/* PO Number — manual entry, optional (auto-generated if blank) */}
+          <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
+            <FormField
+              label="P.O. No."
+              value={poNumber}
+              onChangeText={setPoNumber}
+              placeholder="e.g. PO-2025-0001"
+              error={errors.poNumber}
+              required
+            />
+          </View>
+
           {/* Vendor — CIAMS card layout */}
           <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
             <Text className="text-[17px] font-semibold text-[#0F172A] mb-4">
