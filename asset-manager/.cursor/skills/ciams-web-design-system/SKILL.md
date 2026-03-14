@@ -12,6 +12,10 @@ Industrial-grade UI/UX system for construction inventory management. Every compo
 **Industrial Clarity** — Designed for dusty job sites, bright sunlight, gloved hands (on mobile), and complex data management (on desktop).
 **Trust Through Structure** — Managing expensive inventory requires confidence. UI feels structured, organized, authoritative — like a well-run warehouse.
 
+### Iconography Strategy
+**No Emojis** — Use the central `<Icon />` component for all iconography. The app uses Heroicons (SVG-based) stored centrally to ensure scale, color-matching, and consistency across platforms.
+Example: `<Icon name="archive-box" className="w-5 h-5 text-slate-500" />`
+
 ---
 
 ## Quick Reference: Tailwind CSS Classes

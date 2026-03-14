@@ -14,10 +14,10 @@ const AppLayout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: '📊' },
-    { name: 'Inventory', href: '/inventory', icon: '📦' },
-    { name: 'Orders', href: '/orders', icon: '📄' },
-    { name: 'Requests', href: '/requests', icon: '📋' },
+    { name: 'Dashboard', href: '/dashboard', icon: <Icon name="chart-bar" className="w-5 h-5" /> },
+    { name: 'Inventory', href: '/inventory', icon: <Icon name="archive-box" className="w-5 h-5" /> },
+    { name: 'Orders', href: '/orders', icon: <Icon name="document-text" className="w-5 h-5" /> },
+    { name: 'Requests', href: '/requests', icon: <Icon name="clipboard-document-list" className="w-5 h-5" /> },
   ];
 
   return (
@@ -39,7 +39,7 @@ const AppLayout = () => {
                     ${isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'}
                   `}
                 >
-                  <span className="mr-3 text-lg">{item.icon}</span>
+                  <span className="mr-3 flex items-center justify-center">{item.icon}</span>
                   {item.name}
                 </NavLink>
               </li>
@@ -80,7 +80,11 @@ const AppLayout = () => {
             {/* Search can go here */}
           </div>
           <div className="flex items-center gap-4">
-            <button className="text-slate-500 hover:text-slate-900 transition-colors">🔔</button>
+            <button className="text-slate-500 hover:text-slate-900 transition-colors relative">
+              <Icon name="bell" className="w-6 h-6" />
+              {/* Notification dot */}
+              <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+            </button>
           </div>
         </header>
 
@@ -125,7 +129,7 @@ const AppLayout = () => {
                     ${isActive ? 'bg-blue-50 text-blue-800' : 'text-slate-700 hover:bg-slate-50'}
                   `}
                 >
-                  <span className="mr-3 text-xl">{item.icon}</span>
+                  <span className="mr-3 flex items-center justify-center">{item.icon}</span>
                   {item.name}
                 </NavLink>
               </li>
@@ -157,16 +161,16 @@ const DashboardPage = () => {
           <p className="text-[13px] md:text-sm text-slate-500 mt-1">Overview of your inventory across all sites.</p>
         </div>
         <button className="bg-blue-800 hover:bg-blue-900 transition-colors text-white px-5 py-2.5 rounded-lg text-[15px] font-semibold flex items-center justify-center w-full md:w-auto shadow-sm">
-          <span>+</span> <span className="ml-2">Create PO</span>
+          <Icon name="plus" className="w-5 h-5 mr-2" /> <span>Create PO</span>
         </button>
       </div>
 
       {/* KPI Section */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard value="₹12.5L" label="Total Value" icon="💰" trend="+5.2%" trendUp={true} />
-        <KPICard value="8" label="Pending POs" icon="⏳" highlighted={true} />
-        <KPICard value="24" label="Active Sites" icon="🏗️" />
-        <KPICard value="3" label="Critical Low" icon="⚠️" trend="-1.2%" trendUp={false} isError={true} />
+        <KPICard value="₹12.5L" label="Total Value" icon={<Icon name="currency-rupee" className="w-8 h-8 text-blue-800" />} trend="+5.2%" trendUp={true} />
+        <KPICard value="8" label="Pending POs" icon={<Icon name="clock" className="w-8 h-8 text-amber-600" />} highlighted={true} />
+        <KPICard value="24" label="Active Sites" icon={<Icon name="building-office-2" className="w-8 h-8 text-blue-800" />} />
+        <KPICard value="3" label="Critical Low" icon={<Icon name="exclamation-triangle" className="w-8 h-8 text-red-600" />} trend="-1.2%" trendUp={false} isError={true} />
       </section>
 
       {/* Quick Actions & Recent Activity (Grid Layout) */}
@@ -176,10 +180,10 @@ const DashboardPage = () => {
         <section className="lg:col-span-1 space-y-4">
           <h2 className="text-[17px] font-semibold text-slate-900">Quick Actions</h2>
           <div className="grid grid-cols-2 gap-3">
-            <QuickAction title="Manage Users" icon="👥" />
-            <QuickAction title="View All POs" icon="📄" />
-            <QuickAction title="Activity Log" icon="📊" />
-            <QuickAction title="Reports" icon="📈" />
+            <QuickAction title="Manage Users" icon={<Icon name="users" className="w-8 h-8 text-slate-700" />} />
+            <QuickAction title="View All POs" icon={<Icon name="document-text" className="w-8 h-8 text-slate-700" />} />
+            <QuickAction title="Activity Log" icon={<Icon name="chart-bar" className="w-8 h-8 text-slate-700" />} />
+            <QuickAction title="Reports" icon={<Icon name="arrow-trending-up" className="w-8 h-8 text-slate-700" />} />
           </div>
         </section>
 
@@ -218,7 +222,7 @@ const KPICard = ({ value, label, icon, trend, trendUp, highlighted, isError }) =
     ${highlighted ? 'border-amber-500 shadow-amber-500/10' : isError ? 'border-red-500 shadow-red-500/10' : 'border-slate-200'}
     flex flex-col relative overflow-hidden
   `}>
-    <span className="text-3xl mb-3">{icon}</span>
+    <div className="mb-3">{icon}</div>
     <h3 className="text-[32px] font-bold text-slate-900 leading-tight mb-1">{value}</h3>
     <p className="text-[13px] text-slate-500 font-medium uppercase tracking-wide">{label}</p>
     
@@ -234,8 +238,8 @@ const KPICard = ({ value, label, icon, trend, trendUp, highlighted, isError }) =
 );
 
 const QuickAction = ({ title, icon }) => (
-  <button className="bg-white border border-slate-200 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-blue-300 hover:shadow-sm focus:ring-2 focus:ring-blue-800 focus:outline-none transition-all aspect-square sm:aspect-auto sm:h-32">
-    <span className="text-3xl">{icon}</span>
+  <button className="bg-white border border-slate-200 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-blue-300 hover:shadow-sm focus:ring-2 focus:ring-blue-800 focus:outline-none transition-all aspect-square sm:aspect-auto sm:h-32 group">
+    <div className="group-hover:text-blue-600 transition-colors">{icon}</div>
     <span className="text-[14px] font-semibold text-slate-900 text-center leading-tight">{title}</span>
   </button>
 );
@@ -249,7 +253,7 @@ const AttentionAlert = ({ type, title, description, time }) => {
     `}>
       {/* Icon */}
       <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${isError ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
-        <span className="text-xl">{isError ? '⚠️' : '⏳'}</span>
+        <Icon name={isError ? "exclamation-triangle" : "clock"} className="w-5 h-5" />
       </div>
       
       {/* Content */}

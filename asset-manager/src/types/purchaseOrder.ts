@@ -35,6 +35,7 @@ export interface PurchaseOrderItem {
   receivedQuantity: number | null;
   orderedUnit?: string;
   orderedQuantity?: number;
+  remarks?: string;
 }
 
 /**
@@ -59,6 +60,9 @@ export interface PurchaseOrderFirestore {
   vendorContact: string;
   vendorEmail?: string;
   vendorAddress?: string;
+  vendorGstin?: string;
+  location?: string;
+  jobNo?: string;
 
   items: PurchaseOrderItem[];
 
@@ -106,6 +110,9 @@ export interface PurchaseOrder {
   vendorContact: string;
   vendorEmail?: string;
   vendorAddress?: string;
+  vendorGstin?: string;
+  location?: string;
+  jobNo?: string;
 
   items: PurchaseOrderItem[];
 
@@ -168,6 +175,9 @@ export interface CreatePurchaseOrderData {
   vendorContact: string;
   vendorEmail?: string;
   vendorAddress?: string;
+  vendorGstin?: string;
+  location?: string;
+  jobNo?: string;
   items: Array<{
     itemId: string;
     itemName: string;
@@ -179,6 +189,7 @@ export interface CreatePurchaseOrderData {
     gstPercentage?: number;
     orderedUnit?: string;
     orderedQuantity?: number;
+    remarks?: string;
   }>;
   justification: string;
   expectedDeliveryDate: string | null;

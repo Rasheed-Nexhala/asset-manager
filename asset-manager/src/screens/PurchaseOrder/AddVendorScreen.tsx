@@ -37,6 +37,7 @@ export const AddVendorScreen: React.FC = () => {
     phone: '',
     email: '',
     address: '',
+    gstin: '',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof CreateVendorData, string>>>({});
   const [loading, setLoading] = useState(false);
@@ -54,6 +55,7 @@ export const AddVendorScreen: React.FC = () => {
               phone: v.phone,
               email: v.email ?? '',
               address: v.address ?? '',
+              gstin: v.gstin ?? '',
             });
           }
         })
@@ -82,6 +84,7 @@ export const AddVendorScreen: React.FC = () => {
           phone: formData.phone.trim(),
           email: formData.email?.trim() || undefined,
           address: formData.address?.trim() || undefined,
+          gstin: formData.gstin?.trim() || undefined,
         });
         Alert.alert('Success', 'Vendor updated.', [
           { text: 'OK', onPress: () => navigation.goBack() },
@@ -93,6 +96,7 @@ export const AddVendorScreen: React.FC = () => {
           phone: formData.phone.trim(),
           email: formData.email?.trim() || undefined,
           address: formData.address?.trim() || undefined,
+          gstin: formData.gstin?.trim() || undefined,
         });
         Alert.alert('Success', 'Vendor added.', [
           { text: 'OK', onPress: () => navigation.goBack() },

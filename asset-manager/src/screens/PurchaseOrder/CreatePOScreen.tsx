@@ -85,6 +85,9 @@ export const CreatePOScreen: React.FC = () => {
   const [vendorContact, setVendorContact] = useState('');
   const [vendorEmail, setVendorEmail] = useState('');
   const [vendorAddress, setVendorAddress] = useState('');
+  const [vendorGstin, setVendorGstin] = useState('');
+  const [location, setLocation] = useState('');
+  const [jobNo, setJobNo] = useState('');
   const [items, setItems] = useState<PurchaseOrderItem[]>([]);
   const [justification, setJustification] = useState('');
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState<Date | null>(
@@ -118,6 +121,7 @@ export const CreatePOScreen: React.FC = () => {
         setVendorContact(v.phone);
         setVendorEmail(v.email ?? '');
         setVendorAddress(v.address ?? '');
+        setVendorGstin(v.gstin ?? '');
       }
     }
   }, [selectedVendorId, vendors]);
@@ -138,6 +142,9 @@ export const CreatePOScreen: React.FC = () => {
       setVendorContact(po.vendorContact);
       setVendorEmail(po.vendorEmail ?? '');
       setVendorAddress(po.vendorAddress ?? '');
+      setVendorGstin(po.vendorGstin ?? '');
+      setLocation(po.location ?? '');
+      setJobNo(po.jobNo ?? '');
       setItems(po.items);
       setJustification(po.justification);
       setExpectedDeliveryDate(
@@ -151,6 +158,9 @@ export const CreatePOScreen: React.FC = () => {
         vendorContact: po.vendorContact,
         vendorEmail: po.vendorEmail ?? '',
         vendorAddress: po.vendorAddress ?? '',
+        vendorGstin: po.vendorGstin ?? '',
+        location: po.location ?? '',
+        jobNo: po.jobNo ?? '',
         items: po.items.map(i => ({
           itemId: i.itemId,
           quantity: i.quantity,
@@ -158,6 +168,7 @@ export const CreatePOScreen: React.FC = () => {
           gstPercentage: i.gstPercentage,
           orderedUnit: i.orderedUnit,
           orderedQuantity: i.orderedQuantity,
+          remarks: i.remarks ?? '',
         })),
         justification: po.justification,
         expectedDeliveryDate: po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate).toISOString() : null,
@@ -196,6 +207,9 @@ export const CreatePOScreen: React.FC = () => {
         vendorContact: '',
         vendorEmail: '',
         vendorAddress: '',
+        vendorGstin: '',
+        location: '',
+        jobNo: '',
         items: [],
         justification: '',
         expectedDeliveryDate: null,
@@ -209,6 +223,9 @@ export const CreatePOScreen: React.FC = () => {
     vendorContact: vendorContact.trim(),
     vendorEmail: vendorEmail.trim(),
     vendorAddress: vendorAddress.trim(),
+    vendorGstin: vendorGstin.trim(),
+    location: location.trim(),
+    jobNo: jobNo.trim(),
     items: items.map(i => ({
       itemId: i.itemId,
       quantity: i.quantity,
@@ -216,6 +233,7 @@ export const CreatePOScreen: React.FC = () => {
       gstPercentage: i.gstPercentage,
       orderedUnit: i.orderedUnit,
       orderedQuantity: i.orderedQuantity,
+      remarks: i.remarks ?? '',
     })),
     justification: justification.trim(),
     expectedDeliveryDate: expectedDeliveryDate ? expectedDeliveryDate.toISOString() : null,
@@ -268,6 +286,7 @@ export const CreatePOScreen: React.FC = () => {
             receivedQuantity: null,
             orderedUnit: item.unit,
             orderedQuantity: initialQty,
+            remarks: undefined,
           };
         });
         setItems((prev) => {
@@ -330,6 +349,12 @@ export const CreatePOScreen: React.FC = () => {
     setItems((prev) => prev.filter((p) => p.itemId !== itemId));
   }, []);
 
+  const handleRemarksChange = useCallback((itemId: string, remarks: string) => {
+    setItems((prev) =>
+      prev.map((p) => (p.itemId === itemId ? { ...p, remarks } : p))
+    );
+  }, []);
+
   const handleSubmit = useCallback(
     async (asDraft: boolean) => {
       if (!asDraft && !validate()) return;
@@ -379,7 +404,7 @@ export const CreatePOScreen: React.FC = () => {
             phone: vContact,
             email: vendorEmail.trim() || undefined,
             address: vendorAddress.trim() || undefined,
-            category: 'other',
+            gstin: vendorGstin.trim() || undefined,
           });
           vendorCreatedThisAttempt = true;
         }
@@ -390,6 +415,9 @@ export const CreatePOScreen: React.FC = () => {
           vendorContact: vContact,
           vendorEmail: vendorEmail.trim() || undefined,
           vendorAddress: vendorAddress.trim() || undefined,
+          vendorGstin: vendorGstin.trim() || undefined,
+          location: location.trim() || undefined,
+          jobNo: jobNo.trim() || undefined,
           items: items.map((i) => ({
             itemId: i.itemId,
             itemName: i.itemName,
@@ -401,6 +429,7 @@ export const CreatePOScreen: React.FC = () => {
             gstPercentage: i.gstPercentage,
             orderedUnit: i.orderedUnit,
             orderedQuantity: i.orderedQuantity,
+            remarks: i.remarks?.trim() || undefined,
           })),
           justification: justification.trim(),
           expectedDeliveryDate: expectedDeliveryDate
@@ -481,6 +510,9 @@ export const CreatePOScreen: React.FC = () => {
       vendorContact,
       vendorEmail,
       vendorAddress,
+      vendorGstin,
+      location,
+      jobNo,
       items,
       justification,
       expectedDeliveryDate,
@@ -544,6 +576,9 @@ export const CreatePOScreen: React.FC = () => {
           vendorContact: vendorContact.trim(),
           vendorEmail: vendorEmail.trim() || undefined,
           vendorAddress: vendorAddress.trim() || undefined,
+          vendorGstin: vendorGstin.trim() || undefined,
+          location: location.trim() || undefined,
+          jobNo: jobNo.trim() || undefined,
           items,
           justification: justification.trim(),
           expectedDeliveryDate,
@@ -563,6 +598,9 @@ export const CreatePOScreen: React.FC = () => {
     vendorContact,
     vendorEmail,
     vendorAddress,
+    vendorGstin,
+    location,
+    jobNo,
     items,
     justification,
     expectedDeliveryDate,
@@ -695,6 +733,13 @@ export const CreatePOScreen: React.FC = () => {
                   keyboardType="phone-pad"
                   error={errors.vendorContact}
                 />
+                <FormField
+                  label="GSTIN"
+                  value={vendorGstin}
+                  onChangeText={setVendorGstin}
+                  placeholder="e.g. 29AJWPD4844N1ZC"
+                  error={errors.vendorGstin}
+                />
               </View>
             </View>
           </View>
@@ -732,6 +777,7 @@ export const CreatePOScreen: React.FC = () => {
                     onQuantityChange={(q, u, o) => handleQuantityChange(item.itemId, q, u, o)}
                     onUnitPriceChange={(p) => handleUnitPriceChange(item.itemId, p)}
                     onGstPercentageChange={(p) => handleGstPercentageChange(item.itemId, p)}
+                    onRemarksChange={(r) => handleRemarksChange(item.itemId, r)}
                   />
                 </View>
               );
@@ -810,6 +856,28 @@ export const CreatePOScreen: React.FC = () => {
                 }}
               />
             )}
+          </View>
+
+          {/* Location and Job No. */}
+          <View className="flex-row gap-4">
+            <View className="flex-1">
+              <FormField
+                label="Location/Work"
+                value={location}
+                onChangeText={setLocation}
+                placeholder="e.g. FO"
+                error={errors.location}
+              />
+            </View>
+            <View className="flex-1">
+              <FormField
+                label="Job No."
+                value={jobNo}
+                onChangeText={setJobNo}
+                placeholder="e.g. 2513"
+                error={errors.jobNo}
+              />
+            </View>
           </View>
 
           {/* Print Preview */}

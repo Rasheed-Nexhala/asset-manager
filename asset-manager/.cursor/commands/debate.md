@@ -1,0 +1,1 @@
+use 2 SUBAGENTS to debate on what is the problem and come up with a solution using a 3rd SUBAGENT

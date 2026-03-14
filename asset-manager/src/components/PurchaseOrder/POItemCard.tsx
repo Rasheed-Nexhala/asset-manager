@@ -19,6 +19,7 @@ interface POItemCardProps {
   onQuantityChange?: (quantity: number, orderedUnit?: string, orderedQuantity?: number) => void;
   onUnitPriceChange?: (price: number) => void;
   onGstPercentageChange?: (percentage: number) => void;
+  onRemarksChange?: (remarks: string) => void;
 }
 
 const formatCurrency = (amount: number): string => {
@@ -42,6 +43,7 @@ export const POItemCard: React.FC<POItemCardProps> = ({
   onQuantityChange,
   onUnitPriceChange,
   onGstPercentageChange,
+  onRemarksChange,
 }) => {
   const baseUnit = inventoryItem?.unit || item.unit || 'Pieces';
   const isSteel = inventoryItem ? isWeightBasedItem(inventoryItem) : false;
@@ -264,6 +266,19 @@ export const POItemCard: React.FC<POItemCardProps> = ({
             </Text>
           </View>
         </View>
+
+        {editable && onRemarksChange ? (
+          <View className="gap-1.5">
+            <Text className="text-[15px] text-[#0F172A]">Remarks</Text>
+            <TextInput
+              value={item.remarks ?? ''}
+              onChangeText={onRemarksChange}
+              placeholder="Optional"
+              placeholderTextColor="#94A3B8"
+              className="border border-[#E2E8F0] rounded-lg h-12 px-4 bg-white text-[15px] text-[#0F172A]"
+            />
+          </View>
+        ) : null}
       </View>
     </View>
   );

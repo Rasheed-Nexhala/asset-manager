@@ -22,13 +22,13 @@ Detailed specifications for all CIAMS Web components with exact HTML structures 
       <li>
         {/* Active Link */}
         <a href="/dashboard" className="flex items-center px-3 py-2.5 bg-blue-600 rounded-lg text-sm font-medium">
-          <span className="mr-3 text-lg">📊</span> Dashboard
+          <Icon name="chart-bar" className="mr-3 w-5 h-5" /> Dashboard
         </a>
       </li>
       <li>
         {/* Inactive Link */}
         <a href="/inventory" className="flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-800 rounded-lg text-sm font-medium transition-colors">
-          <span className="mr-3 text-lg">📦</span> Inventory
+          <Icon name="archive-box" className="mr-3 w-5 h-5" /> Inventory
         </a>
       </li>
     </ul>
@@ -58,7 +58,7 @@ Detailed specifications for all CIAMS Web components with exact HTML structures 
   <div className="flex items-center">
     {/* Mobile Menu Toggle (hidden on md) */}
     <button className="md:hidden w-10 h-10 flex items-center justify-center mr-2 text-slate-500 hover:bg-slate-50 rounded-md">
-      ☰
+      <Icon name="bars-3" className="w-6 h-6" />
     </button>
     
     <h1 className="text-[22px] font-semibold text-slate-900">
@@ -68,10 +68,11 @@ Detailed specifications for all CIAMS Web components with exact HTML structures 
   
   <div className="flex items-center gap-2">
     <button className="w-10 h-10 flex items-center justify-center text-slate-500 hover:bg-slate-50 rounded-full transition-colors">
-      🔍
+      <Icon name="magnifying-glass" className="w-5 h-5" />
     </button>
-    <button className="w-10 h-10 flex items-center justify-center text-slate-500 hover:bg-slate-50 rounded-full transition-colors">
-      🔔
+    <button className="w-10 h-10 flex items-center justify-center text-slate-500 hover:bg-slate-50 rounded-full transition-colors relative">
+      <Icon name="bell" className="w-5 h-5" />
+      {/* Notification badge dot usually goes here */}
     </button>
   </div>
 </header>
@@ -146,7 +147,7 @@ On mobile, standard cards ensure minimum 48px touch targets.
     {/* Bottom Row */}
     <footer className="border-t border-slate-200 pt-3 flex justify-between items-center text-[13px] text-slate-500">
       <span>Updated 2h ago</span>
-      <span>→</span>
+      <Icon name="chevron-right" className="w-4 h-4" />
     </footer>
   </article>
 </div>
@@ -156,7 +157,7 @@ On mobile, standard cards ensure minimum 48px touch targets.
 
 ```tsx
 <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100 flex flex-col">
-  <span className="text-3xl mb-3">📦</span>
+  <Icon name="archive-box" className="w-8 h-8 text-blue-800 mb-3" />
   <h2 className="text-[32px] font-bold text-slate-900 leading-none mb-1">342</h2>
   <p className="text-[13px] text-slate-500 font-medium tracking-wide">ITEMS IN STOCK</p>
   
@@ -214,7 +215,7 @@ On mobile, standard cards ensure minimum 48px touch targets.
       accept="image/*" 
       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
     />
-    <span className="text-3xl text-slate-400 group-hover:text-blue-600 transition-colors mb-2">📸</span>
+    <Icon name="camera" className="w-8 h-8 text-slate-400 group-hover:text-blue-600 transition-colors mb-2" />
     <p className="text-[15px] font-medium text-blue-800">Click to upload or drag and drop</p>
     <p className="text-[13px] text-slate-500">SVG, PNG, JPG or GIF (max. 5MB)</p>
   </div>
@@ -228,7 +229,7 @@ On mobile, standard cards ensure minimum 48px touch targets.
 ```tsx
 <div className="flex flex-col items-center justify-center py-16 px-4 w-full h-full">
   <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-5">
-    <span className="text-4xl opacity-50">📋</span>
+    <Icon name="document-text" className="w-10 h-10 text-slate-400" />
   </div>
   
   <h3 className="text-[22px] font-semibold text-slate-900 text-center mb-2">

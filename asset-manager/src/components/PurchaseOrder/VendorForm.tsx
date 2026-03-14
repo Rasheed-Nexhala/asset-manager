@@ -60,6 +60,13 @@ export const VendorForm: React.FC<VendorFormProps> = ({
         error={errors.address}
         multiline
       />
+      <FormField
+        label="GSTIN"
+        value={data.gstin ?? ''}
+        onChangeText={(v) => handleChange('gstin', v)}
+        placeholder="e.g. 29AJWPD4844N1ZC"
+        error={errors.gstin}
+      />
     </View>
   );
 };

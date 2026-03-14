@@ -17,7 +17,7 @@ import {
   Image,
   RefreshControl,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { CommonActions, useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { isLowStock } from '../../utils/inventoryUtils';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
@@ -147,6 +147,32 @@ export const SelectItemsScreen: React.FC = () => {
   const handleAdd = useCallback(() => {
     const selected = filteredItems.filter((item) => selectedIds.has(item.id));
     if (selected.length === 0) return;
+
+    // For CreatePO: use goBack + setParams to return to the EXISTING screen without
+    // pushing a new one. navigation.navigate() can push a fresh CreatePO instance
+    // (React Navigation 7), losing vendor details in component state.
+    if (returnScreen === 'CreatePO') {
+      try {
+        const state = navigation.getState?.();
+        const routes = state?.routes;
+        const previousRoute = routes?.[routes.length - 2];
+        if (previousRoute?.name === 'CreatePO' && typeof navigation.dispatch === 'function') {
+          navigation.dispatch({
+            ...CommonActions.setParams({
+              ...returnParams,
+              selectedItems: selected,
+            }),
+            source: previousRoute.key,
+          });
+          navigation.goBack();
+          return;
+        }
+      } catch {
+        // Fall through to navigate if getState/dispatch unavailable (e.g. in tests)
+      }
+    }
+
+    // Fallback: navigate (for CreateRequest, EditRequest, or when previous route not found)
     // @ts-ignore - dynamic navigation params
     navigation.navigate(returnScreen as any, {
       ...returnParams,

@@ -16,6 +16,7 @@ export interface FirestoreVendor {
   phone: string;
   email?: string;
   address?: string;
+  gstin?: string;
   poCount: number;
   lastPoDate: Timestamp | null;
   status: VendorStatus;
@@ -33,6 +34,7 @@ export interface Vendor {
   phone: string;
   email?: string;
   address?: string;
+  gstin?: string;
   poCount: number;
   lastPoDate: string | null;
   status: VendorStatus;
@@ -59,6 +61,7 @@ export interface CreateVendorData {
   phone: string;
   email?: string;
   address?: string;
+  gstin?: string;
 }
 
 /**
@@ -70,5 +73,6 @@ export interface UpdateVendorData {
   phone?: string;
   email?: string;
   address?: string;
+  gstin?: string;
   status?: VendorStatus;
 }

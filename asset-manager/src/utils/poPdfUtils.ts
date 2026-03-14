@@ -3,6 +3,7 @@ import * as Sharing from 'expo-sharing';
 import { Asset } from 'expo-asset';
 import * as ImageManipulator from 'expo-image-manipulator';
 import type { PurchaseOrder, PurchaseOrderItem } from '../types/purchaseOrder';
+import { companyConfig } from '../../config/company';
 
 const DEFAULT_GST_PERCENTAGE = 18;
 
@@ -27,190 +28,24 @@ async function loadLogoBase64(): Promise<string> {
 const formatDate = (iso: string | null | undefined): string => {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-IN', {
+    day: '2-digit',
     month: 'short',
-    day: 'numeric',
-    year: 'numeric',
+    year: '2-digit',
   });
 };
 
-const formatCurrency = (amount: number): string =>
-  `₹${amount.toLocaleString('en-IN')}`;
-
-/** Format currency or "—" when amount is 0 (optional/not provided) */
-const formatCurrencyOrOptional = (amount: number): string =>
-  amount > 0 ? formatCurrency(amount) : '—';
-
-/** Format GST % or "—" when 0 (optional/not provided) */
-const formatGstOrOptional = (gstPct: number): string =>
-  gstPct > 0 ? `${gstPct}%` : '—';
-
-const statusLabels: Record<string, string> = {
-  draft: 'Draft',
-  pending_approval: 'Pending Approval',
-  approved: 'Approved',
-  ordered: 'Ordered',
-  received: 'Received',
-  rejected: 'Rejected',
-};
-
-const statusBadgeClass: Record<string, string> = {
-  draft: 'background: rgba(100, 116, 139, 0.2); color: #64748B;',
-  pending_approval: 'background: rgba(217, 119, 6, 0.2); color: #D97706;',
-  approved: 'background: rgba(30, 64, 175, 0.2); color: #1E40AF;',
-  ordered: 'background: rgba(22, 163, 74, 0.2); color: #16A34A;',
-  received: 'background: rgba(71, 85, 105, 0.2); color: #475569;',
-  rejected: 'background: rgba(220, 38, 38, 0.2); color: #DC2626;',
-};
-
 /**
- * Generate HTML string for a Purchase Order PDF.
- * Uses CIAMS design system colors and typography.
- * @param po - Purchase order data
- * @param logoBase64 - Optional base64-encoded logo image for header
+ * Format quantity for IBF-style PO: "5 nos", "3 pack", etc.
  */
-export function generatePOHtml(po: PurchaseOrder, logoBase64?: string): string {
-  const statusLabel = statusLabels[po.status] ?? po.status;
-  const statusStyle = statusBadgeClass[po.status] ?? statusBadgeClass.draft;
-
-  const itemRows = (po.items ?? []).map((item) => {
-    const amount = Number(item.amount) || 0;
-    const unitPrice = Number(item.unitPrice) || 0;
-    const gstPct = Number(item.gstPercentage ?? (unitPrice > 0 ? DEFAULT_GST_PERCENTAGE : 0)) || 0;
-    const gstAmt = gstPct > 0 ? (Number(item.gstAmount) || Math.round((amount * gstPct) / 100)) : 0;
-    const totalWithGst = amount + gstAmt;
-    const quantity = Number(item.quantity) || 0;
-    const orderedQty = item.orderedQuantity != null ? Number(item.orderedQuantity) : null;
-    const orderedUnit = item.orderedUnit?.trim();
-    const baseUnit = item.unit?.trim() || 'Pcs';
-    const displayQty = orderedQty != null && orderedUnit
-      ? `${orderedQty} ${orderedUnit} (${quantity} ${baseUnit} stock)`
-      : `${quantity} ${baseUnit}`;
-    const priceBasis = orderedUnit ? `per ${orderedUnit}` : `per ${baseUnit}`;
-    return `
-      <tr>
-        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A;">${escapeHtml(item.itemName)}</td>
-        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 13px; color: #64748B;">${escapeHtml(item.itemSku)}</td>
-        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${escapeHtml(displayQty)}</td>
-        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${formatCurrencyOrOptional(unitPrice)} <span style="font-size: 12px; color: #64748B;">${escapeHtml(priceBasis)}</span></td>
-        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; color: #0F172A; text-align: right;">${formatGstOrOptional(gstPct)}</td>
-        <td style="padding: 8px 12px; border: 1px solid #E2E8F0; font-size: 15px; font-weight: 600; color: #0F172A; text-align: right;">${formatCurrencyOrOptional(totalWithGst)}</td>
-      </tr>`;
-  }).join('');
-
-  const hasAnyPrice = (po.items ?? []).some(
-    (i) => (Number(i.unitPrice) || 0) > 0
-  );
-
-  const footerParts: string[] = [];
-  if (po.receivedByName) {
-    footerParts.push(`Received by ${escapeHtml(po.receivedByName)} on ${formatDate(po.receivedAt)}`);
+function formatQtyDisplay(item: PurchaseOrderItem): string {
+  const orderedQty = item.orderedQuantity != null ? Number(item.orderedQuantity) : null;
+  const orderedUnit = item.orderedUnit?.trim();
+  const baseUnit = item.unit?.trim() || 'nos';
+  const qty = Number(item.quantity) || 0;
+  if (orderedQty != null && orderedUnit) {
+    return `${orderedQty} ${orderedUnit}`;
   }
-
-  const logoImg = logoBase64
-    ? `<div class="header-logo"><img src="data:image/png;base64,${logoBase64}" alt="IBF Logo" style="height: 48px; width: auto; display: block;" /></div>`
-    : '';
-
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: -apple-system, Helvetica, sans-serif; color: #0F172A; padding: 24px; font-size: 15px; }
-    .header { border-bottom: 2px solid #1E40AF; padding-bottom: 16px; margin-bottom: 24px; display: flex; flex-direction: row; align-items: center; gap: 16px; }
-    .header-brand { flex: 1; }
-    .header-logo { flex-shrink: 0; }
-    .section { margin-bottom: 24px; }
-    .section-title { font-size: 17px; font-weight: 600; color: #0F172A; margin-bottom: 12px; }
-    .label { font-size: 13px; color: #64748B; }
-    .value { font-size: 15px; color: #0F172A; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1px solid #E2E8F0; }
-    th { background: #F8FAFC; font-size: 13px; color: #64748B; font-weight: 600; padding: 8px 12px; text-align: left; }
-    .status-badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 500; margin-left: 8px; }
-    .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #E2E8F0; font-size: 13px; color: #64748B; }
-    .signature-block { margin-top: 48px; display: flex; flex-direction: column; align-items: flex-end; }
-    .signature-line { width: 200px; border-bottom: 1px solid #0F172A; padding-bottom: 4px; }
-    .signature-label { font-size: 13px; color: #64748B; margin-top: 8px; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    ${logoImg}
-    <div class="header-brand">
-      <p style="font-size: 16px; font-weight: 600; margin: 0 0 8px; color: #1E40AF;">IBF Engineering Services Pvt Ltd</p>
-      <h1 style="font-size: 22px; font-weight: 600; margin: 0; color: #0F172A;">PURCHASE ORDER</h1>
-      <p style="font-size: 15px; margin: 8px 0 0; color: #0F172A;">
-        ${escapeHtml(po.poNumber)}
-        <span class="status-badge" style="${statusStyle}">${escapeHtml(statusLabel)}</span>
-      </p>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">VENDOR</div>
-    <p style="margin: 0 0 4px; font-size: 15px; color: #0F172A;">${escapeHtml(po.vendorName ?? '—')}</p>
-    <p style="margin: 0 0 4px; font-size: 13px; color: #64748B;">📞 ${escapeHtml(po.vendorContact ?? '—')}</p>
-    ${po.vendorEmail ? `<p style="margin: 0 0 4px; font-size: 13px; color: #64748B;">${escapeHtml(po.vendorEmail)}</p>` : ''}
-    ${po.vendorAddress ? `<p style="margin: 0; font-size: 13px; color: #64748B;">${escapeHtml(po.vendorAddress)}</p>` : ''}
-  </div>
-
-  <div class="section">
-    <div class="section-title">ITEMS</div>
-    <table>
-      <thead>
-        <tr>
-          <th>Item</th>
-          <th>SKU</th>
-          <th style="text-align: right;">Qty</th>
-          <th style="text-align: right;">Unit Price</th>
-          <th style="text-align: right;">GST %</th>
-          <th style="text-align: right;">Amount (incl. GST)</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${itemRows}
-      </tbody>
-    </table>
-  </div>
-
-  ${hasAnyPrice ? `
-  <div class="section">
-    <div class="section-title">SUMMARY</div>
-    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-      <span class="label">Subtotal</span>
-      <span class="value">${formatCurrencyOrOptional(Number(po.subtotal) || 0)}</span>
-    </div>
-    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-      <span class="label">Total GST</span>
-      <span class="value">${formatCurrencyOrOptional(Number(po.gstAmount) || 0)}</span>
-    </div>
-    <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 1px solid #E2E8F0;">
-      <span class="section-title" style="margin: 0;">Total</span>
-      <span style="font-size: 17px; font-weight: 600; color: #0F172A;">${formatCurrencyOrOptional(Number(po.totalAmount) || 0)}</span>
-    </div>
-  </div>
-  ` : ''}
-
-  <div class="section">
-    <div class="section-title">JUSTIFICATION</div>
-    <p style="margin: 0; font-size: 15px; color: #0F172A;">${escapeHtml(po.justification || '—')}</p>
-  </div>
-
-  <div class="section">
-    <div class="section-title">EXPECTED DELIVERY</div>
-    <p style="margin: 0; font-size: 15px; color: #0F172A;">${formatDate(po.expectedDeliveryDate)}</p>
-  </div>
-
-  <div class="signature-block">
-    <div class="signature-line"></div>
-    <p class="signature-label" style="margin-right: 0;">Authorized Signature</p>
-  </div>
-
-  ${footerParts.length > 0 ? `<div class="footer">
-    ${footerParts.map((p) => `<p style="margin: 0 0 4px;">${p}</p>`).join('')}
-  </div>` : ''}
-</body>
-</html>`;
+  return `${qty} ${baseUnit}`;
 }
 
 /**
@@ -230,6 +65,150 @@ function escapeHtml(text: string | null | undefined): string {
 }
 
 /**
+ * Generate HTML string for a Purchase Order PDF.
+ * Matches IBF document layout: two-column address blocks, right-side PO metadata,
+ * simplified items table (Sl No, ITEM, Qty, Remarks), blank signature area.
+ */
+export function generatePOHtml(po: PurchaseOrder, logoBase64?: string): string {
+  const itemRows = (po.items ?? []).map((item, index) => {
+    const slNo = index + 1;
+    const qtyDisplay = formatQtyDisplay(item);
+    const remarks = item.remarks?.trim() ?? '';
+    return `
+      <tr>
+        <td style="padding: 4px 12px; border: 1px solid #000; font-size: 16px; color: #000; text-align: center;">${slNo}</td>
+        <td style="padding: 4px 12px; border: 1px solid #000; font-size: 16px; color: #000;">${escapeHtml(item.itemName)}</td>
+        <td style="padding: 4px 12px; border: 1px solid #000; font-size: 16px; color: #000;">${escapeHtml(qtyDisplay)}</td>
+        <td style="padding: 4px 12px; border: 1px solid #000; font-size: 16px; color: #000;">${escapeHtml(remarks)}</td>
+      </tr>`;
+  }).join('');
+
+  const billingAddressLines = companyConfig.address
+    .split('\n')
+    .map((line) => `<p style="margin: 0 0 2px; font-size: 16px; font-weight: bold; color: #000;">${escapeHtml(line.trim())}</p>`)
+    .join('');
+
+  const vendorAddressLines = (po.vendorAddress ?? '')
+    .split('\n')
+    .filter((l) => l.trim())
+    .map((line) => `<p style="margin: 0 0 2px; font-size: 16px; font-weight: bold; color: #000;">${escapeHtml(line.trim())}</p>`)
+    .join('');
+
+  const logoImg = logoBase64
+    ? `<img src="data:image/png;base64,${logoBase64}" alt="Logo" style="height: 60px; width: auto; display: block;" />`
+    : '';
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; color: #000; padding: 24px; font-size: 16px; }
+    table { width: 100%; border-collapse: collapse; border: 2px solid #000; }
+    th, td { border: 1px solid #000; }
+    th { background: #f0f0f0; font-size: 16px; font-weight: bold; padding: 10px 12px; text-align: center; }
+    p { margin: 0; }
+  </style>
+</head>
+<body>
+  <!-- Header Title -->
+  <div style="text-align: center; margin-bottom: 8px;">
+    <div style="font-size: 26px; font-weight: 900; color: #000; text-transform: uppercase;">${escapeHtml(companyConfig.name)}</div>
+  </div>
+
+  <!-- Header Logo & Badge -->
+  <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 32px; position: relative; height: 60px;">
+    <div style="position: absolute; left: 0; top: 0;">
+      ${logoImg}
+    </div>
+    <div style="border: 3px solid #000; border-radius: 8px; padding: 8px 24px; background: #fff;">
+      <div style="font-size: 20px; font-weight: 900; color: #000; letter-spacing: 0.5px;">PURCHASE ORDER</div>
+    </div>
+  </div>
+
+  <!-- Two-column: Left (Address) | Right (Meta) -->
+  <div style="display: flex; gap: 40px; margin-bottom: 32px;">
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 24px;">
+      <!-- To (Vendor) -->
+      <div style="border: 3px solid #000; padding: 12px; min-height: 140px;">
+        <p style="font-size: 16px; font-weight: 900; margin: 0 0 4px; color: #000;">To</p>
+        <p style="margin: 0 0 2px; font-size: 16px; font-weight: 900; color: #000; text-transform: uppercase;">${escapeHtml(po.vendorName ?? '—')}</p>
+        ${vendorAddressLines || `<p style="margin: 0 0 2px; font-size: 16px; font-weight: bold; color: #000;">—</p>`}
+        ${po.vendorEmail ? `<p style="margin: 0 0 2px; font-size: 16px; font-weight: bold; color: #000;">Email: ${escapeHtml(po.vendorEmail)}</p>` : ''}
+        ${po.vendorGstin ? `<p style="margin: 0; font-size: 16px; font-weight: bold; color: #000;">GSTIN: ${escapeHtml(po.vendorGstin)}</p>` : ''}
+      </div>
+      <!-- Billing Address -->
+      <div style="border: 3px solid #000; padding: 12px; min-height: 140px;">
+        <p style="font-size: 17px; font-weight: 900; margin: 0 0 6px; color: #000; text-decoration: underline;">Billing Address</p>
+        <p style="margin: 0 0 2px; font-size: 16px; font-weight: 900; color: #000; text-transform: uppercase;">${escapeHtml(companyConfig.name)}</p>
+        ${billingAddressLines}
+        <p style="margin: 2px 0 0; font-size: 16px; font-weight: bold; color: #000;">Email: ${escapeHtml(companyConfig.email)}</p>
+        <p style="margin: 0; font-size: 16px; font-weight: bold; color: #000;">GSTIN: ${escapeHtml(companyConfig.gstin)}</p>
+      </div>
+    </div>
+    <div style="width: 360px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px;">
+      <!-- Date Box -->
+      <div style="border: 2px solid #000; padding: 12px 16px; display: flex; align-items: center;">
+        <div style="font-size: 16px; font-weight: 900; color: #000; width: 60px;">Date</div>
+        <div style="font-size: 16px; font-weight: 900; color: #000; flex: 1; text-align: center;">${escapeHtml(formatDate(po.createdAt))}</div>
+      </div>
+      
+      <!-- P.O. No -->
+      <div style="border: 2px solid #000; padding: 12px 16px; text-align: center;">
+        <div style="font-size: 16px; font-weight: 900; color: #000;">P.O. No. ${escapeHtml(po.poNumber ?? '—')}</div>
+      </div>
+
+      <!-- Location -->
+      <div style="border: 2px solid #000; padding: 12px 16px; text-align: center;">
+        <div style="font-size: 16px; font-weight: 900; color: #000;">Location / Work: ${escapeHtml(po.location ?? '—')}</div>
+      </div>
+
+      <!-- JOB NO -->
+      <div style="border: 2px solid #000; padding: 12px 16px; text-align: center;">
+        <div style="font-size: 16px; font-weight: 900; color: #000;">JOB NO: ${escapeHtml(po.jobNo ?? '—')}</div>
+      </div>
+
+      <!-- Ordered by -->
+      <div style="border: 2px solid #000; padding: 12px 16px; text-align: center;">
+        <div style="font-size: 16px; font-weight: 900; color: #000;">Ordered by: ${escapeHtml(po.createdByName ?? '—')}</div>
+      </div>
+
+      <!-- Approved by -->
+      <div style="border: 2px solid #000; padding: 12px 16px; text-align: center;">
+        <div style="font-size: 16px; font-weight: 900; color: #000;">Approved by: ${escapeHtml(po.reviewedByName ?? '—')}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Salutation -->
+  <p style="margin: 0 0 8px; font-size: 16px; font-weight: 900; color: #000;">Dear Sir,</p>
+  <p style="margin: 0 0 16px 40px; font-size: 16px; font-weight: 900; color: #000;">Please supply the following items</p>
+
+  <!-- Items Table -->
+  <table style="margin-bottom: 32px;">
+    <thead>
+      <tr>
+        <th style="width: 60px;">Sl<br/>No</th>
+        <th>ITEM</th>
+        <th style="width: 100px;">Qty</th>
+        <th style="width: 30%;">Remarks</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemRows}
+    </tbody>
+  </table>
+
+  <!-- Signature block - blank for manual signature -->
+  <div style="margin-top: 48px; display: flex; flex-direction: column; align-items: flex-end;">
+    <div style="width: 220px; height: 24px; border-bottom: 1px solid #000; margin-bottom: 8px;"></div>
+    <p style="font-size: 16px; font-weight: bold; color: #000; margin: 0; text-decoration: underline;">Authorised Signature</p>
+  </div>
+</body>
+</html>`;
+}
+
+/**
  * Build a PurchaseOrder-like object from form data for printing draft/preview.
  */
 export function buildDraftPOForPrint(
@@ -238,6 +217,9 @@ export function buildDraftPOForPrint(
     vendorContact: string;
     vendorEmail?: string;
     vendorAddress?: string;
+    vendorGstin?: string;
+    location?: string;
+    jobNo?: string;
     items: PurchaseOrderItem[];
     justification: string;
     expectedDeliveryDate: Date | null;
@@ -265,6 +247,9 @@ export function buildDraftPOForPrint(
     vendorContact: formData.vendorContact,
     vendorEmail: formData.vendorEmail,
     vendorAddress: formData.vendorAddress,
+    vendorGstin: formData.vendorGstin,
+    location: formData.location,
+    jobNo: formData.jobNo,
     items,
     subtotal,
     gstPercentage: subtotal > 0 ? (gstAmount / subtotal) * 100 : 0,

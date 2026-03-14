@@ -24,7 +24,7 @@ In the new `asset-manager-web` directory, install the identical core logic libra
 - **Logic**: `npm install firebase @reduxjs/toolkit react-redux`
 - **Routing**: `npm install react-router-dom`
 - **Tailwind**: `npm install -D tailwindcss postcss autoprefixer`
-- **Icons**: `npm install react-icons @heroicons/react`
+- **Icons**: `npm install @heroicons/react` (Building a central `<Icon />` component to replace Expo Vector Icons and Emojis).
 - **Utilities**: `npm install date-fns clsx tailwind-merge`
 
 ### Step 1.3: Configure TailwindCSS
@@ -103,7 +103,12 @@ Copy the following directories completely unchanged from the mobile app (`asset-
 - Make it visible only on mobile (`flex md:hidden h-16 items-center`).
 - Includes a top header with a Hamburger Menu icon that triggers a slide-out drawer or dropdown.
 
-### Step 5.3: Main Layout Component
+### Step 5.3: Central Icon Component
+- Create `src/components/shared/Icon.tsx`.
+- This component runs centrally using `@heroicons/react/24/outline` (or solid).
+- **CRITICAL**: Do NOT use emojis for icons anywhere in the web app UI. Always use the `<Icon name="..." />` component for consistency, scalability, and Tailwind color-matching.
+
+### Step 5.4: Main Layout Component
 - Create `src/components/layout/AppLayout.tsx`.
 - Structure should encompass the sidebar, navbar, and the main content area:
   ```tsx
