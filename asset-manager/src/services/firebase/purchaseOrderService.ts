@@ -269,7 +269,7 @@ const buildPOItems = (
       itemId: item.itemId,
       itemName: item.itemName,
       itemSku: item.itemSku,
-      unit: item.unit ?? undefined,
+      ...(item.unit != null && item.unit !== '' ? { unit: item.unit } : {}),
       isExistingItem: item.isExistingItem,
       quantity: item.quantity,
       unitPrice,
@@ -277,9 +277,9 @@ const buildPOItems = (
       gstPercentage: gstPct,
       gstAmount,
       receivedQuantity: null,
-      orderedUnit: item.orderedUnit ?? undefined,
-      orderedQuantity: item.orderedQuantity ?? undefined,
-      remarks: item.remarks ?? undefined,
+      ...(item.orderedUnit != null && item.orderedUnit !== '' ? { orderedUnit: item.orderedUnit } : {}),
+      ...(item.orderedQuantity != null ? { orderedQuantity: item.orderedQuantity } : {}),
+      ...(item.remarks != null && item.remarks !== '' ? { remarks: item.remarks } : {}),
     };
   });
 

@@ -50,6 +50,17 @@ function formatQtyDisplay(item: PurchaseOrderItem): string {
 }
 
 /**
+ * Sanitizes a PO number for safe use in file paths.
+ * Replaces path separators (/, \) and other characters that could create nested
+ * directories with underscores, so the filename stays flat.
+ * Example: "IBF/SRIRAM/2026/225" → "IBF_SRIRAM_2026_225"
+ */
+function sanitizePoNumberForPath(poNumber: string | null | undefined): string {
+  if (poNumber == null) return '';
+  return String(poNumber).replace(/[/\\:*?"<>|]/g, '_').trim() || 'po';
+}
+
+/**
  * Escapes HTML special characters to prevent XSS when interpolating user-provided
  * strings into generated HTML. Returns empty string for null/undefined.
  */
@@ -305,7 +316,14 @@ export async function printPurchaseOrder(
       }
       const pathBeforeQuery = signedUrl.split('?')[0];
       const ext = pathBeforeQuery.toLowerCase().endsWith('.pdf') ? 'pdf' : 'jpg';
-      const localPath = `${documentDir}signed_${po.poNumber}_${Date.now()}.${ext}`;
+      const sanitizedPoNumber = sanitizePoNumberForPath(po.poNumber);
+      const localPath = `${documentDir}signed_${sanitizedPoNumber}_${Date.now()}.${ext}`;
+      // Android: downloadAsync fails if parent directory doesn't exist; ensure it does
+      const parentDir = localPath.substring(0, localPath.lastIndexOf('/') + 1);
+      const dirInfo = await FileSystem.getInfoAsync(parentDir, { size: false });
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(parentDir, { intermediates: true });
+      }
       const result = await FileSystem.downloadAsync(signedUrl, localPath);
       if (result.status !== 200) {
         throw new Error('Failed to download signed document');
