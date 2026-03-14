@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply m-0 antialiased;
+  }
+}
+
+/* Print styles: hide nav, format tables for PDF/print */
+@media print {
+  /* Hide navigation and non-print UI */
+  nav,
+  header[role="banner"],
+  aside,
+  .sidebar,
+  .top-header,
+  [data-print-hide],
+  button:not([data-print-keep]),
+  .no-print {
+    display: none !important;
+  }
+
+  /* Ensure print content fills page */
+  body {
+    background: white;
+  }
+
+  /* Clean table formatting for print */
+  table {
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tfoot {
+    display: table-footer-group;
+  }
+}

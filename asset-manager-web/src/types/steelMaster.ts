@@ -1,0 +1,59 @@
+import { Timestamp } from 'firebase/firestore';
+
+/**
+ * Custom Item document structure in Firestore (with Firebase Timestamps)
+ * Stores standard steel item specifications for weight-based conversion
+ */
+export interface FirestoreSteelMaster {
+  id: string;
+  name: string;
+  weightPerMeter: number;
+  defaultLength: number;
+  hsnCode: string;
+  isActive: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+/**
+ * Custom Item document structure for Redux store (serialized timestamps)
+ */
+export interface SteelMaster {
+  id: string;
+  name: string;
+  weightPerMeter: number;
+  defaultLength: number;
+  hsnCode: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Data required to create a new steel master
+ */
+export interface CreateSteelMasterData {
+  name: string;
+  weightPerMeter: number;
+  defaultLength: number;
+  hsnCode: string;
+  /** User who created (for activity log) */
+  createdBy?: string;
+  createdByName?: string;
+  createdByRole?: string;
+}
+
+/**
+ * Data for updating an existing steel master
+ */
+export interface UpdateSteelMasterData {
+  name?: string;
+  weightPerMeter?: number;
+  defaultLength?: number;
+  hsnCode?: string;
+  isActive?: boolean;
+  /** User who updated (for activity log) */
+  updatedBy?: string;
+  updatedByName?: string;
+  updatedByRole?: string;
+}

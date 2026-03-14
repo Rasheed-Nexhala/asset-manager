@@ -1,0 +1,456 @@
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { Item, Category, InventoryEntry, ItemFilters } from '../../types/inventory';
+import { isLowStock } from '../../utils/inventoryUtils';
+import { sanitizeForDisplay } from '../../utils/sanitizeUtils';
+
+/** Safely extract error message from thunk rejection payload, then sanitize for XSS */
+const getErrorMessage = (payload: unknown): string => {
+  let msg: string;
+  if (typeof payload === 'string') msg = payload;
+  else if (payload instanceof Error) msg = payload.message;
+  else if (payload && typeof payload === 'object' && 'message' in payload) {
+    msg = String((payload as { message: unknown }).message);
+  } else {
+    msg = 'An unexpected error occurred';
+  }
+  return sanitizeForDisplay(msg) || 'An unexpected error occurred';
+};
+import {
+  fetchItems,
+  fetchItemsPaginated,
+  loadMoreItems,
+  fetchItemById,
+  createItem,
+  updateItem,
+  deleteItem,
+  adjustQuantity,
+  fetchInventoryByLocation,
+  fetchCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+} from '../thunks/inventoryThunks';
+import { ITEMS_PAGE_SIZE } from '../../services/firebase/inventoryService';
+
+export interface ClearErrorPayload {
+  reason?: string;
+}
+
+interface InventoryState {
+  items: Item[];
+  categories: Category[];
+  inventoryByLocation: Record<string, InventoryEntry[]>; // Key: locationId, Value: inventory entries
+  lowStockItemIds: string[]; // IDs of items at or below minimum stock level
+  loading: boolean;
+  error: string | null;
+  errorTimestamp: number | null; // When error occurred (for auto-clear and debugging)
+  filters: ItemFilters | null; // Current filters applied to items list
+  // Pagination (cursor-based)
+  totalCount: number | null; // From getCountFromServer
+  lastDoc: unknown | null; // DocumentSnapshot for startAfter (non-serializable)
+  hasMore: boolean;
+  loadingMore: boolean;
+}
+
+const initialState: InventoryState = {
+  items: [],
+  categories: [],
+  inventoryByLocation: {},
+  lowStockItemIds: [],
+  loading: false,
+  error: null,
+  errorTimestamp: null,
+  filters: null,
+  totalCount: null,
+  lastDoc: null,
+  hasMore: false,
+  loadingMore: false,
+};
+
+const inventorySlice = createSlice({
+  name: 'inventory',
+  initialState,
+  reducers: {
+    setItems: (state, action: PayloadAction<Item[]>) => {
+      state.items = action.payload;
+      // Update low stock item IDs (central store quantity <= min)
+      state.lowStockItemIds = action.payload
+        .filter((item) => isLowStock(item))
+        .map((item) => item.id);
+    },
+    setCategories: (state, action: PayloadAction<Category[]>) => {
+      state.categories = action.payload;
+    },
+    setInventoryForLocation: (
+      state,
+      action: PayloadAction<{ locationId: string; inventory: InventoryEntry[] }>
+    ) => {
+      state.inventoryByLocation[action.payload.locationId] = action.payload.inventory;
+    },
+    setLowStockItemIds: (state, action: PayloadAction<string[]>) => {
+      state.lowStockItemIds = action.payload;
+    },
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.loading = action.payload;
+    },
+    setError: (state, action: PayloadAction<string | null>) => {
+      state.error = action.payload;
+      state.errorTimestamp = action.payload ? Date.now() : null;
+    },
+    setFilters: (state, action: PayloadAction<ItemFilters | null>) => {
+      state.filters = action.payload;
+      // Reset pagination when filters change
+      state.items = [];
+      state.totalCount = null;
+      state.lastDoc = null;
+      state.hasMore = false;
+    },
+    clearError: (state, action: PayloadAction<ClearErrorPayload | undefined>) => {
+      state.error = null;
+      state.errorTimestamp = null;
+    },
+    // Update a single item in the items array (useful for real-time updates)
+    // Adds the item if not present (e.g. when ItemDetailScreen subscribes before items are loaded)
+    updateItemInState: (state, action: PayloadAction<Item>) => {
+      const index = state.items.findIndex((item) => item.id === action.payload.id);
+      if (index !== -1) {
+        state.items[index] = action.payload;
+      } else {
+        state.items.push(action.payload);
+      }
+      // Update low stock item IDs (central store quantity <= min)
+      state.lowStockItemIds = state.items
+        .filter((item) => isLowStock(item))
+        .map((item) => item.id);
+    },
+    // Add a new item to the items array
+    addItem: (state, action: PayloadAction<Item>) => {
+      state.items.push(action.payload);
+      // Update low stock item IDs (central store quantity <= min)
+      if (isLowStock(action.payload)) {
+        state.lowStockItemIds.push(action.payload.id);
+      }
+    },
+    /**
+     * Set items from Firestore snapshot subscription (real-time updates).
+     * Replaces pagination state with full list from subscription.
+     */
+    setItemsFromSubscription: (state, action: PayloadAction<Item[]>) => {
+      state.items = action.payload;
+      state.lowStockItemIds = action.payload
+        .filter((item) => isLowStock(item))
+        .map((item) => item.id);
+      state.totalCount = action.payload.length;
+      state.lastDoc = null;
+      state.hasMore = false;
+      state.loading = false;
+      state.loadingMore = false;
+      state.error = null;
+      state.errorTimestamp = null;
+    },
+    // Clear inventory for a location (useful when location is removed or user logs out)
+    clearInventoryForLocation: (state, action: PayloadAction<string>) => {
+      delete state.inventoryByLocation[action.payload];
+    },
+    // Clear all inventory data (useful on logout)
+    clearInventory: (state) => {
+      state.items = [];
+      state.categories = [];
+      state.inventoryByLocation = {};
+      state.lowStockItemIds = [];
+      state.filters = null;
+      state.totalCount = null;
+      state.lastDoc = null;
+      state.hasMore = false;
+      state.error = null;
+      state.errorTimestamp = null;
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      // Fetch items
+      .addCase(fetchItems.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(fetchItems.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items = action.payload;
+        // Update low stock item IDs (central store quantity <= min)
+        state.lowStockItemIds = action.payload
+          .filter((item) => isLowStock(item))
+          .map((item) => item.id);
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(fetchItems.rejected, (state, action) => {
+        state.loading = false;
+        state.error = getErrorMessage(action.payload);
+        state.errorTimestamp = Date.now();
+      })
+      // Fetch items (paginated)
+      .addCase(fetchItemsPaginated.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(fetchItemsPaginated.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items = action.payload.items;
+        state.totalCount = action.payload.totalCount;
+        state.lastDoc = action.payload.lastDoc;
+        state.hasMore = action.payload.items.length >= ITEMS_PAGE_SIZE;
+        state.lowStockItemIds = action.payload.items
+          .filter((item) => isLowStock(item))
+          .map((item) => item.id);
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(fetchItemsPaginated.rejected, (state, action) => {
+        state.loading = false;
+        state.error = getErrorMessage(action.payload);
+        state.errorTimestamp = Date.now();
+      })
+      // Load more items
+      .addCase(loadMoreItems.pending, (state) => {
+        state.loadingMore = true;
+      })
+      .addCase(loadMoreItems.fulfilled, (state, action) => {
+        state.loadingMore = false;
+        state.items = [...state.items, ...action.payload.items];
+        state.lastDoc = action.payload.lastDoc;
+        state.hasMore = action.payload.items.length >= ITEMS_PAGE_SIZE;
+        state.lowStockItemIds = state.items
+          .filter((item) => isLowStock(item))
+          .map((item) => item.id);
+      })
+      .addCase(loadMoreItems.rejected, (state) => {
+        state.loadingMore = false;
+      })
+      // Fetch item by ID
+      .addCase(fetchItemById.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(fetchItemById.fulfilled, (state, action) => {
+        state.loading = false;
+        if (action.payload) {
+          const index = state.items.findIndex((item) => item.id === action.payload!.id);
+          if (index !== -1) {
+            state.items[index] = action.payload;
+          } else {
+            state.items.push(action.payload);
+          }
+          // Update low stock item IDs (central store quantity <= min)
+          state.lowStockItemIds = state.items
+            .filter((item) => isLowStock(item))
+            .map((item) => item.id);
+        }
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(fetchItemById.rejected, (state, action) => {
+        state.loading = false;
+        state.error = getErrorMessage(action.payload);
+        state.errorTimestamp = Date.now();
+      })
+      // Create item
+      .addCase(createItem.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(createItem.fulfilled, (state) => {
+        state.loading = false;
+        // Don't manually add the item here - the real-time listener will handle it
+        // to avoid duplicate entries when subscribeItems triggers
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(createItem.rejected, (state, action) => {
+        state.loading = false;
+        state.error = getErrorMessage(action.payload);
+        state.errorTimestamp = Date.now();
+      })
+      // Update item
+      .addCase(updateItem.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(updateItem.fulfilled, (state) => {
+        state.loading = false;
+        // Don't manually update the item here - the real-time listener will handle it
+        // to ensure consistency and avoid race conditions
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(updateItem.rejected, (state, action) => {
+        state.loading = false;
+        state.error = getErrorMessage(action.payload);
+        state.errorTimestamp = Date.now();
+      })
+      // Delete item
+      .addCase(deleteItem.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(deleteItem.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items = state.items.filter((item) => item.id !== action.payload);
+        state.lowStockItemIds = state.lowStockItemIds.filter((id) => id !== action.payload);
+        // Clear inventory entries for this item from all locations
+        Object.keys(state.inventoryByLocation).forEach((locationId) => {
+          state.inventoryByLocation[locationId] = state.inventoryByLocation[
+            locationId
+          ].filter((entry) => entry.itemId !== action.payload);
+        });
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(deleteItem.rejected, (state, action) => {
+        state.loading = false;
+        state.error = getErrorMessage(action.payload);
+        state.errorTimestamp = Date.now();
+      })
+      // Adjust quantity
+      .addCase(adjustQuantity.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(adjustQuantity.fulfilled, (state) => {
+        state.loading = false;
+        // Don't manually update here - real-time listeners will handle updates
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(adjustQuantity.rejected, (state, action) => {
+        state.loading = false;
+        state.error = getErrorMessage(action.payload);
+        state.errorTimestamp = Date.now();
+      })
+      // Fetch inventory by location
+      .addCase(fetchInventoryByLocation.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(fetchInventoryByLocation.fulfilled, (state, action) => {
+        state.loading = false;
+        state.inventoryByLocation[action.payload.locationId] = action.payload.inventory;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(fetchInventoryByLocation.rejected, (state, action) => {
+        state.loading = false;
+        state.error = getErrorMessage(action.payload);
+        state.errorTimestamp = Date.now();
+      })
+      // Fetch categories
+      .addCase(fetchCategories.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(fetchCategories.fulfilled, (state, action) => {
+        state.loading = false;
+        state.categories = action.payload;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(fetchCategories.rejected, (state, action) => {
+        state.loading = false;
+        state.error = getErrorMessage(action.payload);
+        state.errorTimestamp = Date.now();
+      })
+      // Create category
+      .addCase(createCategory.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(createCategory.fulfilled, (state) => {
+        state.loading = false;
+        // Don't manually add the category here - the real-time listener will handle it
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(createCategory.rejected, (state, action) => {
+        state.loading = false;
+        state.error = getErrorMessage(action.payload);
+        state.errorTimestamp = Date.now();
+      })
+      // Update category
+      .addCase(updateCategory.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(updateCategory.fulfilled, (state) => {
+        state.loading = false;
+        // Don't manually update the category here - the real-time listener will handle it
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(updateCategory.rejected, (state, action) => {
+        state.loading = false;
+        state.error = getErrorMessage(action.payload);
+        state.errorTimestamp = Date.now();
+      })
+      // Delete category
+      .addCase(deleteCategory.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(deleteCategory.fulfilled, (state) => {
+        state.loading = false;
+        // Don't manually remove the category here - the real-time listener will handle it
+        state.error = null;
+        state.errorTimestamp = null;
+      })
+      .addCase(deleteCategory.rejected, (state, action) => {
+        state.loading = false;
+        state.error = getErrorMessage(action.payload);
+        state.errorTimestamp = Date.now();
+      });
+  },
+});
+
+export const {
+  setItems,
+  setCategories,
+  setInventoryForLocation,
+  setLowStockItemIds,
+  setLoading,
+  setError,
+  setFilters,
+  clearError,
+  updateItemInState,
+  addItem,
+  setItemsFromSubscription,
+  clearInventoryForLocation,
+  clearInventory,
+} = inventorySlice.actions;
+
+export {
+  fetchItems,
+  fetchItemsPaginated,
+  loadMoreItems,
+  fetchItemById,
+  createItem,
+  updateItem,
+  deleteItem,
+  adjustQuantity,
+  fetchInventoryByLocation,
+  fetchCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+} from '../thunks/inventoryThunks';
+
+export default inventorySlice.reducer;
