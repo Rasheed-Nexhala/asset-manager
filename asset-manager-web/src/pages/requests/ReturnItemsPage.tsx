@@ -6,6 +6,8 @@ import { fetchItems } from '../../store/thunks/inventoryThunks';
 import {
   selectUserId,
   selectUserDisplayName,
+  selectIsAdmin,
+  selectIsStoreIncharge,
 } from '../../store/selectors/authSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import { requestService } from '../../services/firebase/requestService';
@@ -15,6 +17,7 @@ import { ViewModeToggle } from '../../components/inventory/ViewModeToggle';
 import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
 import { isWeightBasedItem } from '../../utils/weightConversionUtils';
 import { Icon } from '../../components/shared/Icon';
+import { QuickMoveToMaintenanceButton } from '../../components/maintenance/QuickMoveToMaintenanceButton';
 import type {
   Request,
   RequestItem,
@@ -61,6 +64,8 @@ export function ReturnItemsPage() {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
+  const isAdmin = useAppSelector(selectIsAdmin);
+  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const inventoryItems = useAppSelector(selectAllItems);
   const { viewMode, toggleViewMode } = useWeightViewPreference();
 
@@ -314,6 +319,70 @@ export function ReturnItemsPage() {
             Store Incharge may later move damaged items to Maintenance.
           </p>
         </div>
+
+        {/* Previous Return History */}
+        {request.returnHistory && request.returnHistory.length > 0 && (
+          <div className="bg-slate-50 rounded-lg p-4 border border-slate-200 space-y-3">
+            <h2 className="text-[15px] font-semibold text-slate-900">Previous Returns</h2>
+            {request.returnHistory.map((returnEvent) => (
+              <div
+                key={returnEvent.returnId}
+                className="mb-3 pb-3 border-b border-slate-200 last:border-b-0 last:mb-0 last:pb-0 space-y-2"
+              >
+                <p className="text-[13px] text-slate-500">
+                  {formatDate(returnEvent.returnedAt)} by {returnEvent.returnedByName} —{' '}
+                  {returnEvent.items.length} item(s)
+                </p>
+                {returnEvent.items.map((returnedItem) => {
+                  const isDamaged = returnedItem.condition === 'damaged';
+                  const hasNotes =
+                    returnEvent.returnNotes && returnEvent.returnNotes.trim();
+                  const reqItem = request.items?.find(
+                    (i) => i.itemId === returnedItem.itemId
+                  );
+                  return (
+                    <div key={returnedItem.itemId} className="space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-[15px] text-slate-900">
+                          {returnedItem.itemName}
+                        </span>
+                        <span className="text-[15px] text-slate-900">
+                          {returnedItem.quantityReturned}{' '}
+                          {reqItem?.unit ?? 'units'} returned
+                        </span>
+                      </div>
+                      {isDamaged && (
+                        <div className="flex items-center gap-1">
+                          <Icon name="exclamation-triangle" className="h-4 w-4 text-amber-600" />
+                          <span className="text-[13px] text-amber-600">
+                            Damaged{hasNotes && ` • ${returnEvent.returnNotes}`}
+                          </span>
+                        </div>
+                      )}
+                      {isDamaged && (isAdmin || isStoreIncharge) && (
+                        <div className="mt-2">
+                          <QuickMoveToMaintenanceButton
+                            itemId={returnedItem.itemId}
+                            itemName={returnedItem.itemName}
+                            itemSku={reqItem?.itemSku || ''}
+                            quantity={returnedItem.quantityReturned}
+                            issueDescription={`Returned damaged from ${request.siteName}. ${returnEvent.returnNotes || ''}`}
+                            sourceRequestId={request.id}
+                            sourceReturnDate={
+                              typeof (returnEvent.returnedAt as { toDate?: () => Date }).toDate === 'function'
+                                ? (returnEvent.returnedAt as { toDate: () => Date }).toDate()
+                                : new Date()
+                            }
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        )}
 
         <div>
           <div className="flex items-center justify-between mb-3">

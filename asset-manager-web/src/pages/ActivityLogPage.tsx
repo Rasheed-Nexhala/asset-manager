@@ -15,7 +15,7 @@ import {
   loadMoreActivityLogs,
   exportActivityLogsThunk,
 } from '../store/thunks/activityLogThunks';
-import { setSearchQuery, clearError } from '../store/slices/activityLogSlice';
+import { setSearchQuery, clearError, setFilters, clearFilters } from '../store/slices/activityLogSlice';
 import { useAutoClearError } from '../hooks/useAutoClearError';
 import {
   ACTION_TYPE_CONFIG,
@@ -23,9 +23,10 @@ import {
   CATEGORY_BADGE_BG_CLASS,
   CATEGORY_TEXT_CLASS,
 } from '../constants/activityLogConfig';
-import type { ActivityLog } from '../types/activityLog';
+import type { ActivityLog, ActivityLogFiltersStore } from '../types/activityLog';
 import { ActivityLogCard } from '../components/activityLog/ActivityLogCard';
 import { ActivityLogDetailModal } from '../components/activityLog/ActivityLogDetailModal';
+import { ActivityLogFilterPanel } from '../components/activityLog/ActivityLogFilterPanel';
 import { Icon } from '../components/shared/Icon';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
 
@@ -44,6 +45,7 @@ export function ActivityLogPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
 
   const filteredLogs = useMemo(() => {
     const q = (filters.searchQuery ?? '').toLowerCase().trim();
@@ -85,6 +87,17 @@ export function ActivityLogPage() {
     [dispatch]
   );
 
+  const handleApplyFilters = useCallback(
+    (newFilters: ActivityLogFiltersStore) => {
+      dispatch(setFilters(newFilters));
+    },
+    [dispatch]
+  );
+
+  const handleClearFilters = useCallback(() => {
+    dispatch(clearFilters());
+  }, [dispatch]);
+
   const handleCardPress = useCallback((log: ActivityLog) => {
     setSelectedLog(log);
     setDetailOpen(true);
@@ -121,14 +134,41 @@ export function ActivityLogPage() {
     <div className="flex flex-col gap-4 px-4 py-4 md:px-6">
       <div className="flex items-center justify-between">
         <h1 className="text-[22px] font-semibold text-slate-900">Activity Log</h1>
-        <button
-          type="button"
-          onClick={handleExport}
-          disabled={exportLoading}
-          className="border border-blue-800 rounded-[10px] px-4 py-2 text-[15px] font-medium text-blue-800 hover:bg-blue-50 disabled:opacity-50"
-        >
-          {exportLoading ? 'Exporting...' : 'Export'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFilterPanelOpen(true)}
+            className={`flex items-center gap-2 border rounded-[10px] px-4 py-2 text-[15px] font-medium transition-colors ${
+              hasActiveFilters
+                ? 'border-blue-800 text-blue-800 bg-blue-50'
+                : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <Icon name="funnel" className="h-4 w-4" />
+            {hasActiveFilters ? 'Filters Applied' : 'Filter'}
+            {hasActiveFilters && (
+              <span className="w-2 h-2 rounded-full bg-blue-800" />
+            )}
+          </button>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-slate-200 hover:bg-slate-50"
+              aria-label="Clear filters"
+            >
+              <Icon name="x-mark" className="h-4 w-4 text-slate-500" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={exportLoading}
+            className="border border-blue-800 rounded-[10px] px-4 py-2 text-[15px] font-medium text-blue-800 hover:bg-blue-50 disabled:opacity-50"
+          >
+            {exportLoading ? 'Exporting...' : 'Export'}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -306,6 +346,12 @@ export function ActivityLogPage() {
         isOpen={detailOpen}
         log={selectedLog}
         onClose={() => setDetailOpen(false)}
+      />
+
+      <ActivityLogFilterPanel
+        isOpen={filterPanelOpen}
+        filters={filters}
+        onClose={() => setFilterPanelOpen(false)}
       />
     </div>
   );
