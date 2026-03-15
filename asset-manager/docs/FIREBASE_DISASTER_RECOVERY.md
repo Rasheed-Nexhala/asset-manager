@@ -42,17 +42,17 @@ Every day at 2 AM
         ├── 1. FIRESTORE EXPORT
         │      Reads all documents in Firestore
         │      Writes snapshot to GCS bucket
-        │      gs://...backups/firestore/YYYY-MM-DD/
+        │      gs://...backups-us/firestore/YYYY-MM-DD/
         │
         ├── 2. AUTH EXPORT
         │      Lists all user accounts
         │      Writes JSON file to GCS
-        │      gs://...backups/auth/YYYY-MM-DD.json
+        │      gs://...backups-us/auth/YYYY-MM-DD.json
         │
         └── 3. STORAGE BACKUP
                Copies every file from your app's storage bucket
                to the backup bucket
-               gs://...backups/storage/YYYY-MM-DD/
+               gs://...backups-us/storage/YYYY-MM-DD/
 
 
 Separately — Firebase built-in (Option C):
@@ -81,9 +81,9 @@ With daily backups at 2 AM, the maximum you can ever lose is **24 hours of data*
 3. **Check available backups**:
 
 ```bash
-gsutil ls gs://asset-management-system-622c2-backups/firestore/
-gsutil ls gs://asset-management-system-622c2-backups/auth/
-gsutil ls gs://asset-management-system-622c2-backups/storage/
+gcloud storage ls gs://asset-management-system-622c2-backups-us/firestore/
+gcloud storage ls gs://asset-management-system-622c2-backups-us/auth/
+gcloud storage ls gs://asset-management-system-622c2-backups-us/storage/
 ```
 
 ---
@@ -93,7 +93,7 @@ gsutil ls gs://asset-management-system-622c2-backups/storage/
 Restore only the affected collections (safe — leaves everything else untouched):
 
 ```bash
-gcloud firestore import gs://asset-management-system-622c2-backups/firestore/YYYY-MM-DD \
+gcloud firestore import gs://asset-management-system-622c2-backups-us/firestore/YYYY-MM-DD \
   --collection-ids=items,inventory \
   --project=asset-management-system-622c2
 ```
@@ -109,7 +109,7 @@ Replace `YYYY-MM-DD` with the date of the backup you want (e.g. `2026-03-07`).
 3. Full Firestore restore:
 
 ```bash
-gcloud firestore import gs://asset-management-system-622c2-backups/firestore/YYYY-MM-DD \
+gcloud firestore import gs://asset-management-system-622c2-backups-us/firestore/YYYY-MM-DD \
   --project=asset-management-system-622c2
 ```
 
@@ -122,7 +122,7 @@ gcloud firestore import gs://asset-management-system-622c2-backups/firestore/YYY
 
 ```bash
 # Download the Auth backup
-gsutil cp gs://asset-management-system-622c2-backups/auth/YYYY-MM-DD.json ./
+gcloud storage cp gs://asset-management-system-622c2-backups-us/auth/YYYY-MM-DD.json ./
 
 # Re-import users
 firebase auth:import YYYY-MM-DD.json --project=asset-management-system-622c2
@@ -137,7 +137,7 @@ firebase auth:import YYYY-MM-DD.json --project=asset-management-system-622c2
 
 ```bash
 gsutil -m rsync -r \
-  gs://asset-management-system-622c2-backups/storage/YYYY-MM-DD \
+  gs://asset-management-system-622c2-backups-us/storage/YYYY-MM-DD \
   gs://asset-management-system-622c2.appspot.com
 ```
 
@@ -151,20 +151,20 @@ Restore in this exact order:
 
 **Step 1 — Auth** (so users can log in again):
 ```bash
-gsutil cp gs://asset-management-system-622c2-backups/auth/YYYY-MM-DD.json ./
+gcloud storage cp gs://asset-management-system-622c2-backups-us/auth/YYYY-MM-DD.json ./
 firebase auth:import YYYY-MM-DD.json --project=asset-management-system-622c2
 ```
 
 **Step 2 — Firestore** (so all data is back):
 ```bash
-gcloud firestore import gs://asset-management-system-622c2-backups/firestore/YYYY-MM-DD \
+gcloud firestore import gs://asset-management-system-622c2-backups-us/firestore/YYYY-MM-DD \
   --project=asset-management-system-622c2
 ```
 
 **Step 3 — Storage** (so all files and documents are back):
 ```bash
 gsutil -m rsync -r \
-  gs://asset-management-system-622c2-backups/storage/YYYY-MM-DD \
+  gs://asset-management-system-622c2-backups-us/storage/YYYY-MM-DD \
   gs://asset-management-system-622c2.appspot.com
 ```
 
@@ -214,8 +214,8 @@ gcloud firestore operations list --project=asset-management-system-622c2
 | Item | Value |
 |------|-------|
 | Project ID | `asset-management-system-622c2` |
-| Backup bucket | `gs://asset-management-system-622c2-backups` |
-| Firestore region | `eur3` (Europe) |
+| Backup bucket | `gs://asset-management-system-622c2-backups-us` |
+| Firestore region | US (requires US bucket for export) |
 | Backup schedule | Daily at 2 AM Asia/Kolkata |
 | Backup function | `scheduledFirestoreBackup` |
 | Firestore backup path | `gs://...backups/firestore/YYYY-MM-DD/` |

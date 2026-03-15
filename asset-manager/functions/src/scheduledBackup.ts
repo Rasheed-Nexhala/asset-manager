@@ -7,7 +7,7 @@
  * - Storage: all files from default bucket to backup bucket
  *
  * Prerequisites:
- * - Backup bucket: gs://PROJECT_ID-backups
+ * - Backup bucket: gs://PROJECT_ID-backups-us (must be in US region for Firestore export)
  * - IAM: Cloud Function service account needs datastore.importExportAdmin + Storage Admin on bucket
  * - IAM: Firestore service account needs storage.admin on project (for Firestore export writes)
  */
@@ -40,7 +40,8 @@ interface AuthExportUser {
 
 /**
  * Scheduled backup — runs daily at 2 AM Asia/Kolkata.
- * Backs up Firestore, Auth, and Storage to gs://PROJECT_ID-backups/
+ * Backs up Firestore, Auth, and Storage to gs://PROJECT_ID-backups-us/
+ * (US bucket required: Firestore export only supports us/us-central1/etc.)
  */
 export const scheduledFirestoreBackup = onSchedule(
   {
@@ -57,7 +58,7 @@ export const scheduledFirestoreBackup = onSchedule(
     }
 
     const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    const backupBucketName = `${projectId}-backups`;
+    const backupBucketName = `${projectId}-backups-us`;
 
     // Ensure admin is initialized (idempotent)
     if (!admin.apps.length) {

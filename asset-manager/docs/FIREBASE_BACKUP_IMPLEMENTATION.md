@@ -13,9 +13,9 @@ This guide walks you through implementing **both** Firebase's native daily backu
 | **Option A** (Cloud Function) | Firestore + Auth + Storage export to GCS | Daily at 2 AM (configurable) |
 
 **Option A now backs up:**
-- **Firestore** — all collections → `gs://PROJECT-backups/firestore/YYYY-MM-DD/`
-- **Auth** — all users (JSON) → `gs://PROJECT-backups/auth/YYYY-MM-DD.json`
-- **Storage** — all files from default bucket → `gs://PROJECT-backups/storage/YYYY-MM-DD/`
+- **Firestore** — all collections → `gs://PROJECT-backups-us/firestore/YYYY-MM-DD/`
+- **Auth** — all users (JSON) → `gs://PROJECT-backups-us/auth/YYYY-MM-DD.json`
+- **Storage** — all files from default bucket → `gs://PROJECT-backups-us/storage/YYYY-MM-DD/`
 
 Together they give you:
 - **Redundancy**: Two independent backup systems for Firestore
@@ -70,17 +70,16 @@ Firebase's native daily backups require the **Blaze (pay-as-you-go)** plan.
 
 ## Step 2.2: Create a GCS Bucket for Backups
 
-Use a bucket in the same region as Firestore (`eur3` → Europe). For `eur3`, use `eur3` or `europe-west1` for the bucket location.
+**Important:** Firestore export requires the bucket to be in a US region (`us`, `us-central1`, etc.). European buckets will fail with `INVALID_ARGUMENT`.
 
 ```bash
-# Create bucket (eur3 matches your Firestore region)
-gsutil mb -l eur3 gs://asset-management-system-622c2-backups
+# Create bucket in us-central1 (required for Firestore export)
+gcloud storage buckets create gs://asset-management-system-622c2-backups-us \
+  --location=us-central1 \
+  --project=asset-management-system-622c2
 ```
 
-If `eur3` is not available for buckets, use:
-```bash
-gsutil mb -l europe-west1 gs://asset-management-system-622c2-backups
-```
+**If you already have the bucket:** Skip to Step 2.3 to grant IAM permissions, then deploy.
 
 ## Step 2.3: Grant Firestore Export Permissions
 
@@ -95,8 +94,10 @@ gcloud projects add-iam-policy-binding asset-management-system-622c2 \
 
 **B. Grant the Cloud Function service account Storage Admin on the bucket:**
 ```bash
-gsutil iam ch serviceAccount:asset-management-system-622c2@appspot.gserviceaccount.com:admin \
-  gs://asset-management-system-622c2-backups
+gcloud storage buckets add-iam-policy-binding gs://asset-management-system-622c2-backups-us \
+  --member="serviceAccount:asset-management-system-622c2@appspot.gserviceaccount.com" \
+  --role="roles/storage.admin" \
+  --project=asset-management-system-622c2
 ```
 
 **C. Grant the Firestore service account write access to the bucket** (Firestore writes the export files):
@@ -118,8 +119,7 @@ gcloud projects add-iam-policy-binding asset-management-system-622c2 \
 The scheduled backup function is in `functions/src/scheduledBackup.ts`. It runs daily at 2 AM (Asia/Kolkata) and exports **Firestore, Auth, and Storage** to your backup bucket.
 
 ```bash
-cd /Applications/Nexhala/asset-manager/asset-manager
-cd functions
+cd functions   # from project root
 npm install
 npm run build
 firebase deploy --only functions:scheduledFirestoreBackup
@@ -130,15 +130,15 @@ firebase deploy --only functions:scheduledFirestoreBackup
 1. **Trigger manually** (optional): In [Cloud Scheduler](https://console.cloud.google.com/cloudscheduler), find the job for `scheduledFirestoreBackup` and click **Run now**
 2. **Check logs**: Firebase Console → Functions → Logs, or [Cloud Logging](https://console.cloud.google.com/logs)
 3. **Check bucket**: After a few minutes, verify all three backup types:
-   - Firestore: `gs://...-backups/firestore/YYYY-MM-DD/`
-   - Auth: `gs://...-backups/auth/YYYY-MM-DD.json`
-   - Storage: `gs://...-backups/storage/YYYY-MM-DD/`
+   - Firestore: `gs://...-backups-us/firestore/YYYY-MM-DD/`
+   - Auth: `gs://...-backups-us/auth/YYYY-MM-DD.json`
+   - Storage: `gs://...-backups-us/storage/YYYY-MM-DD/`
 
 ```bash
 # List all backups
-gsutil ls gs://asset-management-system-622c2-backups/firestore/
-gsutil ls gs://asset-management-system-622c2-backups/auth/
-gsutil ls gs://asset-management-system-622c2-backups/storage/
+gcloud storage ls gs://asset-management-system-622c2-backups-us/firestore/
+gcloud storage ls gs://asset-management-system-622c2-backups-us/auth/
+gcloud storage ls gs://asset-management-system-622c2-backups-us/storage/
 ```
 
 ---
@@ -149,11 +149,11 @@ gsutil ls gs://asset-management-system-622c2-backups/storage/
 
 ```bash
 # Restore from a specific date
-gcloud firestore import gs://asset-management-system-622c2-backups/firestore/2025-03-08 \
+gcloud firestore import gs://asset-management-system-622c2-backups-us/firestore/2025-03-08 \
   --project=asset-management-system-622c2
 
 # Restore specific collections only
-gcloud firestore import gs://asset-management-system-622c2-backups/firestore/2025-03-08 \
+gcloud firestore import gs://asset-management-system-622c2-backups-us/firestore/2025-03-08 \
   --collection-ids=users,items,inventory,requests,purchaseOrders,vendors,sites \
   --project=asset-management-system-622c2
 ```
@@ -170,7 +170,7 @@ First, download the Auth backup from GCS:
 
 ```bash
 # Download the backup file
-gsutil cp gs://asset-management-system-622c2-backups/auth/2025-03-08.json ./
+gcloud storage cp gs://asset-management-system-622c2-backups-us/auth/2025-03-08.json ./
 
 # Import users (replaces existing users with same UID)
 firebase auth:import 2025-03-08.json --project=asset-management-system-622c2
@@ -182,7 +182,7 @@ firebase auth:import 2025-03-08.json --project=asset-management-system-622c2
 
 ```bash
 # Restore all files from a backup date
-gsutil -m rsync -r gs://asset-management-system-622c2-backups/storage/2025-03-08 \
+gcloud storage -m rsync -r gs://asset-management-system-622c2-backups-us/storage/2025-03-08 \
   gs://asset-management-system-622c2.appspot.com
 ```
 
