@@ -183,10 +183,27 @@ firebase auth:import 2025-03-08.json --project=asset-management-system-622c2
 ```bash
 # Restore all files from a backup date
 gcloud storage -m rsync -r gs://asset-management-system-622c2-backups-us/storage/2025-03-08 \
-  gs://asset-management-system-622c2.appspot.com
+  gs://asset-management-system-622c2.firebasestorage.app
 ```
 
 **Warning:** This overwrites existing files with the same path. Use with caution.
+
+---
+
+# Disaster Recovery Checklist
+
+When you lose data or need to restore from backup, follow these steps:
+
+| Step | Action |
+|------|--------|
+| 1 | Stop the app / pause writes |
+| 2 | Run `./scripts/restore-all.sh YYYY-MM-DD` |
+| 3 | Wait for Firestore import to finish: `gcloud firestore operations list --project=asset-management-system-622c2` |
+| 4 | Redeploy rules and indexes: `firebase deploy --only firestore:rules,firestore:indexes` |
+| 5 | Tell email/password users to reset passwords (if Auth backup was from Cloud Function) |
+| 6 | Test the app and resume |
+
+See [FIREBASE_RESTORE_ALL.md](./FIREBASE_RESTORE_ALL.md) for the full restore script and guide.
 
 ---
 
