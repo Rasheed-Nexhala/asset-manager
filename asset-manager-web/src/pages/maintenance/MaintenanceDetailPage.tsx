@@ -159,7 +159,7 @@ export function MaintenanceDetailPage() {
   const actionButtons = useMemo(() => {
     if (!maintenance) return null;
     const { status } = maintenance;
-    if (status === 'returned' || status === 'written_off') return null;
+    if (status === 'returned' || status === 'written_off' || status === 'partially_returned_and_written_off') return null;
     return (
       <div className="mt-2 mb-6 flex flex-col gap-3">
         <button
@@ -372,7 +372,7 @@ export function MaintenanceDetailPage() {
           </div>
         )}
 
-        {maintenance.status === 'returned' && (
+        {(maintenance.status === 'returned' || maintenance.status === 'partially_returned_and_written_off') && (
           <div className="rounded-[10px] border border-green-600/30 bg-green-50 p-4">
             <div className="mb-3 flex items-center gap-2">
               <Icon name="arrow-uturn-left" className="h-5 w-5 text-green-600" />
@@ -419,7 +419,7 @@ export function MaintenanceDetailPage() {
           </div>
         )}
 
-        {maintenance.status === 'written_off' && (
+        {(maintenance.status === 'written_off' || maintenance.status === 'partially_returned_and_written_off') && (
           <div className="rounded-[10px] border border-red-600/30 bg-red-50 p-4">
             <div className="mb-3 flex items-center gap-2">
               <Icon name="x-circle" className="h-5 w-5 text-red-600" />

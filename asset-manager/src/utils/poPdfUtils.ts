@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -8,12 +9,35 @@ import { companyConfig } from '../../config/company';
 
 const DEFAULT_GST_PERCENTAGE = 18;
 
-/** Load IBF logo as base64 for embedding in PDF HTML. Returns empty string on failure. */
+/**
+ * Load IBF logo as base64 for embedding in PDF HTML.
+ * Returns empty string on failure.
+ *
+ * Android release builds: Asset.localUri can be malformed (e.g. "assets_images_IBF_logo"
+ * instead of file://). Copy to cache first so ImageManipulator can read it.
+ * See: https://github.com/expo/expo/issues/41996, https://github.com/expo/expo/issues/24011
+ */
 async function loadLogoBase64(): Promise<string> {
   try {
     const [asset] = await Asset.loadAsync(require('../assets/images/IBF_logo.png'));
-    const uri = asset.localUri ?? asset.uri;
+    let uri = asset.localUri ?? asset.uri ?? '';
     if (!uri) return '';
+
+    // Android release: localUri is often invalid (no file:// prefix). Copy to cache so
+    // ImageManipulator and expo-print WebView can load the image.
+    const isAndroidRelease = Platform.OS === 'android' && !__DEV__;
+    if (isAndroidRelease && uri && !uri.startsWith('file://')) {
+      const cacheDir = FileSystem.cacheDirectory;
+      if (cacheDir) {
+        const destPath = `${cacheDir}IBF_logo_${Date.now()}.png`;
+        try {
+          await FileSystem.copyAsync({ from: uri, to: destPath });
+          uri = destPath;
+        } catch {
+          // copyAsync failed; ImageManipulator will likely fail with original uri
+        }
+      }
+    }
 
     const result = await ImageManipulator.manipulateAsync(
       uri,

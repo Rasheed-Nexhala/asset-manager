@@ -105,15 +105,19 @@ describe('maintenanceSelectors', () => {
     expect(selectReturnedRecords(state)[0].status).toBe('returned');
   });
 
-  it('selectMaintenanceHistory returns returned and written_off', () => {
+  it('selectMaintenanceHistory returns returned, written_off, and partially_returned_and_written_off', () => {
     const records = [
       mockRecord('1', 'returned'),
       mockRecord('2', 'written_off'),
-      mockRecord('3', 'pending'),
+      mockRecord('3', 'partially_returned_and_written_off'),
+      mockRecord('4', 'pending'),
     ];
     const state = createMockState({ maintenanceRecords: records });
     const result = selectMaintenanceHistory(state);
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(3);
+    expect(result.map((r) => r.status)).toContain('returned');
+    expect(result.map((r) => r.status)).toContain('written_off');
+    expect(result.map((r) => r.status)).toContain('partially_returned_and_written_off');
   });
 
   it('selectMaintenanceByItemId filters by itemId', () => {

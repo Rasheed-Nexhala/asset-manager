@@ -342,6 +342,37 @@ export const uploadPOSignedDocument = async (
 };
 
 /**
+ * Delete a signed PO document from Firebase Storage by its download URL.
+ * Used when the user wants to remove the uploaded signed document and upload a different one.
+ *
+ * Handles errors gracefully - does not throw if the file does not exist.
+ *
+ * @param signedPdfUrl - Full download URL from Firebase Storage
+ */
+export const deletePOSignedDocumentByUrl = async (
+  signedPdfUrl: string
+): Promise<void> => {
+  if (!signedPdfUrl?.trim()) return;
+
+  const path = getStoragePathFromUrl(signedPdfUrl);
+  if (!path) {
+    console.warn('Could not extract storage path from signed PO URL:', signedPdfUrl);
+    return;
+  }
+
+  try {
+    const storageRef = ref(storage, path);
+    await deleteObject(storageRef);
+  } catch (error: any) {
+    if (error?.code === 'storage/object-not-found') {
+      return;
+    }
+    console.error('Error deleting signed PO document:', error);
+    throw error;
+  }
+};
+
+/**
  * Upload an item image from a blob (useful for web or when you already have a blob)
  * 
  * @param blob - Blob object containing the image data

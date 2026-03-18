@@ -614,6 +614,40 @@ export const setSignedPdfUrl = async (
 };
 
 /**
+ * Clear the signed document URL from a PO (allows user to remove and re-upload).
+ * Only allowed for pending_approval POs.
+ */
+export const clearSignedPdfUrl = async (
+  poId: string,
+  adminId: string
+): Promise<PurchaseOrder | null> => {
+  try {
+    await ensureAdminUser(adminId);
+    const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
+    const poSnap = await getDoc(poRef);
+
+    if (!poSnap.exists()) {
+      throw new Error('Purchase order not found');
+    }
+
+    const poData = poSnap.data();
+    if (poData.status !== 'pending_approval') {
+      throw new Error('Signed document can only be removed from pending approval POs');
+    }
+
+    await updateDoc(poRef, {
+      signedPdfUrl: null,
+      updatedAt: serverTimestamp(),
+    });
+
+    return getPOById(poId);
+  } catch (error) {
+    console.error('Error clearing signed PDF URL:', error);
+    throw error;
+  }
+};
+
+/**
  * Approve a PO (Admin only).
  * Requires signedPdfUrl to be set (admin must upload signed PO before approving).
  */

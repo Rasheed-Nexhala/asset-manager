@@ -1,5 +1,6 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import * as purchaseOrderService from '../../services/firebase/purchaseOrderService';
+import { deletePOSignedDocumentByUrl } from '../../services/firebase/storageService';
 import { saveCsvAndShare, formatDateForCsv } from '../../utils/csvExport';
 import type {
   CreatePurchaseOrderData,
@@ -208,6 +209,36 @@ export const uploadSignedPO = createAsyncThunk(
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to upload signed document';
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * Remove signed PO document (delete from Storage and clear from PO).
+ * Allows user to remove the uploaded document and upload a different one.
+ */
+export const removeSignedPO = createAsyncThunk(
+  'purchaseOrders/removeSignedPO',
+  async (
+    { poId, signedPdfUrl }: { poId: string; signedPdfUrl: string },
+    { dispatch, rejectWithValue, getState }
+  ) => {
+    const adminId = selectUserId(getState() as RootState);
+    if (!adminId) {
+      return rejectWithValue('Admin credentials required to remove signed document');
+    }
+
+    try {
+      await deletePOSignedDocumentByUrl(signedPdfUrl);
+      const updatedPO = await purchaseOrderService.clearSignedPdfUrl(poId, adminId);
+      if (updatedPO) {
+        dispatch(addOrUpdatePO(updatedPO));
+      }
+      return updatedPO;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to remove signed document';
       return rejectWithValue(errorMessage);
     }
   }

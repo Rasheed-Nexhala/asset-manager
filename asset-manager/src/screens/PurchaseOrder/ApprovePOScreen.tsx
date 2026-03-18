@@ -25,6 +25,7 @@ import {
   markPOOrdered,
   recordPODownloadForSigning,
   uploadSignedPO,
+  removeSignedPO,
 } from '../../store/thunks/purchaseOrderThunks';
 import {
   selectUserId,
@@ -84,6 +85,7 @@ export const ApprovePOScreen: React.FC = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [uploadingSigned, setUploadingSigned] = useState(false);
+  const [removingSigned, setRemovingSigned] = useState(false);
 
   useEffect(() => {
     setLoadError(null);
@@ -157,6 +159,26 @@ export const ApprovePOScreen: React.FC = () => {
       setUploadingSigned(false);
     }
   }, [poId, dispatch]);
+
+  const handleRemoveSignedPO = useCallback(async () => {
+    if (!po?.signedPdfUrl?.trim()) return;
+    setRemovingSigned(true);
+    try {
+      await dispatch(
+        removeSignedPO({ poId, signedPdfUrl: po.signedPdfUrl })
+      ).unwrap();
+      const refreshed = await getPOById(poId);
+      if (refreshed) setPo(refreshed);
+      Alert.alert('Success', 'Signed document removed. You can upload a different one.');
+    } catch (err) {
+      Alert.alert(
+        'Error',
+        err instanceof Error ? err.message : 'Failed to remove signed document'
+      );
+    } finally {
+      setRemovingSigned(false);
+    }
+  }, [po, poId, dispatch]);
 
   const handleApprove = useCallback(async () => {
     if (!userId || !userName) return;
@@ -631,12 +653,24 @@ export const ApprovePOScreen: React.FC = () => {
                 Download the PO above, sign it manually, then upload the signed PDF or image here before approving.
               </Text>
               {po.signedPdfUrl ? (
-                <View className="flex-row items-center gap-2 py-2">
+                <View className="flex-row flex-wrap items-center gap-2 py-2">
                   <View className="px-2 py-1 rounded-full bg-[#16A34A]/15">
                     <Text className="text-[12px] font-medium text-[#16A34A]">
                       Signed document uploaded
                     </Text>
                   </View>
+                  <TouchableOpacity
+                    onPress={handleRemoveSignedPO}
+                    disabled={removingSigned}
+                    className="flex-row items-center gap-2 rounded-lg border border-[#DC2626] px-3 py-1.5"
+                  >
+                    {removingSigned && (
+                      <ActivityIndicator size="small" color="#DC2626" />
+                    )}
+                    <Text className="text-[13px] font-medium text-[#DC2626]">
+                      {removingSigned ? 'Removing...' : 'Remove'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               ) : (
                 <TouchableOpacity

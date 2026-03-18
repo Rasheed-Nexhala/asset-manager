@@ -7,6 +7,7 @@ import { useConfirm } from '../../hooks';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { ItemSelectorModal } from '../../components/shared/ItemSelectorModal';
 import { VendorSelector, POItemCard } from '../../components/purchaseOrder';
+import { VendorForm } from '../../components/purchaseOrder/VendorForm';
 import { printPurchaseOrder, buildDraftPOForPrint } from '../../utils/poPdfUtils';
 import {
   createPO,
@@ -42,7 +43,7 @@ import type {
   PurchaseOrder,
   PurchaseOrderItem,
 } from '../../types/purchaseOrder';
-import type { Vendor } from '../../types/vendor';
+import type { Vendor, CreateVendorData } from '../../types/vendor';
 import type { Item } from '../../types/inventory';
 
 const DEFAULT_GST_PERCENTAGE = 18;
@@ -98,6 +99,19 @@ export function CreatePOPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [itemSelectorOpen, setItemSelectorOpen] = useState(false);
   const [inventoryItemsMap, setInventoryItemsMap] = useState<Record<string, Item>>({});
+  const [addVendorModalOpen, setAddVendorModalOpen] = useState(false);
+  const [addVendorFormData, setAddVendorFormData] = useState<CreateVendorData>({
+    name: '',
+    contactPerson: '',
+    phone: '',
+    email: '',
+    address: '',
+    gstin: '',
+  });
+  const [addVendorErrors, setAddVendorErrors] = useState<
+    Partial<Record<keyof CreateVendorData, string>>
+  >({});
+  const [addVendorSaving, setAddVendorSaving] = useState(false);
 
   useEffect(() => {
     const unsub = subscribeToVendors((v) => dispatch(setVendors(v)));
@@ -520,6 +534,50 @@ export function CreatePOPage() {
     }
   }, [poId, editingPOStatus, userId, dispatch, navigate, toast, confirm]);
 
+  const handleOpenAddVendorModal = useCallback(() => {
+    setAddVendorFormData({
+      name: '',
+      contactPerson: '',
+      phone: '',
+      email: '',
+      address: '',
+      gstin: '',
+    });
+    setAddVendorErrors({});
+    setAddVendorModalOpen(true);
+  }, []);
+
+  const handleCloseAddVendorModal = useCallback(() => {
+    setAddVendorModalOpen(false);
+  }, []);
+
+  const handleAddVendorSave = useCallback(async () => {
+    const e: Partial<Record<keyof CreateVendorData, string>> = {};
+    if (!addVendorFormData.name.trim()) e.name = 'Vendor name is required';
+    if (!addVendorFormData.phone.trim()) e.phone = 'Phone number is required';
+    setAddVendorErrors(e);
+    if (Object.keys(e).length > 0) return;
+
+    setAddVendorSaving(true);
+    try {
+      const newVendorId = await createVendor({
+        name: addVendorFormData.name.trim(),
+        contactPerson: addVendorFormData.contactPerson.trim(),
+        phone: addVendorFormData.phone.trim(),
+        email: addVendorFormData.email?.trim() || undefined,
+        address: addVendorFormData.address?.trim() || undefined,
+        gstin: addVendorFormData.gstin?.trim() || undefined,
+      });
+      toast.success('Vendor added.');
+      handleCloseAddVendorModal();
+      setSelectedVendorId(newVendorId);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save vendor');
+    } finally {
+      setAddVendorSaving(false);
+    }
+  }, [addVendorFormData, handleCloseAddVendorModal, toast]);
+
   const handlePrintDraft = useCallback(async () => {
     if (!poNumber.trim()) {
       toast.error('P.O. No. is required to print.');
@@ -710,13 +768,14 @@ export function CreatePOPage() {
             placeholder="Select Saved Vendor"
           />
           <div className="mt-4 flex gap-3">
-            <Link
-              to="/vendors?add=1"
+            <button
+              type="button"
+              onClick={handleOpenAddVendorModal}
               className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 py-3 text-[15px] font-medium text-blue-800 hover:bg-slate-100 min-h-[48px]"
             >
               <Icon name="plus" className="h-5 w-5" />
               Add New
-            </Link>
+            </button>
             <Link
               to="/vendors"
               className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 py-3 text-[15px] font-medium text-blue-800 hover:bg-slate-100 min-h-[48px]"
@@ -934,6 +993,63 @@ export function CreatePOPage() {
         excludeItemIds={items.map((i) => i.itemId)}
         restrictToLowStock={isStoreIncharge}
       />
+
+      {addVendorModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => e.target === e.currentTarget && handleCloseAddVendorModal()}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-vendor-modal-title"
+        >
+          <div
+            className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 p-4">
+              <h2 id="add-vendor-modal-title" className="text-[22px] font-semibold text-slate-900">
+                Add Vendor
+              </h2>
+              <button
+                type="button"
+                onClick={handleCloseAddVendorModal}
+                className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-slate-100"
+                aria-label="Close"
+              >
+                <Icon name="x-mark" className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-4">
+              <VendorForm
+                data={addVendorFormData}
+                onChange={setAddVendorFormData}
+                errors={addVendorErrors}
+              />
+            </div>
+            <div className="flex gap-3 border-t border-slate-200 p-4">
+              <button
+                type="button"
+                onClick={handleCloseAddVendorModal}
+                className="flex-1 rounded-[10px] border border-slate-200 py-3 text-[15px] font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddVendorSave}
+                disabled={addVendorSaving}
+                className="flex flex-1 items-center justify-center rounded-[10px] bg-blue-800 py-3 text-[15px] font-semibold text-white hover:bg-blue-900 disabled:opacity-50"
+              >
+                {addVendorSaving ? (
+                  <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
+                ) : (
+                  'Save'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

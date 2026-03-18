@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Icon } from '../../components/shared/Icon';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
-import { POStatusBadge } from '../../components/purchaseOrder/POStatusBadge';
+import { POStatusBadge, PODocumentCard } from '../../components/purchaseOrder';
 import { useAppSelector } from '../../store/hooks';
 import { selectPOById } from '../../store/selectors/purchaseOrderSelectors';
 import { selectIsAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
@@ -271,6 +271,28 @@ export function PurchaseOrderDetailPage() {
           {po.justification || '—'}
         </p>
       </div>
+
+      {/* Attached Documents */}
+      {(po.documents?.length ?? 0) > 0 && (
+        <div className="rounded-[10px] border border-slate-200 bg-white p-4 lg:p-6">
+          <h2 className="mb-1 text-[17px] font-semibold text-slate-900">
+            ATTACHED DOCUMENTS
+          </h2>
+          <p className="mb-3 text-[13px] text-slate-500">
+            Invoice and bills attached at receipt
+          </p>
+          <div className="space-y-3">
+            {po.documents!.map((doc, i) => (
+              <PODocumentCard
+                key={`${doc.fileUrl}-${i}`}
+                fileName={doc.fileName}
+                fileUrl={doc.fileUrl}
+                type={doc.type}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

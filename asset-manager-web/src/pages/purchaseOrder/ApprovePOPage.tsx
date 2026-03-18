@@ -12,6 +12,7 @@ import {
   markPOOrdered,
   recordPODownloadForSigning,
   uploadSignedPO,
+  removeSignedPO,
 } from '../../store/thunks/purchaseOrderThunks';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { clearError, setError } from '../../store/slices/purchaseOrderSlice';
@@ -22,6 +23,7 @@ import {
   selectIsStoreIncharge,
 } from '../../store/selectors/authSelectors';
 import { selectPurchaseOrderError } from '../../store/selectors/purchaseOrderSelectors';
+import { PODocumentCard } from '../../components/purchaseOrder';
 import type { PurchaseOrder } from '../../types/purchaseOrder';
 
 const formatDate = (iso: string | null | undefined): string => {
@@ -60,6 +62,7 @@ export function ApprovePOPage() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [uploadingSigned, setUploadingSigned] = useState(false);
+  const [removingSigned, setRemovingSigned] = useState(false);
 
   useEffect(() => {
     dispatch(clearError());
@@ -134,6 +137,25 @@ export function ApprovePOPage() {
     },
     [poId, dispatch, toast]
   );
+
+  const handleRemoveSignedPO = useCallback(async () => {
+    if (!po?.signedPdfUrl?.trim() || !poId) return;
+    setRemovingSigned(true);
+    try {
+      await dispatch(
+        removeSignedPO({ poId, signedPdfUrl: po.signedPdfUrl })
+      ).unwrap();
+      const refreshed = await getPOById(poId);
+      if (refreshed) setPo(refreshed);
+      toast.success('Signed document removed. You can upload a different one.');
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to remove signed document'
+      );
+    } finally {
+      setRemovingSigned(false);
+    }
+  }, [po, poId, dispatch, toast]);
 
   const handleApprove = useCallback(async () => {
     if (!userId || !userName || !poId) return;
@@ -428,6 +450,27 @@ export function ApprovePOPage() {
           </p>
         </div>
 
+        {po.status === 'received' && (po.documents?.length ?? 0) > 0 && (
+          <div className="rounded-[10px] border border-slate-200 bg-white p-4">
+            <h2 className="mb-1 text-[17px] font-semibold text-slate-900">
+              ATTACHED DOCUMENTS
+            </h2>
+            <p className="mb-3 text-[13px] text-slate-500">
+              Invoice and bills attached at receipt
+            </p>
+            <div className="space-y-3">
+              {po.documents!.map((doc, i) => (
+                <PODocumentCard
+                  key={`${doc.fileUrl}-${i}`}
+                  fileName={doc.fileName}
+                  fileUrl={doc.fileUrl}
+                  type={doc.type}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {isReadOnly && po.status === 'rejected' && (po.rejectionReason || po.adminComments) && (
           <div className="rounded-[10px] border border-slate-200 bg-white p-4">
             <h2 className="mb-3 text-[17px] font-semibold text-slate-900">
@@ -459,10 +502,18 @@ export function ApprovePOPage() {
                 PDF or image here before approving.
               </p>
               {po.signedPdfUrl ? (
-                <div className="flex items-center gap-2 py-2">
+                <div className="flex flex-wrap items-center gap-2 py-2">
                   <span className="rounded-full bg-green-600/15 px-2 py-1 text-[12px] font-medium text-green-600">
                     Signed document uploaded
                   </span>
+                  <button
+                    type="button"
+                    onClick={handleRemoveSignedPO}
+                    disabled={removingSigned}
+                    className="rounded-lg border border-red-600 px-3 py-1.5 text-[13px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {removingSigned ? 'Removing...' : 'Remove'}
+                  </button>
                 </div>
               ) : (
                 <>

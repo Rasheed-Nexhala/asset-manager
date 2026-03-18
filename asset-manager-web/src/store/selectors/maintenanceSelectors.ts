@@ -46,12 +46,12 @@ export const selectReturnedRecords = createSelector(
   (records) => records.filter((record) => record.status === 'returned')
 );
 
-// History records (returned + written_off)
+// History records (returned + written_off + partially_returned_and_written_off)
 export const selectMaintenanceHistory = createSelector(
   [selectMaintenanceRecords],
   (records) =>
     records.filter((record) =>
-      ['returned', 'written_off'].includes(record.status)
+      ['returned', 'written_off', 'partially_returned_and_written_off'].includes(record.status)
     )
 );
 

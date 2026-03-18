@@ -32,6 +32,11 @@ const statusConfig: Record<
     bgColor: 'bg-[#DC2626]/15',
     textColor: 'text-[#DC2626]',
   },
+  partially_returned_and_written_off: {
+    label: 'Partially Returned & Written Off',
+    bgColor: 'bg-[#7C3AED]/15',
+    textColor: 'text-[#7C3AED]',
+  },
 };
 
 export default function MaintenanceStatusBadge({ status }: MaintenanceStatusBadgeProps) {

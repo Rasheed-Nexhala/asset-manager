@@ -117,6 +117,11 @@ const statusConfig: Record<MaintenanceStatus, { bg: string; text: string; label:
   partial_return: { bg: 'bg-[#8B5CF6]/15', text: 'text-[#8B5CF6]', label: 'Partial Return' },
   returned: { bg: 'bg-[#16A34A]/15', text: 'text-[#16A34A]', label: 'Returned' },
   written_off: { bg: 'bg-[#DC2626]/15', text: 'text-[#DC2626]', label: 'Written Off' },
+  partially_returned_and_written_off: {
+    bg: 'bg-[#7C3AED]/15',
+    text: 'text-[#7C3AED]',
+    label: 'Partially Returned & Written Off',
+  },
 };
 
 // Format date helper
@@ -195,8 +200,8 @@ export const MaintenanceDetailScreen: React.FC = () => {
 
     const { status } = maintenance;
 
-    // Read-only states
-    if (status === 'returned' || status === 'written_off') {
+    // Read-only states (completed - no further actions)
+    if (status === 'returned' || status === 'written_off' || status === 'partially_returned_and_written_off') {
       return null;
     }
 
@@ -435,7 +440,7 @@ export const MaintenanceDetailScreen: React.FC = () => {
         </Modal>
 
         {/* Return/Write-off Information (if applicable) */}
-        {maintenance.status === 'returned' && (
+        {(maintenance.status === 'returned' || maintenance.status === 'partially_returned_and_written_off') && (
           <View className="bg-[#F0FDF4] rounded-[10px] p-4 border border-[#16A34A]/30 mb-3">
             <View className="flex-row items-center gap-2 mb-3">
               <Ionicons name="arrow-undo" size={20} color="#16A34A" />
@@ -493,7 +498,7 @@ export const MaintenanceDetailScreen: React.FC = () => {
           </View>
         )}
 
-        {maintenance.status === 'written_off' && (
+        {(maintenance.status === 'written_off' || maintenance.status === 'partially_returned_and_written_off') && (
           <View className="bg-[#FEF2F2] rounded-[10px] p-4 border border-[#DC2626]/30 mb-3">
             <View className="flex-row items-center gap-2 mb-3">
               <Ionicons name="close-circle" size={20} color="#DC2626" />

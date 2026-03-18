@@ -9,6 +9,7 @@ import { getItemById } from '../../services/firebase/inventoryService';
 import { uploadPOInvoice } from '../../services/firebase/storageService';
 import { receivePO } from '../../store/thunks/purchaseOrderThunks';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { PODocumentCard } from '../../components/purchaseOrder';
 import {
   selectUserId,
   selectUserDisplayName,
@@ -276,7 +277,7 @@ export function ReceivePOPage() {
     po.status !== 'partially_received'
   ) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <button
           type="button"
           onClick={handleBack}
@@ -291,6 +292,26 @@ export function ReceivePOPage() {
             Current status: {po.status}.
           </p>
         </div>
+        {po.status === 'received' && (po.documents?.length ?? 0) > 0 && (
+          <div className="rounded-[10px] border border-slate-200 bg-white p-4">
+            <h2 className="mb-1 text-[17px] font-semibold text-slate-900">
+              ATTACHED DOCUMENTS
+            </h2>
+            <p className="mb-3 text-[13px] text-slate-500">
+              Invoice and bills attached at receipt
+            </p>
+            <div className="space-y-3">
+              {po.documents!.map((doc, i) => (
+                <PODocumentCard
+                  key={`${doc.fileUrl}-${i}`}
+                  fileName={doc.fileName}
+                  fileUrl={doc.fileUrl}
+                  type={doc.type}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -446,6 +467,27 @@ export function ReceivePOPage() {
           })}
         </div>
       </div>
+
+      {(po.documents?.length ?? 0) > 0 && (
+        <div className="rounded-[10px] border border-slate-200 bg-white p-4">
+          <h2 className="mb-1 text-[17px] font-semibold text-slate-900">
+            ATTACHED DOCUMENTS
+          </h2>
+          <p className="mb-3 text-[13px] text-slate-500">
+            Invoice and bills attached at receipt
+          </p>
+          <div className="space-y-3">
+            {po.documents!.map((doc, i) => (
+              <PODocumentCard
+                key={`${doc.fileUrl}-${i}`}
+                fileName={doc.fileName}
+                fileUrl={doc.fileUrl}
+                type={doc.type}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <div>
         <label className="mb-1.5 block text-[15px] font-medium text-slate-900">

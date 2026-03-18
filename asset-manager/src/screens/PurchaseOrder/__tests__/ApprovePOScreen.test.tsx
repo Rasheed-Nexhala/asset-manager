@@ -158,6 +158,10 @@ jest.mock('../../../store/thunks/purchaseOrderThunks', () => {
       'purchaseOrders/uploadSigned',
       async () => null
     ),
+    removeSignedPO: createAsyncThunk(
+      'purchaseOrders/removeSigned',
+      async () => null
+    ),
     approvePO: createAsyncThunk(
       'purchaseOrders/approve',
       async () =>

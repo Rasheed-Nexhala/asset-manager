@@ -44,7 +44,7 @@ function waitForImages(win: Window, timeoutMs = 3000): Promise<void> {
   const timeout = new Promise<void>((resolve) =>
     setTimeout(resolve, timeoutMs)
   );
-  return Promise.race([allLoaded, timeout]);
+  return Promise.race([allLoaded, timeout]).then(() => {});
 }
 
 const DEFAULT_GST_PERCENTAGE = 18;
