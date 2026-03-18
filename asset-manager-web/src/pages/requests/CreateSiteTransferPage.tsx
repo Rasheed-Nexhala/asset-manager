@@ -11,6 +11,7 @@ import { selectSiteById } from '../../store/selectors/sitesSelectors';
 import { FormField } from '../../components/auth/FormField';
 import { PrioritySelector } from '../../components/requests';
 import { Icon } from '../../components/shared/Icon';
+import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import type { RequestPriority } from '../../types/request';
 
 interface LocationState {
@@ -268,7 +269,7 @@ export function CreateSiteTransferPage() {
           }`}
         >
           {isSubmitting ? (
-            'Submitting...'
+            <LoadingSpinner size="sm" className="!border-indigo-200 !border-t-white" />
           ) : (
             <>
               <Icon name="arrows-right-left" className="h-5 w-5" />

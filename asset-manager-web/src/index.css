@@ -9,6 +9,15 @@
     @apply m-0 antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
+
+  /* Hide native search clear button - we use our own clear button for consistency */
+  input[type="search"]::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  input[type="search"]::-moz-search-cancel-button {
+    display: none;
+  }
 }
 
 /* Print styles: hide nav, format tables for PDF/print */

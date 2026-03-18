@@ -19,6 +19,7 @@ import { PrioritySelector } from '../../components/requests';
 import { RequestItemCard } from '../../components/requests/RequestItemCard';
 import { ItemSelectorModal } from '../../components/shared/ItemSelectorModal';
 import { Icon } from '../../components/shared/Icon';
+import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import type { RequestPriority, CreateRequestData } from '../../types/request';
 import type { Item } from '../../types/inventory';
 
@@ -335,7 +336,7 @@ export function CreateRequestPage() {
           disabled={isBusy}
           className="flex-1 border-[1.5px] border-blue-800 rounded-[10px] h-[50px] flex items-center justify-center text-[15px] font-semibold text-blue-800 hover:bg-blue-50 disabled:opacity-50"
         >
-          {isSavingDraft ? 'Saving...' : 'Save Draft'}
+          {isSavingDraft ? <LoadingSpinner size="sm" /> : 'Save Draft'}
         </button>
         <button
           type="button"
@@ -343,7 +344,11 @@ export function CreateRequestPage() {
           disabled={isBusy}
           className="flex-1 bg-blue-800 rounded-[10px] h-[50px] flex items-center justify-center text-[15px] font-semibold text-white hover:bg-blue-900 disabled:opacity-50"
         >
-          {isSubmittingRequest ? 'Submitting...' : 'Submit Request'}
+          {isSubmittingRequest ? (
+            <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
+          ) : (
+            'Submit Request'
+          )}
         </button>
       </div>
 

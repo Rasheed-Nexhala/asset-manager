@@ -17,6 +17,7 @@ import { ViewModeToggle } from '../../components/inventory/ViewModeToggle';
 import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
 import { isWeightBasedItem } from '../../utils/weightConversionUtils';
 import { Icon } from '../../components/shared/Icon';
+import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { QuickMoveToMaintenanceButton } from '../../components/maintenance/QuickMoveToMaintenanceButton';
 import type {
   Request,
@@ -209,7 +210,8 @@ export function ReturnItemsPage() {
           </h1>
         </header>
         <div className="flex-1 flex flex-col items-center justify-center">
-          <p className="text-[15px] text-slate-500">Loading request...</p>
+          <LoadingSpinner size="lg" />
+          <span className="sr-only">Loading request</span>
         </div>
       </div>
     );
@@ -554,7 +556,11 @@ export function ReturnItemsPage() {
           disabled={isSubmitting}
           className="w-full bg-blue-800 rounded-[10px] h-[50px] flex items-center justify-center text-[15px] font-semibold text-white hover:bg-blue-900 disabled:opacity-50"
         >
-          {isSubmitting ? 'Submitting...' : 'Submit Return'}
+          {isSubmitting ? (
+            <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
+          ) : (
+            'Submit Return'
+          )}
         </button>
       </div>
     </div>

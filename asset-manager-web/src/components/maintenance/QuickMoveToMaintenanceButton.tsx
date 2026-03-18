@@ -86,10 +86,7 @@ export function QuickMoveToMaintenanceButton({
       aria-label={loading ? 'Moving to maintenance, please wait' : 'Move to maintenance'}
     >
       {loading ? (
-        <>
-          <LoadingSpinner className="h-4 w-4 text-white" />
-          <span>Please wait…</span>
-        </>
+        <LoadingSpinner size="sm" className="!border-amber-200 !border-t-white" />
       ) : (
         <>
           <Icon name="wrench-screwdriver" className="h-4 w-4" />

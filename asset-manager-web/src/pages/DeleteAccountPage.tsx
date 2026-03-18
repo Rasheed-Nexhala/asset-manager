@@ -129,10 +129,7 @@ export function DeleteAccountPage() {
               } hover:bg-red-700 disabled:opacity-70`}
             >
               {isLoading ? (
-                <>
-                  <LoadingSpinner size="sm" />
-                  Please wait…
-                </>
+                <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
               ) : (
                 <>
                   <Icon name="trash" className="h-5 w-5" />
@@ -172,7 +169,11 @@ export function DeleteAccountPage() {
                 disabled={isLoading}
                 className="flex h-[50px] w-full items-center justify-center rounded-[10px] bg-red-600 font-semibold text-white hover:bg-red-700 disabled:opacity-70"
               >
-                {isLoading ? <LoadingSpinner size="sm" /> : 'Delete'}
+                {isLoading ? (
+                  <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
+                ) : (
+                  'Delete'
+                )}
               </button>
               <button
                 type="button"

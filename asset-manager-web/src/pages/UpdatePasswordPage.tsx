@@ -222,10 +222,7 @@ export function UpdatePasswordPage() {
               } hover:bg-blue-900 disabled:opacity-70`}
             >
               {isLoading ? (
-                <>
-                  <LoadingSpinner size="sm" />
-                  Please wait…
-                </>
+                <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
               ) : (
                 'Update Password'
               )}

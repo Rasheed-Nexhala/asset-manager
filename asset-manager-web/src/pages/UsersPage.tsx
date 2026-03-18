@@ -185,7 +185,6 @@ export function UsersPage() {
         </header>
         <div className="flex flex-1 flex-col items-center justify-center py-12">
           <LoadingSpinner size="lg" />
-          <p className="mt-4 text-[15px] text-slate-500">Loading users...</p>
         </div>
       </div>
     );
@@ -324,7 +323,11 @@ export function UsersPage() {
                             disabled={isSaving}
                             className="flex items-center gap-2 rounded-lg bg-blue-800 px-4 py-2 text-[14px] font-semibold text-white hover:bg-blue-900 shadow-sm"
                           >
-                            {isSaving ? <LoadingSpinner size="sm" /> : 'Save'}
+                            {isSaving ? (
+                              <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
+                            ) : (
+                              'Save'
+                            )}
                           </button>
                         </div>
                       ) : (
@@ -481,10 +484,7 @@ export function UsersPage() {
                       } hover:bg-blue-900 disabled:opacity-70`}
                     >
                       {isSaving ? (
-                        <>
-                          <LoadingSpinner size="sm" />
-                          Please wait…
-                        </>
+                        <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
                       ) : (
                         'Save'
                       )}

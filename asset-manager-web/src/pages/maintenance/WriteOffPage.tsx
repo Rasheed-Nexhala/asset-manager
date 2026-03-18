@@ -315,10 +315,10 @@ export function WriteOffPage() {
                 type="button"
                 onClick={submitWriteOff}
                 disabled={isSubmitting}
-                className="flex-1 rounded-[10px] bg-red-600 py-3 text-[15px] font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                className="flex flex-1 items-center justify-center rounded-[10px] bg-red-600 py-3 text-[15px] font-semibold text-white hover:bg-red-700 disabled:opacity-50"
               >
                 {isSubmitting ? (
-                  <LoadingSpinner className="mx-auto h-6 w-6 text-white" />
+                  <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
                 ) : (
                   'Confirm Write Off'
                 )}

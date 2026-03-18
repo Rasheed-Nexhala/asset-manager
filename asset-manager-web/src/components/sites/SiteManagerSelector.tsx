@@ -173,9 +173,6 @@ export function SiteManagerSelector({
               {loading || checkingAssignment ? (
                 <div className="flex flex-col items-center py-8">
                   <LoadingSpinner size="lg" />
-                  <span className="mt-4 text-[15px] text-slate-500">
-                    {loading ? 'Loading managers...' : 'Checking assignment...'}
-                  </span>
                 </div>
               ) : managers.length === 0 ? (
                 <p className="py-8 text-center text-[15px] text-slate-500">

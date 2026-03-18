@@ -124,7 +124,6 @@ export function ActivityLogPage() {
         <h1 className="text-[22px] font-semibold text-slate-900">Activity Log</h1>
         <div className="flex flex-col items-center justify-center py-16">
           <LoadingSpinner size="lg" />
-          <p className="text-[15px] text-slate-500 mt-4">Loading...</p>
         </div>
       </div>
     );

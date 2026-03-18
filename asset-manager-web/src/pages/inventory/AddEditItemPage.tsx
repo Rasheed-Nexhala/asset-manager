@@ -63,6 +63,13 @@ export function AddEditItemPage() {
         minStockLevel: item.minStockLevel,
         status: item.status,
         imageUrl: item.imageUrl,
+        standardUnitPrice: item.standardUnitPrice,
+        standardGstPercentage: item.standardGstPercentage,
+        steelMasterId: item.steelMasterId,
+        weightPerMeter: item.weightPerMeter,
+        lengthPerPiece: item.lengthPerPiece,
+        centralStoreQuantity: item.centralStoreQuantity,
+        totalQuantity: item.totalQuantity,
       };
     }
     return undefined;

@@ -170,10 +170,7 @@ export function SignupPage() {
               className="flex h-[50px] w-full items-center justify-center gap-2 rounded-[10px] bg-blue-800 text-[15px] font-semibold text-white transition-colors hover:bg-blue-900 disabled:bg-blue-800/70"
             >
               {isLoading ? (
-                <>
-                  <LoadingSpinner size="sm" className="border-white border-t-transparent" />
-                  <span>Please wait…</span>
-                </>
+                <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
               ) : (
                 'Create account'
               )}

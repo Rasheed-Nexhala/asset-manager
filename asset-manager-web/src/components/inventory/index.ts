@@ -6,6 +6,7 @@ export { InventorySubNav } from './InventorySubNav';
 export { CategoryPicker } from './CategoryPicker';
 export { ItemForm } from './ItemForm';
 export { SteelMasterForm } from './SteelMasterForm';
+export { SteelMasterSelector } from './SteelMasterSelector';
 export { InventoryUpdateRequestCard } from './InventoryUpdateRequestCard';
 export { ActiveAccessCard } from './ActiveAccessCard';
 export { RequestAccessBanner } from './RequestAccessBanner';

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Icon } from '../shared/Icon';
+import { LoadingSpinner } from '../shared/LoadingSpinner';
 import { generateSkuFromHsn } from '../../utils/skuGenerationUtils';
 import type { SteelMaster, CreateSteelMasterData, UpdateSteelMasterData } from '../../types/steelMaster';
 
@@ -177,9 +178,13 @@ export function SteelMasterForm({
           type="button"
           onClick={handleSubmit}
           disabled={loading}
-          className="flex-1 bg-blue-800 rounded-[10px] h-[50px] font-semibold text-white disabled:opacity-70"
+          className="flex flex-1 items-center justify-center rounded-[10px] h-[50px] bg-blue-800 font-semibold text-white disabled:opacity-70"
         >
-          {loading ? 'Saving...' : mode === 'create' ? 'Create' : 'Save'}
+          {loading ? (
+            <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
+          ) : (
+            mode === 'create' ? 'Create' : 'Save'
+          )}
         </button>
       </div>
     </div>

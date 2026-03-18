@@ -245,12 +245,7 @@ export function SiteForm({
                 aria-pressed={formData.status === 'inactive'}
               >
                 {statusChangeLoading ? (
-                  <>
-                    <LoadingSpinner size="sm" />
-                    <span className="text-[15px] font-semibold text-slate-500">
-                      Please wait…
-                    </span>
-                  </>
+                  <LoadingSpinner size="sm" />
                 ) : (
                   <>
                     <Icon
@@ -287,10 +282,7 @@ export function SiteForm({
         } font-semibold text-white transition-colors hover:bg-blue-900 disabled:opacity-70`}
       >
         {isLoading ? (
-          <>
-            <LoadingSpinner size="sm" />
-            <span>Please wait…</span>
-          </>
+          <LoadingSpinner size="sm" />
         ) : (
           <>
             <Icon name="check-circle" className="h-5 w-5" />

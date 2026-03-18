@@ -363,10 +363,8 @@ export function ProcessRequestPage() {
             </>
           ) : (
             <>
-              <LoadingSpinner className="h-8 w-8 text-blue-800" />
-              <p className="text-[15px] text-slate-500 mt-4">
-                Loading request...
-              </p>
+              <LoadingSpinner size="lg" />
+              <span className="sr-only">Loading request</span>
             </>
           )}
         </div>
@@ -580,7 +578,7 @@ export function ProcessRequestPage() {
             }`}
           >
             {isLoading ? (
-              <LoadingSpinner className="h-5 w-5 text-white" />
+              <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
             ) : (
               'Approve'
             )}

@@ -173,10 +173,7 @@ export function RequestInventoryAccessModal({
               aria-busy={loading}
             >
               {loading ? (
-                <>
-                  <LoadingSpinner />
-                  <span className="text-[15px]">Please wait…</span>
-                </>
+                <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
               ) : (
                 <>
                   <Icon name="arrow-right" className="w-5 h-5" />

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Icon } from '../../components/shared/Icon';
+import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { VendorForm } from '../../components/purchaseOrder/VendorForm';
 import { useAppSelector } from '../../store/hooks';
 import { selectIsAdmin } from '../../store/selectors/authSelectors';
@@ -418,9 +419,13 @@ export function VendorManagementPage() {
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-1 rounded-[10px] bg-blue-800 py-3 text-[15px] font-semibold text-white hover:bg-blue-900 disabled:opacity-50"
+                className="flex flex-1 items-center justify-center rounded-[10px] bg-blue-800 py-3 text-[15px] font-semibold text-white hover:bg-blue-900 disabled:opacity-50"
               >
-                {saving ? 'Saving...' : 'Save'}
+                {saving ? (
+                  <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
+                ) : (
+                  'Save'
+                )}
               </button>
             </div>
           </div>

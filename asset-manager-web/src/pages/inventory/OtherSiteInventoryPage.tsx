@@ -158,7 +158,9 @@ export function OtherSiteInventoryPage() {
           >
             <Icon name="arrow-left" className="w-6 h-6 text-slate-900" />
           </button>
-          <h1 className="text-[22px] font-semibold text-slate-900 flex-1">Loading...</h1>
+          <h1 className="text-[22px] font-semibold text-slate-900 flex-1">
+            {site?.name ? `${site.name} Inventory` : 'Site Inventory'}
+          </h1>
         </header>
         <InventoryLoadingState message="Loading site inventory..." />
       </div>

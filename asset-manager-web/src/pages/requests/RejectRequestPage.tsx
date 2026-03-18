@@ -9,6 +9,7 @@ import {
 } from '../../store/selectors/authSelectors';
 import { FormField } from '../../components/auth/FormField';
 import { Icon } from '../../components/shared/Icon';
+import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import type { RejectRequestData } from '../../types/request';
 
 const REJECTION_REASONS: Array<{
@@ -104,7 +105,8 @@ export function RejectRequestPage() {
           </h1>
         </header>
         <div className="flex-1 flex flex-col items-center justify-center">
-          <p className="text-[15px] text-slate-500">Loading request...</p>
+          <LoadingSpinner size="lg" />
+          <span className="sr-only">Loading request</span>
         </div>
       </div>
     );
@@ -193,7 +195,11 @@ export function RejectRequestPage() {
           disabled={isSubmitting}
           className="w-full bg-red-600 rounded-[10px] h-[50px] flex items-center justify-center text-[15px] font-semibold text-white hover:bg-red-700 disabled:opacity-50"
         >
-          {isSubmitting ? 'Submitting...' : 'Confirm Rejection'}
+          {isSubmitting ? (
+            <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
+          ) : (
+            'Confirm Rejection'
+          )}
         </button>
       </div>
     </div>

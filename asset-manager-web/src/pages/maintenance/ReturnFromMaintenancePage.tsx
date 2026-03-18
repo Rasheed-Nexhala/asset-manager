@@ -256,7 +256,7 @@ export function ReturnFromMaintenancePage() {
           className="flex h-[50px] w-full items-center justify-center gap-2 rounded-[10px] bg-blue-800 text-[15px] font-semibold text-white hover:bg-blue-900 disabled:opacity-50"
         >
           {isSubmitting ? (
-            <LoadingSpinner className="h-6 w-6 text-white" />
+            <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
           ) : (
             <>
               <Icon name="arrow-uturn-left" className="h-5 w-5" />

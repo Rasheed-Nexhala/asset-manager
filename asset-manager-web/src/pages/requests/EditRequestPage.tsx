@@ -17,6 +17,7 @@ import { PrioritySelector } from '../../components/requests';
 import { RequestItemCard } from '../../components/requests/RequestItemCard';
 import { ItemSelectorModal } from '../../components/shared/ItemSelectorModal';
 import { Icon } from '../../components/shared/Icon';
+import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import type {
   RequestPriority,
   EditRequestData,
@@ -214,7 +215,8 @@ export function EditRequestPage() {
           </h1>
         </header>
         <div className="flex-1 flex flex-col items-center justify-center">
-          <p className="text-[15px] text-slate-500">Loading request...</p>
+          <LoadingSpinner size="lg" />
+          <span className="sr-only">Loading request</span>
         </div>
       </div>
     );
@@ -312,7 +314,7 @@ export function EditRequestPage() {
             disabled={isBusy || !hasItems}
             className="flex-1 border-[1.5px] border-blue-800 rounded-[10px] h-[50px] flex items-center justify-center text-[15px] font-semibold text-blue-800 hover:bg-blue-50 disabled:opacity-50"
           >
-            {isSavingDraft ? 'Saving...' : 'Save Draft'}
+            {isSavingDraft ? <LoadingSpinner size="sm" /> : 'Save Draft'}
           </button>
           <button
             type="button"
@@ -320,7 +322,11 @@ export function EditRequestPage() {
             disabled={isBusy || !hasItems}
             className="flex-1 bg-blue-800 rounded-[10px] h-[50px] flex items-center justify-center text-[15px] font-semibold text-white hover:bg-blue-900 disabled:opacity-50"
           >
-            {isSubmittingRequest ? 'Submitting...' : 'Submit Request'}
+            {isSubmittingRequest ? (
+              <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
+            ) : (
+              'Submit Request'
+            )}
           </button>
         </div>
 
@@ -331,7 +337,7 @@ export function EditRequestPage() {
           className="w-full flex items-center justify-center gap-2 pt-3 border-t border-slate-200 text-[15px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
         >
           {isDeleting ? (
-            'Deleting...'
+            <LoadingSpinner size="sm" />
           ) : (
             <>
               <Icon name="trash" className="h-5 w-5" />

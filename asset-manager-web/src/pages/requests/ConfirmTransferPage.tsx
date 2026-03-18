@@ -16,6 +16,7 @@ import { WeightDisplay } from '../../components/inventory/WeightDisplay';
 import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
 import { isWeightBasedItem } from '../../utils/weightConversionUtils';
 import { Icon } from '../../components/shared/Icon';
+import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import type { Request } from '../../types/request';
 
 export function ConfirmTransferPage() {
@@ -270,7 +271,11 @@ export function ConfirmTransferPage() {
           disabled={isSubmitting}
           className="w-full bg-blue-800 rounded-[10px] h-[50px] flex items-center justify-center text-[15px] font-semibold text-white hover:bg-blue-900 disabled:opacity-50"
         >
-          {isSubmitting ? 'Confirming...' : 'Confirm Transfer'}
+          {isSubmitting ? (
+            <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
+          ) : (
+            'Confirm Transfer'
+          )}
         </button>
       </div>
     </div>

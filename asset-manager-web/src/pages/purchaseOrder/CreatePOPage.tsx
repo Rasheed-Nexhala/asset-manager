@@ -812,12 +812,12 @@ export function CreatePOPage() {
             type="button"
             onClick={() => handleSubmit(true)}
             disabled={isSubmitting || isDeleting || !isDirty}
-            className={`flex-1 rounded-[10px] border-[1.5px] border-blue-800 py-3 text-[15px] font-semibold text-blue-800 transition-colors hover:bg-blue-50 disabled:opacity-50 ${
+            className={`flex flex-1 items-center justify-center rounded-[10px] border-[1.5px] border-blue-800 py-3 text-[15px] font-semibold text-blue-800 transition-colors hover:bg-blue-50 disabled:opacity-50 ${
               !isDirty ? 'opacity-50' : ''
             }`}
           >
             {isSubmitting && isDraft ? (
-              <LoadingSpinner className="mx-auto h-5 w-5" />
+              <LoadingSpinner size="sm" />
             ) : (
               'Save Draft'
             )}
@@ -826,10 +826,10 @@ export function CreatePOPage() {
             type="button"
             onClick={() => handleSubmit(false)}
             disabled={isSubmitting || isDeleting}
-            className="flex-1 rounded-[10px] bg-blue-800 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-blue-900"
+            className="flex flex-1 items-center justify-center rounded-[10px] bg-blue-800 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-blue-900"
           >
             {isSubmitting && !isDraft ? (
-              <LoadingSpinner className="mx-auto h-5 w-5" />
+              <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
             ) : isAdmin ? (
               'Submit PO'
             ) : (

@@ -96,7 +96,7 @@ export function RequestQueuePage() {
             className="flex items-center gap-2 rounded-[10px] border border-slate-200 bg-white px-4 py-2.5 text-[15px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
             {isExporting ? (
-              <LoadingSpinner className="h-5 w-5" />
+              <LoadingSpinner size="sm" />
             ) : (
               <Icon name="arrow-down-tray" className="h-5 w-5" />
             )}
@@ -104,8 +104,7 @@ export function RequestQueuePage() {
           </button>
         </header>
         <div className="flex-1 flex flex-col items-center justify-center">
-          <LoadingSpinner className="h-8 w-8 text-blue-800" />
-          <p className="text-[15px] text-slate-500 mt-4">Loading requests...</p>
+          <LoadingSpinner size="lg" />
         </div>
       </div>
     );
@@ -137,7 +136,7 @@ export function RequestQueuePage() {
             className="flex items-center gap-2 rounded-[10px] border border-slate-200 bg-white px-4 py-2.5 text-[15px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
             {isExporting ? (
-              <LoadingSpinner className="h-5 w-5" />
+              <LoadingSpinner size="sm" />
             ) : (
               <Icon name="arrow-down-tray" className="h-5 w-5" />
             )}

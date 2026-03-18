@@ -269,7 +269,7 @@ export function InventoryUpdateRequestsPage() {
                 className="flex-1 bg-red-600 rounded-[10px] h-[50px] flex items-center justify-center gap-2 font-semibold text-white"
               >
                 {rejectingId ? (
-                  <LoadingSpinner />
+                  <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
                 ) : (
                   <Icon name="x-mark" className="w-5 h-5" />
                 )}

@@ -65,7 +65,6 @@ export function MyRecentActivityWidget({ onViewAll }: MyRecentActivityWidgetProp
     return (
       <div className="bg-white rounded-[10px] p-4 border border-slate-200 shadow-sm flex flex-col items-center justify-center min-h-[180px]">
         <LoadingSpinner size="sm" />
-        <p className="text-[13px] text-slate-500 mt-2">Loading...</p>
       </div>
     );
   }

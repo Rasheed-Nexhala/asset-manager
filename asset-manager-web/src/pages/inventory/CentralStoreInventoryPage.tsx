@@ -16,6 +16,8 @@ import {
   selectAllCategories,
   selectItemsLoading,
   selectItemsTotalCount,
+  selectItemsHasMore,
+  selectItemsLoadingMore,
   selectLowStockCount,
 } from '../../store/selectors/inventorySelectors';
 import { selectIsAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
@@ -59,6 +61,8 @@ export function CentralStoreInventoryPage() {
   const categories = useAppSelector(selectAllCategories);
   const isLoading = useAppSelector(selectItemsLoading);
   const totalCount = useAppSelector(selectItemsTotalCount);
+  const hasMore = useAppSelector(selectItemsHasMore);
+  const loadingMore = useAppSelector(selectItemsLoadingMore);
   const error = useInventoryError();
   const lowStockCount = useAppSelector(selectLowStockCount);
   const isAdmin = useAppSelector(selectIsAdmin);
@@ -102,10 +106,9 @@ export function CentralStoreInventoryPage() {
   }, [dispatch]);
 
   const handleLoadMore = useCallback(() => {
-    if (!isLoading && allItems.length < (totalCount ?? 0)) {
-      dispatch(loadMoreItems());
-    }
-  }, [isLoading, allItems.length, totalCount, dispatch]);
+    if (!hasMore || loadingMore) return;
+    dispatch(loadMoreItems());
+  }, [dispatch, hasMore, loadingMore]);
 
   const handleAddItem = useCallback(() => navigate('/inventory/add'), [navigate]);
   const handleSteelMaster = useCallback(() => navigate('/inventory/steel-master'), [navigate]);
@@ -413,6 +416,25 @@ export function CentralStoreInventoryPage() {
               </table>
             </div>
           </div>
+
+          {/* Load more - matches PO and Requests pages */}
+          {hasMore && (
+            <div className="flex justify-center py-4">
+              {loadingMore ? (
+                <LoadingSpinner className="h-6 w-6 text-blue-800" />
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleLoadMore}
+                  className="text-[15px] font-medium text-blue-800 hover:underline"
+                  aria-label="Load more items"
+                >
+                  Load more
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="fixed bottom-0 left-0 right-0 md:relative bg-white border-t md:border-t-0 border-slate-200 px-4 md:px-6 py-4">
             <div className="flex items-center justify-between">
               <p className="text-[15px] text-slate-500">

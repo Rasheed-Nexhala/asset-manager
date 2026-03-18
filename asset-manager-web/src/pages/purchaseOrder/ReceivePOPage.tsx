@@ -480,9 +480,13 @@ export function ReceivePOPage() {
                 </p>
               </>
             ) : (
-              <p className="text-[15px] text-slate-400">
-                {uploadingInvoice ? 'Uploading...' : '+ Upload Invoice'}
-              </p>
+              <span className="flex items-center gap-2 text-[15px] text-slate-400">
+                {uploadingInvoice ? (
+                  <LoadingSpinner size="sm" />
+                ) : (
+                  '+ Upload Invoice'
+                )}
+              </span>
             )}
           </div>
           {invoiceFile && (
@@ -546,12 +550,12 @@ export function ReceivePOPage() {
         type="button"
         onClick={handleConfirm}
         disabled={saving}
-        className={`h-[50px] w-full rounded-[10px] text-[15px] font-semibold text-white transition-colors ${
+        className={`flex h-[50px] w-full items-center justify-center rounded-[10px] text-[15px] font-semibold text-white transition-colors ${
           saving ? 'cursor-not-allowed bg-slate-400' : 'bg-blue-800 hover:bg-blue-900'
         }`}
       >
         {saving ? (
-          <LoadingSpinner className="mx-auto h-5 w-5" />
+          <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
         ) : (
           'CONFIRM & UPDATE INVENTORY'
         )}

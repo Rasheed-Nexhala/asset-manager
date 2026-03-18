@@ -537,14 +537,14 @@ export function ApprovePOPage() {
                     type="button"
                     onClick={handleApprove}
                     disabled={saving || !po.signedPdfUrl?.trim()}
-                    className={`flex-1 rounded-[10px] py-3 text-[15px] font-semibold text-white ${
+                    className={`flex flex-1 items-center justify-center rounded-[10px] py-3 text-[15px] font-semibold text-white ${
                       po.signedPdfUrl?.trim()
                         ? 'bg-green-600 hover:bg-green-700'
                         : 'cursor-not-allowed bg-slate-400'
                     }`}
                   >
                     {saving ? (
-                      <LoadingSpinner className="mx-auto h-5 w-5" />
+                      <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
                     ) : po.signedPdfUrl?.trim() ? (
                       'Approve'
                     ) : (
@@ -568,10 +568,10 @@ export function ApprovePOPage() {
                     type="button"
                     onClick={handleReject}
                     disabled={saving || !rejectionReason.trim()}
-                    className="flex-1 rounded-[10px] bg-red-600 py-3 text-[15px] font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                    className="flex flex-1 items-center justify-center rounded-[10px] bg-red-600 py-3 text-[15px] font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                   >
                     {saving ? (
-                      <LoadingSpinner className="mx-auto h-5 w-5" />
+                      <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
                     ) : (
                       'Confirm Reject'
                     )}
@@ -587,10 +587,10 @@ export function ApprovePOPage() {
             type="button"
             onClick={handleMarkOrdered}
             disabled={saving}
-            className="w-full rounded-[10px] bg-blue-800 py-3 text-[15px] font-semibold text-white hover:bg-blue-900 disabled:opacity-50"
+            className="flex w-full items-center justify-center rounded-[10px] bg-blue-800 py-3 text-[15px] font-semibold text-white hover:bg-blue-900 disabled:opacity-50"
           >
             {saving ? (
-              <LoadingSpinner className="mx-auto h-5 w-5" />
+              <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
             ) : (
               'Mark as Ordered'
             )}
