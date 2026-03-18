@@ -30,24 +30,29 @@ setGlobalOptions({ maxInstances: 10 });
 
 /**
  * Helper: Create activity log document
- * Reusable log creator - handles errors gracefully to not block main operations
+ * Reusable log creator - handles errors gracefully to not block main operations.
+ * Use throwOnError: true when called from callable functions so Firestore errors
+ * (e.g. permission denied) are surfaced to the client instead of silently swallowed.
  */
-async function createActivityLog(logData: {
-  userId: string;
-  userName: string;
-  userRole: string;
-  actionType: string;
-  actionCategory: string;
-  targetType: string;
-  targetId: string;
-  targetDisplay: string;
-  summary: string;
-  details: string;
-  changes?: Array<{ field: string; fieldLabel: string; oldValue: unknown; newValue: unknown }>;
-  deviceInfo?: string;
-  ipAddress?: string;
-  appVersion?: string;
-}): Promise<void> {
+async function createActivityLog(
+  logData: {
+    userId: string;
+    userName: string;
+    userRole: string;
+    actionType: string;
+    actionCategory: string;
+    targetType: string;
+    targetId: string;
+    targetDisplay: string;
+    summary: string;
+    details: string;
+    changes?: Array<{ field: string; fieldLabel: string; oldValue: unknown; newValue: unknown }>;
+    deviceInfo?: string;
+    ipAddress?: string;
+    appVersion?: string;
+  },
+  options?: { throwOnError?: boolean }
+): Promise<void> {
   try {
     await db.collection('activityLogs').add({
       ...logData,
@@ -55,7 +60,10 @@ async function createActivityLog(logData: {
     });
   } catch (error) {
     logger.error('Failed to create activity log', { error, logData });
-    // Don't throw - logging failure should not block the main operation
+    if (options?.throwOnError) {
+      throw error;
+    }
+    // Don't throw by default - logging failure should not block Firestore triggers
   }
 }
 
@@ -1499,91 +1507,113 @@ export const onVendorUpdated = onDocumentUpdated(
  * login_failed does not require auth (user failed to authenticate)
  */
 export const logAuthEvent = onCall(async (request) => {
-  // Extract and strictly sanitize only expected fields to prevent log poisoning
-  const rawData = request.data ?? {};
-  
-  const sanitizeStr = (val: unknown, maxLength: number): string | undefined => {
-    if (typeof val !== 'string') return undefined;
-    return val.substring(0, maxLength);
-  };
+  try {
+    // Extract and strictly sanitize only expected fields to prevent log poisoning
+    const rawData = (request.data != null && typeof request.data === 'object' && !Array.isArray(request.data))
+      ? request.data as Record<string, unknown>
+      : {};
 
-  const actionType = sanitizeStr(rawData.actionType, 50);
-  const userName = sanitizeStr(rawData.userName, 100);
-  const userRole = sanitizeStr(rawData.userRole, 50);
-  const details = sanitizeStr(rawData.details, 1000);
-  const email = sanitizeStr(rawData.email, 255);
-  const deviceInfo = sanitizeStr(rawData.deviceInfo, 500);
-  const appVersion = sanitizeStr(rawData.appVersion, 50);
+    const sanitizeStr = (val: unknown, maxLength: number): string | undefined => {
+      if (typeof val !== 'string') return undefined;
+      return val.substring(0, maxLength);
+    };
 
-  const validTypes = ['user_login', 'user_logout', 'login_failed'];
-  if (!actionType || !validTypes.includes(actionType)) {
-    throw new HttpsError(
-      'invalid-argument',
-      'actionType must be user_login, user_logout, or login_failed'
+    const actionType = sanitizeStr(rawData.actionType, 50);
+    const userName = sanitizeStr(rawData.userName, 100);
+    const userRole = sanitizeStr(rawData.userRole, 50);
+    const details = sanitizeStr(rawData.details, 1000);
+    const email = sanitizeStr(rawData.email, 255);
+    const deviceInfo = sanitizeStr(rawData.deviceInfo, 500);
+    const appVersion = sanitizeStr(rawData.appVersion, 50);
+
+    const validTypes = ['user_login', 'user_logout', 'login_failed'];
+    if (!actionType || !validTypes.includes(actionType)) {
+      throw new HttpsError(
+        'invalid-argument',
+        'actionType must be user_login, user_logout, or login_failed'
+      );
+    }
+
+    // Ensure unauthenticated users can only log 'login_failed'
+    if (!request.auth && actionType !== 'login_failed') {
+      throw new HttpsError(
+        'unauthenticated',
+        'Unauthenticated users can only log login_failed events'
+      );
+    }
+
+    // login_failed: user is not authenticated - use email as identifier
+    if (actionType === 'login_failed') {
+      await createActivityLog(
+        {
+          userId: 'unknown',
+          userName: email ?? 'Unknown',
+          userRole: 'Unassigned',
+          actionType: 'login_failed',
+          actionCategory: 'authentication',
+          targetType: 'user',
+          targetId: 'unknown',
+          targetDisplay: email ?? 'Unknown',
+          summary: 'Login failed',
+          details: details ?? '',
+          changes: [],
+          deviceInfo: deviceInfo ?? undefined,
+          ipAddress: request.rawRequest?.ip ?? undefined,
+          appVersion: appVersion ?? undefined,
+        },
+        { throwOnError: true }
+      );
+      return { success: true };
+    }
+
+    // user_login, user_logout: require authentication
+    if (!request.auth) {
+      throw new HttpsError(
+        'unauthenticated',
+        'User must be authenticated to log auth event'
+      );
+    }
+
+    // Use optional chaining - token.name/token.email may be absent in some auth providers
+    const displayName =
+      request.auth.token?.name ??
+      request.auth.token?.email ??
+      'Unknown';
+
+    await createActivityLog(
+      {
+        userId: request.auth.uid,
+        userName: userName ?? displayName,
+        userRole: userRole ?? 'Unassigned',
+        actionType,
+        actionCategory: 'authentication',
+        targetType: 'user',
+        targetId: request.auth.uid,
+        targetDisplay: userName ?? displayName,
+        summary:
+          actionType === 'user_login' ? 'Logged in' : 'Logged out',
+        details: details ?? '',
+        changes: [],
+        deviceInfo: deviceInfo ?? undefined,
+        ipAddress: request.rawRequest?.ip ?? undefined,
+        appVersion: appVersion ?? undefined,
+      },
+      { throwOnError: true }
     );
-  }
 
-  // Ensure unauthenticated users can only log 'login_failed'
-  if (!request.auth && actionType !== 'login_failed') {
-    throw new HttpsError(
-      'unauthenticated',
-      'Unauthenticated users can only log login_failed events'
-    );
-  }
-
-  // login_failed: user is not authenticated - use email as identifier
-  if (actionType === 'login_failed') {
-    await createActivityLog({
-      userId: 'unknown',
-      userName: email ?? 'Unknown',
-      userRole: 'Unassigned',
-      actionType: 'login_failed',
-      actionCategory: 'authentication',
-      targetType: 'user',
-      targetId: 'unknown',
-      targetDisplay: email ?? 'Unknown',
-      summary: 'Login failed',
-      details: details ?? '',
-      changes: [],
-      deviceInfo: deviceInfo ?? undefined,
-      ipAddress: request.rawRequest?.ip ?? undefined,
-      appVersion: appVersion ?? undefined,
-    });
     return { success: true };
-  }
-
-  // user_login, user_logout: require authentication
-  if (!request.auth) {
+  } catch (err) {
+    // HttpsError is intentional (validation/auth) - rethrow as-is so client gets proper CORS response
+    if (err instanceof HttpsError) {
+      throw err;
+    }
+    // Log unhandled errors for debugging; rethrow as HttpsError so client gets CORS headers
+    logger.error('logAuthEvent failed', { error: err, stack: err instanceof Error ? err.stack : undefined });
     throw new HttpsError(
-      'unauthenticated',
-      'User must be authenticated to log auth event'
+      'internal',
+      err instanceof Error ? err.message : 'An unexpected error occurred'
     );
   }
-
-  const displayName =
-    request.auth.token.name ??
-    request.auth.token.email ??
-    'Unknown';
-
-  await createActivityLog({
-    userId: request.auth.uid,
-    userName: userName ?? displayName,
-    userRole: userRole ?? 'Unassigned',
-    actionType,
-    actionCategory: 'authentication',
-    targetType: 'user',
-    targetId: request.auth.uid,
-    targetDisplay: userName ?? displayName,
-    summary:
-      actionType === 'user_login' ? 'Logged in' : 'Logged out',
-    details: details ?? '',
-    changes: [],
-    deviceInfo: deviceInfo ?? undefined,
-    ipAddress: request.rawRequest?.ip ?? undefined,
-    appVersion: appVersion ?? undefined,
-  });
-
-  return { success: true };
 });
 
 /**
