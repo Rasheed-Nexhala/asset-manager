@@ -17,12 +17,14 @@ import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
 import { isWeightBasedItem } from '../../utils/weightConversionUtils';
 import { Icon } from '../../components/shared/Icon';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
+import { useToast } from '../../contexts/ToastContext';
 import type { Request } from '../../types/request';
 
 export function ConfirmTransferPage() {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const toast = useToast();
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
@@ -47,7 +49,7 @@ export function ConfirmTransferPage() {
   useEffect(() => {
     if (!requestId) return;
     if (!isAdmin && !isStoreIncharge) {
-      window.alert('Only Admin and Store Incharge can confirm transfers.');
+      toast.error('Only Admin and Store Incharge can confirm transfers.');
       navigate(-1);
       setIsLoading(false);
       return;
@@ -60,13 +62,13 @@ export function ConfirmTransferPage() {
         if (r && r.status === 'approved') {
           setRequest(r);
         } else {
-          window.alert('Only approved requests can be transferred');
+          toast.error('Only approved requests can be transferred');
           navigate(-1);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          window.alert('Failed to load request details');
+          toast.error('Failed to load request details');
           navigate(-1);
         }
       })
@@ -76,7 +78,7 @@ export function ConfirmTransferPage() {
     return () => {
       cancelled = true;
     };
-  }, [requestId, navigate, isAdmin, isStoreIncharge]);
+  }, [requestId, navigate, isAdmin, isStoreIncharge, toast]);
 
   const validateForm = (): boolean => {
     const newErrors: { receivedByName?: string } = {};
@@ -103,10 +105,10 @@ export function ConfirmTransferPage() {
           transferredByName: userName,
         })
       ).unwrap();
-      window.alert('Transfer confirmed successfully');
+      toast.success('Transfer confirmed successfully');
       navigate('/requests/queue');
     } catch (error: unknown) {
-      window.alert(
+      toast.error(
         error instanceof Error ? error.message : 'Failed to confirm transfer'
       );
     } finally {

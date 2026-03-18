@@ -12,6 +12,7 @@ import { FormField } from '../../components/auth/FormField';
 import { PrioritySelector } from '../../components/requests';
 import { Icon } from '../../components/shared/Icon';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
+import { useToast } from '../../contexts/ToastContext';
 import type { RequestPriority } from '../../types/request';
 
 interface LocationState {
@@ -43,6 +44,7 @@ export function CreateSiteTransferPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
+  const toast = useToast();
 
   const state = location.state as LocationState | null;
 
@@ -136,12 +138,12 @@ export function CreateSiteTransferPage() {
         })
       ).unwrap();
 
-      window.alert(
+      toast.success(
         `Your transfer request for "${preselectedItem.itemName}" has been submitted. Store Incharge will review it shortly.`
       );
       navigate('/requests/my-requests');
     } catch (error: unknown) {
-      window.alert(
+      toast.error(
         error instanceof Error
           ? error.message
           : 'Failed to submit transfer request. Please try again.'

@@ -10,6 +10,8 @@ import {
   selectActiveSteelMasters,
   selectSteelMasterLoading,
 } from '../../store/selectors/steelMasterSelectors';
+import { useConfirm } from '../../hooks';
+import { useToast } from '../../contexts/ToastContext';
 import { subscribeSteelMasters } from '../../services/firebase/steelMasterService';
 import { setSteelMasters } from '../../store/slices/steelMasterSlice';
 import type { SteelMaster } from '../../types/steelMaster';
@@ -24,6 +26,8 @@ export function SteelMasterPage() {
 
   const steelMasters = useAppSelector(selectActiveSteelMasters);
   const isLoading = useAppSelector(selectSteelMasterLoading);
+  const { confirm, confirmationModal } = useConfirm();
+  const toast = useToast();
 
   useEffect(() => {
     dispatch(fetchSteelMasters(true));
@@ -49,18 +53,18 @@ export function SteelMasterPage() {
   );
 
   const handleDelete = useCallback(
-    (master: SteelMaster) => {
-      if (
-        !window.confirm(
-          `Are you sure you want to deactivate "${master.name}"? It will no longer appear in the list but linked items will keep their configuration.`
-        )
-      )
-        return;
+    async (master: SteelMaster) => {
+      const ok = await confirm({
+        title: 'Deactivate Custom Item?',
+        message: `Are you sure you want to deactivate "${master.name}"? It will no longer appear in the list but linked items will keep their configuration.`,
+        variant: 'danger',
+      });
+      if (!ok) return;
       dispatch(deleteSteelMaster(master.id)).catch((err) => {
-        window.alert(err instanceof Error ? err.message : 'Failed to deactivate');
+        toast.error(err instanceof Error ? err.message : 'Failed to deactivate');
       });
     },
-    [dispatch]
+    [dispatch, confirm, toast]
   );
 
   return (
@@ -156,6 +160,8 @@ export function SteelMasterPage() {
           </div>
         </div>
       )}
+
+      {confirmationModal}
     </div>
   );
 }

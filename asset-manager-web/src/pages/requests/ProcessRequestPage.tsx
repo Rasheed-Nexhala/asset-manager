@@ -21,6 +21,7 @@ import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
 import { isWeightBasedItem } from '../../utils/weightConversionUtils';
 import { Icon } from '../../components/shared/Icon';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
+import { useToast } from '../../contexts/ToastContext';
 import type {
   Request,
   ItemAvailability,
@@ -71,6 +72,7 @@ export function ProcessRequestPage() {
   );
 
   const { viewMode, toggleViewMode } = useWeightViewPreference();
+  const toast = useToast();
   const [request, setRequest] = useState<Request | null>(
     requestFromStore ?? null
   );
@@ -274,7 +276,7 @@ export function ProcessRequestPage() {
         });
       if (!isStillSufficient) {
         setAvailability(currentAvailability);
-        window.alert(
+        toast.error(
           'Insufficient stock. Another transaction may have reduced the available quantity.'
         );
         return;
@@ -292,7 +294,7 @@ export function ProcessRequestPage() {
         })
       ).unwrap();
     } catch (error: unknown) {
-      window.alert(
+      toast.error(
         error instanceof Error ? error.message : 'Failed to approve request'
       );
     } finally {
@@ -306,6 +308,7 @@ export function ProcessRequestPage() {
     allSufficient,
     approvedQuantities,
     dispatch,
+    toast,
   ]);
 
   const isTransferred = request?.status === 'transferred';

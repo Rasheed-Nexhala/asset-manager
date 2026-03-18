@@ -4,6 +4,8 @@ import { Icon } from '../../components/shared/Icon';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { VendorForm } from '../../components/purchaseOrder/VendorForm';
 import { useAppSelector } from '../../store/hooks';
+import { useConfirm } from '../../hooks';
+import { useToast } from '../../contexts/ToastContext';
 import { selectIsAdmin } from '../../store/selectors/authSelectors';
 import { subscribeToVendors } from '../../services/firebase/vendorService';
 import {
@@ -12,8 +14,8 @@ import {
   deleteVendor,
 } from '../../services/firebase/vendorService';
 import { useAppDispatch } from '../../store/hooks';
-import { setVendors } from '../../store/slices/purchaseOrderSlice';
-import { selectVendors } from '../../store/selectors/purchaseOrderSelectors';
+import { setVendors, setVendorsLoading } from '../../store/slices/purchaseOrderSlice';
+import { selectVendors, selectVendorsLoading } from '../../store/selectors/purchaseOrderSelectors';
 import type { Vendor } from '../../types/vendor';
 import type { CreateVendorData } from '../../types/vendor';
 
@@ -31,6 +33,7 @@ export function VendorManagementPage() {
   const dispatch = useAppDispatch();
   const isAdmin = useAppSelector(selectIsAdmin);
   const vendors = useAppSelector(selectVendors);
+  const vendorsLoading = useAppSelector(selectVendorsLoading);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [modalOpen, setModalOpen] = useState<'add' | 'edit' | null>(null);
@@ -45,9 +48,15 @@ export function VendorManagementPage() {
   });
   const [errors, setErrors] = useState<Partial<Record<keyof CreateVendorData, string>>>({});
   const [saving, setSaving] = useState(false);
+  const { confirm, confirmationModal } = useConfirm();
+  const toast = useToast();
 
   useEffect(() => {
-    const unsub = subscribeToVendors((v) => dispatch(setVendors(v)));
+    dispatch(setVendorsLoading(true));
+    const unsub = subscribeToVendors(
+      (v) => dispatch(setVendors(v)),
+      () => dispatch(setVendorsLoading(false))
+    );
     return unsub;
   }, [dispatch]);
 
@@ -131,7 +140,7 @@ export function VendorManagementPage() {
           address: formData.address?.trim() || undefined,
           gstin: formData.gstin?.trim() || undefined,
         });
-        alert('Vendor updated.');
+        toast.success('Vendor updated.');
       } else {
         await createVendor({
           name: formData.name.trim(),
@@ -141,11 +150,11 @@ export function VendorManagementPage() {
           address: formData.address?.trim() || undefined,
           gstin: formData.gstin?.trim() || undefined,
         });
-        alert('Vendor added.');
+        toast.success('Vendor added.');
       }
       handleCloseModal();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to save vendor');
+      toast.error(err instanceof Error ? err.message : 'Failed to save vendor');
     } finally {
       setSaving(false);
     }
@@ -154,20 +163,25 @@ export function VendorManagementPage() {
     formData,
     validate,
     handleCloseModal,
+    toast,
   ]);
 
   const handleDelete = useCallback(
     async (vendor: Vendor) => {
-      if (!confirm(`Delete vendor "${vendor.name}"? This cannot be undone.`))
-        return;
+      const ok = await confirm({
+        title: 'Delete Vendor?',
+        message: `Delete vendor "${vendor.name}"? This cannot be undone.`,
+        variant: 'danger',
+      });
+      if (!ok) return;
       try {
         await deleteVendor(vendor.id);
-        alert('Vendor deleted.');
+        toast.success('Vendor deleted.');
       } catch (err) {
-        alert(err instanceof Error ? err.message : 'Failed to delete vendor');
+        toast.error(err instanceof Error ? err.message : 'Failed to delete vendor');
       }
     },
-    []
+    [confirm, toast]
   );
 
   if (!isAdmin) {
@@ -180,6 +194,33 @@ export function VendorManagementPage() {
         <p className="mt-2 text-[15px] text-slate-500">
           Vendor management is restricted to administrators.
         </p>
+      </div>
+    );
+  }
+
+  if (vendorsLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <Link
+              to="/purchase-orders"
+              className="flex items-center gap-2 text-[15px] font-medium text-slate-600 hover:text-slate-900"
+            >
+              <Icon name="arrow-left" className="h-5 w-5" />
+              Back
+            </Link>
+          </div>
+          <h1 className="text-[22px] font-semibold text-slate-900">
+            Saved Vendors
+          </h1>
+        </div>
+        <div className="flex flex-col items-center justify-center py-24">
+          <LoadingSpinner size="lg" className="text-blue-800" />
+          <p className="mt-4 text-[15px] text-slate-500">
+            Loading vendors…
+          </p>
+        </div>
       </div>
     );
   }
@@ -431,6 +472,8 @@ export function VendorManagementPage() {
           </div>
         </div>
       )}
+
+      {confirmationModal}
     </div>
   );
 }

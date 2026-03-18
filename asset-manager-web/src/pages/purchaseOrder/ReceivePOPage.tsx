@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Icon } from '../../components/shared/Icon';
+import { useToast } from '../../contexts/ToastContext';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { printPurchaseOrder } from '../../utils/poPdfUtils';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
@@ -19,6 +20,7 @@ export function ReceivePOPage() {
   const { poId } = useParams<{ poId: string }>();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const userId = useAppSelector(selectUserId);
@@ -95,9 +97,9 @@ export function ReceivePOPage() {
     try {
       await printPurchaseOrder(po);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to print');
+      toast.error(err instanceof Error ? err.message : 'Failed to print');
     }
-  }, [po]);
+  }, [po, toast]);
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,13 +117,13 @@ export function ReceivePOPage() {
         URL.revokeObjectURL(fileUri);
         setInvoiceFile({ fileName, fileUrl: url });
       } catch (err) {
-        alert(err instanceof Error ? err.message : 'Upload failed');
+        toast.error(err instanceof Error ? err.message : 'Upload failed');
       } finally {
         setUploadingInvoice(false);
         e.target.value = '';
       }
     },
-    [poId]
+    [poId, toast]
   );
 
   const handleConfirm = useCallback(async () => {
@@ -131,7 +133,7 @@ export function ReceivePOPage() {
       const raw = receivedQtys[item.itemId] ?? '';
       const qty = parseInt(raw, 10);
       if (isNaN(qty) || qty < 0 || !Number.isInteger(qty)) {
-        alert(
+        toast.error(
           `Enter a valid quantity (0 or more) for "${item.itemName}".`
         );
         return;
@@ -143,7 +145,7 @@ export function ReceivePOPage() {
       return qty > 0;
     });
     if (!atLeastOne) {
-      alert(
+      toast.error(
         'At least one item must have a received quantity greater than zero.'
       );
       return;
@@ -178,10 +180,10 @@ export function ReceivePOPage() {
           userName,
         })
       ).unwrap();
-      alert('Purchase order received. Inventory updated.');
+      toast.success('Purchase order received. Inventory updated.');
       navigate(-1);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to receive PO');
+      toast.error(err instanceof Error ? err.message : 'Failed to receive PO');
     } finally {
       setSaving(false);
     }
@@ -196,6 +198,7 @@ export function ReceivePOPage() {
     receivedNotes,
     dispatch,
     navigate,
+    toast,
   ]);
 
   const inventoryUpdates = po

@@ -20,6 +20,7 @@ import { RequestItemCard } from '../../components/requests/RequestItemCard';
 import { ItemSelectorModal } from '../../components/shared/ItemSelectorModal';
 import { Icon } from '../../components/shared/Icon';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
+import { useToast } from '../../contexts/ToastContext';
 import type { RequestPriority, CreateRequestData } from '../../types/request';
 import type { Item } from '../../types/inventory';
 
@@ -34,6 +35,7 @@ export function CreateRequestPage() {
   const siteIdParam = searchParams.get('siteId');
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const toast = useToast();
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
@@ -85,7 +87,7 @@ export function CreateRequestPage() {
   const handleSubmit = async (isDraft: boolean = false) => {
     if (!validateForm() && !isDraft) return;
     if (!site || !userId || !userName) {
-      window.alert('Missing required user or site information');
+      toast.error('Missing required user or site information');
       return;
     }
 
@@ -128,12 +130,12 @@ export function CreateRequestPage() {
         })
       ).unwrap();
 
-      window.alert(
+      toast.success(
         isDraft ? 'Request saved as draft' : 'Request submitted successfully'
       );
       navigate(isSiteManager ? '/requests/my-requests' : '/requests/queue');
     } catch (error: unknown) {
-      window.alert(
+      toast.error(
         error instanceof Error ? error.message : 'Failed to create request'
       );
     } finally {

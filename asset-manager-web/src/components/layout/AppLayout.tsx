@@ -14,7 +14,7 @@ export function AppLayout() {
         <Sidebar />
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <TopHeader />
-          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-6 lg:p-8">
+          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 pb-8 md:p-6 md:pb-10 lg:p-8 lg:pb-12">
             <div className="mx-auto flex min-h-full w-full max-w-7xl flex-col">
               <Outlet />
             </div>

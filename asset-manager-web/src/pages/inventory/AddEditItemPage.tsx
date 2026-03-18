@@ -9,6 +9,7 @@ import {
 } from '../../store/thunks/inventoryThunks';
 import { selectAllCategories, selectItemsLoading } from '../../store/selectors/inventorySelectors';
 import { useInventoryError } from '../../hooks/useInventoryError';
+import { useToast } from '../../contexts/ToastContext';
 import { uploadItemImageFromBlob, deleteItemImageByUrl } from '../../services/firebase/storageService';
 import type { Item, CreateItemData, UpdateItemData } from '../../types/inventory';
 import { Icon } from '../../components/shared/Icon';
@@ -30,6 +31,7 @@ export function AddEditItemPage() {
   const categories = useAppSelector(selectAllCategories);
   const isLoading = useAppSelector(selectItemsLoading);
   const reduxError = useInventoryError();
+  const toast = useToast();
 
   const [item, setItem] = useState<Item | null>(null);
   const [loadingItem, setLoadingItem] = useState(mode === 'edit');
@@ -149,13 +151,13 @@ export function AddEditItemPage() {
         const msg = err instanceof Error ? err.message : 'Failed to save item';
         setError(msg);
         if (msg === SKU_EXISTS_ERROR_MESSAGE || (msg.toLowerCase().includes('sku') && msg.toLowerCase().includes('already exists'))) {
-          window.alert(`Duplicate SKU: ${SKU_EXISTS_ERROR_MESSAGE}`);
+          toast.error(`Duplicate SKU: ${SKU_EXISTS_ERROR_MESSAGE}`);
         }
       } finally {
         setIsSubmitting(false);
       }
     },
-    [mode, itemId, dispatch, navigate, categories, initialData?.imageUrl]
+    [mode, itemId, dispatch, navigate, categories, initialData?.imageUrl, toast]
   );
 
   const handleCancel = useCallback(() => navigate(-1), [navigate]);

@@ -7,6 +7,7 @@ interface PurchaseOrderState {
   purchaseOrders: PurchaseOrder[];
   selectedPO: PurchaseOrder | null;
   vendors: Vendor[];
+  vendorsLoading: boolean;
   loading: boolean;
   loadingMore: boolean;
   error: string | null;
@@ -22,6 +23,7 @@ const initialState: PurchaseOrderState = {
   purchaseOrders: [],
   selectedPO: null,
   vendors: [],
+  vendorsLoading: false,
   loading: false,
   loadingMore: false,
   error: null,
@@ -70,6 +72,11 @@ const purchaseOrderSlice = createSlice({
         if (!byId.has(v.id)) byId.set(v.id, v);
       });
       state.vendors = Array.from(byId.values());
+      state.vendorsLoading = false;
+    },
+
+    setVendorsLoading: (state, action: PayloadAction<boolean>) => {
+      state.vendorsLoading = action.payload;
     },
 
     addOrUpdatePO: (state, action: PayloadAction<PurchaseOrder>) => {
@@ -175,6 +182,7 @@ export const {
   setPurchaseOrdersFromSubscription,
   setSelectedPO,
   setVendors,
+  setVendorsLoading,
   addOrUpdatePO,
   removePO,
   setFilters,

@@ -220,7 +220,10 @@ const inventorySlice = createSlice({
         state.loadingMore = false;
         state.items = [...state.items, ...action.payload.items];
         state.lastDoc = action.payload.lastDoc;
-        state.hasMore = action.payload.items.length >= ITEMS_PAGE_SIZE;
+        // No more pages when we get 0 items or no cursor for next page
+        state.hasMore =
+          action.payload.lastDoc != null &&
+          action.payload.items.length >= ITEMS_PAGE_SIZE;
         state.lowStockItemIds = state.items
           .filter((item) => isLowStock(item))
           .map((item) => item.id);

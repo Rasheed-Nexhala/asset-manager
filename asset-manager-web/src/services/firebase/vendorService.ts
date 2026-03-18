@@ -261,10 +261,12 @@ export const updateVendorLastPoDateInTransaction = (
  * Subscribe to real-time updates for vendors collection
  *
  * @param callback - Function called whenever the vendors list changes
+ * @param onError - Optional callback when subscription errors (e.g. to clear loading state)
  * @returns Unsubscribe function to stop listening
  */
 export const subscribeToVendors = (
-  callback: (vendors: Vendor[]) => void
+  callback: (vendors: Vendor[]) => void,
+  onError?: (error: Error) => void
 ): (() => void) => {
   const q = query(
     collection(db, VENDORS_COLLECTION),
@@ -297,6 +299,7 @@ export const subscribeToVendors = (
     },
     (error) => {
       console.error('Error in vendors subscription:', error);
+      onError?.(error instanceof Error ? error : new Error(String(error)));
     }
   );
 

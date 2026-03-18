@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { FormField } from '../../components/auth/FormField';
 import { Icon } from '../../components/shared/Icon';
+import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../hooks';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { ItemSelectorModal } from '../../components/shared/ItemSelectorModal';
 import { VendorSelector, POItemCard } from '../../components/purchaseOrder';
@@ -53,6 +55,8 @@ export function CreatePOPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const toast = useToast();
+  const { confirm, confirmationModal } = useConfirm();
   const poId = searchParams.get('poId');
 
   const userId = useAppSelector(selectUserId);
@@ -278,7 +282,7 @@ export function CreatePOPage() {
     async (asDraft: boolean) => {
       if (!asDraft && !validate()) return;
       if (!userId || !userName) {
-        alert('User information is missing');
+        toast.error('User information is missing');
         return;
       }
 
@@ -286,12 +290,12 @@ export function CreatePOPage() {
       const vName = vendorName.trim();
       const vContact = vendorContact.trim();
       if (!vName || !vContact) {
-        alert('Vendor name and contact are required');
+        toast.error('Vendor name and contact are required');
         return;
       }
 
       if (items.length === 0) {
-        alert('At least one item is required');
+        toast.error('At least one item is required');
         return;
       }
 
@@ -307,7 +311,7 @@ export function CreatePOPage() {
         return false;
       });
       if (invalidItem) {
-        alert(
+        toast.error(
           `Please review ${invalidItem.itemName}. Quantity must be positive and steel conversions must resolve to whole pieces.`
         );
         return;
@@ -382,12 +386,16 @@ export function CreatePOPage() {
             ? 'Purchase order approved.'
             : 'Purchase order submitted for approval.';
 
-        if (confirm(`${successMsg} Print?`)) {
+        const ok = await confirm({
+          title: 'Print?',
+          message: `${successMsg} Would you like to print?`,
+        });
+        if (ok) {
           try {
             const toPrint = poForPrint ?? (await getPOById(savedPoId));
             if (toPrint) await printPurchaseOrder(toPrint);
           } catch (err) {
-            alert(err instanceof Error ? err.message : 'Failed to print');
+            toast.error(err instanceof Error ? err.message : 'Failed to print');
           }
         }
         navigate('/purchase-orders');
@@ -430,37 +438,43 @@ export function CreatePOPage() {
       editingPOStatus,
       dispatch,
       navigate,
+      toast,
+      confirm,
     ]
   );
 
-  const handleDeleteDraft = useCallback(() => {
+  const handleDeleteDraft = useCallback(async () => {
     if (!poId || editingPOStatus !== 'draft' || !userId) return;
-    if (!confirm('Are you sure you want to delete this draft? This cannot be undone.')) return;
+    const ok = await confirm({
+      title: 'Delete Draft?',
+      message: 'Are you sure you want to delete this draft? This cannot be undone.',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     setIsDeleting(true);
-    dispatch(deletePO({ poId, userId }))
-      .unwrap()
-      .then(() => {
-        alert('Draft deleted');
-        navigate('/purchase-orders');
-      })
-      .catch((err: unknown) => {
-        alert(err instanceof Error ? err.message : 'Failed to delete draft');
-      })
-      .finally(() => setIsDeleting(false));
-  }, [poId, editingPOStatus, userId, dispatch, navigate]);
+    try {
+      await dispatch(deletePO({ poId, userId })).unwrap();
+      toast.success('Draft deleted');
+      navigate('/purchase-orders');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete draft');
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [poId, editingPOStatus, userId, dispatch, navigate, toast, confirm]);
 
   const handlePrintDraft = useCallback(async () => {
     if (!poNumber.trim()) {
-      alert('P.O. No. is required to print.');
+      toast.error('P.O. No. is required to print.');
       return;
     }
     if (!vendorName.trim() || !vendorContact.trim()) {
-      alert('Vendor name and contact are required to print.');
+      toast.error('Vendor name and contact are required to print.');
       return;
     }
     if (items.length === 0) {
-      alert('Add at least one item to print.');
+      toast.error('Add at least one item to print.');
       return;
     }
     try {
@@ -482,7 +496,7 @@ export function CreatePOPage() {
       );
       await printPurchaseOrder(draftPO);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to print');
+      toast.error(err instanceof Error ? err.message : 'Failed to print');
     }
   }, [
     vendorName,
@@ -497,6 +511,7 @@ export function CreatePOPage() {
     expectedDeliveryDate,
     userName,
     poNumber,
+    toast,
   ]);
 
   const currentHash = JSON.stringify({
@@ -595,6 +610,7 @@ export function CreatePOPage() {
 
   return (
     <div className="space-y-6">
+      {confirmationModal}
       <button
         type="button"
         onClick={() => navigate(-1)}

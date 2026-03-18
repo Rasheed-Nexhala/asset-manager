@@ -107,8 +107,9 @@ export function CentralStoreInventoryPage() {
 
   const handleLoadMore = useCallback(() => {
     if (!hasMore || loadingMore) return;
+    if (totalCount != null && allItems.length >= totalCount) return;
     dispatch(loadMoreItems());
-  }, [dispatch, hasMore, loadingMore]);
+  }, [dispatch, hasMore, loadingMore, totalCount, allItems.length]);
 
   const handleAddItem = useCallback(() => navigate('/inventory/add'), [navigate]);
   const handleSteelMaster = useCallback(() => navigate('/inventory/steel-master'), [navigate]);
@@ -417,8 +418,8 @@ export function CentralStoreInventoryPage() {
             </div>
           </div>
 
-          {/* Load more - matches PO and Requests pages */}
-          {hasMore && (
+          {/* Load more - only when there is more to load */}
+          {hasMore && (totalCount == null || allItems.length < totalCount) && (
             <div className="flex justify-center py-4">
               {loadingMore ? (
                 <LoadingSpinner className="h-6 w-6 text-blue-800" />
@@ -426,7 +427,7 @@ export function CentralStoreInventoryPage() {
                 <button
                   type="button"
                   onClick={handleLoadMore}
-                  className="text-[15px] font-medium text-blue-800 hover:underline"
+                  className="px-6 py-2 rounded-lg bg-blue-800/10 text-[15px] font-medium text-blue-800 hover:bg-blue-800/20"
                   aria-label="Load more items"
                 >
                   Load more

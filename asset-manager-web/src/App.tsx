@@ -7,6 +7,7 @@ import { useUserRoleSync } from './hooks/useUserRoleSync';
 import { useInventoryAccessSync } from './hooks/useInventoryAccessSync';
 import { useManagerValidationSync } from './hooks/useManagerValidationSync';
 import { WeightViewPreferenceProvider } from './hooks/useWeightViewPreference';
+import { ToastProvider } from './contexts/ToastContext';
 import { router } from './router';
 import { AuthCheckingPage } from './pages/AuthCheckingPage';
 
@@ -29,7 +30,9 @@ function AppContent() {
 function App() {
   return (
     <WeightViewPreferenceProvider>
-      <AppContent />
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
     </WeightViewPreferenceProvider>
   );
 }

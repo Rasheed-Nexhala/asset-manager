@@ -48,7 +48,7 @@ export function NotificationCenterPage() {
     if (data?.screen === 'ItemDetail' && data?.itemId) {
       return `/inventory/${data.itemId}`;
     }
-    if (data?.screen === 'InventoryUpdateRequests') return '/inventory/categories';
+    if (data?.screen === 'InventoryUpdateRequests') return '/inventory/update-requests';
     if (data?.screen === 'Users') return '/admin/users';
     return '/requests/queue';
   }, []);

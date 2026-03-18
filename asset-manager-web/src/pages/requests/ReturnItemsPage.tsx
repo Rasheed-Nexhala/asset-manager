@@ -19,6 +19,7 @@ import { isWeightBasedItem } from '../../utils/weightConversionUtils';
 import { Icon } from '../../components/shared/Icon';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { QuickMoveToMaintenanceButton } from '../../components/maintenance/QuickMoveToMaintenanceButton';
+import { useToast } from '../../contexts/ToastContext';
 import type {
   Request,
   RequestItem,
@@ -62,6 +63,7 @@ export function ReturnItemsPage() {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const toast = useToast();
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
@@ -116,7 +118,7 @@ export function ReturnItemsPage() {
             }))
           );
         } else if (!cancelled) {
-          window.alert(
+          toast.error(
             'Only transferred or partially returned requests have items that can be returned'
           );
           navigate(-1);
@@ -124,7 +126,7 @@ export function ReturnItemsPage() {
       })
       .catch(() => {
         if (!cancelled) {
-          window.alert('Failed to load request');
+          toast.error('Failed to load request');
           navigate(-1);
         }
       })
@@ -134,7 +136,7 @@ export function ReturnItemsPage() {
     return () => {
       cancelled = true;
     };
-  }, [requestId, navigate, nonConsumableItems]);
+  }, [requestId, navigate, nonConsumableItems, toast]);
 
   const updateItem = useCallback(
     (itemId: string, updates: Partial<ReturnItemState>) => {
@@ -182,10 +184,10 @@ export function ReturnItemsPage() {
         })
       ).unwrap();
 
-      window.alert('Items returned successfully');
+      toast.success('Items returned successfully');
       navigate(-1);
     } catch (error: unknown) {
-      window.alert(
+      toast.error(
         error instanceof Error ? error.message : 'Failed to return items'
       );
     } finally {

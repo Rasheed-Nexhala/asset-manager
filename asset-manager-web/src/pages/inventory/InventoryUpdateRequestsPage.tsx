@@ -17,6 +17,7 @@ import {
 import { selectIsAdmin } from '../../store/selectors/authSelectors';
 import { clearError } from '../../store/slices/inventoryUpdateRequestSlice';
 import type { InventoryUpdateRequest } from '../../types/inventoryUpdateRequest';
+import { useToast } from '../../contexts/ToastContext';
 import { Icon } from '../../components/shared/Icon';
 import { InventoryUpdateRequestCard } from '../../components/inventory/InventoryUpdateRequestCard';
 import { ActiveAccessCard } from '../../components/inventory/ActiveAccessCard';
@@ -46,6 +47,7 @@ export function InventoryUpdateRequestsPage() {
   const isLoading = useAppSelector(selectInventoryUpdateRequestLoading);
   const error = useAppSelector(selectInventoryUpdateRequestError);
   const isAdmin = useAppSelector(selectIsAdmin);
+  const toast = useToast();
 
   useEffect(() => {
     if (isAdmin) dispatch(fetchPendingRequests());
@@ -65,12 +67,12 @@ export function InventoryUpdateRequestsPage() {
           approveInventoryUpdateRequest({ requestId, expiresInHours: 24 })
         ).unwrap();
       } catch (err) {
-        window.alert(err instanceof Error ? err.message : 'Failed to approve request');
+        toast.error(err instanceof Error ? err.message : 'Failed to approve request');
       } finally {
         setApprovingId(null);
       }
     },
-    [dispatch]
+    [dispatch, toast]
   );
 
   const handleRejectPress = useCallback((request: InventoryUpdateRequest) => {
@@ -91,11 +93,11 @@ export function InventoryUpdateRequestsPage() {
       ).unwrap();
       setRequestToReject(null);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Failed to reject request');
+      toast.error(err instanceof Error ? err.message : 'Failed to reject request');
     } finally {
       setRejectingId(null);
     }
-  }, [dispatch, requestToReject, rejectionReason]);
+  }, [dispatch, requestToReject, rejectionReason, toast]);
 
   const handleRejectCancel = useCallback(() => {
     setRequestToReject(null);
@@ -112,12 +114,12 @@ export function InventoryUpdateRequestsPage() {
           await dispatch(restoreInventoryUpdateAccess(requestId)).unwrap();
         }
       } catch (err) {
-        window.alert(err instanceof Error ? err.message : 'Failed to update access');
+        toast.error(err instanceof Error ? err.message : 'Failed to update access');
       } finally {
         setTogglingId(null);
       }
     },
-    [dispatch]
+    [dispatch, toast]
   );
 
   const handleBack = useCallback(() => navigate(-1), [navigate]);

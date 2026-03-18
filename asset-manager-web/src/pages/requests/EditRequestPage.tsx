@@ -18,6 +18,8 @@ import { RequestItemCard } from '../../components/requests/RequestItemCard';
 import { ItemSelectorModal } from '../../components/shared/ItemSelectorModal';
 import { Icon } from '../../components/shared/Icon';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
+import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../hooks';
 import type {
   RequestPriority,
   EditRequestData,
@@ -34,6 +36,8 @@ export function EditRequestPage() {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const toast = useToast();
+  const { confirm, confirmationModal } = useConfirm();
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
@@ -71,13 +75,13 @@ export function EditRequestPage() {
           setPurpose(r.purpose ?? '');
           setItems(r.items ?? []);
         } else if (!cancelled) {
-          window.alert('Only draft requests can be edited');
+          toast.error('Only draft requests can be edited');
           navigate(-1);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          window.alert('Failed to load request');
+          toast.error('Failed to load request');
           navigate(-1);
         }
       })
@@ -87,7 +91,7 @@ export function EditRequestPage() {
     return () => {
       cancelled = true;
     };
-  }, [requestId, navigate]);
+  }, [requestId, navigate, toast]);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -135,21 +139,26 @@ export function EditRequestPage() {
   };
 
   const handleDeleteDraft = useCallback(async () => {
-    if (!window.confirm('Are you sure you want to delete this draft? This cannot be undone.')) return;
-    if (!userId || !requestId) return;
+    const ok = await confirm({
+      title: 'Delete Draft?',
+      message: 'Are you sure you want to delete this draft? This cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok || !userId || !requestId) return;
     setIsDeleting(true);
     try {
       await dispatch(deleteRequest({ requestId, userId })).unwrap();
-      window.alert('Draft deleted');
+      toast.success('Draft deleted');
       navigate(isSiteManager ? '/requests/my-requests' : '/requests/queue');
     } catch (error: unknown) {
-      window.alert(
+      toast.error(
         error instanceof Error ? error.message : 'Failed to delete draft'
       );
     } finally {
       setIsDeleting(false);
     }
-  }, [requestId, userId, dispatch, navigate, isSiteManager]);
+  }, [requestId, userId, dispatch, navigate, isSiteManager, confirm, toast]);
 
   const handleSubmit = async (isDraft: boolean = true) => {
     if (!isDraft && !validateForm()) return;
@@ -180,12 +189,12 @@ export function EditRequestPage() {
         await dispatch(submitDraftRequest({ requestId, userId })).unwrap();
       }
 
-      window.alert(
+      toast.success(
         isDraft ? 'Draft saved successfully' : 'Request submitted successfully'
       );
       navigate(isSiteManager ? '/requests/my-requests' : '/requests/queue');
     } catch (error: unknown) {
-      window.alert(
+      toast.error(
         error instanceof Error ? error.message : 'Failed to update request'
       );
     } finally {
@@ -354,6 +363,7 @@ export function EditRequestPage() {
         excludeItemIds={items.map((i) => i.itemId)}
         allowedItemTypes={['consumable', 'non_consumable']}
       />
+      {confirmationModal}
     </div>
   );
 }

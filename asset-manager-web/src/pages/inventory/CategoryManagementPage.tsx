@@ -13,6 +13,8 @@ import {
   selectItemsLoading,
 } from '../../store/selectors/inventorySelectors';
 import { useInventoryError } from '../../hooks/useInventoryError';
+import { useConfirm } from '../../hooks';
+import { useToast } from '../../contexts/ToastContext';
 import { subscribeCategories, checkItemsUsingCategory } from '../../services/firebase/categoryService';
 import { setCategories } from '../../store/slices/inventorySlice';
 import type { Category, Item } from '../../types/inventory';
@@ -32,6 +34,8 @@ export function CategoryManagementPage() {
   const allItems = useAppSelector(selectAllItems);
   const isLoading = useAppSelector(selectItemsLoading);
   const error = useInventoryError();
+  const { confirm, confirmationModal } = useConfirm();
+  const toast = useToast();
 
   const itemsByCategory = useMemo(() => {
     const map: Record<string, Item[]> = {};
@@ -64,35 +68,33 @@ export function CategoryManagementPage() {
       try {
         const itemCount = await checkItemsUsingCategory(category.id);
         if (itemCount > 0) {
-          window.alert(
+          toast.error(
             `This category has ${itemCount} item${itemCount > 1 ? 's' : ''} associated with it. Please reassign these items to another category before deleting.`
           );
           return;
         }
-        if (
-          !window.confirm(
-            `Are you sure you want to delete "${category.name}"? This action cannot be undone.`
-          )
-        )
-          return;
+        const ok = await confirm({
+          title: 'Delete Category?',
+          message: `Are you sure you want to delete "${category.name}"? This action cannot be undone.`,
+          variant: 'danger',
+        });
+        if (!ok) return;
         await dispatch(deleteCategory(category.id)).unwrap();
       } catch (err) {
-        window.alert(
-          err instanceof Error ? err.message : 'Failed to delete category'
-        );
+        toast.error(err instanceof Error ? err.message : 'Failed to delete category');
       }
     },
-    [dispatch]
+    [dispatch, confirm, toast]
   );
 
   const handleCreateCategory = useCallback(async () => {
     const trimmed = newCategoryName.trim();
     if (!trimmed) {
-      window.alert('Please enter a category name');
+      toast.error('Please enter a category name');
       return;
     }
     if (trimmed.length > 50) {
-      window.alert('Category name must be 50 characters or less');
+      toast.error('Category name must be 50 characters or less');
       return;
     }
     try {
@@ -101,11 +103,11 @@ export function CategoryManagementPage() {
       setNewCategoryName('');
       setShowAddModal(false);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Failed to create category');
+      toast.error(err instanceof Error ? err.message : 'Failed to create category');
     } finally {
       setIsCreating(false);
     }
-  }, [dispatch, newCategoryName]);
+  }, [dispatch, newCategoryName, toast]);
 
   const safeCategories = Array.isArray(categories) ? categories : [];
   const filteredCategories = safeCategories.filter((c) =>
@@ -280,6 +282,8 @@ export function CategoryManagementPage() {
           </div>
         </div>
       )}
+
+      {confirmationModal}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
 import { FormField } from '../../components/auth/FormField';
 import { Icon } from '../../components/shared/Icon';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
+import { useToast } from '../../contexts/ToastContext';
 import type { RejectRequestData } from '../../types/request';
 
 const REJECTION_REASONS: Array<{
@@ -26,6 +27,7 @@ export function RejectRequestPage() {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const toast = useToast();
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
@@ -77,10 +79,10 @@ export function RejectRequestPage() {
           processedByName: userName,
         })
       ).unwrap();
-      window.alert('Request rejected');
+      toast.success('Request rejected');
       navigate(-1);
     } catch (error: unknown) {
-      window.alert(
+      toast.error(
         error instanceof Error ? error.message : 'Failed to reject request'
       );
     } finally {

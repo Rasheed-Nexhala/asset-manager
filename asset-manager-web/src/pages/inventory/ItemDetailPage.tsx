@@ -29,6 +29,8 @@ import { RequestAccessBanner } from '../../components/inventory/RequestAccessBan
 import { RequestInventoryAccessModal } from '../../components/inventory/RequestInventoryAccessModal';
 import { InventoryAdjustmentModal } from '../../components/inventory/InventoryAdjustmentModal';
 import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
+import { useConfirm } from '../../hooks';
+import { useToast } from '../../contexts/ToastContext';
 import { InventoryLoadingState } from '../../components/shared/InventoryLoadingState';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 
@@ -113,6 +115,8 @@ export function ItemDetailPage() {
   const myAccessGrantedUntil = useAppSelector(selectMyAccessGrantedUntil);
 
   const { viewMode, toggleViewMode } = useWeightViewPreference();
+  const { confirm, confirmationModal } = useConfirm();
+  const toast = useToast();
   const [adjustmentMode, setAdjustmentMode] = useState<AdjustmentType | null>(null);
   const [showRequestAccessModal, setShowRequestAccessModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -183,7 +187,7 @@ export function ItemDetailPage() {
       try {
         await dispatch(createInventoryUpdateRequest(reason)).unwrap();
         setShowRequestAccessModal(false);
-        window.alert('Request Submitted. Admin will review it shortly.');
+        toast.success('Request Submitted. Admin will review it shortly.');
       } catch (err) {
         throw new Error(err instanceof Error ? err.message : 'Failed to submit request');
       } finally {
@@ -203,26 +207,26 @@ export function ItemDetailPage() {
         inMaintenanceQuantity: item.inMaintenanceQuantity,
       });
       if (!result.canDelete) {
-        window.alert(result.reason ?? 'This item cannot be deleted.');
+        toast.error(result.reason ?? 'This item cannot be deleted.');
         return;
       }
-      if (
-        !window.confirm(
-          `Delete ${item.name}? This cannot be undone. Historical POs and maintenance records will keep the item name for reference.`
-        )
-      )
-        return;
+      const ok = await confirm({
+        title: 'Delete Item?',
+        message: `Delete ${item.name}? This cannot be undone. Historical POs and maintenance records will keep the item name for reference.`,
+        variant: 'danger',
+      });
+      if (!ok) return;
       setIsDeleting(true);
       await dispatch(deleteItem(itemId)).unwrap();
-      window.alert('Item deleted.');
+      toast.success('Item deleted.');
       navigate(-1);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Failed to delete item');
+      toast.error(err instanceof Error ? err.message : 'Failed to delete item');
     } finally {
       setIsCheckingDelete(false);
       setIsDeleting(false);
     }
-  }, [itemId, item, dispatch, navigate]);
+  }, [itemId, item, dispatch, navigate, confirm, toast]);
 
   useEffect(() => {
     return () => {
@@ -589,6 +593,8 @@ export function ItemDetailPage() {
           loading={isSubmitting}
         />
       )}
+
+      {confirmationModal}
     </div>
   );
 }

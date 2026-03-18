@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Icon } from '../../components/shared/Icon';
+import { useToast } from '../../contexts/ToastContext';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { printPurchaseOrder } from '../../utils/poPdfUtils';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
@@ -41,6 +42,7 @@ export function ApprovePOPage() {
   const { poId } = useParams<{ poId: string }>();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const userId = useAppSelector(selectUserId);
@@ -100,9 +102,9 @@ export function ApprovePOPage() {
         await printPurchaseOrder(po);
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to print');
+      toast.error(err instanceof Error ? err.message : 'Failed to print');
     }
-  }, [po, poId, isAdmin, userId, userName, dispatch]);
+  }, [po, poId, isAdmin, userId, userName, dispatch, toast]);
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -122,7 +124,7 @@ export function ApprovePOPage() {
         const refreshed = await getPOById(poId);
         if (refreshed) setPo(refreshed);
       } catch (err) {
-        alert(
+        toast.error(
           err instanceof Error ? err.message : 'Failed to upload signed document'
         );
       } finally {
@@ -130,7 +132,7 @@ export function ApprovePOPage() {
         e.target.value = '';
       }
     },
-    [poId, dispatch]
+    [poId, dispatch, toast]
   );
 
   const handleApprove = useCallback(async () => {
@@ -145,14 +147,14 @@ export function ApprovePOPage() {
           data: { adminComments: adminComments.trim() || undefined },
         })
       ).unwrap();
-      alert('Purchase order approved.');
+      toast.success('Purchase order approved.');
       navigate(-1);
     } catch {
       // Thunk dispatches setError
     } finally {
       setSaving(false);
     }
-  }, [poId, userId, userName, adminComments, dispatch, navigate]);
+  }, [poId, userId, userName, adminComments, dispatch, navigate, toast]);
 
   const handleReject = useCallback(async () => {
     const reason = rejectionReason.trim();
@@ -174,28 +176,28 @@ export function ApprovePOPage() {
           },
         })
       ).unwrap();
-      alert('Purchase order rejected.');
+      toast.success('Purchase order rejected.');
       navigate(-1);
     } catch {
       // Thunk dispatches setError
     } finally {
       setSaving(false);
     }
-  }, [poId, userId, userName, rejectionReason, adminComments, dispatch, navigate]);
+  }, [poId, userId, userName, rejectionReason, adminComments, dispatch, navigate, toast]);
 
   const handleMarkOrdered = useCallback(async () => {
     if (!poId) return;
     setSaving(true);
     try {
       await dispatch(markPOOrdered({ poId })).unwrap();
-      alert('Purchase order marked as ordered.');
+      toast.success('Purchase order marked as ordered.');
       navigate(-1);
     } catch {
       // Thunk dispatches setError
     } finally {
       setSaving(false);
     }
-  }, [poId, dispatch, navigate]);
+  }, [poId, dispatch, navigate, toast]);
 
   if (loading || !po) {
     return (

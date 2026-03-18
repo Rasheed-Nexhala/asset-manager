@@ -16,3 +16,4 @@ export {
 export { useAutoClearError } from './useAutoClearError';
 export { useInventoryError } from './useInventoryError';
 export { useUnreadNotificationCount } from './useUnreadNotificationCount';
+export { useConfirm } from './useConfirm';

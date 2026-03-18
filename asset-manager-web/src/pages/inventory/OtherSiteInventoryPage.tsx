@@ -18,6 +18,7 @@ import { getSite } from '../../services/firebase/siteService';
 import { getLocationId } from '../../utils/locationUtils';
 import type { Site } from '../../types/sites';
 import type { InventoryEntry, Item } from '../../types/inventory';
+import { useToast } from '../../contexts/ToastContext';
 import { InventorySubNav } from '../../components/inventory';
 import { InventoryListItem } from '../../components/inventory/InventoryListItem';
 import { Icon } from '../../components/shared/Icon';
@@ -46,6 +47,7 @@ export function OtherSiteInventoryPage() {
     () => sites.find((s) => s.id === myAssignedSiteId) ?? null,
     [sites, myAssignedSiteId]
   );
+  const toast = useToast();
 
   useEffect(() => {
     if (sites.length === 0) {
@@ -105,11 +107,11 @@ export function OtherSiteInventoryPage() {
   const handleRequestTransfer = useCallback(
     (entry: InventoryEntry, item: Item) => {
       if (!myAssignedSiteId || !myAssignedSite) {
-        window.alert('You need to be assigned to a site before requesting a transfer.');
+        toast.error('You need to be assigned to a site before requesting a transfer.');
         return;
       }
       if (entry.quantity <= 0) {
-        window.alert(
+        toast.error(
           `There is no available stock of "${entry.itemName}" at ${site?.name ?? 'this site'}.`
         );
         return;
@@ -136,7 +138,7 @@ export function OtherSiteInventoryPage() {
         },
       });
     },
-    [siteId, site, myAssignedSiteId, myAssignedSite, navigate]
+    [siteId, site, myAssignedSiteId, myAssignedSite, navigate, toast]
   );
 
   useEffect(() => {

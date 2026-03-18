@@ -14,6 +14,9 @@ export const selectSelectedPO = (state: RootState) =>
 export const selectVendors = (state: RootState) =>
   state.purchaseOrders.vendors;
 
+export const selectVendorsLoading = (state: RootState) =>
+  state.purchaseOrders.vendorsLoading;
+
 export const selectPurchaseOrderLoading = (state: RootState) =>
   state.purchaseOrders.loading;
 

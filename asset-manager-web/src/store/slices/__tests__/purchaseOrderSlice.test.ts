@@ -2,6 +2,7 @@ import purchaseOrderReducer, {
   setPurchaseOrders,
   setSelectedPO,
   setVendors,
+  setVendorsLoading,
   addOrUpdatePO,
   setFilters,
   setLoading,
@@ -29,6 +30,7 @@ describe('purchaseOrderSlice', () => {
     purchaseOrders: [],
     selectedPO: null,
     vendors: [],
+    vendorsLoading: false,
     loading: false,
     loadingMore: false,
     error: null,
@@ -56,12 +58,19 @@ describe('purchaseOrderSlice', () => {
     expect(state.selectedPO).toEqual(mockPO);
   });
 
-  it('setVendors sets vendors with deduplication', () => {
+  it('setVendors sets vendors with deduplication and clears loading', () => {
+    const loadingState = { ...initialState, vendorsLoading: true };
     const state = purchaseOrderReducer(
-      initialState,
+      loadingState,
       setVendors([mockVendor, { ...mockVendor, id: 'v1' }] as never[])
     );
     expect(state.vendors).toHaveLength(1);
+    expect(state.vendorsLoading).toBe(false);
+  });
+
+  it('setVendorsLoading sets vendors loading state', () => {
+    const state = purchaseOrderReducer(initialState, setVendorsLoading(true));
+    expect(state.vendorsLoading).toBe(true);
   });
 
   it('addOrUpdatePO adds new PO', () => {
