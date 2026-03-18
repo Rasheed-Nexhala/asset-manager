@@ -339,14 +339,14 @@ export function DashboardPage() {
               </>
             )}
 
-            {!isAdmin && !isStoreIncharge && !isSiteManager && !isActive && roleType === 'Unassigned' && (
+            {!isAdmin && !isStoreIncharge && !isSiteManager && roleType === 'Unassigned' && (
               <div
-                className="bg-amber-600/15 rounded-[10px] p-4 border border-amber-600/30 flex items-center"
+                className="bg-amber-600/15 rounded-[10px] p-4 lg:p-6 border border-amber-600/30 flex items-center gap-4"
                 role="alert"
               >
-                <Icon name="exclamation-triangle" className="h-6 w-6 text-amber-600 shrink-0" />
-                <p className="text-[15px] text-amber-600 ml-3 flex-1">
-                  Your account will be activated once the Admin activates it and assigns you a role.
+                <Icon name="exclamation-triangle" className="h-8 w-8 text-amber-600 shrink-0" />
+                <p className="text-[15px] text-amber-600 flex-1">
+                  The Admin has to accept you and assign you a role for you to access this application.
                 </p>
               </div>
             )}
@@ -369,19 +369,21 @@ export function DashboardPage() {
             
             <MyRecentActivityWidget onViewAll={() => navigate('/activity/my-activity')} />
 
-            <div className="bg-white rounded-[10px] p-4 lg:p-6 border border-slate-200 shadow-sm">
-              <h3 className="text-[17px] font-semibold text-slate-900 mb-4">Quick Links</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <Link to="/inventory" className="flex flex-col items-center justify-center p-3 rounded-lg border border-slate-100 hover:border-blue-300 hover:bg-blue-50 transition-all text-center">
-                  <Icon name="cube" className="h-6 w-6 text-blue-800 mb-2" />
-                  <span className="text-[13px] font-medium text-slate-700">Inventory</span>
-                </Link>
-                <Link to="/profile" className="flex flex-col items-center justify-center p-3 rounded-lg border border-slate-100 hover:border-blue-300 hover:bg-blue-50 transition-all text-center">
-                  <Icon name="user-circle" className="h-6 w-6 text-blue-800 mb-2" />
-                  <span className="text-[13px] font-medium text-slate-700">My Profile</span>
-                </Link>
+            {roleType !== 'Unassigned' && (
+              <div className="bg-white rounded-[10px] p-4 lg:p-6 border border-slate-200 shadow-sm">
+                <h3 className="text-[17px] font-semibold text-slate-900 mb-4">Quick Links</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <Link to="/inventory" className="flex flex-col items-center justify-center p-3 rounded-lg border border-slate-100 hover:border-blue-300 hover:bg-blue-50 transition-all text-center">
+                    <Icon name="cube" className="h-6 w-6 text-blue-800 mb-2" />
+                    <span className="text-[13px] font-medium text-slate-700">Inventory</span>
+                  </Link>
+                  <Link to="/profile" className="flex flex-col items-center justify-center p-3 rounded-lg border border-slate-100 hover:border-blue-300 hover:bg-blue-50 transition-all text-center">
+                    <Icon name="user-circle" className="h-6 w-6 text-blue-800 mb-2" />
+                    <span className="text-[13px] font-medium text-slate-700">My Profile</span>
+                  </Link>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

@@ -8,6 +8,7 @@ import {
   selectIsStoreIncharge,
   selectIsSiteManager,
   selectUserId,
+  selectUserRoleType,
 } from '../../store/selectors/authSelectors';
 import { selectUserDisplayName } from '../../store/selectors/authSelectors';
 import { useUnreadNotificationCount } from '../../hooks/useUnreadNotificationCount';
@@ -35,7 +36,9 @@ export function TopHeader() {
   const isSiteManager = useAppSelector(selectIsSiteManager);
   const displayName = useAppSelector(selectUserDisplayName);
   const userId = useAppSelector(selectUserId);
+  const roleType = useAppSelector(selectUserRoleType);
   const unreadCount = useUnreadNotificationCount(userId);
+  const showNotifications = roleType !== 'Unassigned';
 
   const showInventory = isAdmin || isStoreIncharge || isSiteManager;
   const showRequests = isAdmin || isStoreIncharge || isSiteManager;
@@ -133,18 +136,20 @@ export function TopHeader() {
 
         {/* Notifications bell + Profile (both mobile and desktop) */}
         <div className="flex items-center gap-2 md:flex-1 md:justify-end">
-          <Link
-            to="/notifications"
-            className="relative flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
-            aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
-          >
-            <Icon name="bell" className="h-6 w-6" />
-            {unreadCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-medium text-white">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
-          </Link>
+          {showNotifications && (
+            <Link
+              to="/notifications"
+              className="relative flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
+              aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
+            >
+              <Icon name="bell" className="h-6 w-6" />
+              {unreadCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-medium text-white">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </Link>
+          )}
           <div className="relative">
             <button
               type="button"
