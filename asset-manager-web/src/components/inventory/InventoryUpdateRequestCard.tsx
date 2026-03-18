@@ -1,4 +1,5 @@
 import { Icon } from '../shared/Icon';
+import { LoadingSpinner } from '../shared/LoadingSpinner';
 import type { InventoryUpdateRequest, InventoryUpdateRequestStatus } from '../../types/inventoryUpdateRequest';
 
 const STATUS_CONFIG: Record<
@@ -44,13 +45,13 @@ export function InventoryUpdateRequestCard({
   const isDisabled = isApproving || isRejecting;
 
   return (
-    <div className="bg-white rounded-[10px] p-4 border border-slate-200">
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex-1">
-          <p className="text-[15px] font-semibold text-slate-900">{request.requestedByName}</p>
+    <div className="bg-white rounded-[10px] p-4 lg:p-6 border border-slate-200 shadow-sm">
+      <div className="flex justify-between items-start gap-3 mb-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-[15px] font-semibold text-slate-900 truncate">{request.requestedByName}</p>
           <p className="text-[13px] text-slate-500">{request.requestedByRole}</p>
         </div>
-        <span className={`px-2 py-1 rounded-full text-[12px] font-medium ${statusConfig.bg} ${statusConfig.text}`}>
+        <span className={`px-2 py-1 rounded-full text-[12px] font-medium shrink-0 ${statusConfig.bg} ${statusConfig.text}`}>
           {statusConfig.label}
         </span>
       </div>
@@ -60,15 +61,15 @@ export function InventoryUpdateRequestCard({
       </div>
       <p className="text-[13px] text-slate-500 mb-3">{formatRelativeTime(request.createdAt)}</p>
       {isPending && onApprove && onReject && (
-        <div className="flex gap-3 pt-2 border-t border-slate-200">
+        <div className="flex gap-3 pt-3 border-t border-slate-200">
           <button
             type="button"
             onClick={onApprove}
             disabled={isDisabled}
-            className="flex-1 bg-green-600 rounded-[10px] h-[50px] flex items-center justify-center gap-2 text-white font-semibold disabled:opacity-70"
+            className="flex-1 bg-green-600 hover:bg-green-700 transition-colors rounded-[10px] h-[50px] inline-flex items-center justify-center gap-2 text-[15px] font-semibold text-white disabled:opacity-70"
           >
             {isApproving ? (
-              <span className="animate-spin">...</span>
+              <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
             ) : (
               <Icon name="check-circle" className="w-5 h-5" />
             )}
@@ -78,10 +79,10 @@ export function InventoryUpdateRequestCard({
             type="button"
             onClick={onReject}
             disabled={isDisabled}
-            className="flex-1 border-2 border-red-600 rounded-[10px] h-[50px] flex items-center justify-center gap-2 text-red-600 font-semibold disabled:opacity-70"
+            className="flex-1 border-[1.5px] border-red-600 hover:bg-red-50 transition-colors rounded-[10px] h-[50px] inline-flex items-center justify-center gap-2 text-[15px] font-semibold text-red-600 disabled:opacity-70"
           >
             {isRejecting ? (
-              <span className="animate-spin">...</span>
+              <LoadingSpinner size="sm" className="!border-red-600/30 !border-t-red-600" />
             ) : (
               <Icon name="x-mark" className="w-5 h-5" />
             )}

@@ -282,7 +282,7 @@ export function DashboardPage() {
                 {(lowStockItemsWidget.length > 0 || isInitialLoad || dashboardLoading) && (
                   <LowStockAlertWidget
                     items={lowStockItemsWidget}
-                    onViewAll={() => navigate('/inventory?lowStockFilter=true')}
+                    onViewAll={() => navigate('/inventory/central?lowStockFilter=true')}
                     onCreatePO={(itemId) => {
                       const item = lowStockItemsWidget.find((i) => i.id === itemId);
                       if (!item) return;

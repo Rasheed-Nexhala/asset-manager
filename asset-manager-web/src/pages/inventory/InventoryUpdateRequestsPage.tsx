@@ -132,17 +132,22 @@ export function InventoryUpdateRequestsPage() {
 
   if (!isAdmin) {
     return (
-      <div className="flex flex-col h-full">
-        <header className="bg-white border-b border-slate-200 px-4 flex items-center h-14">
-          <button type="button" onClick={handleBack} className="w-12 h-12 -ml-2 flex items-center justify-center" aria-label="Go back">
+      <div className="flex flex-col min-h-0 flex-1">
+        <header className="bg-white border-b border-slate-200 px-4 md:px-6 flex items-center min-h-[56px] shrink-0">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="w-12 h-12 -ml-2 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
+            aria-label="Go back"
+          >
             <Icon name="arrow-left" className="w-6 h-6" />
           </button>
           <h1 className="text-[22px] font-semibold text-slate-900 flex-1">Inventory Update Requests</h1>
         </header>
-        <div className="flex-1 flex flex-col items-center justify-center px-4">
-          <Icon name="lock-closed" className="w-12 h-12 text-slate-400" />
+        <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-6 py-12">
+          <Icon name="lock-closed" className="w-16 h-16 text-slate-400" />
           <h2 className="text-[17px] font-semibold text-slate-900 mt-4 text-center">Admin Only</h2>
-          <p className="text-[15px] text-slate-500 mt-2 text-center">
+          <p className="text-[15px] text-slate-500 mt-2 text-center max-w-sm">
             This screen is only available to Admin users.
           </p>
         </div>
@@ -151,21 +156,27 @@ export function InventoryUpdateRequestsPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <header className="bg-white border-b border-slate-200 px-4 flex items-center h-14">
-        <button type="button" onClick={handleBack} className="w-12 h-12 -ml-2 flex items-center justify-center" aria-label="Go back">
+    <div className="flex flex-col min-h-0 flex-1">
+      <header className="bg-white border-b border-slate-200 px-4 md:px-6 flex items-center min-h-[56px] shrink-0">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="w-12 h-12 -ml-2 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
+          aria-label="Go back"
+        >
           <Icon name="arrow-left" className="w-6 h-6" />
         </button>
         <h1 className="text-[22px] font-semibold text-slate-900 flex-1">Inventory Update Requests</h1>
       </header>
 
       {error && (
-        <div className="bg-red-600/15 px-4 py-3 mx-4 mt-4 rounded-lg flex items-center gap-3">
-          <Icon name="exclamation-circle" className="w-6 h-6 text-red-600" />
+        <div className="bg-red-600/15 px-4 md:px-6 py-3 mx-4 md:mx-6 mt-4 rounded-lg flex items-center gap-3 border border-red-600/20">
+          <Icon name="exclamation-circle" className="w-6 h-6 text-red-600 shrink-0" />
           <p className="text-[15px] text-red-600 flex-1">{error}</p>
           <button
             type="button"
             onClick={() => dispatch(clearError())}
+            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-red-600/10 transition-colors"
             aria-label="Dismiss error"
           >
             <Icon name="x-mark" className="w-5 h-5 text-red-600" />
@@ -176,20 +187,20 @@ export function InventoryUpdateRequestsPage() {
       {isLoading && pendingRequests.length === 0 && activeApprovedRequests.length === 0 ? (
         <InventoryLoadingState message="Loading requests..." />
       ) : pendingRequests.length === 0 && activeApprovedRequests.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-4">
+        <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-6 py-12">
           <Icon name="document-text" className="w-20 h-20 text-slate-400" />
           <h2 className="text-[22px] font-semibold text-slate-900 mt-4 text-center">
             No pending requests
           </h2>
-          <p className="text-[15px] text-slate-500 mt-2 text-center">
+          <p className="text-[15px] text-slate-500 mt-2 text-center max-w-sm">
             All inventory update requests have been processed.
           </p>
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto pb-24">
           {activeAccessRequests.length > 0 && (
-            <div className="px-4 pt-4">
-              <h3 className="text-[17px] font-semibold text-slate-900 mb-3">Active Access</h3>
+            <div className="px-4 md:px-6 pt-6">
+              <h3 className="text-[17px] font-semibold text-slate-900 mb-1.5">Active Access</h3>
               <p className="text-[13px] text-slate-500 mb-3">Toggle off to revoke access.</p>
               <div className="flex flex-col gap-3">
                 {activeAccessRequests.map((req) => (
@@ -205,8 +216,8 @@ export function InventoryUpdateRequestsPage() {
           )}
 
           {inactiveAccessRequests.length > 0 && (
-            <div className="px-4 pt-6">
-              <h3 className="text-[17px] font-semibold text-slate-900 mb-3">Inactive Requests</h3>
+            <div className="px-4 md:px-6 pt-6">
+              <h3 className="text-[17px] font-semibold text-slate-900 mb-1.5">Inactive Requests</h3>
               <p className="text-[13px] text-slate-500 mb-3">Toggle on to restore access.</p>
               <div className="flex flex-col gap-3">
                 {inactiveAccessRequests.map((req) => (
@@ -222,8 +233,8 @@ export function InventoryUpdateRequestsPage() {
           )}
 
           {pendingRequests.length > 0 && (
-            <div className="px-4 pt-6 pb-4">
-              <h3 className="text-[17px] font-semibold text-slate-900 mb-3">Pending Requests</h3>
+            <div className="px-4 md:px-6 pt-6 pb-6">
+              <h3 className="text-[17px] font-semibold text-slate-900 mb-1.5">Pending Requests</h3>
               <div className="flex flex-col gap-3">
                 {pendingRequests.map((req) => (
                   <InventoryUpdateRequestCard
@@ -242,8 +253,8 @@ export function InventoryUpdateRequestsPage() {
       )}
 
       {requestToReject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-6">
-          <div className="bg-white rounded-[10px] p-4 max-w-md w-full">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 md:px-6">
+          <div className="bg-white rounded-[10px] p-4 lg:p-6 max-w-md w-full border border-slate-200 shadow-sm">
             <h3 className="text-[17px] font-semibold text-slate-900 mb-2">Reject Request</h3>
             <p className="text-[15px] text-slate-500 mb-3">
               Enter a reason for rejection (required):
@@ -251,7 +262,7 @@ export function InventoryUpdateRequestsPage() {
             <textarea
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg h-24 px-4 py-3 bg-white text-[15px] text-slate-900 mb-4 resize-none"
+              className="w-full border border-slate-200 rounded-lg h-24 px-4 py-3 bg-white text-[15px] text-slate-900 mb-4 resize-none focus:outline-none focus:border-blue-800 focus:ring-1 focus:ring-blue-800 disabled:opacity-70"
               placeholder="e.g. Please verify stock count first"
               disabled={!!rejectingId}
             />
@@ -260,7 +271,7 @@ export function InventoryUpdateRequestsPage() {
                 type="button"
                 onClick={handleRejectCancel}
                 disabled={!!rejectingId}
-                className="flex-1 border-2 border-blue-800 rounded-[10px] h-[50px] font-semibold text-blue-800"
+                className="flex-1 border-[1.5px] border-blue-800 hover:bg-blue-50 transition-colors rounded-[10px] h-[50px] inline-flex items-center justify-center text-[15px] font-semibold text-blue-800 disabled:opacity-70"
               >
                 Cancel
               </button>
@@ -268,7 +279,7 @@ export function InventoryUpdateRequestsPage() {
                 type="button"
                 onClick={handleRejectSubmit}
                 disabled={!!rejectingId}
-                className="flex-1 bg-red-600 rounded-[10px] h-[50px] flex items-center justify-center gap-2 font-semibold text-white"
+                className="flex-1 bg-red-600 hover:bg-red-700 transition-colors rounded-[10px] h-[50px] inline-flex items-center justify-center gap-2 text-[15px] font-semibold text-white disabled:opacity-70"
               >
                 {rejectingId ? (
                   <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />

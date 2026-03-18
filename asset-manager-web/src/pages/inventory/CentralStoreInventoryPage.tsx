@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import {
   fetchCategories,
@@ -48,11 +48,15 @@ const toItemFilters = (f: FilterState, searchTerm?: string): ItemFilters => ({
 });
 
 export function CentralStoreInventoryPage() {
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [filters, setLocalFilters] = useState<FilterState>({ stock: 'all' });
+  const lowStockFromUrl = searchParams.get('lowStockFilter') === 'true';
+  const [filters, setLocalFilters] = useState<FilterState>(() => ({
+    stock: lowStockFromUrl ? 'low_stock' : 'all',
+  }));
   const [showFilters, setShowFilters] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -85,6 +89,12 @@ export function CentralStoreInventoryPage() {
     () => filteredItems.filter((item) => isLowStock(item)).length,
     [filteredItems]
   );
+
+  useEffect(() => {
+    if (lowStockFromUrl && filters.stock !== 'low_stock') {
+      setLocalFilters((p) => ({ ...p, stock: 'low_stock' }));
+    }
+  }, [lowStockFromUrl, filters.stock]);
 
   useEffect(() => {
     const itemFilters = toItemFilters(filters, debouncedSearch);

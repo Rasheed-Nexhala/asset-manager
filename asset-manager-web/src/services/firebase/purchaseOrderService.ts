@@ -63,7 +63,8 @@ const validatePoItemQuantities = (
     if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
       throw new Error(`Invalid quantity for ${item.itemName}`);
     }
-    if ((item.orderedUnit === 'Kg' || item.orderedUnit === 'Ton') && !Number.isInteger(item.quantity)) {
+    const isWeightUnit = item.orderedUnit === 'Kg' || item.orderedUnit === 'Ton' || item.orderedUnit === 'Ton (MT)';
+    if (isWeightUnit && !Number.isInteger(item.quantity)) {
       throw new Error(
         `Invalid quantity for ${item.itemName}. Weight-based orders must convert to whole pieces.`
       );

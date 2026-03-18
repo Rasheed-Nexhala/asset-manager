@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useState, useRef } from 'react';
+import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { FormField } from '../../components/auth/FormField';
 import { Icon } from '../../components/shared/Icon';
 import { useToast } from '../../contexts/ToastContext';
@@ -51,10 +51,17 @@ const formatCurrency = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 const formatCurrencyOrOptional = (n: number) =>
   n > 0 ? formatCurrency(n) : '—';
 
+interface CreatePOState {
+  selectedItems?: { id: string; name: string }[];
+  initialQuantities?: Record<string, number>;
+}
+
 export function CreatePOPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const routerLocation = useLocation();
   const dispatch = useAppDispatch();
+  const prefillAppliedRef = useRef(false);
   const toast = useToast();
   const { confirm, confirmationModal } = useConfirm();
   const poId = searchParams.get('poId');
@@ -96,6 +103,58 @@ export function CreatePOPage() {
     const unsub = subscribeToVendors((v) => dispatch(setVendors(v)));
     return unsub;
   }, [dispatch]);
+
+  // Pre-fill from Dashboard low-stock "Create PO" (matches React Native behavior)
+  useEffect(() => {
+    if (poId || prefillAppliedRef.current) return;
+    const state = routerLocation.state as CreatePOState | null;
+    const selected = state?.selectedItems;
+    const initialQty = state?.initialQuantities;
+    if (!selected?.length || !initialQty) return;
+
+    prefillAppliedRef.current = true;
+    (async () => {
+      try {
+        const results = await Promise.all(selected.map((s) => getItemById(s.id)));
+        const newItems: PurchaseOrderItem[] = results
+          .filter((item): item is Item => item != null)
+          .map((item) => {
+            const qty = initialQty[item.id] ?? 1;
+            const unitPrice = item.standardUnitPrice ?? 0;
+            const gstPct =
+              item.standardGstPercentage ??
+              (unitPrice > 0 ? DEFAULT_GST_PERCENTAGE : undefined);
+            const amount = unitPrice > 0 ? qty * unitPrice : 0;
+            return {
+              itemId: item.id,
+              itemName: item.name,
+              itemSku: item.sku ?? '',
+              unit: item.unit,
+              isExistingItem: true,
+              quantity: qty,
+              unitPrice,
+              amount,
+              gstPercentage: gstPct,
+              receivedQuantity: null,
+              orderedUnit: item.unit,
+              orderedQuantity: qty,
+              remarks: undefined,
+            };
+          });
+        if (newItems.length > 0) {
+          setItems(newItems);
+          setErrors((prev) => {
+            const next = { ...prev };
+            delete next.items;
+            return next;
+          });
+          navigate(routerLocation.pathname + routerLocation.search, { replace: true, state: undefined });
+        }
+      } catch (err) {
+        console.error('Failed to pre-fill PO from dashboard:', err);
+      }
+    })();
+  }, [poId, routerLocation.state, routerLocation.pathname, routerLocation.search, navigate]);
 
   const fetchInventoryDetails = useCallback(async (itemIds: string[]) => {
     const missingIds = itemIds.filter((id) => !inventoryItemsMap[id]);
@@ -301,11 +360,8 @@ export function CreatePOPage() {
 
       const invalidItem = items.find((i) => {
         if (i.quantity <= 0) return true;
-        if (
-          i.orderedUnit &&
-          (i.orderedUnit === 'Kg' || i.orderedUnit === 'Ton') &&
-          !Number.isInteger(i.quantity)
-        ) {
+        const isWeightUnit = i.orderedUnit === 'Kg' || i.orderedUnit === 'Ton' || i.orderedUnit === 'Ton (MT)';
+        if (i.orderedUnit && isWeightUnit && !Number.isInteger(i.quantity)) {
           return true;
         }
         return false;

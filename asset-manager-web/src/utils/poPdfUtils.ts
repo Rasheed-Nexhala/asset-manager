@@ -1,9 +1,51 @@
 /**
  * PO PDF utilities - Web version
- * Uses window.print() with generated HTML. Logo omitted (can add via public asset later).
+ * Uses window.print() with generated HTML. Logo embedded as base64 for reliable print rendering.
  */
 import type { PurchaseOrder, PurchaseOrderItem } from '../types/purchaseOrder';
 import { companyConfig } from '../config/company';
+
+/** Load company logo as data URL for embedding in PDF HTML. Returns empty string on failure. */
+async function loadLogoDataUrl(): Promise<string> {
+  try {
+    const url = `${window.location.origin}${companyConfig.logoPath}`;
+    const res = await fetch(url);
+    if (!res.ok) return '';
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string) ?? '');
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return '';
+  }
+}
+
+/** Wait for all images in the document to load before printing. */
+function waitForImages(win: Window, timeoutMs = 3000): Promise<void> {
+  const doc = win.document;
+  const images = Array.from(doc.images);
+  if (images.length === 0) return Promise.resolve();
+
+  const allLoaded = Promise.all(
+    images.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          if (img.complete) {
+            resolve();
+            return;
+          }
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        })
+    )
+  );
+  const timeout = new Promise<void>((resolve) =>
+    setTimeout(resolve, timeoutMs)
+  );
+  return Promise.race([allLoaded, timeout]);
+}
 
 const DEFAULT_GST_PERCENTAGE = 18;
 
@@ -44,7 +86,7 @@ function escapeHtml(text: string | null | undefined): string {
  */
 export function generatePOHtml(
   po: PurchaseOrder,
-  logoBase64?: string,
+  logoDataUrl?: string,
   approvedByName?: string
 ): string {
   const approvedByDisplay =
@@ -73,12 +115,11 @@ export function generatePOHtml(
     .map((line: string) => `<p style="margin: 0 0 2px; font-size: 16px; font-weight: bold; color: #000;">${escapeHtml(line.trim())}</p>`)
     .join('');
 
-  const logoImg =
-    logoBase64
-      ? `<img src="data:image/png;base64,${logoBase64}" alt="${escapeHtml(companyConfig.logoAlt)}" style="height: 60px; width: auto; display: block;" />`
-      : typeof window !== 'undefined'
-        ? `<img src="${window.location.origin}${companyConfig.logoPath}" alt="${escapeHtml(companyConfig.logoAlt)}" style="height: 60px; width: auto; display: block;" />`
-        : '';
+  const logoImg = logoDataUrl
+    ? `<img src="${escapeHtml(logoDataUrl)}" alt="${escapeHtml(companyConfig.logoAlt)}" style="height: 60px; width: auto; display: block;" />`
+    : typeof window !== 'undefined'
+      ? `<img src="${window.location.origin}${companyConfig.logoPath}" alt="${escapeHtml(companyConfig.logoAlt)}" style="height: 60px; width: auto; display: block;" />`
+      : '';
 
   return `<!DOCTYPE html>
 <html>
@@ -241,13 +282,16 @@ export async function printPurchaseOrder(
     window.open(signedUrl, '_blank', 'noopener,noreferrer');
     return;
   }
-  const html = generatePOHtml(po, undefined, approvedByName);
+  const logoDataUrl = await loadLogoDataUrl();
+  const html = generatePOHtml(po, logoDataUrl || undefined, approvedByName);
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
     throw new Error('Popup blocked. Allow popups to print.');
   }
   printWindow.document.write(html);
   printWindow.document.close();
+  await waitForImages(printWindow);
+  await new Promise((r) => setTimeout(r, 150));
   printWindow.focus();
   printWindow.print();
   printWindow.close();

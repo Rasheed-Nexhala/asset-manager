@@ -20,6 +20,12 @@ export function AuthCheckingPage() {
         </p>
         <LoadingSpinner size="lg" />
         <p className="text-[13px] text-slate-500">Restoring your session</p>
+        <p
+          className="text-[13px] text-slate-400"
+          aria-label="Powered by Nexhala"
+        >
+          Powered by Nexhala
+        </p>
       </div>
     </div>
   );

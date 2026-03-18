@@ -3,7 +3,9 @@ import { Icon } from '../shared/Icon';
 import {
   isWeightBasedItem,
   kgToPieces,
+  piecesToKg,
   tonToKg,
+  getConversionErrorMessage,
 } from '../../utils/weightConversionUtils';
 import type { PurchaseOrderItem } from '../../types/purchaseOrder';
 import type { Item } from '../../types/inventory';
@@ -66,7 +68,7 @@ export function POItemCard({
 
   useEffect(() => {
     if (item.orderedUnit === 'Kg') setEntryMode('kg');
-    else if (item.orderedUnit === 'Ton') setEntryMode('ton');
+    else if (item.orderedUnit === 'Ton' || item.orderedUnit === 'Ton (MT)') setEntryMode('ton');
     else setEntryMode('pieces');
   }, [item.orderedUnit]);
 
@@ -77,6 +79,40 @@ export function POItemCard({
   useEffect(() => {
     setGstStr((item.gstPercentage ?? 0) > 0 ? String(item.gstPercentage) : '');
   }, [item.itemId]);
+
+  const handleModeChange = (m: 'pieces' | 'kg' | 'ton') => {
+    setEntryMode(m);
+    setQtyError(null);
+    if (item.quantity > 0 && hasFullWeightConfig && inventoryItem) {
+      if (m === 'pieces') {
+        setQuantityStr(String(item.quantity));
+      } else if (m === 'kg') {
+        setQuantityStr(
+          String(
+            piecesToKg(
+              item.quantity,
+              inventoryItem.weightPerMeter!,
+              inventoryItem.lengthPerPiece!
+            )
+          )
+        );
+      } else {
+        setQuantityStr(
+          String(
+            piecesToKg(
+              item.quantity,
+              inventoryItem.weightPerMeter!,
+              inventoryItem.lengthPerPiece!
+            ) / 1000
+          )
+        );
+      }
+    } else if (item.quantity > 0) {
+      setQuantityStr(String(item.quantity));
+    } else {
+      setQuantityStr('');
+    }
+  };
 
   const handleQuantityInput = (text: string) => {
     setQuantityStr(text);
@@ -136,7 +172,13 @@ export function POItemCard({
         inventoryItem!.lengthPerPiece!
       );
       if (!res.isExact) {
-        setQtyError('Inexact conversion');
+        setQtyError(
+          getConversionErrorMessage(
+            kg,
+            inventoryItem!.weightPerMeter!,
+            inventoryItem!.lengthPerPiece!
+          )
+        );
         return;
       }
       setQtyError(null);
@@ -183,12 +225,7 @@ export function POItemCard({
                 <button
                   key={m}
                   type="button"
-                  onClick={() => {
-                    setEntryMode(m);
-                    setQuantityStr('');
-                    setQtyError(null);
-                    onQuantityChange?.(0, m === 'pieces' ? undefined : m === 'kg' ? 'Kg' : 'Ton', 0);
-                  }}
+                  onClick={() => handleModeChange(m)}
                   className={`rounded-md border px-3 py-1.5 text-[12px] font-medium ${
                     entryMode === m
                       ? 'border-blue-800 bg-blue-800 text-white'
@@ -219,7 +256,7 @@ export function POItemCard({
                 }`}
               />
               {qtyError && (
-                <p className="mt-1 text-[12px] text-red-600">{qtyError}</p>
+                <p className="mt-1 text-[12px] text-red-600 whitespace-pre-wrap">{qtyError}</p>
               )}
               {entryMode !== 'pieces' && !qtyError && item.quantity > 0 && (
                 <p className="mt-1 text-[12px] text-green-600">

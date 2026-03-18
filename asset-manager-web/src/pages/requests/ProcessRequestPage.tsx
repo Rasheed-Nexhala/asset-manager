@@ -234,20 +234,32 @@ export function ProcessRequestPage() {
 
   const handleCreatePOForShortfall = useCallback(() => {
     const shortfallItems = availability.filter((a) => !a.sufficient);
-    const qtyMap: Record<string, number> = {};
+    const selectedItems = shortfallItems.map((s) => ({
+      id: s.itemId,
+      name: s.itemName,
+    }));
+    const initialQuantities: Record<string, number> = {};
     shortfallItems.forEach((sa) => {
-      qtyMap[sa.itemId] = Math.max(0, sa.requested - sa.available);
+      initialQuantities[sa.itemId] = Math.max(0, sa.requested - sa.available);
     });
-    navigate(`/purchase-orders/create?prefill=${encodeURIComponent(JSON.stringify(qtyMap))}`);
+    navigate('/purchase-orders/new', {
+      state: { selectedItems, initialQuantities },
+    });
   }, [availability, navigate]);
 
   const handleCreatePOForReplenishment = useCallback(() => {
     if (replenishmentItems.length === 0) return;
-    const qtyMap: Record<string, number> = {};
+    const selectedItems = replenishmentItems.map((r) => ({
+      id: r.itemId,
+      name: r.itemName,
+    }));
+    const initialQuantities: Record<string, number> = {};
     replenishmentItems.forEach((r) => {
-      qtyMap[r.itemId] = r.qtyToReplenish;
+      initialQuantities[r.itemId] = r.qtyToReplenish;
     });
-    navigate(`/purchase-orders/create?prefill=${encodeURIComponent(JSON.stringify(qtyMap))}`);
+    navigate('/purchase-orders/new', {
+      state: { selectedItems, initialQuantities },
+    });
   }, [replenishmentItems, navigate]);
 
   const handleApprove = useCallback(async () => {

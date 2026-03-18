@@ -15,6 +15,7 @@ import { selectAssignedSiteIdForUser, selectSiteById } from '../store/selectors/
 import type { RootState } from '../store';
 import { useMemo } from 'react';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
+import { BrandFooter } from '../components/layout/BrandFooter';
 
 export function ProfilePage() {
   const dispatch = useAppDispatch();
@@ -157,6 +158,7 @@ export function ProfilePage() {
           </div>
         </section>
       </main>
+      <BrandFooter />
     </div>
   );
 }
