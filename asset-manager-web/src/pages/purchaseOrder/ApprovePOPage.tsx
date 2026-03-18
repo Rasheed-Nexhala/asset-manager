@@ -1,18 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Icon } from '../../components/shared/Icon';
 import { useToast } from '../../contexts/ToastContext';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { printPurchaseOrder } from '../../utils/poPdfUtils';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
-import { uploadPOSignedDocument } from '../../services/firebase/storageService';
 import {
   approvePO,
   rejectPO,
-  markPOOrdered,
-  recordPODownloadForSigning,
-  uploadSignedPO,
-  removeSignedPO,
 } from '../../store/thunks/purchaseOrderThunks';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { clearError, setError } from '../../store/slices/purchaseOrderSlice';
@@ -20,7 +15,6 @@ import {
   selectUserId,
   selectUserDisplayName,
   selectIsAdmin,
-  selectIsStoreIncharge,
 } from '../../store/selectors/authSelectors';
 import { selectPurchaseOrderError } from '../../store/selectors/purchaseOrderSelectors';
 import { PODocumentCard } from '../../components/purchaseOrder';
@@ -45,12 +39,10 @@ export function ApprovePOPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const toast = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
   const isAdmin = useAppSelector(selectIsAdmin);
-  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const reduxError = useAppSelector(selectPurchaseOrderError);
 
   const [po, setPo] = useState<PurchaseOrder | null>(null);
@@ -61,8 +53,6 @@ export function ApprovePOPage() {
   const [adminComments, setAdminComments] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectForm, setShowRejectForm] = useState(false);
-  const [uploadingSigned, setUploadingSigned] = useState(false);
-  const [removingSigned, setRemovingSigned] = useState(false);
 
   useEffect(() => {
     dispatch(clearError());
@@ -90,72 +80,11 @@ export function ApprovePOPage() {
   const handlePrint = useCallback(async () => {
     if (!po) return;
     try {
-      if (po.status === 'pending_approval' && isAdmin && userId && userName) {
-        await dispatch(
-          recordPODownloadForSigning({
-            poId: poId!,
-            adminId: userId,
-            adminName: userName,
-          })
-        ).unwrap();
-        const refreshed = await getPOById(poId!);
-        if (refreshed) setPo(refreshed);
-        await printPurchaseOrder(refreshed ?? po, userName);
-      } else {
-        await printPurchaseOrder(po);
-      }
+      await printPurchaseOrder(po);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to print');
     }
-  }, [po, poId, isAdmin, userId, userName, dispatch, toast]);
-
-  const handleFileChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file || !poId) return;
-
-      setUploadingSigned(true);
-      try {
-        const fileUri = URL.createObjectURL(file);
-        const { url } = await uploadPOSignedDocument(
-          fileUri,
-          poId,
-          file.name
-        );
-        URL.revokeObjectURL(fileUri);
-        await dispatch(uploadSignedPO({ poId, signedPdfUrl: url })).unwrap();
-        const refreshed = await getPOById(poId);
-        if (refreshed) setPo(refreshed);
-      } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : 'Failed to upload signed document'
-        );
-      } finally {
-        setUploadingSigned(false);
-        e.target.value = '';
-      }
-    },
-    [poId, dispatch, toast]
-  );
-
-  const handleRemoveSignedPO = useCallback(async () => {
-    if (!po?.signedPdfUrl?.trim() || !poId) return;
-    setRemovingSigned(true);
-    try {
-      await dispatch(
-        removeSignedPO({ poId, signedPdfUrl: po.signedPdfUrl })
-      ).unwrap();
-      const refreshed = await getPOById(poId);
-      if (refreshed) setPo(refreshed);
-      toast.success('Signed document removed. You can upload a different one.');
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to remove signed document'
-      );
-    } finally {
-      setRemovingSigned(false);
-    }
-  }, [po, poId, dispatch, toast]);
+  }, [po, toast]);
 
   const handleApprove = useCallback(async () => {
     if (!userId || !userName || !poId) return;
@@ -207,20 +136,6 @@ export function ApprovePOPage() {
     }
   }, [poId, userId, userName, rejectionReason, adminComments, dispatch, navigate, toast]);
 
-  const handleMarkOrdered = useCallback(async () => {
-    if (!poId) return;
-    setSaving(true);
-    try {
-      await dispatch(markPOOrdered({ poId })).unwrap();
-      toast.success('Purchase order marked as ordered.');
-      navigate(-1);
-    } catch {
-      // Thunk dispatches setError
-    } finally {
-      setSaving(false);
-    }
-  }, [poId, dispatch, navigate, toast]);
-
   if (loading || !po) {
     return (
       <div className="space-y-4">
@@ -270,7 +185,7 @@ export function ApprovePOPage() {
     );
   }
 
-  if (po.status === 'ordered' || po.status === 'partially_received') {
+  if (po.status === 'partially_received') {
     return (
       <div className="space-y-4">
         <button
@@ -283,24 +198,47 @@ export function ApprovePOPage() {
         </button>
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <p className="text-[15px] text-slate-500">
-            This PO has been{' '}
-            {po.status === 'partially_received'
-              ? 'partially received'
-              : 'marked as ordered'}
-            . You can receive it from the list.
+            This PO has been partially received. You can receive it from the list.
           </p>
         </div>
       </div>
     );
   }
 
-  const canMarkOrdered =
-    po.status === 'approved' && (isAdmin || isStoreIncharge);
+  if (po.status === 'ordered') {
+    return (
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="flex items-center gap-2 text-[15px] font-medium text-slate-600"
+        >
+          <Icon name="arrow-left" className="h-5 w-5" />
+          Back
+        </button>
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <p className="text-[15px] text-slate-500">
+            This PO can be received from the list.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const isAssignedAdmin =
+    po.assignedToAdminId != null && po.assignedToAdminId.trim() !== ''
+      ? po.assignedToAdminId === userId
+      : isAdmin;
+  const showApproveReject =
+    po.status === 'pending_approval' && isAdmin && isAssignedAdmin;
+  const isOtherAdminViewing =
+    po.status === 'pending_approval' && isAdmin && !isAssignedAdmin;
   const isReadOnly = ['received', 'rejected'].includes(po.status);
-  const showApproveReject = po.status === 'pending_approval' && isAdmin;
   const hasAnyPrice = (po.items ?? []).some(
     (i) => (Number(i.unitPrice) || 0) > 0
   );
+
+  const showPrint = po.status !== 'pending_approval';
 
   return (
     <div className="space-y-6">
@@ -313,14 +251,16 @@ export function ApprovePOPage() {
           <Icon name="arrow-left" className="h-5 w-5" />
           Back
         </button>
-        <button
-          type="button"
-          onClick={handlePrint}
-          className="flex items-center gap-2 rounded-[10px] border border-slate-200 px-4 py-2 text-[15px] font-medium text-slate-700 hover:bg-slate-50"
-        >
-          <Icon name="arrow-down-tray" className="h-5 w-5" />
-          Print
-        </button>
+        {showPrint && (
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="flex items-center gap-2 rounded-[10px] border border-slate-200 px-4 py-2 text-[15px] font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <Icon name="arrow-down-tray" className="h-5 w-5" />
+            Print
+          </button>
+        )}
       </div>
 
       {reduxError && (
@@ -359,6 +299,21 @@ export function ApprovePOPage() {
             {po.status === 'rejected' && 'Rejected'}
           </p>
         </div>
+
+        {isOtherAdminViewing && (po.assignedToAdminId || po.assignedToAdminName) && (
+          <div className="rounded-[10px] border border-amber-200 bg-amber-50 p-4">
+            <p className="text-[13px] text-amber-800">
+              {po.assignedToAdminName?.trim() ? (
+                <>Assigned to: <span className="font-semibold">{po.assignedToAdminName}</span></>
+              ) : (
+                'Assigned to another admin'
+              )}
+            </p>
+            <p className="mt-1 text-[13px] text-amber-700">
+              Only the assigned admin can approve or reject this PO.
+            </p>
+          </div>
+        )}
 
         <div className="rounded-[10px] border border-slate-200 bg-white p-4">
           <h2 className="mb-3 text-[17px] font-semibold text-slate-900">VENDOR</h2>
@@ -493,56 +448,6 @@ export function ApprovePOPage() {
 
         {showApproveReject && (
           <>
-            <div className="rounded-[10px] border border-slate-200 bg-white p-4">
-              <h2 className="mb-2 text-[17px] font-semibold text-slate-900">
-                UPLOAD SIGNED PO
-              </h2>
-              <p className="mb-3 text-[13px] text-slate-500">
-                Download the PO above, sign it manually, then upload the signed
-                PDF or image here before approving.
-              </p>
-              {po.signedPdfUrl ? (
-                <div className="flex flex-wrap items-center gap-2 py-2">
-                  <span className="rounded-full bg-green-600/15 px-2 py-1 text-[12px] font-medium text-green-600">
-                    Signed document uploaded
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleRemoveSignedPO}
-                    disabled={removingSigned}
-                    className="rounded-lg border border-red-600 px-3 py-1.5 text-[13px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-                  >
-                    {removingSigned ? 'Removing...' : 'Remove'}
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.doc,.docx,application/pdf,image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingSigned}
-                    className="flex h-[50px] w-full items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-dashed border-blue-800 text-[15px] font-semibold text-blue-800 hover:bg-blue-50 disabled:opacity-50"
-                  >
-                    {uploadingSigned ? (
-                      <LoadingSpinner className="h-5 w-5" />
-                    ) : (
-                      <>
-                        <Icon name="cloud-arrow-up" className="h-6 w-6" />
-                        Upload Signed PO (PDF or Image)
-                      </>
-                    )}
-                  </button>
-                </>
-              )}
-            </div>
-
             <div>
               <label className="mb-1.5 block text-[15px] font-medium text-slate-900">
                 Comments (Optional)
@@ -589,19 +494,13 @@ export function ApprovePOPage() {
                   <button
                     type="button"
                     onClick={handleApprove}
-                    disabled={saving || !po.signedPdfUrl?.trim()}
-                    className={`flex flex-1 items-center justify-center rounded-[10px] py-3 text-[15px] font-semibold text-white ${
-                      po.signedPdfUrl?.trim()
-                        ? 'bg-green-600 hover:bg-green-700'
-                        : 'cursor-not-allowed bg-slate-400'
-                    }`}
+                    disabled={saving}
+                    className="flex flex-1 items-center justify-center rounded-[10px] py-3 text-[15px] font-semibold text-white bg-green-600 hover:bg-green-700"
                   >
                     {saving ? (
                       <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
-                    ) : po.signedPdfUrl?.trim() ? (
-                      'Approve'
                     ) : (
-                      'Upload signed PO first'
+                      'Approve'
                     )}
                   </button>
                 </>
@@ -635,20 +534,6 @@ export function ApprovePOPage() {
           </>
         )}
 
-        {canMarkOrdered && (
-          <button
-            type="button"
-            onClick={handleMarkOrdered}
-            disabled={saving}
-            className="flex w-full items-center justify-center rounded-[10px] bg-blue-800 py-3 text-[15px] font-semibold text-white hover:bg-blue-900 disabled:opacity-50"
-          >
-            {saving ? (
-              <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
-            ) : (
-              'Mark as Ordered'
-            )}
-          </button>
-        )}
       </div>
     </div>
   );

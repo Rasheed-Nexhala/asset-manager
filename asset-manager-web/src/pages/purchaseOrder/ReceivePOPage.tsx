@@ -32,10 +32,9 @@ export function ReceivePOPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryTrigger, setRetryTrigger] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [invoiceFile, setInvoiceFile] = useState<{
-    fileName: string;
-    fileUrl: string;
-  } | null>(null);
+  const [invoiceFiles, setInvoiceFiles] = useState<
+    Array<{ fileName: string; fileUrl: string }>
+  >([]);
   const [receivedDate, setReceivedDate] = useState(new Date());
   const [receivedNotes, setReceivedNotes] = useState('');
   const [uploadingInvoice, setUploadingInvoice] = useState(false);
@@ -104,21 +103,26 @@ export function ReceivePOPage() {
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file || !poId) return;
+      const files = e.target.files;
+      if (!files?.length || !poId) return;
 
       setUploadingInvoice(true);
       try {
-        const fileUri = URL.createObjectURL(file);
-        const { url, fileName } = await uploadPOInvoice(
-          fileUri,
-          poId,
-          file.name
-        );
-        URL.revokeObjectURL(fileUri);
-        setInvoiceFile({ fileName, fileUrl: url });
+        const newFiles: Array<{ fileName: string; fileUrl: string }> = [];
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const fileUri = URL.createObjectURL(file);
+          const { url, fileName } = await uploadPOInvoice(
+            fileUri,
+            poId,
+            file.name
+          );
+          URL.revokeObjectURL(fileUri);
+          newFiles.push({ fileName, fileUrl: url });
+        }
+        setInvoiceFiles((prev) => [...prev, ...newFiles]);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Upload failed');
+        toast.error(err instanceof Error ? err.message : 'Failed to upload');
       } finally {
         setUploadingInvoice(false);
         e.target.value = '';
@@ -126,6 +130,10 @@ export function ReceivePOPage() {
     },
     [poId, toast]
   );
+
+  const handleRemoveInvoice = useCallback((index: number) => {
+    setInvoiceFiles((prev) => prev.filter((_, i) => i !== index));
+  }, []);
 
   const handleConfirm = useCallback(async () => {
     if (!po || !userId || !userName || !poId) return;
@@ -165,15 +173,11 @@ export function ReceivePOPage() {
                 10
               ),
             })),
-            documents: invoiceFile
-              ? [
-                  {
-                    type: 'invoice' as const,
-                    fileName: invoiceFile.fileName,
-                    fileUrl: invoiceFile.fileUrl,
-                  },
-                ]
-              : [],
+            documents: invoiceFiles.map((f) => ({
+              type: 'invoice' as const,
+              fileName: f.fileName,
+              fileUrl: f.fileUrl,
+            })),
             receivedDate: receivedDate.toISOString(),
             receivedNotes: receivedNotes.trim() || undefined,
           },
@@ -194,7 +198,7 @@ export function ReceivePOPage() {
     userId,
     userName,
     receivedQtys,
-    invoiceFile,
+    invoiceFiles,
     receivedDate,
     receivedNotes,
     dispatch,
@@ -493,10 +497,14 @@ export function ReceivePOPage() {
         <label className="mb-1.5 block text-[15px] font-medium text-slate-900">
           Invoice/Bill (Optional)
         </label>
+        <p className="mb-2 text-[13px] text-slate-500">
+          Upload multiple images or PDFs
+        </p>
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.doc,.docx,application/pdf,image/*"
+          accept=".pdf,application/pdf,image/*"
+          multiple
           onChange={handleFileChange}
           className="hidden"
         />
@@ -504,46 +512,51 @@ export function ReceivePOPage() {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploadingInvoice}
-          className={`flex w-full items-center gap-3 rounded-lg border p-4 transition-colors ${
-            invoiceFile
-              ? 'border-slate-200 bg-white'
-              : 'border-slate-200 bg-white hover:border-slate-300'
-          }`}
+          className="flex w-full items-center gap-3 rounded-lg border border-slate-200 border-dashed p-4 transition-colors hover:border-slate-300 disabled:opacity-50"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-800/15">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-800/15">
             <Icon name="document-plus" className="h-6 w-6 text-blue-800" />
           </div>
-          <div className="flex-1 text-left">
-            {invoiceFile ? (
-              <>
-                <p className="text-[15px] font-medium text-slate-900">
-                  {invoiceFile.fileName}
-                </p>
-                <p className="flex items-center gap-1 text-[13px] text-green-600">
-                  <Icon name="check-circle" className="h-4 w-4" />
-                  Uploaded
-                </p>
-              </>
-            ) : (
-              <span className="flex items-center gap-2 text-[15px] text-slate-400">
-                {uploadingInvoice ? (
-                  <LoadingSpinner size="sm" />
-                ) : (
-                  '+ Upload Invoice'
-                )}
+          <span className="flex-1 text-left text-[15px] text-slate-600">
+            {uploadingInvoice ? (
+              <span className="flex items-center gap-2">
+                <LoadingSpinner size="sm" />
+                Uploading...
               </span>
+            ) : (
+              '+ Add images or PDFs'
             )}
-          </div>
-          {invoiceFile && (
-            <button
-              type="button"
-              onClick={() => setInvoiceFile(null)}
-              className="p-2 text-red-600 hover:bg-red-50"
-            >
-              <Icon name="x-mark" className="h-6 w-6" />
-            </button>
-          )}
+          </span>
         </button>
+        {invoiceFiles.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {invoiceFiles.map((file, index) => (
+              <div
+                key={`${file.fileUrl}-${index}`}
+                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3"
+              >
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <Icon name="document-text" className="h-5 w-5 shrink-0 text-slate-500" />
+                  <p className="truncate text-[15px] font-medium text-slate-900">
+                    {file.fileName}
+                  </p>
+                  <span className="flex shrink-0 items-center gap-1 text-[13px] text-green-600">
+                    <Icon name="check-circle" className="h-4 w-4" />
+                    Uploaded
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveInvoice(index)}
+                  className="p-2 text-red-600 hover:bg-red-50"
+                  aria-label={`Remove ${file.fileName}`}
+                >
+                  <Icon name="x-mark" className="h-5 w-5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div>

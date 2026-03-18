@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
-import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
@@ -18,20 +17,14 @@ import { FormField } from '../../components/FormField';
 import { PODocumentCard } from '../../components/PurchaseOrder';
 import { printPurchaseOrder } from '../../utils/poPdfUtils';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
-import { uploadPOSignedDocument } from '../../services/firebase/storageService';
 import {
   approvePO,
   rejectPO,
-  markPOOrdered,
-  recordPODownloadForSigning,
-  uploadSignedPO,
-  removeSignedPO,
 } from '../../store/thunks/purchaseOrderThunks';
 import {
   selectUserId,
   selectUserDisplayName,
   selectIsAdmin,
-  selectIsStoreIncharge,
 } from '../../store/selectors/authSelectors';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { clearError, setError } from '../../store/slices/purchaseOrderSlice';
@@ -73,7 +66,6 @@ export const ApprovePOScreen: React.FC = () => {
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
   const isAdmin = useAppSelector(selectIsAdmin);
-  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const reduxError = useAppSelector(selectPurchaseOrderError);
 
   const [po, setPo] = useState<PurchaseOrder | null>(null);
@@ -84,8 +76,6 @@ export const ApprovePOScreen: React.FC = () => {
   const [adminComments, setAdminComments] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectForm, setShowRejectForm] = useState(false);
-  const [uploadingSigned, setUploadingSigned] = useState(false);
-  const [removingSigned, setRemovingSigned] = useState(false);
 
   useEffect(() => {
     setLoadError(null);
@@ -115,70 +105,14 @@ export const ApprovePOScreen: React.FC = () => {
   const handlePrint = useCallback(async () => {
     if (!po) return;
     try {
-      if (po.status === 'pending_approval' && isAdmin && userId && userName) {
-        await dispatch(
-          recordPODownloadForSigning({ poId, adminId: userId, adminName: userName })
-        ).unwrap();
-        const refreshed = await getPOById(poId);
-        if (refreshed) setPo(refreshed);
-        await printPurchaseOrder(refreshed ?? po, userName);
-      } else {
-        await printPurchaseOrder(po);
-      }
+      await printPurchaseOrder(po);
     } catch (err) {
       Alert.alert(
         'Error',
         err instanceof Error ? err.message : 'Failed to print'
       );
     }
-  }, [po, poId, isAdmin, userId, userName, dispatch]);
-
-  const handleUploadSignedPO = useCallback(async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/*'],
-        copyToCacheDirectory: true,
-      });
-      if (result.canceled || !result.assets[0]) return;
-
-      setUploadingSigned(true);
-      const { url } = await uploadPOSignedDocument(
-        result.assets[0].uri,
-        poId,
-        result.assets[0].name ?? undefined
-      );
-      await dispatch(uploadSignedPO({ poId, signedPdfUrl: url })).unwrap();
-      const refreshed = await getPOById(poId);
-      if (refreshed) setPo(refreshed);
-    } catch (err) {
-      Alert.alert(
-        'Error',
-        err instanceof Error ? err.message : 'Failed to upload signed document'
-      );
-    } finally {
-      setUploadingSigned(false);
-    }
-  }, [poId, dispatch]);
-
-  const handleRemoveSignedPO = useCallback(async () => {
-    if (!po?.signedPdfUrl?.trim()) return;
-    setRemovingSigned(true);
-    try {
-      await dispatch(
-        removeSignedPO({ poId, signedPdfUrl: po.signedPdfUrl })
-      ).unwrap();
-      const refreshed = await getPOById(poId);
-      if (refreshed) setPo(refreshed);
-      Alert.alert('Success', 'Signed document removed. You can upload a different one.');
-    } catch (err) {
-      Alert.alert(
-        'Error',
-        err instanceof Error ? err.message : 'Failed to remove signed document'
-      );
-    } finally {
-      setRemovingSigned(false);
-    }
-  }, [po, poId, dispatch]);
+  }, [po]);
 
   const handleApprove = useCallback(async () => {
     if (!userId || !userName) return;
@@ -231,20 +165,6 @@ export const ApprovePOScreen: React.FC = () => {
       setSaving(false);
     }
   }, [poId, userId, userName, rejectionReason, adminComments, dispatch, navigation]);
-
-  const handleMarkOrdered = useCallback(async () => {
-    setSaving(true);
-    try {
-      await dispatch(markPOOrdered({ poId })).unwrap();
-      Alert.alert('Success', 'Purchase order marked as ordered.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
-    } catch {
-      // Thunk dispatches setError; banner will show
-    } finally {
-      setSaving(false);
-    }
-  }, [poId, dispatch, navigation]);
 
   if (loading || !po) {
     return (
@@ -299,7 +219,7 @@ export const ApprovePOScreen: React.FC = () => {
     );
   }
 
-  if (po.status === 'ordered' || po.status === 'partially_received') {
+  if (po.status === 'partially_received') {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader
@@ -315,19 +235,46 @@ export const ApprovePOScreen: React.FC = () => {
         />
         <View className="flex-1 items-center justify-center px-4">
           <Text className="text-[15px] text-[#64748B] text-center">
-            This PO has been {po.status === 'partially_received' ? 'partially received' : 'marked as ordered'}. You can receive it from the list.
+            This PO has been partially received. You can receive it from the list.
           </Text>
         </View>
       </ScreenLayout>
     );
   }
 
-  const canMarkOrdered =
-    po.status === 'approved' && (isAdmin || isStoreIncharge);
+  if (po.status === 'ordered') {
+    return (
+      <ScreenLayout edges={['top']}>
+        <ScreenHeader
+          title="Review PO"
+          showBack
+          onBackPress={handleBack}
+          rightAction={{
+            icon: 'print-outline',
+            label: 'Print',
+            onPress: handlePrint,
+            accessibilityLabel: 'Print purchase order',
+          }}
+        />
+        <View className="flex-1 items-center justify-center px-4">
+          <Text className="text-[15px] text-[#64748B] text-center">
+            This PO can be received from the list.
+          </Text>
+        </View>
+      </ScreenLayout>
+    );
+  }
 
+  const isAssignedAdmin =
+    po.assignedToAdminId != null && po.assignedToAdminId.trim() !== ''
+      ? po.assignedToAdminId === userId
+      : isAdmin;
+  const showApproveReject =
+    po.status === 'pending_approval' && isAdmin && isAssignedAdmin;
+  const isOtherAdminViewing =
+    po.status === 'pending_approval' && isAdmin && !isAssignedAdmin;
   const isReadOnly =
     po.status === 'received' || po.status === 'partially_received' || po.status === 'rejected';
-  const showApproveReject = po.status === 'pending_approval' && isAdmin;
   const statusBadge =
     po.status === 'pending_approval'
       ? isAdmin
@@ -345,18 +292,24 @@ export const ApprovePOScreen: React.FC = () => {
     (i) => (Number(i.unitPrice) || 0) > 0
   );
 
+  const showPrint = po.status !== 'pending_approval';
+
   return (
     <ScreenLayout edges={['top']}>
       <ScreenHeader
         title={isAdmin ? `Review ${po.poNumber}` : po.poNumber}
         showBack
         onBackPress={handleBack}
-        rightAction={{
-          icon: 'print-outline',
-          label: 'Print',
-          onPress: handlePrint,
-          accessibilityLabel: 'Print purchase order',
-        }}
+        rightAction={
+          showPrint
+            ? {
+                icon: 'print-outline',
+                label: 'Print',
+                onPress: handlePrint,
+                accessibilityLabel: 'Print purchase order',
+              }
+            : undefined
+        }
       />
 
       {reduxError && (
@@ -401,6 +354,19 @@ export const ApprovePOScreen: React.FC = () => {
             {statusBadge}
           </Text>
         </View>
+
+        {isOtherAdminViewing && (po.assignedToAdminId || po.assignedToAdminName) && (
+          <View className="mb-4 rounded-[10px] bg-[#FEF3C7] border border-[#FCD34D] p-4">
+            <Text className="text-[13px] text-[#92400E]">
+              {po.assignedToAdminName?.trim()
+                ? <>Assigned to: <Text className="font-semibold">{po.assignedToAdminName}</Text></>
+                : 'Assigned to another admin'}
+            </Text>
+            <Text className="text-[13px] text-[#B45309] mt-1">
+              Only the assigned admin can approve or reject this PO.
+            </Text>
+          </View>
+        )}
 
         <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-4">
           <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">
@@ -645,51 +611,6 @@ export const ApprovePOScreen: React.FC = () => {
 
         {showApproveReject && (
           <>
-            <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-4">
-              <Text className="text-[17px] font-semibold text-[#0F172A] mb-2">
-                UPLOAD SIGNED PO
-              </Text>
-              <Text className="text-[13px] text-[#64748B] mb-3">
-                Download the PO above, sign it manually, then upload the signed PDF or image here before approving.
-              </Text>
-              {po.signedPdfUrl ? (
-                <View className="flex-row flex-wrap items-center gap-2 py-2">
-                  <View className="px-2 py-1 rounded-full bg-[#16A34A]/15">
-                    <Text className="text-[12px] font-medium text-[#16A34A]">
-                      Signed document uploaded
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={handleRemoveSignedPO}
-                    disabled={removingSigned}
-                    className="flex-row items-center gap-2 rounded-lg border border-[#DC2626] px-3 py-1.5"
-                  >
-                    {removingSigned && (
-                      <ActivityIndicator size="small" color="#DC2626" />
-                    )}
-                    <Text className="text-[13px] font-medium text-[#DC2626]">
-                      {removingSigned ? 'Removing...' : 'Remove'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  onPress={handleUploadSignedPO}
-                  disabled={uploadingSigned}
-                  className="border-[1.5px] border-dashed border-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
-                >
-                  {uploadingSigned ? (
-                    <ActivityIndicator size="small" color="#1E40AF" />
-                  ) : (
-                    <Ionicons name="cloud-upload-outline" size={24} color="#1E40AF" />
-                  )}
-                  <Text className="text-[15px] font-semibold text-[#1E40AF]">
-                    {uploadingSigned ? 'Uploading...' : 'Upload Signed PO (PDF or Image)'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
             <FormField
               label="Comments (Optional)"
               value={adminComments}
@@ -727,18 +648,14 @@ export const ApprovePOScreen: React.FC = () => {
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={handleApprove}
-                    disabled={saving || !po.signedPdfUrl?.trim()}
-                    className={`flex-1 rounded-[10px] h-[50px] items-center justify-center ${
-                      po.signedPdfUrl?.trim()
-                        ? 'bg-[#16A34A]'
-                        : 'bg-[#94A3B8]'
-                    }`}
+                    disabled={saving}
+                    className="flex-1 rounded-[10px] h-[50px] items-center justify-center bg-[#16A34A]"
                   >
                     {saving ? (
                       <ActivityIndicator size="small" color="white" />
                     ) : (
                       <Text className="text-[15px] font-semibold text-white">
-                        {po.signedPdfUrl?.trim() ? 'Approve' : 'Upload signed PO first'}
+                        Approve
                       </Text>
                     )}
                   </TouchableOpacity>
@@ -775,21 +692,6 @@ export const ApprovePOScreen: React.FC = () => {
           </>
         )}
 
-        {canMarkOrdered && (
-          <TouchableOpacity
-            onPress={handleMarkOrdered}
-            disabled={saving}
-            className="mt-6 bg-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center"
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <Text className="text-[15px] font-semibold text-white">
-                Mark as Ordered
-              </Text>
-            )}
-          </TouchableOpacity>
-        )}
       </ScrollView>
     </ScreenLayout>
   );

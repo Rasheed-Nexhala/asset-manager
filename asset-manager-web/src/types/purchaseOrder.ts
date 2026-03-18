@@ -3,15 +3,18 @@ import { timestampToISO } from './inventory';
 
 /**
  * Purchase Order status flow:
- * DRAFT → PENDING_APPROVAL → APPROVED → ORDERED → RECEIVED
+ * DRAFT → PENDING_APPROVAL → APPROVED → RECEIVED
  *                    ↓
  *               REJECTED
+ *
+ * Note: 'ordered' is kept for backward compatibility with existing Firestore documents.
+ * New POs no longer use this status; store incharge receives directly from approved.
  */
 export type PurchaseOrderStatus =
   | 'draft'
   | 'pending_approval'
   | 'approved'
-  | 'ordered'
+  | 'ordered' // Legacy; no longer set by app
   | 'partially_received'
   | 'received'
   | 'rejected';
@@ -96,6 +99,10 @@ export interface PurchaseOrderFirestore {
   downloadedBy?: string | null;
   downloadedByName?: string | null;
 
+  /** Admin assigned to approve this PO (only that admin can approve/reject) */
+  assignedToAdminId?: string | null;
+  assignedToAdminName?: string | null;
+
   receivedAt: Timestamp | null;
   receivedBy: string | null;
   receivedByName: string | null;
@@ -152,6 +159,10 @@ export interface PurchaseOrder {
   downloadedBy?: string | null;
   downloadedByName?: string | null;
 
+  /** Admin assigned to approve this PO (only that admin can approve/reject) */
+  assignedToAdminId?: string | null;
+  assignedToAdminName?: string | null;
+
   receivedAt: string | null;
   receivedBy: string | null;
   receivedByName: string | null;
@@ -207,6 +218,9 @@ export interface CreatePurchaseOrderData {
   }>;
   justification: string;
   expectedDeliveryDate: string | null;
+  /** Required when submitting for approval (not draft). Admin to assign for approval. */
+  assignedToAdminId?: string;
+  assignedToAdminName?: string;
 }
 
 /**

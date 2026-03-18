@@ -11,13 +11,13 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
-import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { FormField } from '../../components/FormField';
-import { InvoiceUploadField, POReceiptSummary } from '../../components/PurchaseOrder';
+import { POReceiptSummary } from '../../components/PurchaseOrder';
 import { printPurchaseOrder } from '../../utils/poPdfUtils';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
 import { getItemById } from '../../services/firebase/inventoryService';
@@ -52,7 +52,9 @@ export const ReceivePOScreen: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryTrigger, setRetryTrigger] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [invoiceFile, setInvoiceFile] = useState<{ fileName: string; fileUrl: string } | null>(null);
+  const [invoiceFiles, setInvoiceFiles] = useState<
+    Array<{ fileName: string; fileUrl: string }>
+  >([]);
   const [receivedDate, setReceivedDate] = useState(new Date());
   const [receivedNotes, setReceivedNotes] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -128,27 +130,26 @@ export const ReceivePOScreen: React.FC = () => {
     }
   }, [po]);
 
-  const handleUploadInvoice = useCallback(async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Allow access to pick invoice image.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-    });
-    if (result.canceled || !result.assets[0]) return;
-
-    setUploadingInvoice(true);
+  const handleAddInvoice = useCallback(async () => {
     try {
-      const { url, fileName } = await uploadPOInvoice(
-        result.assets[0].uri,
-        poId,
-        result.assets[0].fileName ?? undefined
-      );
-      setInvoiceFile({ fileName, fileUrl: url });
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'application/pdf'],
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.length) return;
+
+      setUploadingInvoice(true);
+      const newFiles: Array<{ fileName: string; fileUrl: string }> = [];
+      for (const asset of result.assets) {
+        const { url, fileName } = await uploadPOInvoice(
+          asset.uri,
+          poId,
+          asset.name ?? undefined
+        );
+        newFiles.push({ fileName, fileUrl: url });
+      }
+      setInvoiceFiles((prev) => [...prev, ...newFiles]);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Upload failed';
       Alert.alert('Error', msg);
@@ -156,6 +157,10 @@ export const ReceivePOScreen: React.FC = () => {
       setUploadingInvoice(false);
     }
   }, [poId]);
+
+  const handleRemoveInvoice = useCallback((index: number) => {
+    setInvoiceFiles((prev) => prev.filter((_, i) => i !== index));
+  }, []);
 
   const handleConfirm = useCallback(async () => {
     if (!po || !userId || !userName) return;
@@ -189,15 +194,11 @@ export const ReceivePOScreen: React.FC = () => {
               itemId: item.itemId,
               receivedQuantity: parseInt(receivedQtys[item.itemId] ?? '0', 10),
             })),
-            documents: invoiceFile
-              ? [
-                  {
-                    type: 'invoice' as const,
-                    fileName: invoiceFile.fileName,
-                    fileUrl: invoiceFile.fileUrl,
-                  },
-                ]
-              : [],
+            documents: invoiceFiles.map((f) => ({
+              type: 'invoice' as const,
+              fileName: f.fileName,
+              fileUrl: f.fileUrl,
+            })),
             receivedDate: receivedDate.toISOString(),
             receivedNotes: receivedNotes.trim() || undefined,
           },
@@ -220,7 +221,7 @@ export const ReceivePOScreen: React.FC = () => {
     userId,
     userName,
     receivedQtys,
-    invoiceFile,
+    invoiceFiles,
     receivedDate,
     receivedNotes,
     dispatch,
@@ -447,16 +448,56 @@ export const ReceivePOScreen: React.FC = () => {
         </View>
 
         <View className="mb-4">
-          <InvoiceUploadField
-            fileName={invoiceFile?.fileName ?? null}
-            fileUrl={invoiceFile?.fileUrl ?? null}
-            onUpload={handleUploadInvoice}
-            onRemove={() => setInvoiceFile(null)}
-            label="Invoice/Bill (Optional)"
-          />
-          {uploadingInvoice && (
-            <View className="mt-2">
+          <Text className="text-[15px] font-medium text-[#0F172A] mb-1.5">
+            Invoice/Bill (Optional)
+          </Text>
+          <TouchableOpacity
+            onPress={handleAddInvoice}
+            disabled={uploadingInvoice}
+            className="border border-[#E2E8F0] rounded-lg p-4 flex-row items-center gap-3 bg-white"
+            accessibilityRole="button"
+            accessibilityLabel="Add invoice or bill"
+          >
+            <View className="w-10 h-10 rounded-lg bg-[#1E40AF]/15 items-center justify-center">
+              <Ionicons name="document-attach-outline" size={24} color="#1E40AF" />
+            </View>
+            <View className="flex-1">
+              {uploadingInvoice ? (
+                <Text className="text-[15px] text-[#64748B]">Uploading...</Text>
+              ) : (
+                <Text className="text-[15px] text-[#94A3B8]">+ Add images or PDFs</Text>
+              )}
+            </View>
+            {uploadingInvoice && (
               <ActivityIndicator size="small" color="#1E40AF" />
+            )}
+          </TouchableOpacity>
+          {invoiceFiles.length > 0 && (
+            <View className="mt-3 gap-2">
+              {invoiceFiles.map((file, index) => (
+                <View
+                  key={`${file.fileUrl}-${index}`}
+                  className="flex-row items-center justify-between rounded-lg border border-[#E2E8F0] bg-white px-4 py-3"
+                >
+                  <View className="flex-1 min-w-0 flex-row items-center gap-3">
+                    <Ionicons name="document-text-outline" size={20} color="#64748B" />
+                    <Text className="text-[15px] font-medium text-[#0F172A]" numberOfLines={1}>
+                      {file.fileName}
+                    </Text>
+                    <View className="flex-row items-center gap-1">
+                      <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
+                      <Text className="text-[13px] text-[#16A34A]">Uploaded</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleRemoveInvoice(index)}
+                    className="p-2"
+                    accessibilityLabel={`Remove ${file.fileName}`}
+                  >
+                    <Ionicons name="close-circle" size={24} color="#DC2626" />
+                  </TouchableOpacity>
+                </View>
+              ))}
             </View>
           )}
         </View>

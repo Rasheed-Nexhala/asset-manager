@@ -93,7 +93,6 @@ export const store = configureStore({
           'purchaseOrders/createPO/fulfilled',
           'purchaseOrders/approvePO/fulfilled',
           'purchaseOrders/rejectPO/fulfilled',
-          'purchaseOrders/markPOOrdered/fulfilled',
           'purchaseOrders/receivePO/fulfilled',
           'purchaseOrders/fetchPurchaseOrdersPaginated/fulfilled',
           'purchaseOrders/loadMorePurchaseOrders/fulfilled',

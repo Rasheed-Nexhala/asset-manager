@@ -21,6 +21,8 @@ import {
 } from '../../services/firebase/vendorService';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
 import { getItemById } from '../../services/firebase/inventoryService';
+import { getAdminUsers } from '../../services/firebase/userRoleService';
+import type { UserListItem } from '../../types/roles';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   setVendors,
@@ -112,11 +114,34 @@ export function CreatePOPage() {
     Partial<Record<keyof CreateVendorData, string>>
   >({});
   const [addVendorSaving, setAddVendorSaving] = useState(false);
+  const [assignedToAdminId, setAssignedToAdminId] = useState<string | null>(null);
+  const [assignedToAdminName, setAssignedToAdminName] = useState<string | null>(null);
+  const [adminUsers, setAdminUsers] = useState<UserListItem[]>([]);
+  const [adminUsersLoading, setAdminUsersLoading] = useState(false);
+  const assignedAdminRef = useRef<{
+    assignedToAdminId: string | null;
+    assignedToAdminName: string | null;
+  }>({ assignedToAdminId: null, assignedToAdminName: null });
 
   useEffect(() => {
     const unsub = subscribeToVendors((v) => dispatch(setVendors(v)));
     return unsub;
   }, [dispatch]);
+
+  useEffect(() => {
+    setAdminUsersLoading(true);
+    getAdminUsers()
+      .then(setAdminUsers)
+      .catch((err) => {
+        console.error('Failed to load admins:', err);
+        setAdminUsers([]);
+      })
+      .finally(() => setAdminUsersLoading(false));
+  }, []);
+
+  useEffect(() => {
+    assignedAdminRef.current = { assignedToAdminId, assignedToAdminName };
+  }, [assignedToAdminId, assignedToAdminName]);
 
   // Pre-fill from Dashboard low-stock "Create PO" (matches React Native behavior)
   useEffect(() => {
@@ -358,6 +383,15 @@ export function CreatePOPage() {
         toast.error('User information is missing');
         return;
       }
+      // Use state values directly to avoid stale ref; ref is backup for validation
+      const assignedId = assignedToAdminId ?? assignedAdminRef.current.assignedToAdminId;
+      const assignedName = assignedToAdminName ?? assignedAdminRef.current.assignedToAdminName;
+      if (!asDraft) {
+        if (!assignedId?.trim() || !assignedName?.trim()) {
+          toast.error('Please select an admin to assign for approval.');
+          return;
+        }
+      }
 
       let vendorId = selectedVendorId ?? '';
       const vName = vendorName.trim();
@@ -432,6 +466,9 @@ export function CreatePOPage() {
           expectedDeliveryDate: expectedDeliveryDate
             ? expectedDeliveryDate.toISOString()
             : null,
+          ...(!asDraft && assignedId?.trim() && assignedName?.trim()
+            ? { assignedToAdminId: assignedId.trim(), assignedToAdminName: assignedName.trim() }
+            : {}),
         };
 
         let savedPoId: string;
@@ -506,6 +543,8 @@ export function CreatePOPage() {
       expectedDeliveryDate,
       poId,
       editingPOStatus,
+      assignedToAdminId,
+      assignedToAdminName,
       dispatch,
       navigate,
       toast,
@@ -937,6 +976,51 @@ export function CreatePOPage() {
           <Icon name="document-text" className="h-5 w-5" />
           Print Preview
         </button>
+
+        <div>
+          <label className="mb-1.5 block text-[15px] font-medium text-slate-900">
+            Assign Admin for Approval
+          </label>
+          <p className="mb-2 text-[13px] text-slate-500">
+            Select the admin who will approve this PO when submitting for approval.
+          </p>
+          <select
+            value={assignedToAdminId ?? ''}
+            onChange={(e) => {
+              const id = e.target.value || null;
+              setAssignedToAdminId(id);
+              if (id) {
+                const admin = adminUsers.find((u) => u.id === id);
+                const name = admin?.displayName || admin?.email || 'Unknown';
+                setAssignedToAdminName(name);
+                assignedAdminRef.current = { assignedToAdminId: id, assignedToAdminName: name };
+              } else {
+                setAssignedToAdminName(null);
+                assignedAdminRef.current = { assignedToAdminId: null, assignedToAdminName: null };
+              }
+            }}
+            disabled={adminUsersLoading}
+            className="h-12 w-full rounded-lg border border-slate-200 px-4 text-[15px] text-slate-900 focus:border-blue-800 focus:outline-none focus:ring-1 focus:ring-blue-800 disabled:opacity-50"
+          >
+            <option value="">
+              {adminUsersLoading
+                ? 'Loading admins...'
+                : adminUsers.length === 0
+                  ? 'No admins found'
+                  : 'Select admin'}
+            </option>
+            {adminUsers.map((admin) => (
+              <option key={admin.id} value={admin.id}>
+                {admin.displayName || admin.email || 'Unknown'}
+              </option>
+            ))}
+          </select>
+          {!adminUsersLoading && adminUsers.length === 0 && (
+            <p className="mt-1.5 text-[13px] text-amber-600">
+              No active Admin users found. Ensure at least one user has the Admin role and is active.
+            </p>
+          )}
+        </div>
 
         <div className="flex gap-3">
           <button

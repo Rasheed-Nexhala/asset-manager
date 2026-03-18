@@ -115,18 +115,6 @@ const ensureAdminUser = async (userId: string): Promise<void> => {
   }
 };
 
-const ensureCanMarkOrdered = async (userId: string): Promise<void> => {
-  const userRef = doc(db, USERS_COLLECTION, userId);
-  const userSnap = await getDocFromServer(userRef);
-  if (!userSnap.exists()) {
-    throw new Error('User not found');
-  }
-  const role = userSnap.data()?.role;
-  if (role !== 'Admin' && role !== 'StoreIncharge') {
-    throw new Error('Only Admin or Store Incharge can mark POs as ordered');
-  }
-};
-
 const ensureCanReceive = async (userId: string): Promise<void> => {
   const userRef = doc(db, USERS_COLLECTION, userId);
   const userSnap = await getDocFromServer(userRef);
@@ -210,6 +198,8 @@ const mapFirestoreDocToPOFirestore = (
     signedPdfUrl: data.signedPdfUrl ?? undefined,
     downloadedBy: data.downloadedBy ?? undefined,
     downloadedByName: data.downloadedByName ?? undefined,
+    assignedToAdminId: data.assignedToAdminId ?? undefined,
+    assignedToAdminName: data.assignedToAdminName ?? undefined,
     receivedAt: data.receivedAt ?? null,
     receivedBy: data.receivedBy ?? null,
     receivedByName: data.receivedByName ?? null,
@@ -309,6 +299,13 @@ export const createPO = async (
 ): Promise<string> => {
   try {
     validatePoItemQuantities(data.items);
+    if (!isDraft) {
+      const assignedId = data.assignedToAdminId?.trim();
+      const assignedName = data.assignedToAdminName?.trim();
+      if (!assignedId || !assignedName) {
+        throw new Error('Please select an admin to assign for approval when submitting for approval.');
+      }
+    }
     const trimmed = data.poNumber?.trim();
     if (!trimmed) {
       throw new Error('PO number is required.');
@@ -362,6 +359,8 @@ export const createPO = async (
       receivedBy: null,
       receivedByName: null,
       receivedNotes: null,
+      assignedToAdminId: !isDraft && data.assignedToAdminId?.trim() ? data.assignedToAdminId.trim() : null,
+      assignedToAdminName: !isDraft && data.assignedToAdminName?.trim() ? data.assignedToAdminName.trim() : null,
       updatedAt: serverTimestamp(),
     };
 
@@ -456,6 +455,13 @@ export const updatePO = async (
     if (!userId) {
       throw new Error('User ID is required to update a purchase order');
     }
+    if (!isDraft) {
+      const assignedId = data.assignedToAdminId?.trim();
+      const assignedName = data.assignedToAdminName?.trim();
+      if (!assignedId || !assignedName) {
+        throw new Error('Please select an admin to assign for approval when submitting for approval.');
+      }
+    }
     const trimmed = data.poNumber?.trim();
     if (!trimmed) {
       throw new Error('PO number is required.');
@@ -521,6 +527,8 @@ export const updatePO = async (
         reviewedBy,
         reviewedByName,
         reviewedAt,
+        assignedToAdminId: !isDraft && data.assignedToAdminId?.trim() ? data.assignedToAdminId.trim() : null,
+        assignedToAdminName: !isDraft && data.assignedToAdminName?.trim() ? data.assignedToAdminName.trim() : null,
         updatedAt: serverTimestamp(),
       };
       updatePayload.poNumber = newPoNumber;
@@ -600,6 +608,10 @@ export const setSignedPdfUrl = async (
     if (poData.status !== 'pending_approval') {
       throw new Error('Signed document can only be uploaded for pending approval POs');
     }
+    const assignedId = poData.assignedToAdminId?.trim();
+    if (assignedId && assignedId !== adminId) {
+      throw new Error('Only the assigned admin can upload the signed document for this PO.');
+    }
 
     await updateDoc(poRef, {
       signedPdfUrl,
@@ -634,6 +646,10 @@ export const clearSignedPdfUrl = async (
     if (poData.status !== 'pending_approval') {
       throw new Error('Signed document can only be removed from pending approval POs');
     }
+    const assignedId = poData.assignedToAdminId?.trim();
+    if (assignedId && assignedId !== adminId) {
+      throw new Error('Only the assigned admin can remove the signed document for this PO.');
+    }
 
     await updateDoc(poRef, {
       signedPdfUrl: null,
@@ -649,7 +665,8 @@ export const clearSignedPdfUrl = async (
 
 /**
  * Approve a PO (Admin only).
- * Requires signedPdfUrl to be set (admin must upload signed PO before approving).
+ * Admin name is recorded in reviewedBy/reviewedByName. Signed document upload is optional;
+ * store incharge can print and sign later when receiving.
  */
 export const approvePO = async (
   poId: string,
@@ -673,12 +690,9 @@ export const approvePO = async (
           `Cannot approve PO with status "${poData.status}". Only pending approval POs can be approved.`
         );
       }
-
-      const signedUrl = poData.signedPdfUrl?.trim();
-      if (!signedUrl) {
-        throw new Error(
-          'Please upload the signed PO document before approving. Download the PO, sign it, then upload it here.'
-        );
+      const assignedId = poData.assignedToAdminId?.trim();
+      if (assignedId && assignedId !== adminId) {
+        throw new Error('Only the assigned admin can approve this PO.');
       }
 
       transaction.update(poRef, {
@@ -722,6 +736,10 @@ export const rejectPO = async (
           `Cannot reject PO with status "${poData.status}". Only pending approval POs can be rejected.`
         );
       }
+      const assignedId = poData.assignedToAdminId?.trim();
+      if (assignedId && assignedId !== adminId) {
+        throw new Error('Only the assigned admin can reject this PO.');
+      }
 
       transaction.update(poRef, {
         status: 'rejected',
@@ -735,38 +753,6 @@ export const rejectPO = async (
     });
   } catch (error) {
     console.error('Error rejecting PO:', error);
-    throw error;
-  }
-};
-
-/**
- * Mark PO as ordered (Admin/Store Incharge)
- */
-export const markPOOrdered = async (poId: string, userId: string): Promise<void> => {
-  try {
-    await ensureCanMarkOrdered(userId);
-    const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
-
-    await runTransaction(db, async (transaction) => {
-      const poSnap = await transaction.get(poRef);
-      if (!poSnap.exists()) {
-        throw new Error('Purchase order not found');
-      }
-
-      const poData = poSnap.data();
-      if (poData.status !== 'approved') {
-        throw new Error(
-          `Cannot mark PO as ordered. Current status: "${poData.status}". Only approved POs can be marked as ordered.`
-        );
-      }
-
-      transaction.update(poRef, {
-        status: 'ordered',
-        updatedAt: serverTimestamp(),
-      });
-    });
-  } catch (error) {
-    console.error('Error marking PO as ordered:', error);
     throw error;
   }
 };

@@ -50,7 +50,6 @@ let mockApprovePOResolve: () => void;
 let mockApprovePOReject: (err: unknown) => void;
 let mockRejectPOResolve: () => void;
 let mockRejectPOReject: (err: unknown) => void;
-let mockMarkOrderedResolve: () => void;
 
 jest.mock('../../../services/firebase/purchaseOrderService', () => ({
   getPOById: jest.fn(() =>
@@ -178,13 +177,6 @@ jest.mock('../../../store/thunks/purchaseOrderThunks', () => {
           mockRejectPOReject = reject;
         })
     ),
-    markPOOrdered: createAsyncThunk(
-      'purchaseOrders/markOrdered',
-      async () =>
-        new Promise<void>((resolve) => {
-          mockMarkOrderedResolve = resolve;
-        })
-    ),
     createPurchaseOrder: createAsyncThunk('purchaseOrders/create', async () => null),
     updatePurchaseOrder: createAsyncThunk('purchaseOrders/update', async () => null),
     receivePO: createAsyncThunk('purchaseOrders/receive', async () => null),
@@ -306,14 +298,14 @@ describe('ApprovePOScreen — PO Approval flow', () => {
     expect(screen.getByText('ABC Suppliers')).toBeTruthy();
     expect(screen.getByText('Steel Bar')).toBeTruthy();
     expect(screen.getByText(/PENDING APPROVAL/)).toBeTruthy();
-    expect(screen.getByText('Upload signed PO first')).toBeTruthy();
+    expect(screen.getByText('Approve')).toBeTruthy();
     expect(screen.getByText('Reject')).toBeTruthy();
   });
 
   it('approves PO and navigates back on success', async () => {
     renderWithStore(<ApprovePOScreen />, defaultPreloadedState);
 
-    mockGetPOByIdResolve!(createMockPO({ signedPdfUrl: 'https://example.com/signed.pdf' }));
+    mockGetPOByIdResolve!(createMockPO());
 
     await waitFor(() => {
       expect(screen.getByText('Approve')).toBeTruthy();
@@ -370,36 +362,6 @@ describe('ApprovePOScreen — PO Approval flow', () => {
     expect(screen.getByText('Rejection Reason')).toBeTruthy();
     expect(screen.getByText('Reason is required')).toBeTruthy();
     expect(screen.getByText('Confirm Reject')).toBeTruthy();
-  });
-
-  it('shows Mark as Ordered for approved PO when admin', async () => {
-    renderWithStore(<ApprovePOScreen />, defaultPreloadedState);
-
-    mockGetPOByIdResolve!(createMockPO({ status: 'approved' }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Mark as Ordered')).toBeTruthy();
-    });
-  });
-
-  it('marks PO as ordered and navigates back', async () => {
-    renderWithStore(<ApprovePOScreen />, defaultPreloadedState);
-
-    mockGetPOByIdResolve!(createMockPO({ status: 'approved' }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Mark as Ordered')).toBeTruthy();
-    });
-
-    fireEvent.press(screen.getByText('Mark as Ordered'));
-
-    mockMarkOrderedResolve!();
-
-    await waitFor(() => {
-      expect(Alert.alert).toHaveBeenCalledWith('Success', 'Purchase order marked as ordered.', expect.any(Array));
-    });
-
-    expect(mockGoBack).toHaveBeenCalled();
   });
 
   it('shows read-only view for rejected PO', async () => {

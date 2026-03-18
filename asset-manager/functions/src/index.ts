@@ -1093,20 +1093,38 @@ export const onPurchaseOrderCreated = onDocumentCreated(
 
     if (po.status === 'pending_approval') {
       try {
-        const createdBy = po.createdBy as string | undefined;
-        const tokens = await getAdminAndStoreInchargeTokens(
-          'purchaseOrderUpdates',
-          createdBy
-        );
-        if (tokens.length > 0) {
+        const rawAssigned = po.assignedToAdminId;
+        const assignedToAdminId =
+          typeof rawAssigned === 'string' && rawAssigned.trim().length > 0
+            ? rawAssigned.trim()
+            : undefined;
+
+        if (!assignedToAdminId) {
+          logger.error('PO pending approval but assignedToAdminId missing or invalid', {
+            poId,
+            rawAssigned: rawAssigned ?? 'missing',
+          });
+          return;
+        }
+
+        const tokens = await getUserPushTokens(assignedToAdminId, 'purchaseOrderUpdates');
+        const userIds = [assignedToAdminId];
+        logger.info('PO pending approval: notifying assigned admin only', {
+          poId,
+          assignedToAdminId,
+          tokenCount: tokens.length,
+        });
+
+        if (tokens.length > 0 || userIds.length > 0) {
           const title = 'New PO Pending Approval';
           const body = `${po.createdByName ?? 'Someone'} submitted PO ${po.poNumber ?? poId} for approval`;
           const pushData = { screen: 'ApprovePO', poId };
-          const userIds = await getAdminAndStoreInchargeUserIds(createdBy);
           for (const uid of userIds) {
             await createInAppNotification(uid, 'po_pending_approval', title, body, pushData);
           }
-          await sendExpoPushNotification(tokens, title, body, pushData);
+          if (tokens.length > 0) {
+            await sendExpoPushNotification(tokens, title, body, pushData);
+          }
         }
       } catch (notifErr) {
         logger.error('Push failed for new PO', { notifErr, poId });
@@ -1260,10 +1278,50 @@ export const onPurchaseOrderUpdated = onDocumentUpdated(
     const poId = event.params.poId;
     const poNum = after.poNumber ?? poId;
 
+    if (before.status === 'draft' && after.status === 'pending_approval') {
+      try {
+        const rawAssigned = after.assignedToAdminId;
+        const assignedToAdminId =
+          typeof rawAssigned === 'string' && rawAssigned.trim().length > 0
+            ? rawAssigned.trim()
+            : undefined;
+
+        if (!assignedToAdminId) {
+          logger.error('PO submitted from draft but assignedToAdminId missing or invalid', {
+            poId,
+            rawAssigned: rawAssigned ?? 'missing',
+          });
+          return;
+        }
+
+        const tokens = await getUserPushTokens(assignedToAdminId, 'purchaseOrderUpdates');
+        const userIds = [assignedToAdminId];
+        logger.info('PO submitted from draft: notifying assigned admin only', {
+          poId,
+          assignedToAdminId,
+          tokenCount: tokens.length,
+        });
+
+        if (tokens.length > 0 || userIds.length > 0) {
+          const title = 'New PO Pending Approval';
+          const body = `${after.createdByName ?? 'Someone'} submitted PO ${poNum} for approval`;
+          const pushData = { screen: 'ApprovePO' as const, poId };
+          for (const uid of userIds) {
+            await createInAppNotification(uid, 'po_pending_approval', title, body, pushData);
+          }
+          if (tokens.length > 0) {
+            await sendExpoPushNotification(tokens, title, body, pushData);
+          }
+        }
+      } catch (notifErr) {
+        logger.error('Push failed for PO submitted from draft', { notifErr, poId });
+      }
+      return;
+    }
+
     const statusActionMap: Record<string, string> = {
       approved: 'po_approved',
       rejected: 'po_rejected',
-      ordered: 'po_ordered',
       received: 'po_received',
     };
     const actionType = statusActionMap[after.status];
@@ -1288,16 +1346,12 @@ export const onPurchaseOrderUpdated = onDocumentUpdated(
       userName = after.reviewedByName ?? after.createdByName ?? 'System';
       userRole = 'Admin';
       summary = `Approved PO: ${targetDisplay}`;
-    } else if (after.status === 'rejected') {
+    } else {
+      // after.status === 'rejected'
       userId = after.reviewedBy ?? after.createdBy ?? 'system';
       userName = after.reviewedByName ?? after.createdByName ?? 'System';
       userRole = 'Admin';
       summary = `Rejected PO: ${targetDisplay}`;
-    } else {
-      userId = after.createdBy ?? 'system';
-      userName = after.createdByName ?? 'System';
-      userRole = 'Admin';
-      summary = `Marked PO as ordered: ${targetDisplay}`;
     }
 
     await createActivityLog({
@@ -1349,6 +1403,9 @@ export const onPurchaseOrderUpdated = onDocumentUpdated(
         }
       } else if (after.status === 'rejected') {
         if (createdBy && createdBy !== reviewedBy) {
+          const reviewedByName = (after.reviewedByName as string | undefined)?.trim();
+          const rejectorLabel = reviewedByName || 'an admin';
+          const body = `Your PO ${targetDisplay} was rejected by ${rejectorLabel}.`;
           const pushData = { screen: 'ApprovePO' as const, poId };
           const creatorTokens = await getUserPushTokens(createdBy, 'purchaseOrderUpdates');
           if (creatorTokens.length > 0) {
@@ -1356,40 +1413,16 @@ export const onPurchaseOrderUpdated = onDocumentUpdated(
               createdBy,
               'po_rejected',
               'PO Rejected',
-              `Your PO ${targetDisplay} was rejected.`,
+              body,
               pushData
             );
             await sendExpoPushNotification(
               creatorTokens,
               'PO Rejected',
-              `Your PO ${targetDisplay} was rejected.`,
+              body,
               pushData
             );
           }
-        }
-      } else if (after.status === 'ordered') {
-        const pushData = { screen: 'PurchaseOrderList' as const, poId };
-        const tokens = await getAdminAndStoreInchargeTokens(
-          'purchaseOrderUpdates',
-          createdBy
-        );
-        if (tokens.length > 0) {
-          const userIds = await getAdminAndStoreInchargeUserIds(createdBy);
-          for (const uid of userIds) {
-            await createInAppNotification(
-              uid,
-              'po_ordered',
-              'PO Marked as Ordered',
-              `PO ${targetDisplay} has been marked as ordered.`,
-              pushData
-            );
-          }
-          await sendExpoPushNotification(
-            tokens,
-            'PO Marked as Ordered',
-            `PO ${targetDisplay} has been marked as ordered.`,
-            pushData
-          );
         }
       } else if (after.status === 'received') {
         const pushData = { screen: 'ReceivePO' as const, poId };

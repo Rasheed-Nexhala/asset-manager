@@ -134,8 +134,8 @@ service cloud.firestore {
     match /users/{userId} {
       // Allow reading individual user documents
       allow get: if isAuthenticated() && (isAdmin() || request.auth.uid == userId);
-      // Allow listing/querying the entire users collection (only for Admins)
-      allow list: if isAuthenticated() && isAdmin();
+      // Allow listing users: Admins (full) and Store Incharge (needed to assign admin when submitting PO for approval)
+      allow list: if isAuthenticated() && (isAdmin() || isStoreIncharge());
       // Allow Admins to create users; allow self-registration on signup (create own doc with Unassigned role)
       allow create: if isAuthenticated() && (
         (isUserActive() && isAdmin()) ||

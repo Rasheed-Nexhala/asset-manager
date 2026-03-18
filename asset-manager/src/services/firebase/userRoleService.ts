@@ -214,6 +214,16 @@ export const getAllUsers = async (): Promise<UserListItem[]> => {
 };
 
 /**
+ * Get active Admin users (for PO approval assignment).
+ */
+export const getAdminUsers = async (): Promise<UserListItem[]> => {
+  const users = await getAllUsers();
+  return users.filter(
+    (u) => u.role === 'Admin' && u.isActive && !u.isDeleted
+  );
+};
+
+/**
  * Subscribe to real-time updates for a single user's role data
  * Returns an unsubscribe function that should be called when done listening
  *

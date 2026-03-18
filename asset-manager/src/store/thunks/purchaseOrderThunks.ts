@@ -327,39 +327,6 @@ export const rejectPO = createAsyncThunk(
 );
 
 /**
- * Mark PO as ordered
- */
-export const markPOOrdered = createAsyncThunk(
-  'purchaseOrders/markPOOrdered',
-  async ({ poId }: { poId: string }, { dispatch, rejectWithValue, getState }) => {
-    const userId = selectUserId(getState() as RootState);
-    if (!userId) {
-      return rejectWithValue('User ID is required to mark PO as ordered');
-    }
-
-    try {
-      dispatch(setLoading(true));
-      dispatch(clearError());
-
-      await purchaseOrderService.markPOOrdered(poId, userId);
-
-      const updatedPO = await purchaseOrderService.getPOById(poId);
-      if (updatedPO) {
-        dispatch(addOrUpdatePO(updatedPO));
-      }
-
-      dispatch(setLoading(false));
-      return updatedPO;
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to mark PO as ordered';
-      dispatch(setError(errorMessage));
-      return rejectWithValue(errorMessage);
-    }
-  }
-);
-
-/**
  * Receive a PO and update inventory
  */
 export const receivePO = createAsyncThunk(

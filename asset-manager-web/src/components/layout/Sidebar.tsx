@@ -52,12 +52,17 @@ export function Sidebar() {
       className="sidebar hidden md:flex md:w-64 md:flex-col md:bg-slate-900 md:text-white"
       aria-label="Main navigation"
     >
-      <div className="flex h-16 items-center border-b border-slate-800 px-6">
+      <div className="flex h-16 shrink-0 items-center justify-center border-b border-slate-800 px-6">
         <Link
           to="/dashboard"
-          className="text-xl font-bold tracking-tight text-white hover:text-blue-400 transition-colors"
+          className="flex items-center justify-center rounded-lg bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900 transition-opacity hover:opacity-90 min-h-[44px] min-w-[44px]"
+          aria-label={`${companyConfig.appName} - Go to dashboard`}
         >
-          {companyConfig.appName}
+          <img
+            src={companyConfig.logoPath}
+            alt={companyConfig.logoAlt}
+            className="h-9 max-h-[40px] w-auto max-w-[180px] object-contain object-center"
+          />
         </Link>
       </div>
 
