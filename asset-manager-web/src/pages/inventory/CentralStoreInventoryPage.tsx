@@ -7,6 +7,7 @@ import {
   setCategories,
 } from '../../store/slices/inventorySlice';
 import {
+  fetchItems,
   fetchItemsPaginated,
   loadMoreItems,
   exportInventoryThunk,
@@ -19,6 +20,7 @@ import {
   selectItemsHasMore,
   selectItemsLoadingMore,
   selectLowStockCount,
+  selectFilteredAndSearchedItems,
 } from '../../store/selectors/inventorySelectors';
 import { selectIsAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
 import { useInventoryError } from '../../hooks/useInventoryError';
@@ -77,17 +79,22 @@ export function CentralStoreInventoryPage() {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  const filteredItems = useMemo(() => {
-    let items = allItems;
+  // Client-side search: case-insensitive, searches name, SKU, category, description
+  const filteredItems = useAppSelector((state) =>
+    selectFilteredAndSearchedItems(state, searchQuery)
+  );
+
+  // Apply low-stock filter on top of search (filteredItems already has category/type from Redux filters)
+  const displayedItems = useMemo(() => {
     if (filters.stock === 'low_stock') {
-      items = items.filter((item) => isLowStock(item));
+      return filteredItems.filter((item) => isLowStock(item));
     }
-    return items;
-  }, [allItems, filters.stock]);
+    return filteredItems;
+  }, [filteredItems, filters.stock]);
 
   const filteredLowStockCount = useMemo(
-    () => filteredItems.filter((item) => isLowStock(item)).length,
-    [filteredItems]
+    () => displayedItems.filter((item) => isLowStock(item)).length,
+    [displayedItems]
   );
 
   useEffect(() => {
@@ -97,9 +104,15 @@ export function CentralStoreInventoryPage() {
   }, [lowStockFromUrl, filters.stock]);
 
   useEffect(() => {
-    const itemFilters = toItemFilters(filters, debouncedSearch);
+    // Do NOT pass searchTerm to server - we use client-side search for proper
+    // case-insensitive "contains" matching across name, SKU, category, description
+    const itemFilters = toItemFilters(filters, undefined);
     dispatch(setFilters(itemFilters));
-    dispatch(fetchItemsPaginated());
+    if (debouncedSearch.trim()) {
+      dispatch(fetchItems(itemFilters));
+    } else {
+      dispatch(fetchItemsPaginated());
+    }
   }, [dispatch, filters, debouncedSearch]);
 
   useEffect(() => {
@@ -170,7 +183,7 @@ export function CentralStoreInventoryPage() {
     );
   }
 
-  const hasNoItems = filteredItems.length === 0 && !isLoading;
+  const hasNoItems = displayedItems.length === 0 && !isLoading;
 
   return (
     <div className="flex flex-col h-full">
@@ -367,7 +380,7 @@ export function CentralStoreInventoryPage() {
       ) : (
           <div className="flex-1 overflow-y-auto">
           <div className="grid grid-cols-1 gap-4 md:hidden p-4 md:p-6 pb-24">
-            {filteredItems.map((item) => (
+            {displayedItems.map((item) => (
               <ItemCard key={item.id} item={item} />
             ))}
           </div>
@@ -397,7 +410,7 @@ export function CentralStoreInventoryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredItems.map((item) => (
+                  {displayedItems.map((item) => (
                     <tr
                       key={item.id}
                       className="border-b border-slate-100 hover:bg-slate-50"
@@ -451,11 +464,11 @@ export function CentralStoreInventoryPage() {
               <p className="text-[15px] text-slate-500">
                 {totalCount != null ? (
                   <>
-                    Showing <span className="font-semibold text-slate-900">{filteredItems.length}</span> of{' '}
+                    Showing <span className="font-semibold text-slate-900">{displayedItems.length}</span> of{' '}
                     <span className="font-semibold text-slate-900">{totalCount}</span>
                   </>
                 ) : (
-                  <span className="font-semibold text-slate-900">{filteredItems.length}</span>
+                  <span className="font-semibold text-slate-900">{displayedItems.length}</span>
                 )}{' '}
                 items
               </p>
