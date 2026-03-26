@@ -85,16 +85,18 @@ export function MySiteInventoryPage() {
     inventoryEntries.forEach((entry) => {
       if (!uniqueEntriesMap.has(entry.id)) uniqueEntriesMap.set(entry.id, entry);
     });
-    return Array.from(uniqueEntriesMap.values()).map((entry) => {
-      const item = items.find((i) => i.id === entry.itemId);
-      return {
-        entry,
-        item,
-        type: (item?.type || 'consumable') as ItemType,
-        unit: item?.unit || 'piece',
-        imageUrl: item?.imageUrl,
-      };
-    });
+    return Array.from(uniqueEntriesMap.values())
+      .filter((entry) => entry.quantity > 0)
+      .map((entry) => {
+        const item = items.find((i) => i.id === entry.itemId);
+        return {
+          entry,
+          item,
+          type: (item?.type || 'consumable') as ItemType,
+          unit: item?.unit || 'piece',
+          imageUrl: item?.imageUrl,
+        };
+      });
   }, [inventoryEntries, items]);
 
   const filteredInventory = useMemo(() => {

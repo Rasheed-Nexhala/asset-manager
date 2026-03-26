@@ -304,6 +304,34 @@ describe('OtherSiteInventoryScreen', () => {
     expect(screen.getByText('Need these items? Contact Store Incharge to coordinate transfer.')).toBeTruthy();
   });
 
+  it('does not list site inventory rows with zero quantity', async () => {
+    mockGetSiteResult = mockSite;
+
+    const zeroQtyEntry: InventoryEntry = {
+      ...mockInventoryEntry,
+      id: 'entry-zero',
+      quantity: 0,
+    };
+
+    const preloadedInventory = {
+      ...defaultInventoryState,
+      items: [mockItem],
+      inventoryByLocation: { site_s1: [zeroQtyEntry] },
+      loading: false,
+      error: null,
+    };
+
+    renderWithStore(<OtherSiteInventoryScreen />, {
+      inventory: preloadedInventory,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('header', { name: 'North Site Inventory' })).toBeTruthy();
+    });
+    expect(screen.getByText('No Inventory Items')).toBeTruthy();
+    expect(screen.queryByText('Steel Rod 12mm')).toBeNull();
+  });
+
   it('back button calls goBack', async () => {
     mockGetSiteResult = mockSite;
 

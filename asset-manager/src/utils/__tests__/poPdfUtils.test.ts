@@ -173,7 +173,7 @@ describe('poPdfUtils', () => {
       expect(html).not.toContain('₹0');
     });
 
-    it('includes signature block and Authorized Signature label', () => {
+    it('includes signature block and IBF Authorized Signature label', () => {
       const po: PurchaseOrder = {
         id: 'po1',
         poNumber: 'PO-003',
@@ -191,7 +191,7 @@ describe('poPdfUtils', () => {
       } as PurchaseOrder;
 
       const html = generatePOHtml(po);
-      expect(html).toContain('Authorised Signature');
+      expect(html).toContain('IBF Authorized Signature');
     });
 
     it('includes logo when logoBase64 is provided', () => {

@@ -312,10 +312,11 @@ export function ItemDetailPage() {
   const statusLabel =
     stockStatus === 'low_stock' ? 'Low Stock' : stockStatus === 'discontinued' ? 'Discontinued' : 'In Stock';
 
-  const filteredEntries =
+  const filteredEntries = (
     item.type === 'fuel'
       ? inventoryByLocation.filter((e) => e.locationType === 'store')
-      : inventoryByLocation;
+      : inventoryByLocation
+  ).filter((e) => e.quantity > 0);
 
   return (
     <div className="flex flex-col h-full">

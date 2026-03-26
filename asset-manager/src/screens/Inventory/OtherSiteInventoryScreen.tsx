@@ -144,6 +144,7 @@ export const OtherSiteInventoryScreen: React.FC = () => {
     
     // Convert map values back to array, enrich with item data, and filter out entries without items
     return Array.from(uniqueEntriesMap.values())
+      .filter((entry) => entry.quantity > 0)
       .map((entry) => {
         const item = allItems.find((item) => item.id === entry.itemId);
         if (!item) return null;

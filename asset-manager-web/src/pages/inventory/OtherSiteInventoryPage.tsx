@@ -94,6 +94,7 @@ export function OtherSiteInventoryPage() {
       if (!unique.has(e.id)) unique.set(e.id, e);
     });
     return Array.from(unique.values())
+      .filter((entry) => entry.quantity > 0)
       .map((entry) => {
         const item = allItems.find((i) => i.id === entry.itemId);
         if (!item) return null;

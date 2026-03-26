@@ -556,7 +556,10 @@ export const ItemDetailScreen: React.FC = () => {
 
           {/* By Location - shown for all item types (store-only for Fuel) */}
           <StockDistributionBreakdown
-            entries={item.type === 'fuel' ? inventoryByLocation.filter((e) => e.locationType === 'store') : inventoryByLocation}
+            entries={(item.type === 'fuel'
+              ? inventoryByLocation.filter((e) => e.locationType === 'store')
+              : inventoryByLocation
+            ).filter((e) => e.quantity > 0)}
             item={item}
             viewMode={viewMode}
           />

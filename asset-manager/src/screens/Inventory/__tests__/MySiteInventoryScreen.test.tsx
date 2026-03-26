@@ -373,6 +373,42 @@ describe('MySiteInventoryScreen', () => {
     });
   });
 
+  it('does not list site inventory rows with zero quantity', async () => {
+    const zeroQtyEntry: InventoryEntry = {
+      ...mockInventoryEntry,
+      id: 'inv-zero',
+      quantity: 0,
+    };
+    mockFetchSitesResult = [mockUserSite, mockOtherSite];
+    mockSitesToReturn = [mockUserSite, mockOtherSite];
+    mockFetchInventoryResult = {
+      locationId: SITE_LOCATION_ID,
+      inventory: [zeroQtyEntry],
+    };
+
+    renderWithStore(<MySiteInventoryScreen />, {
+      auth: defaultAuthState,
+      sites: {
+        sites: [mockUserSite, mockOtherSite],
+        isLoading: false,
+        error: null,
+        searchQuery: '',
+        validationLoading: false,
+        lastValidationAt: null,
+      },
+      inventory: {
+        ...defaultInventoryState,
+        items: [mockItem],
+        inventoryByLocation: { [SITE_LOCATION_ID]: [zeroQtyEntry] },
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('No Inventory Items')).toBeTruthy();
+    });
+    expect(screen.queryByText('Steel Rod 12mm')).toBeNull();
+  });
+
   it('View other sites opens modal', async () => {
     mockFetchSitesResult = [mockUserSite, mockOtherSite];
     mockSitesToReturn = [mockUserSite, mockOtherSite];

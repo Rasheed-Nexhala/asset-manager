@@ -125,6 +125,10 @@ export function DashboardPage() {
     [assignedSiteId]
   );
   const siteInventory = useAppSelector(siteInventorySelector);
+  const siteInventoryInStock = useMemo(
+    () => siteInventory.filter((e) => e.quantity > 0),
+    [siteInventory]
+  );
 
   const isVisible = location.pathname === '/dashboard';
   const { isInitialLoad, isRefreshing, triggerRefresh } = useDashboardSubscriptions({
@@ -320,13 +324,13 @@ export function DashboardPage() {
                     <div className="flex justify-between">
                       <span className="text-[15px] text-slate-500">Total items</span>
                       <span className="text-[15px] font-semibold text-slate-900">
-                        {siteInventory.length}
+                        {siteInventoryInStock.length}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-[15px] text-slate-500">Total quantity</span>
                       <span className="text-[15px] font-semibold text-slate-900">
-                        {siteInventory.reduce((s, e) => s + e.quantity, 0)}
+                        {siteInventoryInStock.reduce((s, e) => s + e.quantity, 0)}
                       </span>
                     </div>
                   </div>

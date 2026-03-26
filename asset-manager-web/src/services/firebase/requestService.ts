@@ -563,6 +563,10 @@ export const transferRequest = async (
       const sourceName = isSiteTransferTx
         ? requestData.sourceSiteName ?? 'Source Site'
         : 'Central Store';
+      const sourceLocationIdInTx = isSiteTransferTx
+        ? `site_${requestData.sourceSiteId}`
+        : 'store';
+      const sourceIsSiteLocation = sourceLocationIdInTx.startsWith('site_');
 
       // Process all writes based on the read data
       for (const data of readsData) {
@@ -576,10 +580,15 @@ export const transferRequest = async (
               `Insufficient stock for "${item.itemName}" at ${sourceName}. Available: ${currentQty}, Required: ${quantity}`
             );
           }
-          transaction.update(refs.storeRef, {
-            quantity: currentQty - quantity,
-            updatedAt: serverTimestamp(),
-          });
+          const newSourceQty = currentQty - quantity;
+          if (sourceIsSiteLocation && newSourceQty === 0) {
+            transaction.delete(refs.storeRef);
+          } else {
+            transaction.update(refs.storeRef, {
+              quantity: newSourceQty,
+              updatedAt: serverTimestamp(),
+            });
+          }
         } else {
           throw new TransferValidationError(
             `Item "${item.itemName}" has no inventory record at "${sourceName}". ` +
@@ -876,16 +885,21 @@ const returnItemsBatch = async (
         const { returnItem, item, refs, itemRef, itemData, siteDoc, storeDoc } = data;
         const qty = returnItem.quantityReturned;
 
-        // Update site inventory
+        // Update site inventory (remove doc when site stock is fully returned)
         if (siteDoc && siteDoc.exists()) {
           const currentSiteQty = siteDoc.data().quantity;
           if (currentSiteQty < qty) {
             throw new Error(`Insufficient stock at site for ${item.itemName}. Available: ${currentSiteQty}, Trying to return: ${qty}`);
           }
-          transaction.update(refs.siteRef, {
-            quantity: currentSiteQty - qty,
-            updatedAt: now,
-          });
+          const newSiteQty = currentSiteQty - qty;
+          if (newSiteQty === 0) {
+            transaction.delete(refs.siteRef);
+          } else {
+            transaction.update(refs.siteRef, {
+              quantity: newSiteQty,
+              updatedAt: now,
+            });
+          }
         } else {
           throw new Error(`Item ${item.itemName} not found in site inventory. Cannot return.`);
         }

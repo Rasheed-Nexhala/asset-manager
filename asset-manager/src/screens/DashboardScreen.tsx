@@ -148,6 +148,10 @@ export const DashboardScreen: React.FC = () => {
     [assignedSiteId]
   );
   const siteInventory = useAppSelector(siteInventorySelector);
+  const siteInventoryInStock = useMemo(
+    () => siteInventory.filter((e) => e.quantity > 0),
+    [siteInventory]
+  );
 
   const { isInitialLoad, isRefreshing, triggerRefresh } = useDashboardSubscriptions({
     userId,
@@ -456,13 +460,13 @@ export const DashboardScreen: React.FC = () => {
                   <View className="flex-row justify-between">
                     <Text className="text-[15px] text-[#64748B]">Total items</Text>
                     <Text className="text-[15px] font-semibold text-[#0F172A]">
-                      {siteInventory.length}
+                      {siteInventoryInStock.length}
                     </Text>
                   </View>
                   <View className="flex-row justify-between">
                     <Text className="text-[15px] text-[#64748B]">Total quantity</Text>
                     <Text className="text-[15px] font-semibold text-[#0F172A]">
-                      {siteInventory.reduce((s, e) => s + e.quantity, 0)}
+                      {siteInventoryInStock.reduce((s, e) => s + e.quantity, 0)}
                     </Text>
                   </View>
                 </View>

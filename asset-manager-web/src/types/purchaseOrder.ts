@@ -64,8 +64,16 @@ export interface PurchaseOrderFirestore {
   vendorEmail?: string;
   vendorAddress?: string;
   vendorGstin?: string;
+  vendorContactPerson?: string;
   location?: string;
   jobNo?: string;
+  poIssueSite?: string;
+  deliveryLocation?: string;
+  buyerContactName?: string;
+  buyerContactPhone?: string;
+  siteId?: string;
+  siteName?: string;
+  deliveryDateText?: string;
 
   items: PurchaseOrderItem[];
 
@@ -124,8 +132,16 @@ export interface PurchaseOrder {
   vendorEmail?: string;
   vendorAddress?: string;
   vendorGstin?: string;
+  vendorContactPerson?: string;
   location?: string;
   jobNo?: string;
+  poIssueSite?: string;
+  deliveryLocation?: string;
+  buyerContactName?: string;
+  buyerContactPhone?: string;
+  siteId?: string;
+  siteName?: string;
+  deliveryDateText?: string;
 
   items: PurchaseOrderItem[];
 
@@ -201,8 +217,16 @@ export interface CreatePurchaseOrderData {
   vendorEmail?: string;
   vendorAddress?: string;
   vendorGstin?: string;
+  vendorContactPerson?: string;
   location?: string;
   jobNo?: string;
+  poIssueSite?: string;
+  deliveryLocation?: string;
+  buyerContactName?: string;
+  buyerContactPhone?: string;
+  siteId?: string;
+  siteName?: string;
+  deliveryDateText?: string;
   items: Array<{
     itemId: string;
     itemName: string;

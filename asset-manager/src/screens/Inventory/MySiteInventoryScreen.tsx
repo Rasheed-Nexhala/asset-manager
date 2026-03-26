@@ -145,16 +145,18 @@ export const MySiteInventoryScreen: React.FC = () => {
     });
     
     // Convert map values back to array and enrich with item data
-    return Array.from(uniqueEntriesMap.values()).map((entry) => {
-      const item = items.find((i) => i.id === entry.itemId);
-      return {
-        entry,
-        item,
-        type: item?.type || 'consumable' as ItemType,
-        unit: item?.unit || 'piece',
-        imageUrl: item?.imageUrl,
-      };
-    });
+    return Array.from(uniqueEntriesMap.values())
+      .filter((entry) => entry.quantity > 0)
+      .map((entry) => {
+        const item = items.find((i) => i.id === entry.itemId);
+        return {
+          entry,
+          item,
+          type: item?.type || 'consumable' as ItemType,
+          unit: item?.unit || 'piece',
+          imageUrl: item?.imageUrl,
+        };
+      });
   }, [inventoryEntries, items]);
   
   // Filter inventory by search query

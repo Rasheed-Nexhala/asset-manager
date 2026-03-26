@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,8 @@ import {
   deleteVendor,
 } from '../../services/firebase/vendorService';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
+import { getSites } from '../../services/firebase/siteService';
+import type { Site } from '../../types/sites';
 import { getItemById } from '../../services/firebase/inventoryService';
 import { getAdminUsers } from '../../services/firebase/userRoleService';
 import type { UserListItem } from '../../types/roles';
@@ -95,12 +97,22 @@ export const CreatePOScreen: React.FC = () => {
   const [vendorGstin, setVendorGstin] = useState('');
   const [location, setLocation] = useState('');
   const [jobNo, setJobNo] = useState('');
+  const [vendorContactPerson, setVendorContactPerson] = useState('');
+  const [deliveryLocation, setDeliveryLocation] = useState('');
+  const [buyerContactName, setBuyerContactName] = useState('');
+  const [buyerContactPhone, setBuyerContactPhone] = useState('');
   const [poNumber, setPoNumber] = useState('');
   const [items, setItems] = useState<PurchaseOrderItem[]>([]);
   const [justification, setJustification] = useState('');
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState<Date | null>(
     null
   );
+  const [deliveryDateText, setDeliveryDateText] = useState('');
+  const [orderSiteId, setOrderSiteId] = useState<string | null>(null);
+  const [orderSiteName, setOrderSiteName] = useState('');
+  const [sites, setSites] = useState<Site[]>([]);
+  const [sitesLoading, setSitesLoading] = useState(false);
+  const [sitePickerVisible, setSitePickerVisible] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDraft, setIsDraft] = useState(false);
@@ -126,6 +138,17 @@ export const CreatePOScreen: React.FC = () => {
     const unsub = subscribeToVendors((v) => dispatch(setVendors(v)));
     return unsub;
   }, [dispatch]);
+
+  useEffect(() => {
+    setSitesLoading(true);
+    getSites()
+      .then(setSites)
+      .catch((err) => {
+        console.error('Failed to load sites:', err);
+        setSites([]);
+      })
+      .finally(() => setSitesLoading(false));
+  }, []);
 
   useEffect(() => {
     setAdminUsersLoading(true);
@@ -178,6 +201,7 @@ export const CreatePOScreen: React.FC = () => {
         setVendorEmail(v.email ?? '');
         setVendorAddress(v.address ?? '');
         setVendorGstin(v.gstin ?? '');
+        setVendorContactPerson(v.contactPerson ?? '');
       }
     }
   }, [selectedVendorId, vendors]);
@@ -199,6 +223,10 @@ export const CreatePOScreen: React.FC = () => {
       setVendorEmail(po.vendorEmail ?? '');
       setVendorAddress(po.vendorAddress ?? '');
       setVendorGstin(po.vendorGstin ?? '');
+      setVendorContactPerson(po.vendorContactPerson ?? '');
+      setDeliveryLocation(po.deliveryLocation ?? '');
+      setBuyerContactName(po.buyerContactName ?? '');
+      setBuyerContactPhone(po.buyerContactPhone ?? '');
       setLocation(po.location ?? '');
       setJobNo(po.jobNo ?? '');
       setPoNumber(po.poNumber ?? '');
@@ -207,6 +235,14 @@ export const CreatePOScreen: React.FC = () => {
       setExpectedDeliveryDate(
         po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate) : null
       );
+      setDeliveryDateText(po.deliveryDateText ?? '');
+      const sid = po.siteId?.trim() || null;
+      setOrderSiteId(sid);
+      if (sid) {
+        setOrderSiteName((po.siteName ?? po.poIssueSite ?? '').trim());
+      } else {
+        setOrderSiteName((po.poIssueSite ?? '').trim());
+      }
       setEditingPOStatus('draft');
 
       setInitialStateHash(JSON.stringify({
@@ -216,6 +252,10 @@ export const CreatePOScreen: React.FC = () => {
         vendorEmail: po.vendorEmail ?? '',
         vendorAddress: po.vendorAddress ?? '',
         vendorGstin: po.vendorGstin ?? '',
+        vendorContactPerson: po.vendorContactPerson ?? '',
+        deliveryLocation: po.deliveryLocation ?? '',
+        buyerContactName: po.buyerContactName ?? '',
+        buyerContactPhone: po.buyerContactPhone ?? '',
         location: po.location ?? '',
         jobNo: po.jobNo ?? '',
         poNumber: po.poNumber ?? '',
@@ -230,6 +270,9 @@ export const CreatePOScreen: React.FC = () => {
         })),
         justification: po.justification,
         expectedDeliveryDate: po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate).toISOString() : null,
+        deliveryDateText: po.deliveryDateText ?? '',
+        orderSiteId: po.siteId?.trim() || null,
+        orderSiteName: po.siteName?.trim() ?? '',
       }));
     };
 
@@ -266,12 +309,19 @@ export const CreatePOScreen: React.FC = () => {
         vendorEmail: '',
         vendorAddress: '',
         vendorGstin: '',
+        vendorContactPerson: '',
+        deliveryLocation: '',
+        buyerContactName: '',
+        buyerContactPhone: '',
         location: '',
         jobNo: '',
         poNumber: '',
         items: [],
         justification: '',
         expectedDeliveryDate: null,
+        deliveryDateText: '',
+        orderSiteId: null,
+        orderSiteName: '',
       }));
     }
   }, [poId, initialStateHash]);
@@ -283,6 +333,10 @@ export const CreatePOScreen: React.FC = () => {
     vendorEmail: vendorEmail.trim(),
     vendorAddress: vendorAddress.trim(),
     vendorGstin: vendorGstin.trim(),
+    vendorContactPerson: vendorContactPerson.trim(),
+    deliveryLocation: deliveryLocation.trim(),
+    buyerContactName: buyerContactName.trim(),
+    buyerContactPhone: buyerContactPhone.trim(),
     location: location.trim(),
     jobNo: jobNo.trim(),
     poNumber: poNumber.trim(),
@@ -297,6 +351,9 @@ export const CreatePOScreen: React.FC = () => {
     })),
     justification: justification.trim(),
     expectedDeliveryDate: expectedDeliveryDate ? expectedDeliveryDate.toISOString() : null,
+    deliveryDateText: deliveryDateText.trim(),
+    orderSiteId,
+    orderSiteName: orderSiteName.trim(),
   });
 
   const isDirty = initialStateHash !== null && currentHash !== initialStateHash;
@@ -311,6 +368,28 @@ export const CreatePOScreen: React.FC = () => {
   );
   const totalAmount = subtotal + gstAmount;
   const hasAnyPrice = items.some((i) => (i.unitPrice ?? 0) > 0);
+
+  const activeSites = useMemo(
+    () => sites.filter((s) => s.status === 'active'),
+    [sites]
+  );
+
+  useEffect(() => {
+    if (!orderSiteId || orderSiteName.trim()) return;
+    const s = activeSites.find((x) => x.id === orderSiteId);
+    if (s) setOrderSiteName(s.name);
+  }, [orderSiteId, orderSiteName, activeSites]);
+
+  /** Link saved poIssueSite text to a site id once sites are loaded (legacy drafts). */
+  useEffect(() => {
+    if (sites.length === 0 || orderSiteId) return;
+    const t = orderSiteName.trim();
+    if (!t) return;
+    const m = sites.find(
+      (s) => s.status !== 'deleted' && s.name.trim() === t
+    );
+    if (m) setOrderSiteId(m.id);
+  }, [sites, orderSiteId, orderSiteName]);
 
   const validate = useCallback((): boolean => {
     const e: Record<string, string> = {};
@@ -486,8 +565,16 @@ export const CreatePOScreen: React.FC = () => {
           vendorEmail: vendorEmail.trim() || undefined,
           vendorAddress: vendorAddress.trim() || undefined,
           vendorGstin: vendorGstin.trim() || undefined,
+          vendorContactPerson: vendorContactPerson.trim() || undefined,
           location: location.trim() || undefined,
           jobNo: jobNo.trim() || undefined,
+          poIssueSite: orderSiteName.trim() || undefined,
+          deliveryLocation: deliveryLocation.trim() || undefined,
+          buyerContactName: buyerContactName.trim() || undefined,
+          buyerContactPhone: buyerContactPhone.trim() || undefined,
+          siteId: orderSiteId?.trim() || undefined,
+          siteName: orderSiteId ? orderSiteName.trim() || undefined : undefined,
+          deliveryDateText: deliveryDateText.trim() || undefined,
           items: items.map((i) => ({
             itemId: i.itemId,
             itemName: i.itemName,
@@ -583,8 +670,15 @@ export const CreatePOScreen: React.FC = () => {
       vendorEmail,
       vendorAddress,
       vendorGstin,
+      vendorContactPerson,
       location,
       jobNo,
+      deliveryLocation,
+      buyerContactName,
+      buyerContactPhone,
+      orderSiteId,
+      orderSiteName,
+      deliveryDateText,
       poNumber,
       items,
       justification,
@@ -656,8 +750,16 @@ export const CreatePOScreen: React.FC = () => {
           vendorEmail: vendorEmail.trim() || undefined,
           vendorAddress: vendorAddress.trim() || undefined,
           vendorGstin: vendorGstin.trim() || undefined,
+          vendorContactPerson: vendorContactPerson.trim() || undefined,
           location: location.trim() || undefined,
           jobNo: jobNo.trim() || undefined,
+          poIssueSite: orderSiteName.trim() || undefined,
+          deliveryLocation: deliveryLocation.trim() || undefined,
+          buyerContactName: buyerContactName.trim() || undefined,
+          buyerContactPhone: buyerContactPhone.trim() || undefined,
+          siteId: orderSiteId?.trim() || undefined,
+          siteName: orderSiteId ? orderSiteName.trim() || undefined : undefined,
+          deliveryDateText: deliveryDateText.trim() || undefined,
           items,
           justification: justification.trim(),
           expectedDeliveryDate,
@@ -678,8 +780,15 @@ export const CreatePOScreen: React.FC = () => {
     vendorEmail,
     vendorAddress,
     vendorGstin,
+    vendorContactPerson,
     location,
     jobNo,
+    deliveryLocation,
+    buyerContactName,
+    buyerContactPhone,
+    orderSiteId,
+    orderSiteName,
+    deliveryDateText,
     items,
     justification,
     expectedDeliveryDate,
@@ -844,6 +953,12 @@ export const CreatePOScreen: React.FC = () => {
                   placeholder="e.g. 29AJWPD4844N1ZC"
                   error={errors.vendorGstin}
                 />
+                <FormField
+                  label="Supplier contact person"
+                  value={vendorContactPerson}
+                  onChangeText={setVendorContactPerson}
+                  placeholder="As on printed PO"
+                />
               </View>
             </View>
           </View>
@@ -927,61 +1042,136 @@ export const CreatePOScreen: React.FC = () => {
             multiline
           />
 
-          {/* Expected Delivery */}
-          <View>
-            <Text className="text-[15px] font-medium text-[#0F172A] mb-1.5">
-              Expected Delivery
-            </Text>
-            <TouchableOpacity
-              onPress={() => setShowDatePicker(true)}
-              className="border border-[#E2E8F0] rounded-lg h-12 px-4 flex-row items-center justify-between bg-white"
-            >
-              <Text
-                className={
-                  expectedDeliveryDate
-                    ? 'text-[#0F172A]'
-                    : 'text-[#94A3B8]'
-                }
-              >
-                {expectedDeliveryDate
-                  ? expectedDeliveryDate.toLocaleDateString('en-IN')
-                  : 'Select date'}
-              </Text>
-              <Ionicons name="calendar-outline" size={20} color="#64748B" />
-            </TouchableOpacity>
-            {showDatePicker && (
-              <DateTimePicker
-                value={expectedDeliveryDate ?? new Date()}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(_, d) => {
-                  setShowDatePicker(false);
-                  if (d) setExpectedDeliveryDate(d);
-                }}
-              />
-            )}
-          </View>
-
-          {/* Location and Job No. */}
           <View className="flex-row gap-4">
             <View className="flex-1">
               <FormField
-                label="Location/Work"
-                value={location}
-                onChangeText={setLocation}
-                placeholder="e.g. FO"
-                error={errors.location}
-              />
-            </View>
-            <View className="flex-1">
-              <FormField
-                label="Job No."
+                label="Job No. (optional)"
                 value={jobNo}
                 onChangeText={setJobNo}
                 placeholder="e.g. 2513"
                 error={errors.jobNo}
               />
             </View>
+            <View className="flex-1">
+              <FormField
+                label="Location / work (optional)"
+                value={location}
+                onChangeText={setLocation}
+                placeholder="e.g. FO"
+                error={errors.location}
+              />
+            </View>
+          </View>
+
+          <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] gap-3">
+            <Text className="text-[17px] font-semibold text-[#0F172A]">
+              Order &amp; print details (optional)
+            </Text>
+            <Text className="text-[13px] text-[#64748B]">
+              Typed values are shown on the Purchase / Service Order. Leave blank where not
+              needed.
+            </Text>
+            <View>
+              <Text className="text-[15px] font-medium text-[#0F172A] mb-1.5">
+                PO issue site (optional)
+              </Text>
+              <TouchableOpacity
+                onPress={() => setSitePickerVisible(true)}
+                disabled={sitesLoading}
+                className="border border-[#E2E8F0] rounded-lg h-12 px-4 flex-row items-center justify-between bg-white"
+              >
+                {sitesLoading ? (
+                  <ActivityIndicator size="small" color="#1E40AF" />
+                ) : (
+                  <>
+                    <Text
+                      className={
+                        orderSiteName ? 'text-[#0F172A]' : 'text-[#94A3B8]'
+                      }
+                    >
+                      {orderSiteName || 'Select PO issue site'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={20} color="#64748B" />
+                  </>
+                )}
+              </TouchableOpacity>
+              <Text className="text-[13px] text-[#64748B] mt-1.5">
+                Choose from active sites in Site Management. Shown as &quot;PO Issue Site&quot;
+                on the printed order (falls back to location/work if not set).
+              </Text>
+            </View>
+            <FormField
+              label="Delivery date (as printed)"
+              value={deliveryDateText}
+              onChangeText={setDeliveryDateText}
+              placeholder='e.g. Immediately, 24.03.2026, or "Next week"'
+            />
+            <Text className="text-[13px] text-[#64748B] -mt-2">
+              If this is empty, a calendar date below is used when set; otherwise the document
+              shows &quot;Immediately&quot;.
+            </Text>
+            <View>
+              <Text className="text-[15px] font-medium text-[#0F172A] mb-1.5">
+                Expected delivery (calendar, optional)
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowDatePicker(true)}
+                className="border border-[#E2E8F0] rounded-lg h-12 px-4 flex-row items-center justify-between bg-white"
+              >
+                <Text
+                  className={
+                    expectedDeliveryDate
+                      ? 'text-[#0F172A]'
+                      : 'text-[#94A3B8]'
+                  }
+                >
+                  {expectedDeliveryDate
+                    ? expectedDeliveryDate.toLocaleDateString('en-IN')
+                    : 'Tap to pick a date'}
+                </Text>
+                <Ionicons name="calendar-outline" size={20} color="#64748B" />
+              </TouchableOpacity>
+              {expectedDeliveryDate ? (
+                <TouchableOpacity
+                  onPress={() => setExpectedDeliveryDate(null)}
+                  className="mt-2 self-start"
+                >
+                  <Text className="text-[14px] font-medium text-[#1E40AF]">
+                    Clear calendar date
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+              {showDatePicker && (
+                <DateTimePicker
+                  value={expectedDeliveryDate ?? new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(_, d) => {
+                    setShowDatePicker(false);
+                    if (d) setExpectedDeliveryDate(d);
+                  }}
+                />
+              )}
+            </View>
+            <FormField
+              label="Deliver location (optional)"
+              value={deliveryLocation}
+              onChangeText={setDeliveryLocation}
+              placeholder="e.g. IBF Yard Kuthethur"
+            />
+            <FormField
+              label="Contact person (optional)"
+              value={buyerContactName}
+              onChangeText={setBuyerContactName}
+              placeholder="e.g. Mr. Gowrish"
+            />
+            <FormField
+              label="Contact phone (optional)"
+              value={buyerContactPhone}
+              onChangeText={setBuyerContactPhone}
+              placeholder="e.g. 9535698044"
+              keyboardType="phone-pad"
+            />
           </View>
 
           {/* Print Preview */}
@@ -1022,6 +1212,83 @@ export const CreatePOScreen: React.FC = () => {
               <Ionicons name="chevron-down" size={20} color="#64748B" />
             </TouchableOpacity>
           </View>
+
+          <Modal
+            visible={sitePickerVisible}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setSitePickerVisible(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => setSitePickerVisible(false)}
+              className="flex-1 bg-black/50 justify-end"
+            >
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={(e) => e.stopPropagation()}
+                className="bg-white rounded-t-[20px] max-h-[70%]"
+              >
+                <View className="p-4 border-b border-[#E2E8F0]">
+                  <Text className="text-[17px] font-semibold text-[#0F172A]">
+                    PO issue site
+                  </Text>
+                  <Text className="text-[13px] text-[#64748B] mt-1">
+                    Optional. Pick an active site or leave unset.
+                  </Text>
+                </View>
+                <FlatList
+                  ListHeaderComponent={
+                    <TouchableOpacity
+                      onPress={() => {
+                        setOrderSiteId(null);
+                        setOrderSiteName('');
+                        setSitePickerVisible(false);
+                      }}
+                      className="px-4 py-4 border-b border-[#E2E8F0]"
+                    >
+                      <Text className="text-[15px] font-medium text-[#64748B]">
+                        No site
+                      </Text>
+                    </TouchableOpacity>
+                  }
+                  data={activeSites}
+                  keyExtractor={(item) => item.id}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setOrderSiteId(item.id);
+                        setOrderSiteName(item.name);
+                        setSitePickerVisible(false);
+                      }}
+                      className="px-4 py-4 border-b border-[#E2E8F0]"
+                    >
+                      <Text className="text-[15px] font-medium text-[#0F172A]">
+                        {item.name}
+                      </Text>
+                      {item.address ? (
+                        <Text
+                          className="text-[13px] text-[#64748B] mt-0.5"
+                          numberOfLines={2}
+                        >
+                          {item.address}
+                        </Text>
+                      ) : null}
+                    </TouchableOpacity>
+                  )}
+                  ListEmptyComponent={
+                    !sitesLoading ? (
+                      <View className="p-4">
+                        <Text className="text-[15px] text-[#64748B]">
+                          No active sites. Add sites under Site Management.
+                        </Text>
+                      </View>
+                    ) : null
+                  }
+                />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </Modal>
 
           <Modal
             visible={adminSelectorVisible}

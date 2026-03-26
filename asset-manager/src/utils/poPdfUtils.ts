@@ -23,8 +23,6 @@ async function loadLogoBase64(): Promise<string> {
     let uri = asset.localUri ?? asset.uri ?? '';
     if (!uri) return '';
 
-    // Android release: localUri is often invalid (no file:// prefix). Copy to cache so
-    // ImageManipulator and expo-print WebView can load the image.
     const isAndroidRelease = Platform.OS === 'android' && !__DEV__;
     if (isAndroidRelease && uri && !uri.startsWith('file://')) {
       const cacheDir = FileSystem.cacheDirectory;
@@ -34,7 +32,7 @@ async function loadLogoBase64(): Promise<string> {
           await FileSystem.copyAsync({ from: uri, to: destPath });
           uri = destPath;
         } catch {
-          // copyAsync failed; ImageManipulator will likely fail with original uri
+          // copyAsync failed
         }
       }
     }
@@ -50,17 +48,42 @@ async function loadLogoBase64(): Promise<string> {
   }
 }
 
-const formatDate = (iso: string | null | undefined): string => {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: '2-digit',
+function formatInr(n: number): string {
+  return n.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
-};
+}
+
+/** Keeps ₹ and figure on one line in print/PDF (normal space after ₹ often wraps). */
+function inrAmountCellHtml(amount: number): string {
+  return `<span style="white-space:nowrap">₹\u00A0${formatInr(amount)}</span>`;
+}
+
+function nowrapNumCellHtml(n: number): string {
+  return `<span style="white-space:nowrap">${formatInr(n)}</span>`;
+}
+
+/** Issue / line dates as DD.MM.YYYY */
+function formatDdMmYyyy(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${dd}.${mm}.${yyyy}`;
+}
+
+function deliveryDateLabel(po: PurchaseOrder): string {
+  const text = po.deliveryDateText?.trim();
+  if (text) return text;
+  if (!po.expectedDeliveryDate) return 'Immediately';
+  return formatDdMmYyyy(po.expectedDeliveryDate);
+}
 
 /**
- * Format quantity for IBF-style PO: "5 nos", "3 pack", etc.
+ * Format quantity for line display: "5 nos", "3 KGS", etc.
  */
 function formatQtyDisplay(item: PurchaseOrderItem): string {
   const orderedQty = item.orderedQuantity != null ? Number(item.orderedQuantity) : null;
@@ -73,21 +96,26 @@ function formatQtyDisplay(item: PurchaseOrderItem): string {
   return `${qty} ${baseUnit}`;
 }
 
-/**
- * Sanitizes a PO number for safe use in file paths.
- * Replaces path separators (/, \) and other characters that could create nested
- * directories with underscores, so the filename stays flat.
- * Example: "IBF/SRIRAM/2026/225" → "IBF_SRIRAM_2026_225"
- */
+function qtyNumericForTotal(item: PurchaseOrderItem): number {
+  if (item.orderedQuantity != null) return Number(item.orderedQuantity) || 0;
+  return Number(item.quantity) || 0;
+}
+
+function itemUnitColumn(item: PurchaseOrderItem): string {
+  return item.orderedUnit?.trim() || item.unit?.trim() || '—';
+}
+
+function itemLineTotal(item: PurchaseOrderItem): number {
+  const base = item.amount ?? 0;
+  const gst = item.gstAmount ?? 0;
+  return base + gst;
+}
+
 function sanitizePoNumberForPath(poNumber: string | null | undefined): string {
   if (poNumber == null) return '';
   return String(poNumber).replace(/[/\\:*?"<>|]/g, '_').trim() || 'po';
 }
 
-/**
- * Escapes HTML special characters to prevent XSS when interpolating user-provided
- * strings into generated HTML. Returns empty string for null/undefined.
- */
 function escapeHtml(text: string | null | undefined): string {
   if (text == null) return '';
   const map: Record<string, string> = {
@@ -100,11 +128,69 @@ function escapeHtml(text: string | null | undefined): string {
   return String(text).replace(/[&<>"']/g, (c) => map[c] ?? c);
 }
 
+/** IBF brand colors (match printed letterhead) */
+const IBF_BLUE = '#0070C0';
+const IBF_RED = '#C00000';
+
+function companyAddressLinesHtml(): string {
+  return companyConfig.address
+    .split('\n')
+    .map((line) =>
+      line.trim()
+        ? `<div style="font-size:10px;font-weight:normal;color:#000;line-height:1.45;">${escapeHtml(line.trim())}</div>`
+        : ''
+    )
+    .join('');
+}
+
+function vendorAddressLinesHtml(po: PurchaseOrder): string {
+  return (po.vendorAddress ?? '')
+    .split('\n')
+    .filter((l) => l.trim())
+    .map(
+      (line) =>
+        `<div style="font-size:10px;font-weight:normal;color:#000;line-height:1.45;">${escapeHtml(line.trim())}</div>`
+    )
+    .join('');
+}
+
+function buyerContactLine(po: PurchaseOrder): string {
+  const name = po.buyerContactName?.trim();
+  const phone = po.buyerContactPhone?.trim();
+  if (name && phone) return `${name} (${phone})`;
+  if (name) return name;
+  if (phone) return phone;
+  return '—';
+}
+
+function poIssueSiteDisplay(po: PurchaseOrder): string {
+  return (
+    po.poIssueSite?.trim() ||
+    po.siteName?.trim() ||
+    po.location?.trim() ||
+    '—'
+  );
+}
+
+function deliverLocationDisplay(po: PurchaseOrder): string {
+  return po.deliveryLocation?.trim() || po.location?.trim() || '—';
+}
+
+function vendorContactPersonLine(po: PurchaseOrder): string {
+  return po.vendorContactPerson?.trim() || '—';
+}
+
+function vendorPhoneEmailLine(po: PurchaseOrder): string {
+  const phone = po.vendorContact?.trim() || '';
+  const email = po.vendorEmail?.trim() || '';
+  if (phone && email) return `${phone} / ${email}`;
+  return phone || email || '—';
+}
+
 /**
- * Generate HTML string for a Purchase Order PDF.
- * Matches IBF document layout: two-column address blocks, right-side PO metadata,
- * simplified items table (Sl No, ITEM, Qty, Remarks), blank signature area.
- * @param approvedByName - Override for "Approved by" (e.g. admin who downloads for signing)
+ * Generate HTML for Purchase / Service Order (print + PDF).
+ * Layout: letterhead, supplier row, title bar, supplier vs meta, deliver-to block,
+ * priced line table, remarks/justifications + terms (one box), three signature boxes.
  */
 export function generatePOHtml(
   po: PurchaseOrder,
@@ -113,140 +199,200 @@ export function generatePOHtml(
 ): string {
   const approvedByDisplay =
     approvedByName ?? po.downloadedByName ?? po.reviewedByName ?? '—';
-  const itemRows = (po.items ?? []).map((item, index) => {
-    const slNo = index + 1;
-    const qtyDisplay = formatQtyDisplay(item);
-    const remarks = item.remarks?.trim() ?? '';
-    return `
-      <tr>
-        <td style="padding: 4px 12px; border: 1px solid #000; font-size: 16px; color: #000; text-align: center;">${slNo}</td>
-        <td style="padding: 4px 12px; border: 1px solid #000; font-size: 16px; color: #000;">${escapeHtml(item.itemName)}</td>
-        <td style="padding: 4px 12px; border: 1px solid #000; font-size: 16px; color: #000;">${escapeHtml(qtyDisplay)}</td>
-        <td style="padding: 4px 12px; border: 1px solid #000; font-size: 16px; color: #000;">${escapeHtml(remarks)}</td>
+  const docTitle = companyConfig.documentTitle ?? 'PURCHASE / SERVICE ORDER';
+  const displayName = companyConfig.documentDisplayName ?? companyConfig.name;
+  const isoLine = companyConfig.isoCertificationLine?.trim();
+  const phones = companyConfig.phones?.trim();
+  const website = companyConfig.website?.trim();
+  const cin = companyConfig.cin?.trim();
+  const deliverTo = companyConfig.deliveryToName ?? companyConfig.name;
+  const deliverAddr = companyConfig.deliveryAddress ?? '';
+  const deliverContacts = companyConfig.deliveryContacts ?? '';
+  const deliverWeb = companyConfig.deliveryWebsite ?? website ?? '';
+  const footer = companyConfig.documentFooter ?? displayName;
+  const terms = companyConfig.termsAndConditions ?? [];
+
+  const items = po.items ?? [];
+  let totalQtySum = 0;
+  const itemRows = items
+    .map((item, index) => {
+      totalQtySum += qtyNumericForTotal(item);
+      const sl = index + 1;
+      const lineTot = itemLineTotal(item);
+      const gstPct = item.gstPercentage ?? DEFAULT_GST_PERCENTAGE;
+      return `<tr>
+        <td style="border:1px solid #000;padding:8px 10px;font-size:11px;text-align:center;vertical-align:middle;">${sl}</td>
+        <td style="border:1px solid #000;padding:8px 10px;font-size:11px;vertical-align:middle;">${escapeHtml(item.itemSku || '—')}</td>
+        <td style="border:1px solid #000;padding:8px 10px;font-size:11px;vertical-align:middle;">${escapeHtml(item.itemName)}</td>
+        <td style="border:1px solid #000;padding:8px 10px;font-size:11px;text-align:center;vertical-align:middle;">${escapeHtml(itemUnitColumn(item))}</td>
+        <td style="border:1px solid #000;padding:8px 10px;font-size:11px;text-align:right;vertical-align:middle;">${nowrapNumCellHtml(item.unitPrice ?? 0)}</td>
+        <td style="border:1px solid #000;padding:8px 10px;font-size:11px;text-align:right;vertical-align:middle;">${escapeHtml(formatQtyDisplay(item))}</td>
+        <td style="border:1px solid #000;padding:8px 10px;font-size:11px;text-align:center;vertical-align:middle;">${gstPct > 0 ? `${gstPct}%` : '—'}</td>
+        <td style="border:1px solid #000;padding:8px 10px;font-size:11px;text-align:right;vertical-align:middle;">${inrAmountCellHtml(lineTot)}</td>
       </tr>`;
-  }).join('');
-
-  const billingAddressLines = companyConfig.address
-    .split('\n')
-    .map((line) => `<p style="margin: 0 0 2px; font-size: 16px; font-weight: bold; color: #000;">${escapeHtml(line.trim())}</p>`)
+    })
     .join('');
 
-  const vendorAddressLines = (po.vendorAddress ?? '')
-    .split('\n')
-    .filter((l) => l.trim())
-    .map((line) => `<p style="margin: 0 0 2px; font-size: 16px; font-weight: bold; color: #000;">${escapeHtml(line.trim())}</p>`)
-    .join('');
+  const termsHtml =
+    terms.length > 0
+      ? `<ol style="margin:8px 0 0 18px;padding:0;font-size:10px;line-height:1.5;color:#000;">
+          ${terms.map((t) => `<li style="margin-bottom:5px;">${escapeHtml(t)}</li>`).join('')}
+        </ol>`
+      : '';
+
+  const justificationText = (po.justification ?? '').trim();
+  const justificationBodyHtml = `<div style="margin-top:4px;font-size:10px;line-height:1.5;color:#000;white-space:pre-wrap;">${justificationText ? escapeHtml(justificationText) : '—'}</div>`;
 
   const logoImg = logoBase64
-    ? `<img src="data:image/png;base64,${logoBase64}" alt="Logo" style="height: 60px; width: auto; display: block;" />`
+    ? `<img src="data:image/png;base64,${logoBase64}" alt="Logo" style="height:96px;max-width:100%;width:auto;display:block;object-fit:contain;" />`
     : '';
+
+  const totalsFooterRow = `<tr>
+    <td colspan="5" style="border:1px solid #000;padding:10px 12px;background:#fff;"></td>
+    <td style="border:1px solid #000;padding:10px 12px;font-size:11px;text-align:right;font-weight:bold;vertical-align:middle;">${totalQtySum.toLocaleString('en-IN')}</td>
+    <td style="border:1px solid #000;padding:10px 12px;font-size:10px;text-align:center;vertical-align:middle;">&nbsp;</td>
+    <td style="border:1px solid #000;padding:6px;vertical-align:middle;min-width:128px;width:26%;">
+      <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:11px;">
+        <colgroup><col style="width:46%" /><col style="width:54%" /></colgroup>
+        <tr>
+          <td style="padding:8px 10px;font-weight:bold;text-align:right;border-bottom:1px solid #000;vertical-align:middle;"><span style="white-space:nowrap">Sub\u00A0Total</span></td>
+          <td style="padding:8px 10px;text-align:right;border-bottom:1px solid #000;vertical-align:middle;">${inrAmountCellHtml(po.subtotal ?? 0)}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 10px;font-weight:bold;text-align:right;border-bottom:1px solid #000;vertical-align:middle;"><span style="white-space:nowrap">TAX</span></td>
+          <td style="padding:8px 10px;text-align:right;border-bottom:1px solid #000;vertical-align:middle;">${inrAmountCellHtml(po.gstAmount ?? 0)}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 10px;font-weight:bold;text-align:right;vertical-align:middle;"><span style="white-space:nowrap">Final\u00A0Total</span></td>
+          <td style="padding:10px 10px;font-weight:bold;text-align:right;vertical-align:middle;">${inrAmountCellHtml(po.totalAmount ?? 0)}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>`;
 
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <style>
-    body { font-family: Arial, Helvetica, sans-serif; color: #000; padding: 24px; font-size: 16px; }
-    table { width: 100%; border-collapse: collapse; border: 2px solid #000; }
-    th, td { border: 1px solid #000; }
-    th { background: #f0f0f0; font-size: 16px; font-weight: bold; padding: 10px 12px; text-align: center; }
+    @page { size: A4; margin: 10mm 12mm; }
+    body { font-family: Arial, Helvetica, sans-serif; color: #000; margin: 0; padding: 18px 22px 24px; font-size: 12px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    table.po-grid { width: 100%; border-collapse: collapse; }
+    table.po-grid th, table.po-grid td { border: 1px solid #000; }
+    /* Multi-page: repeat column headers; try not to split a line item across pages */
+    table.po-grid thead { display: table-header-group; }
+    table.po-grid tbody tr { page-break-inside: avoid; break-inside: avoid; }
+    table.po-signatures { page-break-inside: avoid; break-inside: avoid; }
+    .po-page-footer { page-break-inside: avoid; break-inside: avoid; }
     p { margin: 0; }
   </style>
 </head>
 <body>
-  <!-- Header Title -->
-  <div style="text-align: center; margin-bottom: 8px;">
-    <div style="font-size: 26px; font-weight: 900; color: #000; text-transform: uppercase;">${escapeHtml(companyConfig.name)}</div>
-  </div>
-
-  <!-- Header Logo & Badge -->
-  <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 32px; position: relative; height: 60px;">
-    <div style="position: absolute; left: 0; top: 0;">
-      ${logoImg}
-    </div>
-    <div style="border: 3px solid #000; border-radius: 8px; padding: 8px 24px; background: #fff;">
-      <div style="font-size: 20px; font-weight: 900; color: #000; letter-spacing: 0.5px;">PURCHASE ORDER</div>
-    </div>
-  </div>
-
-  <!-- Two-column: Left (Address) | Right (Meta) -->
-  <div style="display: flex; gap: 40px; margin-bottom: 32px;">
-    <div style="flex: 1; display: flex; flex-direction: column; gap: 24px;">
-      <!-- To (Vendor) -->
-      <div style="border: 3px solid #000; padding: 12px; min-height: 140px;">
-        <p style="font-size: 16px; font-weight: 900; margin: 0 0 4px; color: #000;">To</p>
-        <p style="margin: 0 0 2px; font-size: 16px; font-weight: 900; color: #000; text-transform: uppercase;">${escapeHtml(po.vendorName ?? '—')}</p>
-        ${vendorAddressLines || `<p style="margin: 0 0 2px; font-size: 16px; font-weight: bold; color: #000;">—</p>`}
-        ${po.vendorEmail ? `<p style="margin: 0 0 2px; font-size: 16px; font-weight: bold; color: #000;">Email: ${escapeHtml(po.vendorEmail)}</p>` : ''}
-        ${po.vendorGstin ? `<p style="margin: 0; font-size: 16px; font-weight: bold; color: #000;">GSTIN: ${escapeHtml(po.vendorGstin)}</p>` : ''}
-      </div>
-      <!-- Billing Address -->
-      <div style="border: 3px solid #000; padding: 12px; min-height: 140px;">
-        <p style="font-size: 17px; font-weight: 900; margin: 0 0 6px; color: #000; text-decoration: underline;">Billing Address</p>
-        <p style="margin: 0 0 2px; font-size: 16px; font-weight: 900; color: #000; text-transform: uppercase;">${escapeHtml(companyConfig.name)}</p>
-        ${billingAddressLines}
-        <p style="margin: 2px 0 0; font-size: 16px; font-weight: bold; color: #000;">Email: ${escapeHtml(companyConfig.email)}</p>
-        <p style="margin: 0; font-size: 16px; font-weight: bold; color: #000;">GSTIN: ${escapeHtml(companyConfig.gstin)}</p>
-      </div>
-    </div>
-    <div style="width: 360px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px;">
-      <!-- Date Box -->
-      <div style="border: 2px solid #000; padding: 12px 16px; display: flex; align-items: center;">
-        <div style="font-size: 16px; font-weight: 900; color: #000; width: 60px;">Date</div>
-        <div style="font-size: 16px; font-weight: 900; color: #000; flex: 1; text-align: center;">${escapeHtml(formatDate(po.createdAt))}</div>
-      </div>
-      
-      <!-- P.O. No -->
-      <div style="border: 2px solid #000; padding: 12px 16px; text-align: center;">
-        <div style="font-size: 16px; font-weight: 900; color: #000;">P.O. No. ${escapeHtml(po.poNumber ?? '—')}</div>
-      </div>
-
-      <!-- Location -->
-      <div style="border: 2px solid #000; padding: 12px 16px; text-align: center;">
-        <div style="font-size: 16px; font-weight: 900; color: #000;">Location / Work: ${escapeHtml(po.location ?? '—')}</div>
-      </div>
-
-      <!-- JOB NO -->
-      <div style="border: 2px solid #000; padding: 12px 16px; text-align: center;">
-        <div style="font-size: 16px; font-weight: 900; color: #000;">JOB NO: ${escapeHtml(po.jobNo ?? '—')}</div>
-      </div>
-
-      <!-- Ordered by -->
-      <div style="border: 2px solid #000; padding: 12px 16px; text-align: center;">
-        <div style="font-size: 16px; font-weight: 900; color: #000;">Ordered by: ${escapeHtml(po.createdByName ?? '—')}</div>
-      </div>
-
-      <!-- Approved by -->
-      <div style="border: 2px solid #000; padding: 12px 16px; text-align: center;">
-        <div style="font-size: 16px; font-weight: 900; color: #000;">Approved by: ${escapeHtml(approvedByDisplay)}</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Salutation -->
-  <p style="margin: 0 0 8px; font-size: 16px; font-weight: 900; color: #000;">Dear Sir,</p>
-  <p style="margin: 0 0 16px 40px; font-size: 16px; font-weight: 900; color: #000;">Please supply the following items</p>
-
-  <!-- Items Table -->
-  <table style="margin-bottom: 32px;">
-    <thead>
-      <tr>
-        <th style="width: 60px;">Sl<br/>No</th>
-        <th>ITEM</th>
-        <th style="width: 100px;">Qty</th>
-        <th style="width: 30%;">Remarks</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${itemRows}
-    </tbody>
+  <!-- Letterhead: logo + red ISO left; company blue + address right -->
+  <table style="width:100%;border-collapse:collapse;border:none;">
+    <tr>
+      <td style="width: 42%; vertical-align: top; border: none; padding: 0 12px 0 0;">
+        ${logoImg}
+        ${isoLine ? `<div style="font-size:9px;margin-top:8px;font-weight:bold;color:${IBF_RED};">${escapeHtml(isoLine)}</div>` : ''}
+      </td>
+      <td style="vertical-align: top; text-align: right; border: none; padding: 0;">
+        <div style="font-size:15px;font-weight:bold;color:${IBF_BLUE};line-height:1.2;">${escapeHtml(displayName)}</div>
+        <div style="margin-top:8px;">${companyAddressLinesHtml()}</div>
+        ${phones ? `<div style="font-size:10px;margin-top:8px;color:#000;">Ph: <strong>${escapeHtml(phones)}</strong></div>` : ''}
+        <div style="font-size:10px;margin-top:4px;color:#000;">Email: <strong>${escapeHtml(companyConfig.email)}</strong></div>
+        ${website ? `<div style="font-size:10px;margin-top:4px;color:#000;">Website: <strong>${escapeHtml(website)}</strong></div>` : ''}
+        ${cin ? `<div style="font-size:10px;margin-top:4px;color:#000;">CIN No.: <strong>${escapeHtml(cin)}</strong></div>` : ''}
+        <div style="font-size:10px;margin-top:4px;color:#000;">GST No.: <strong>${escapeHtml(companyConfig.gstin)}</strong></div>
+      </td>
+    </tr>
   </table>
 
-  <!-- Signature block - blank for manual signature -->
-  <div style="margin-top: 48px; display: flex; flex-direction: column; align-items: flex-end;">
-    <div style="width: 220px; height: 24px; border-bottom: 1px solid #000; margin-bottom: 8px;"></div>
-    <p style="font-size: 16px; font-weight: bold; color: #000; margin: 0; text-decoration: underline;">Authorised Signature</p>
+  <div style="border-top:3px solid #000;margin:14px 0 0 0;height:0;line-height:0;font-size:0;"></div>
+
+  <!-- Title row + supplier / order meta (single bordered block) -->
+  <table class="po-grid" style="margin-top:10px;border:2px solid #000;">
+    <tr>
+      <td colspan="4" style="padding:12px 16px;font-size:13px;font-weight:bold;text-align:center;border:none;border-bottom:1px solid #000;vertical-align:middle;letter-spacing:0.4px;">${escapeHtml(docTitle)}</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="vertical-align:top;padding:14px 14px;border:none;border-right:1px solid #000;">
+        <div style="font-size:12px;font-weight:bold;text-transform:uppercase;margin-bottom:6px;color:#000;">${escapeHtml(po.vendorName ?? '—')}</div>
+        ${vendorAddressLinesHtml(po) || `<div style="font-size:10px;">—</div>`}
+        <div style="margin-top:10px;font-size:10px;"><strong>GST No.:</strong> ${escapeHtml(po.vendorGstin?.trim() || '—')}</div>
+        <div style="margin-top:6px;font-size:10px;"><strong>Contact Person:</strong> ${escapeHtml(vendorContactPersonLine(po))}</div>
+        <div style="margin-top:4px;font-size:10px;"><strong>Contact No:</strong> ${escapeHtml(vendorPhoneEmailLine(po))}</div>
+      </td>
+      <td colspan="2" style="vertical-align:top;padding:14px 14px;border:none;">
+        <table style="width:100%;border-collapse:collapse;font-size:10px;">
+          <tr><td style="padding:8px 12px;font-weight:bold;vertical-align:middle;">Purchase Order No.</td><td style="padding:8px 12px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(po.poNumber ?? '—')}</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;vertical-align:middle;">JOB No.</td><td style="padding:8px 12px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(po.jobNo?.trim() || '—')}</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;vertical-align:middle;">Issue Date</td><td style="padding:8px 12px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(formatDdMmYyyy(po.createdAt))}</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;vertical-align:middle;">Delivery Date</td><td style="padding:8px 12px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(deliveryDateLabel(po))}</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;vertical-align:middle;">PO Issue Site</td><td style="padding:8px 12px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(poIssueSiteDisplay(po))}</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;vertical-align:middle;">Contact person</td><td style="padding:8px 12px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(buyerContactLine(po))}</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;vertical-align:middle;">Deliver Location</td><td style="padding:8px 12px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(deliverLocationDisplay(po))}</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;vertical-align:middle;">Approved by</td><td style="padding:8px 12px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(approvedByDisplay)}</td></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Deliver To -->
+  <div style="border:2px solid #000;border-top:none;padding:14px 14px;">
+    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#000;">Deliver To:</div>
+    <div style="font-size:11px;font-weight:bold;color:${IBF_BLUE};">${escapeHtml(deliverTo)}</div>
+    <div style="margin-top:8px;font-size:10px;line-height:1.45;"><strong>Delivery Address:</strong> ${escapeHtml(deliverAddr || '—')}</div>
+    <div style="margin-top:4px;font-size:10px;line-height:1.45;"><strong>Delivery Contact / Email:</strong> ${escapeHtml(deliverContacts || '—')}</div>
+    ${deliverWeb ? `<div style="margin-top:4px;font-size:10px;"><strong>Website:</strong> ${escapeHtml(deliverWeb)}</div>` : ''}
   </div>
+
+  <!-- Line items + footer totals -->
+  <table class="po-grid" style="margin-top:0;border:2px solid #000;border-top:none;">
+    <thead>
+      <tr style="background:#f0f0f0;">
+        <th style="padding:10px 10px;font-size:10px;width:32px;">Sr.<br/>No.</th>
+        <th style="padding:10px 10px;font-size:10px;width:64px;">SKU</th>
+        <th style="padding:10px 10px;font-size:10px;">Description</th>
+        <th style="padding:10px 10px;font-size:10px;width:40px;">Unit</th>
+        <th style="padding:10px 10px;font-size:10px;width:62px;">U/Price</th>
+        <th style="padding:10px 10px;font-size:10px;width:52px;">Q'ty</th>
+        <th style="padding:10px 10px;font-size:10px;width:36px;">GST</th>
+        <th style="padding:10px 10px;font-size:10px;min-width:108px;width:108px;">Total</th>
+      </tr>
+    </thead>
+    <tbody>${itemRows}${totalsFooterRow}</tbody>
+  </table>
+
+  <!-- Terms + remarks (same bordered box) -->
+  <div style="margin-top:14px;border:1px solid #000;padding:14px 14px;background:#fff;">
+    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:${IBF_BLUE};">Remarks/Justifications</div>
+    ${justificationBodyHtml}
+    <div style="font-size:11px;font-weight:bold;margin-top:14px;margin-bottom:6px;color:${IBF_BLUE};">Terms &amp; Conditions</div>
+    ${termsHtml}
+  </div>
+
+  <!-- Signatures -->
+  <table class="po-signatures" style="width:100%;border-collapse:collapse;margin-top:18px;">
+    <tr>
+      <td style="border:1px solid #000;width:33%;padding:32px 12px 14px;vertical-align:bottom;">
+        <div style="border-bottom:1px solid #000;height:22px;margin-bottom:6px;"></div>
+        <div style="font-size:10px;font-weight:bold;">Authorized signature of Seller</div>
+        <div style="font-size:10px;margin-top:8px;">Date: _______________</div>
+      </td>
+      <td style="border:1px solid #000;border-left:none;width:33%;padding:32px 12px 14px;vertical-align:bottom;">
+        <div style="border-bottom:1px solid #000;height:22px;margin-bottom:6px;"></div>
+        <div style="font-size:10px;font-weight:bold;">Verified by</div>
+        <div style="font-size:10px;margin-top:8px;">Date: _______________</div>
+      </td>
+      <td style="border:1px solid #000;border-left:none;width:34%;padding:32px 12px 14px;vertical-align:bottom;">
+        <div style="border-bottom:1px solid #000;height:22px;margin-bottom:6px;"></div>
+        <div style="font-size:10px;font-weight:bold;color:${IBF_BLUE};">IBF Authorized Signature</div>
+        <div style="font-size:10px;margin-top:8px;">Date: _______________</div>
+      </td>
+    </tr>
+  </table>
+
+  <div class="po-page-footer" style="border-top:2px solid ${IBF_BLUE};margin-top:18px;padding-top:10px;text-align:center;font-size:10px;font-weight:bold;color:${IBF_BLUE};">${escapeHtml(footer)}</div>
 </body>
 </html>`;
 }
@@ -261,8 +407,16 @@ export function buildDraftPOForPrint(
     vendorEmail?: string;
     vendorAddress?: string;
     vendorGstin?: string;
+    vendorContactPerson?: string;
     location?: string;
     jobNo?: string;
+    poIssueSite?: string;
+    deliveryLocation?: string;
+    buyerContactName?: string;
+    buyerContactPhone?: string;
+    siteId?: string;
+    siteName?: string;
+    deliveryDateText?: string;
     items: PurchaseOrderItem[];
     justification: string;
     expectedDeliveryDate: Date | null;
@@ -291,8 +445,16 @@ export function buildDraftPOForPrint(
     vendorEmail: formData.vendorEmail,
     vendorAddress: formData.vendorAddress,
     vendorGstin: formData.vendorGstin,
+    vendorContactPerson: formData.vendorContactPerson,
     location: formData.location,
     jobNo: formData.jobNo,
+    poIssueSite: formData.poIssueSite,
+    deliveryLocation: formData.deliveryLocation,
+    buyerContactName: formData.buyerContactName,
+    buyerContactPhone: formData.buyerContactPhone,
+    siteId: formData.siteId,
+    siteName: formData.siteName,
+    deliveryDateText: formData.deliveryDateText,
     items,
     subtotal,
     gstPercentage: subtotal > 0 ? (gstAmount / subtotal) * 100 : 0,
@@ -323,7 +485,6 @@ export function buildDraftPOForPrint(
 /**
  * Generate PDF from PO HTML and share via native share dialog.
  * If po.signedPdfUrl exists (approved PO with uploaded signed doc), shares that file instead.
- * @param approvedByName - Override for "Approved by" when generating (e.g. admin downloading for signing)
  */
 export async function printPurchaseOrder(
   po: PurchaseOrder,
@@ -342,7 +503,6 @@ export async function printPurchaseOrder(
       const ext = pathBeforeQuery.toLowerCase().endsWith('.pdf') ? 'pdf' : 'jpg';
       const sanitizedPoNumber = sanitizePoNumberForPath(po.poNumber);
       const localPath = `${documentDir}signed_${sanitizedPoNumber}_${Date.now()}.${ext}`;
-      // Android: downloadAsync fails if parent directory doesn't exist; ensure it does
       const parentDir = localPath.substring(0, localPath.lastIndexOf('/') + 1);
       const dirInfo = await FileSystem.getInfoAsync(parentDir, { size: false });
       if (!dirInfo.exists) {

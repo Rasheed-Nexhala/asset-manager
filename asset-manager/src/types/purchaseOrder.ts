@@ -64,8 +64,24 @@ export interface PurchaseOrderFirestore {
   vendorEmail?: string;
   vendorAddress?: string;
   vendorGstin?: string;
+  /** Supplier contact person name (shown on PO; often copied from vendor master) */
+  vendorContactPerson?: string;
   location?: string;
   jobNo?: string;
+  /** Site / office issuing the PO (e.g. FO) */
+  poIssueSite?: string;
+  /** Ship-to / yard location (distinct from poIssueSite when both are used) */
+  deliveryLocation?: string;
+  /** Internal buyer contact on PO (name) */
+  buyerContactName?: string;
+  /** Internal buyer contact phone */
+  buyerContactPhone?: string;
+  /** Optional site this PO is for (from sites collection) */
+  siteId?: string;
+  /** Denormalized site name for print / when site doc changes */
+  siteName?: string;
+  /** Verbatim delivery date line on printed PO; when set, overrides calendar-only display */
+  deliveryDateText?: string;
 
   items: PurchaseOrderItem[];
 
@@ -124,8 +140,16 @@ export interface PurchaseOrder {
   vendorEmail?: string;
   vendorAddress?: string;
   vendorGstin?: string;
+  vendorContactPerson?: string;
   location?: string;
   jobNo?: string;
+  poIssueSite?: string;
+  deliveryLocation?: string;
+  buyerContactName?: string;
+  buyerContactPhone?: string;
+  siteId?: string;
+  siteName?: string;
+  deliveryDateText?: string;
 
   items: PurchaseOrderItem[];
 
@@ -201,8 +225,16 @@ export interface CreatePurchaseOrderData {
   vendorEmail?: string;
   vendorAddress?: string;
   vendorGstin?: string;
+  vendorContactPerson?: string;
   location?: string;
   jobNo?: string;
+  poIssueSite?: string;
+  deliveryLocation?: string;
+  buyerContactName?: string;
+  buyerContactPhone?: string;
+  siteId?: string;
+  siteName?: string;
+  deliveryDateText?: string;
   items: Array<{
     itemId: string;
     itemName: string;

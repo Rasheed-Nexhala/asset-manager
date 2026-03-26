@@ -1190,7 +1190,11 @@ export const adjustQuantity = async (
         inventoryUpdateData.lengthPerPiece = adjustmentData.lengthPerPiece;
       }
 
-      if (!inventoryDoc.exists()) {
+      if (newQuantity === 0 && adjustmentData.locationType === 'site') {
+        if (inventoryDoc.exists()) {
+          transaction.delete(inventoryDocRef);
+        }
+      } else if (!inventoryDoc.exists()) {
         transaction.set(inventoryDocRef, inventoryUpdateData);
       } else {
         transaction.update(inventoryDocRef, inventoryUpdateData);

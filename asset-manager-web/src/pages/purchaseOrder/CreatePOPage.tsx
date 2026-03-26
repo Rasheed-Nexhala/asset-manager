@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { FormField } from '../../components/auth/FormField';
 import { Icon } from '../../components/shared/Icon';
@@ -20,6 +20,8 @@ import {
   deleteVendor,
 } from '../../services/firebase/vendorService';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
+import { getSites } from '../../services/firebase/siteService';
+import type { Site } from '../../types/sites';
 import { getItemById } from '../../services/firebase/inventoryService';
 import { getAdminUsers } from '../../services/firebase/userRoleService';
 import type { UserListItem } from '../../types/roles';
@@ -54,6 +56,9 @@ const formatCurrency = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 const formatCurrencyOrOptional = (n: number) =>
   n > 0 ? formatCurrency(n) : '—';
 
+/** Select value when PO has poIssueSite text but no siteId (legacy / unmatched). */
+const PO_ISSUE_LEGACY_VALUE = '__legacy_po_issue__';
+
 interface CreatePOState {
   selectedItems?: { id: string; name: string }[];
   initialQuantities?: Record<string, number>;
@@ -87,10 +92,19 @@ export function CreatePOPage() {
   const [vendorGstin, setVendorGstin] = useState('');
   const [location, setLocation] = useState('');
   const [jobNo, setJobNo] = useState('');
+  const [vendorContactPerson, setVendorContactPerson] = useState('');
+  const [deliveryLocation, setDeliveryLocation] = useState('');
+  const [buyerContactName, setBuyerContactName] = useState('');
+  const [buyerContactPhone, setBuyerContactPhone] = useState('');
   const [poNumber, setPoNumber] = useState('');
   const [items, setItems] = useState<PurchaseOrderItem[]>([]);
   const [justification, setJustification] = useState('');
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState<Date | null>(null);
+  const [deliveryDateText, setDeliveryDateText] = useState('');
+  const [orderSiteId, setOrderSiteId] = useState<string | null>(null);
+  const [orderSiteName, setOrderSiteName] = useState('');
+  const [sites, setSites] = useState<Site[]>([]);
+  const [sitesLoading, setSitesLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDraft, setIsDraft] = useState(false);
   const [isLoadingPO, setIsLoadingPO] = useState(false);
@@ -127,6 +141,17 @@ export function CreatePOPage() {
     const unsub = subscribeToVendors((v) => dispatch(setVendors(v)));
     return unsub;
   }, [dispatch]);
+
+  useEffect(() => {
+    setSitesLoading(true);
+    getSites()
+      .then(setSites)
+      .catch((err) => {
+        console.error('Failed to load sites:', err);
+        setSites([]);
+      })
+      .finally(() => setSitesLoading(false));
+  }, []);
 
   useEffect(() => {
     setAdminUsersLoading(true);
@@ -224,6 +249,7 @@ export function CreatePOPage() {
         setVendorEmail(v.email ?? '');
         setVendorAddress(v.address ?? '');
         setVendorGstin(v.gstin ?? '');
+        setVendorContactPerson(v.contactPerson ?? '');
       }
     }
   }, [selectedVendorId, vendors]);
@@ -245,6 +271,10 @@ export function CreatePOPage() {
       setVendorEmail(po.vendorEmail ?? '');
       setVendorAddress(po.vendorAddress ?? '');
       setVendorGstin(po.vendorGstin ?? '');
+      setVendorContactPerson(po.vendorContactPerson ?? '');
+      setDeliveryLocation(po.deliveryLocation ?? '');
+      setBuyerContactName(po.buyerContactName ?? '');
+      setBuyerContactPhone(po.buyerContactPhone ?? '');
       setLocation(po.location ?? '');
       setJobNo(po.jobNo ?? '');
       setPoNumber(po.poNumber ?? '');
@@ -253,6 +283,14 @@ export function CreatePOPage() {
       setExpectedDeliveryDate(
         po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate) : null
       );
+      setDeliveryDateText(po.deliveryDateText ?? '');
+      const sid = po.siteId?.trim() || null;
+      setOrderSiteId(sid);
+      if (sid) {
+        setOrderSiteName((po.siteName ?? po.poIssueSite ?? '').trim());
+      } else {
+        setOrderSiteName((po.poIssueSite ?? '').trim());
+      }
       setEditingPOStatus('draft');
     };
 
@@ -335,6 +373,31 @@ export function CreatePOPage() {
   }, 0);
   const totalAmount = subtotal + gstAmount;
   const hasAnyPrice = items.some((i) => (i.unitPrice ?? 0) > 0);
+
+  const activeSites = useMemo(
+    () => sites.filter((s) => s.status === 'active'),
+    [sites]
+  );
+
+  useEffect(() => {
+    if (!orderSiteId || orderSiteName.trim()) return;
+    const s = activeSites.find((x) => x.id === orderSiteId);
+    if (s) setOrderSiteName(s.name);
+  }, [orderSiteId, orderSiteName, activeSites]);
+
+  useEffect(() => {
+    if (sites.length === 0 || orderSiteId) return;
+    const t = orderSiteName.trim();
+    if (!t) return;
+    const m = sites.find(
+      (s) => s.status !== 'deleted' && s.name.trim() === t
+    );
+    if (m) setOrderSiteId(m.id);
+  }, [sites, orderSiteId, orderSiteName]);
+
+  const poIssueSelectValue =
+    orderSiteId ??
+    (orderSiteName.trim() ? PO_ISSUE_LEGACY_VALUE : '');
 
   const handleQuantityChange = useCallback(
     (itemId: string, quantity: number, orderedUnit?: string, orderedQuantity?: number) => {
@@ -447,8 +510,16 @@ export function CreatePOPage() {
           vendorEmail: vendorEmail.trim() || undefined,
           vendorAddress: vendorAddress.trim() || undefined,
           vendorGstin: vendorGstin.trim() || undefined,
+          vendorContactPerson: vendorContactPerson.trim() || undefined,
           location: location.trim() || undefined,
           jobNo: jobNo.trim() || undefined,
+          poIssueSite: orderSiteName.trim() || undefined,
+          deliveryLocation: deliveryLocation.trim() || undefined,
+          buyerContactName: buyerContactName.trim() || undefined,
+          buyerContactPhone: buyerContactPhone.trim() || undefined,
+          siteId: orderSiteId?.trim() || undefined,
+          siteName: orderSiteId ? orderSiteName.trim() || undefined : undefined,
+          deliveryDateText: deliveryDateText.trim() || undefined,
           items: items.map((i) => ({
             itemId: i.itemId,
             itemName: i.itemName,
@@ -535,8 +606,15 @@ export function CreatePOPage() {
       vendorEmail,
       vendorAddress,
       vendorGstin,
+      vendorContactPerson,
       location,
       jobNo,
+      deliveryLocation,
+      buyerContactName,
+      buyerContactPhone,
+      orderSiteId,
+      orderSiteName,
+      deliveryDateText,
       poNumber,
       items,
       justification,
@@ -638,8 +716,16 @@ export function CreatePOPage() {
           vendorEmail: vendorEmail.trim() || undefined,
           vendorAddress: vendorAddress.trim() || undefined,
           vendorGstin: vendorGstin.trim() || undefined,
+          vendorContactPerson: vendorContactPerson.trim() || undefined,
           location: location.trim() || undefined,
           jobNo: jobNo.trim() || undefined,
+          poIssueSite: orderSiteName.trim() || undefined,
+          deliveryLocation: deliveryLocation.trim() || undefined,
+          buyerContactName: buyerContactName.trim() || undefined,
+          buyerContactPhone: buyerContactPhone.trim() || undefined,
+          siteId: orderSiteId?.trim() || undefined,
+          siteName: orderSiteId ? orderSiteName.trim() || undefined : undefined,
+          deliveryDateText: deliveryDateText.trim() || undefined,
           items,
           justification: justification.trim(),
           expectedDeliveryDate,
@@ -657,8 +743,15 @@ export function CreatePOPage() {
     vendorEmail,
     vendorAddress,
     vendorGstin,
+    vendorContactPerson,
     location,
     jobNo,
+    deliveryLocation,
+    buyerContactName,
+    buyerContactPhone,
+    orderSiteId,
+    orderSiteName,
+    deliveryDateText,
     items,
     justification,
     expectedDeliveryDate,
@@ -671,6 +764,18 @@ export function CreatePOPage() {
     selectedVendorId,
     vendorName: vendorName.trim(),
     vendorContact: vendorContact.trim(),
+    vendorEmail: vendorEmail.trim(),
+    vendorAddress: vendorAddress.trim(),
+    vendorGstin: vendorGstin.trim(),
+    vendorContactPerson: vendorContactPerson.trim(),
+    location: location.trim(),
+    jobNo: jobNo.trim(),
+    deliveryLocation: deliveryLocation.trim(),
+    buyerContactName: buyerContactName.trim(),
+    buyerContactPhone: buyerContactPhone.trim(),
+    orderSiteId,
+    orderSiteName: orderSiteName.trim(),
+    deliveryDateText: deliveryDateText.trim(),
     poNumber: poNumber.trim(),
     items: items.map((i) => ({
       itemId: i.itemId,
@@ -691,6 +796,18 @@ export function CreatePOPage() {
           selectedVendorId: poFromStore.vendorId,
           vendorName: (poFromStore.vendorName ?? '').trim(),
           vendorContact: (poFromStore.vendorContact ?? '').trim(),
+          vendorEmail: (poFromStore.vendorEmail ?? '').trim(),
+          vendorAddress: (poFromStore.vendorAddress ?? '').trim(),
+          vendorGstin: (poFromStore.vendorGstin ?? '').trim(),
+          vendorContactPerson: (poFromStore.vendorContactPerson ?? '').trim(),
+          location: (poFromStore.location ?? '').trim(),
+          jobNo: (poFromStore.jobNo ?? '').trim(),
+          deliveryLocation: (poFromStore.deliveryLocation ?? '').trim(),
+          buyerContactName: (poFromStore.buyerContactName ?? '').trim(),
+          buyerContactPhone: (poFromStore.buyerContactPhone ?? '').trim(),
+          orderSiteId: poFromStore.siteId?.trim() || null,
+          orderSiteName: (poFromStore.siteName ?? '').trim(),
+          deliveryDateText: (poFromStore.deliveryDateText ?? '').trim(),
           poNumber: (poFromStore.poNumber ?? '').trim(),
           items: (poFromStore.items ?? []).map((i) => ({
             itemId: i.itemId,
@@ -710,7 +827,19 @@ export function CreatePOPage() {
   const isDirty =
     poId && editingPOStatus === 'draft'
       ? initialStateHash !== null && currentHash !== initialStateHash
-      : items.length > 0 || vendorName.trim() || vendorContact.trim() || poNumber.trim();
+      : items.length > 0 ||
+        vendorName.trim() ||
+        vendorContact.trim() ||
+        poNumber.trim() ||
+        vendorContactPerson.trim() ||
+        location.trim() ||
+        jobNo.trim() ||
+        deliveryLocation.trim() ||
+        buyerContactName.trim() ||
+        buyerContactPhone.trim() ||
+        orderSiteId ||
+        orderSiteName.trim() ||
+        deliveryDateText.trim();
 
   if (poId && (isLoadingPO || loadPOError)) {
     return (
@@ -850,6 +979,12 @@ export function CreatePOPage() {
                 placeholder="e.g. 29AJWPD4844N1ZC"
                 error={errors.vendorGstin}
               />
+              <FormField
+                label="Supplier contact person"
+                value={vendorContactPerson}
+                onChange={setVendorContactPerson}
+                placeholder="As on printed PO"
+              />
             </div>
           </div>
         </div>
@@ -931,41 +1066,144 @@ export function CreatePOPage() {
           />
         </div>
 
-        <div>
-          <label className="mb-1.5 block text-[15px] font-medium text-slate-900">
-            Expected Delivery
-          </label>
-          <input
-            type="date"
-            value={
-              expectedDeliveryDate
-                ? expectedDeliveryDate.toISOString().split('T')[0]
-                : ''
-            }
-            onChange={(e) =>
-              setExpectedDeliveryDate(
-                e.target.value ? new Date(e.target.value) : null
-              )
-            }
-            className="h-12 w-full rounded-lg border border-slate-200 px-4 text-[15px] text-slate-900 focus:border-blue-800 focus:outline-none focus:ring-1 focus:ring-blue-800"
-          />
-        </div>
-
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField
-            label="Location/Work"
-            value={location}
-            onChange={setLocation}
-            placeholder="e.g. FO"
-            error={errors.location}
-          />
-          <FormField
-            label="Job No."
+            label="Job No. (optional)"
             value={jobNo}
             onChange={setJobNo}
             placeholder="e.g. 2513"
             error={errors.jobNo}
           />
+          <FormField
+            label="Location / work (optional)"
+            value={location}
+            onChange={setLocation}
+            placeholder="e.g. FO"
+            error={errors.location}
+          />
+        </div>
+
+        <div className="rounded-[10px] border border-slate-200 bg-white p-4 lg:p-6">
+          <h2 className="mb-1 text-[17px] font-semibold text-slate-900">
+            Order &amp; print details (optional)
+          </h2>
+          <p className="mb-4 text-[13px] text-slate-500">
+            Typed values appear on the Purchase / Service Order. Leave blank where not needed.
+          </p>
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className="mb-1.5 block text-[15px] font-medium text-slate-900">
+                PO issue site (optional)
+              </label>
+              <select
+                value={poIssueSelectValue}
+                disabled={sitesLoading}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (!v) {
+                    setOrderSiteId(null);
+                    setOrderSiteName('');
+                    return;
+                  }
+                  if (v === PO_ISSUE_LEGACY_VALUE) {
+                    return;
+                  }
+                  const s =
+                    activeSites.find((x) => x.id === v) ??
+                    sites.find((x) => x.id === v);
+                  setOrderSiteId(v);
+                  setOrderSiteName(s?.name ?? '');
+                }}
+                className="h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-[15px] text-slate-900 focus:border-blue-800 focus:outline-none focus:ring-1 focus:ring-blue-800 disabled:opacity-60"
+              >
+                <option value="">
+                  {sitesLoading ? 'Loading sites…' : 'None'}
+                </option>
+                {orderSiteName.trim() &&
+                !orderSiteId &&
+                !activeSites.some(
+                  (s) => s.name.trim() === orderSiteName.trim()
+                ) ? (
+                  <option value={PO_ISSUE_LEGACY_VALUE}>
+                    {orderSiteName.trim()} (saved text — pick a site to link)
+                  </option>
+                ) : null}
+                {orderSiteId &&
+                !activeSites.some((s) => s.id === orderSiteId) ? (
+                  <option value={orderSiteId}>
+                    {orderSiteName.trim() || orderSiteId} (inactive or removed)
+                  </option>
+                ) : null}
+                {activeSites.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-[13px] text-slate-500">
+                Shown as &quot;PO Issue Site&quot; on the printed order. Falls back to
+                location/work if not set.
+              </p>
+            </div>
+            <FormField
+              label="Delivery date (as printed)"
+              value={deliveryDateText}
+              onChange={setDeliveryDateText}
+              placeholder='e.g. Immediately, 24.03.2026, or "Next week"'
+            />
+            <p className="-mt-2 text-[13px] text-slate-500">
+              If empty, the calendar date below is used when set; otherwise the document shows
+              &quot;Immediately&quot;.
+            </p>
+            <div>
+              <label className="mb-1.5 block text-[15px] font-medium text-slate-900">
+                Expected delivery (calendar, optional)
+              </label>
+              <input
+                type="date"
+                value={
+                  expectedDeliveryDate
+                    ? expectedDeliveryDate.toISOString().split('T')[0]
+                    : ''
+                }
+                onChange={(e) =>
+                  setExpectedDeliveryDate(
+                    e.target.value ? new Date(e.target.value + 'T12:00:00') : null
+                  )
+                }
+                className="h-12 w-full rounded-lg border border-slate-200 px-4 text-[15px] text-slate-900 focus:border-blue-800 focus:outline-none focus:ring-1 focus:ring-blue-800"
+              />
+              {expectedDeliveryDate ? (
+                <button
+                  type="button"
+                  onClick={() => setExpectedDeliveryDate(null)}
+                  className="mt-2 text-left text-[14px] font-medium text-blue-800"
+                >
+                  Clear calendar date
+                </button>
+              ) : null}
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField
+                label="Deliver location (optional)"
+                value={deliveryLocation}
+                onChange={setDeliveryLocation}
+                placeholder="e.g. IBF Yard Kuthethur"
+              />
+              <FormField
+                label="Contact person (optional)"
+                value={buyerContactName}
+                onChange={setBuyerContactName}
+                placeholder="e.g. Mr. Gowrish"
+              />
+              <FormField
+                label="Contact phone (optional)"
+                value={buyerContactPhone}
+                onChange={setBuyerContactPhone}
+                placeholder="e.g. 9535698044"
+              />
+            </div>
+          </div>
         </div>
 
         <button
