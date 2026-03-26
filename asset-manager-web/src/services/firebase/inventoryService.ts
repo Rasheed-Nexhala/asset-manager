@@ -21,6 +21,7 @@ import {
   runTransaction,
   QueryConstraint,
   DocumentSnapshot,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { auth } from '../../config/firebase';
@@ -894,8 +895,8 @@ export const createItem = async (
 /**
  * Update an existing item
  *
- * Enforces business rule: item type cannot be changed after the first transaction
- * (i.e., once any quantity has been added at any location).
+ * Type changes are blocked only when stock exists at sites or in maintenance
+ * (central-only stock still allows correcting a mistaken type).
  *
  * @param id - Item document ID
  * @param updates - Item data to update
@@ -934,17 +935,14 @@ export const updateItem = async (
         throw new Error(`${resolvedUnit} minimum stock must be a whole number`);
       }
 
-      // Enforce business rule: type cannot be changed after first transaction
+      // Type change: block only when stock is at sites or in maintenance (not central-only)
       if (updates.type !== undefined && updates.type !== itemData.type) {
-        const hasTransactions =
-          (itemData.totalQuantity ?? 0) > 0 ||
-          (itemData.centralStoreQuantity ?? 0) > 0 ||
-          (itemData.atSitesQuantity ?? 0) > 0 ||
-          (itemData.inMaintenanceQuantity ?? 0) > 0;
+        const stockAtSitesOrMaintenance =
+          (itemData.atSitesQuantity ?? 0) > 0 || (itemData.inMaintenanceQuantity ?? 0) > 0;
 
-        if (hasTransactions) {
+        if (stockAtSitesOrMaintenance) {
           throw new Error(
-            'Item type cannot be changed after inventory transactions have occurred'
+            'Item type cannot be changed while stock exists at sites or in maintenance'
           );
         }
       }
@@ -972,6 +970,18 @@ export const updateItem = async (
         ...updates,
         updatedAt: serverTimestamp(),
       };
+
+      const newType = updates.type !== undefined ? updates.type : itemData.type;
+      if (newType === 'fuel') {
+        rawData.unit = 'Liters';
+        if (itemData.type !== 'fuel') {
+          rawData.steelMasterId = deleteField();
+          rawData.steelMasterName = deleteField();
+          rawData.weightPerMeter = deleteField();
+          rawData.lengthPerPiece = deleteField();
+        }
+      }
+
       // Handle category updates using helper functions
       if (updates.categoryId !== undefined) {
         const { categoryId: finalCategoryId, categoryName: finalCategoryName } = prepareCategoryData(

@@ -106,6 +106,8 @@ export const AddEditItemScreen: React.FC = () => {
         steelMasterId: item.steelMasterId,
         centralStoreQuantity: item.centralStoreQuantity,
         totalQuantity: item.totalQuantity,
+        atSitesQuantity: item.atSitesQuantity,
+        inMaintenanceQuantity: item.inMaintenanceQuantity,
       };
     }
     return undefined;

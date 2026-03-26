@@ -170,7 +170,7 @@ export interface CreateItemData {
 
 /**
  * Data for updating an existing item
- * Note: type cannot be changed after first transaction (business rule; enforced in inventoryService)
+ * Note: type cannot be changed while stock exists at sites or in maintenance (enforced in inventoryService).
  */
 export interface UpdateItemData {
   name?: string;
@@ -178,7 +178,7 @@ export interface UpdateItemData {
   description?: string;
   categoryId?: string | null;    // Optional category ID - can be null to uncategorize
   categoryName?: string | null;
-  type?: ItemType;  // Validated by service: cannot change after first transaction
+  type?: ItemType;  // Validated by service: cannot change when atSitesQuantity or inMaintenanceQuantity > 0
   unit?: string;
   imageUrl?: string;
   minStockLevel?: number;

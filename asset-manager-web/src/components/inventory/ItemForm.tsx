@@ -16,6 +16,7 @@ import type { Item, CreateItemData, UpdateItemData, ItemType } from '../../types
 import { normalizeCategoryId } from '../../types/inventory';
 import type { SteelMaster } from '../../types/steelMaster';
 import { LoadingSpinner } from '../shared/LoadingSpinner';
+import { Icon } from '../shared/Icon';
 
 /** Check if unit is weight-based (Kg or Ton) */
 const isWeightUnit = (u: string): boolean => u === 'Kg' || u === 'Ton (MT)';
@@ -91,6 +92,7 @@ export function ItemForm({
 
   /** Weight config for steel items - from steel master or existing item data */
   const weightConfig = useMemo(() => {
+    if (type === 'fuel') return null;
     if (selectedSteelMaster) {
       return {
         weightPerMeter: selectedSteelMaster.weightPerMeter,
@@ -104,9 +106,17 @@ export function ItemForm({
       };
     }
     return null;
-  }, [selectedSteelMaster, mode, initialData?.weightPerMeter, initialData?.lengthPerPiece]);
+  }, [type, selectedSteelMaster, mode, initialData?.weightPerMeter, initialData?.lengthPerPiece]);
 
   const isWeightBased = weightConfig !== null;
+
+  /** Backend blocks type changes when stock exists away from central (sites or maintenance). */
+  const typeChangeLocked = useMemo(
+    () =>
+      mode === 'edit' &&
+      ((initialData?.atSitesQuantity ?? 0) > 0 || (initialData?.inMaintenanceQuantity ?? 0) > 0),
+    [mode, initialData?.atSitesQuantity, initialData?.inMaintenanceQuantity]
+  );
 
   const [minStockLevel, setMinStockLevel] = useState(
     () => initialMinStockLevelDisplay || initialData?.minStockLevel?.toString() || '0'
@@ -355,7 +365,7 @@ export function ItemForm({
   const validate = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (mode === 'create') {
+    if (mode === 'create' || mode === 'edit') {
       if (!name.trim()) newErrors.name = 'Item name is required';
       if (!sku.trim()) newErrors.sku = 'SKU is required';
     }
@@ -439,6 +449,7 @@ export function ItemForm({
   }, [
     name,
     sku,
+    type,
     minStockLevel,
     initialQuantity,
     mode,
@@ -534,16 +545,20 @@ export function ItemForm({
       onSubmit(data, imageFile ?? undefined);
     } else {
       const data: UpdateItemData = {
-        name: (initialData?.name ?? name).trim(),
-        sku: (initialData?.sku ?? sku).trim(),
+        name: name.trim(),
+        sku: sku.trim(),
         description: description.trim() || undefined,
-        categoryId: initialData?.categoryId ?? categoryIdNorm,
-        type: (initialData?.type ?? type) as ItemType,
-        unit: initialData?.unit ?? unitToSend,
+        categoryId: categoryIdNorm,
+        type,
+        unit: type === 'fuel' ? 'Liters' : initialData?.unit ?? unitToSend,
         minStockLevel: minStockLevelPieces,
         status,
-        weightPerMeter,
-        lengthPerPiece,
+        ...(type === 'fuel'
+          ? {}
+          : {
+              weightPerMeter,
+              lengthPerPiece,
+            }),
         standardUnitPrice: stdUnitPrice,
         standardGstPercentage: stdGstPct,
       };
@@ -614,8 +629,8 @@ export function ItemForm({
         </div>
       )}
 
-      {/* Create-only: Item Name, SKU, Category, Type, Unit (not editable in edit mode per RN) */}
-      {mode === 'create' && (
+      {/* Name, SKU, category, type: create + edit. Unit: create only (changing unit with stock is phase 2). */}
+      {(mode === 'create' || mode === 'edit') && (
         <>
           <div>
             <label htmlFor="item-name" className="block text-[15px] text-slate-900 mb-1.5">Item Name *</label>
@@ -650,42 +665,58 @@ export function ItemForm({
 
           <div>
             <label className="block text-[15px] text-slate-900 mb-1.5">Type</label>
+            {typeChangeLocked && (
+              <div
+                className="mb-2 flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[13px] text-amber-900"
+                role="status"
+              >
+                <Icon name="exclamation-triangle" className="h-5 w-5 flex-shrink-0 text-amber-600" />
+                <p>
+                  Item type can’t be changed while stock exists at sites or in maintenance. Move all
+                  stock back to the central store and clear maintenance for this item first.
+                </p>
+              </div>
+            )}
             <select
               value={type}
               onChange={(e) => setType(e.target.value as ItemType)}
-              className="w-full border border-slate-200 rounded-lg h-12 px-4 bg-white"
+              disabled={loading || typeChangeLocked}
+              aria-disabled={loading || typeChangeLocked}
+              className={`w-full border rounded-lg h-12 px-4 bg-white border-slate-200 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500`}
             >
               <option value="consumable">Consumable</option>
               <option value="non_consumable">Non-Consumable</option>
               <option value="fuel">Fuel</option>
             </select>
           </div>
-
-          <div>
-            <label htmlFor="item-unit" className="block text-[15px] text-slate-900 mb-1.5">Unit</label>
-            {type === 'fuel' ? (
-              <div className="w-full border border-slate-200 rounded-lg h-12 px-4 bg-slate-50 flex items-center text-slate-600">
-                Liters
-              </div>
-            ) : (
-              <>
-                <select
-                  id="item-unit"
-                  value={unit}
-                  onChange={(e) => handleUnitChange(e.target.value)}
-                  className={`w-full border rounded-lg h-12 px-4 bg-white ${errors.unit ? 'border-red-600' : 'border-slate-200'}`}
-                >
-                  {unitOptions.map((u) => (
-                    <option key={u} value={u}>
-                      {u}
-                    </option>
-                  ))}
-                </select>
-                {errors.unit && <p className="text-[13px] text-red-600 mt-1">{errors.unit}</p>}
-              </>
-            )}
-          </div>
         </>
+      )}
+
+      {mode === 'create' && (
+        <div>
+          <label htmlFor="item-unit" className="block text-[15px] text-slate-900 mb-1.5">Unit</label>
+          {type === 'fuel' ? (
+            <div className="w-full border border-slate-200 rounded-lg h-12 px-4 bg-slate-50 flex items-center text-slate-600">
+              Liters
+            </div>
+          ) : (
+            <>
+              <select
+                id="item-unit"
+                value={unit}
+                onChange={(e) => handleUnitChange(e.target.value)}
+                className={`w-full border rounded-lg h-12 px-4 bg-white ${errors.unit ? 'border-red-600' : 'border-slate-200'}`}
+              >
+                {unitOptions.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </select>
+              {errors.unit && <p className="text-[13px] text-red-600 mt-1">{errors.unit}</p>}
+            </>
+          )}
+        </div>
       )}
 
       <div>

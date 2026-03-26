@@ -797,6 +797,36 @@ export const onItemUpdated = onDocumentUpdated(
       changes,
     });
 
+    // Keep denormalized inventory location rows in sync with item master name/SKU
+    try {
+      if (before.name !== after.name || before.sku !== after.sku) {
+        const invSnap = await db.collection('inventory').where('itemId', '==', itemId).get();
+        const newName = (after.name as string | undefined) ?? '';
+        const newSku = (after.sku as string | undefined) ?? '';
+        const batchLimit = 500;
+        let batch = db.batch();
+        let opCount = 0;
+        for (const doc of invSnap.docs) {
+          batch.update(doc.ref, {
+            itemName: newName,
+            itemSku: newSku,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          opCount++;
+          if (opCount >= batchLimit) {
+            await batch.commit();
+            batch = db.batch();
+            opCount = 0;
+          }
+        }
+        if (opCount > 0) {
+          await batch.commit();
+        }
+      }
+    } catch (syncErr) {
+      logger.error('Inventory denormalized name/sku sync failed', { syncErr, itemId });
+    }
+
     // Low stock / critical stock alert: notify when item JUST crossed threshold
     try {
       const centralStoreQtyBefore = (before.centralStoreQuantity ?? 0) as number;
