@@ -10,7 +10,7 @@ import { useState, useCallback } from 'react';
 import { Icon } from '../shared/Icon';
 import { LoadingSpinner } from '../shared/LoadingSpinner';
 
-const REASON_OPTIONS = [
+const DEFAULT_REASON_OPTIONS = [
   { value: 'Physical count variation', label: 'Physical count variation' },
   { value: 'Stock discrepancy', label: 'Stock discrepancy' },
   { value: 'Other', label: 'Other' },
@@ -26,6 +26,9 @@ export interface RequestInventoryAccessModalProps {
   onSubmit: (data: RequestInventoryAccessSubmitData) => Promise<void>;
   onCancel: () => void;
   loading?: boolean;
+  title?: string;
+  description?: string;
+  reasonOptions?: { value: string; label: string }[];
 }
 
 export function RequestInventoryAccessModal({
@@ -33,6 +36,9 @@ export function RequestInventoryAccessModal({
   onSubmit,
   onCancel,
   loading = false,
+  title = 'Request Inventory Access',
+  description = 'You need Admin approval to update central store inventory. Submit a request with a reason.',
+  reasonOptions = DEFAULT_REASON_OPTIONS,
 }: RequestInventoryAccessModalProps) {
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
@@ -87,7 +93,7 @@ export function RequestInventoryAccessModal({
             id="request-access-title"
             className="text-[22px] font-semibold text-slate-900"
           >
-            Request Inventory Access
+            {title}
           </h2>
           <button
             type="button"
@@ -102,17 +108,14 @@ export function RequestInventoryAccessModal({
 
         <div className="p-4 overflow-y-auto flex-1">
           <div className="flex flex-col gap-4">
-            <p className="text-[15px] text-slate-500">
-              You need Admin approval to update central store inventory. Submit a
-              request with a reason.
-            </p>
+            <p className="text-[15px] text-slate-500">{description}</p>
 
             <div>
               <label className="block text-[15px] text-slate-900 mb-1.5">
                 Reason <span className="text-red-600">*</span>
               </label>
               <div className="flex flex-wrap gap-3">
-                {REASON_OPTIONS.map((opt) => (
+                {reasonOptions.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"

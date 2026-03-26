@@ -1,6 +1,9 @@
 import { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { setMyAccessGrantedUntil } from '../store/slices/inventoryUpdateRequestSlice';
+import {
+  setMyAccessGrantedUntil,
+  setMyWriteOffAccessGrantedUntil,
+} from '../store/slices/inventoryUpdateRequestSlice';
 import { selectUserId } from '../store/selectors/authSelectors';
 import { selectUserRoleType } from '../store/selectors/authSelectors';
 import { subscribeToMyActiveAccess } from '../services/firebase/inventoryUpdateRequestService';
@@ -18,11 +21,13 @@ export const useInventoryAccessSync = (): void => {
   useEffect(() => {
     if (!userId || role !== 'StoreIncharge') {
       dispatch(setMyAccessGrantedUntil(null));
+      dispatch(setMyWriteOffAccessGrantedUntil(null));
       return;
     }
 
-    const unsubscribe = subscribeToMyActiveAccess(userId, (request) => {
-      dispatch(setMyAccessGrantedUntil(request?.accessExpiresAt ?? null));
+    const unsubscribe = subscribeToMyActiveAccess(userId, (summary) => {
+      dispatch(setMyAccessGrantedUntil(summary.centralStoreAccessExpiresAt));
+      dispatch(setMyWriteOffAccessGrantedUntil(summary.maintenanceWriteOffAccessExpiresAt));
     });
 
     return () => {

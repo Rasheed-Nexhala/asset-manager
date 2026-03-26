@@ -472,6 +472,8 @@ export interface LogInventoryUpdateRequestPayload {
   approvedByName?: string;
   expiresInHours?: number;
   rejectionReason?: string;
+  /** e.g. central_store, maintenance_writeoff — included in activity log details */
+  accessScopes?: string[];
 }
 
 /**

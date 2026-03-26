@@ -17,9 +17,20 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import { auth } from '../../../config/firebase';
-import type { InventoryUpdateRequest, InventoryUpdateRequestStatus } from '../../types/inventoryUpdateRequest';
+import type {
+  InventoryUpdateRequest,
+  InventoryUpdateRequestStatus,
+  InventoryUpdateAccessScope,
+} from '../../types/inventoryUpdateRequest';
+import { normalizeInventoryUpdateAccessScopes } from '../../types/inventoryUpdateRequest';
 
 const COLLECTION = 'inventoryUpdateRequests';
+
+/** Active time-boxed access merged from all approved, non-revoked, non-expired grants for the user. */
+export interface MyActiveAccessSummary {
+  centralStoreAccessExpiresAt: string | null;
+  maintenanceWriteOffAccessExpiresAt: string | null;
+}
 
 /**
  * Convert Firestore document to InventoryUpdateRequest (serialize timestamps to ISO strings)
@@ -37,12 +48,21 @@ function docToRequest(
     return String(v);
   };
 
+  const rawScopes = data.accessScopes;
+  let accessScopes: InventoryUpdateAccessScope[] | undefined;
+  if (Array.isArray(rawScopes)) {
+    accessScopes = normalizeInventoryUpdateAccessScopes(
+      rawScopes.filter((s): s is InventoryUpdateAccessScope => typeof s === 'string') as InventoryUpdateAccessScope[]
+    );
+  }
+
   return {
     id,
     requestedBy: String(data.requestedBy ?? ''),
     requestedByName: String(data.requestedByName ?? ''),
     requestedByRole: String(data.requestedByRole ?? ''),
     reason: String(data.reason ?? ''),
+    ...(accessScopes ? { accessScopes } : {}),
     status: (data.status as InventoryUpdateRequestStatus) ?? 'pending',
     approvedBy: data.approvedBy != null ? String(data.approvedBy) : undefined,
     approvedByName: data.approvedByName != null ? String(data.approvedByName) : undefined,
@@ -63,13 +83,15 @@ function docToRequest(
  * @param userName - Requesting user display name
  * @param userRole - Requesting user role (e.g. 'StoreIncharge')
  * @param reason - Reason for requesting access
+ * @param accessScopes - What access is being requested (default: central store only)
  * @returns The created request document ID
  */
 export const createRequest = async (
   userId: string,
   userName: string,
   userRole: string,
-  reason: string
+  reason: string,
+  accessScopes?: InventoryUpdateAccessScope[]
 ): Promise<string> => {
   const user = auth.currentUser;
   if (!user) {
@@ -79,11 +101,14 @@ export const createRequest = async (
     throw new Error('Cannot create request on behalf of another user');
   }
 
+  const scopes = normalizeInventoryUpdateAccessScopes(accessScopes);
+
   const docRef = await addDoc(collection(db, COLLECTION), {
     requestedBy: userId,
     requestedByName: userName,
     requestedByRole: userRole,
     reason: reason.trim() || 'Inventory update required',
+    accessScopes: scopes,
     status: 'pending',
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -269,7 +294,7 @@ export const getActiveApprovedRequests = async (): Promise<InventoryUpdateReques
 
 /**
  * Get all pending inventory update requests.
- * Admin only (Store Incharge can only see own via getMyActiveAccess / list).
+ * Admin only (Store Incharge can only see own via getMyActiveAccessSummary / list).
  * Ordered by createdAt desc.
  */
 export const getPendingRequests = async (): Promise<InventoryUpdateRequest[]> => {
@@ -283,16 +308,44 @@ export const getPendingRequests = async (): Promise<InventoryUpdateRequest[]> =>
   return snapshot.docs.map((d) => docToRequest(d.id, d.data()));
 };
 
+function mergeMyActiveAccessFromSnapshot(snapshot: QuerySnapshot): MyActiveAccessSummary {
+  const now = Date.now();
+  let centralUntil: string | null = null;
+  let writeOffUntil: string | null = null;
+
+  for (const d of snapshot.docs) {
+    const data = d.data();
+    if (data.accessRevoked === true) continue;
+    const exp = data.accessExpiresAt as Timestamp | undefined;
+    const expMs = exp?.toMillis?.() ?? (exp ? new Date(exp as unknown as string).getTime() : 0);
+    if (expMs <= now) continue;
+
+    const req = docToRequest(d.id, data);
+    const scopes = normalizeInventoryUpdateAccessScopes(req.accessScopes);
+    const iso = req.accessExpiresAt;
+    if (!iso) continue;
+    const isoMs = new Date(iso).getTime();
+
+    if (scopes.includes('central_store')) {
+      if (!centralUntil || isoMs > new Date(centralUntil).getTime()) centralUntil = iso;
+    }
+    if (scopes.includes('maintenance_writeoff')) {
+      if (!writeOffUntil || isoMs > new Date(writeOffUntil).getTime()) writeOffUntil = iso;
+    }
+  }
+
+  return {
+    centralStoreAccessExpiresAt: centralUntil,
+    maintenanceWriteOffAccessExpiresAt: writeOffUntil,
+  };
+}
+
 /**
- * Get the Store Incharge's active approved access (if any).
- * Returns the approved request where requestedBy == userId AND accessExpiresAt > now.
- *
- * @param userId - Store Incharge user ID
- * @returns The active approved request, or null if none
+ * Store Incharge: merge all approved, non-revoked, non-expired grants (by scope).
  */
-export const getMyActiveAccess = async (
+export const getMyActiveAccessSummary = async (
   userId: string
-): Promise<InventoryUpdateRequest | null> => {
+): Promise<MyActiveAccessSummary> => {
   const q = query(
     collection(db, COLLECTION),
     where('requestedBy', '==', userId),
@@ -301,34 +354,24 @@ export const getMyActiveAccess = async (
   );
 
   const snapshot = await getDocs(q);
-  const now = Date.now();
-  for (const d of snapshot.docs) {
-    const data = d.data();
-    if (data.accessRevoked === true) continue;
-    const exp = data.accessExpiresAt as Timestamp | undefined;
-    const expMs = exp?.toMillis?.() ?? (exp ? new Date(exp as unknown as string).getTime() : 0);
-    if (expMs > now) {
-      return docToRequest(d.id, data);
-    }
-  }
-  return null;
+  return mergeMyActiveAccessFromSnapshot(snapshot);
 };
 
 /**
- * Subscribe to real-time updates of the Store Incharge's active access.
- * Callback receives the active approved request or null.
- * Filters client-side by accessExpiresAt > now and sets a timer to clear when access expires.
- *
- * @param userId - Store Incharge user ID
- * @param callback - Called with active request or null
- * @returns Unsubscribe function
+ * Subscribe to real-time updates of the Store Incharge's active access (merged by scope).
+ * Re-evaluates when any matching document changes or when the nearest expiry time is reached.
  */
 export const subscribeToMyActiveAccess = (
   userId: string,
-  callback: (request: InventoryUpdateRequest | null) => void
+  callback: (summary: MyActiveAccessSummary) => void
 ): Unsubscribe => {
+  const empty: MyActiveAccessSummary = {
+    centralStoreAccessExpiresAt: null,
+    maintenanceWriteOffAccessExpiresAt: null,
+  };
+
   if (!userId) {
-    callback(null);
+    callback(empty);
     return () => {};
   }
 
@@ -340,43 +383,45 @@ export const subscribeToMyActiveAccess = (
   );
 
   let expiryTimerId: ReturnType<typeof setTimeout> | null = null;
+  let lastSnapshot: QuerySnapshot | null = null;
 
-  const evaluateAndNotify = (snapshot: QuerySnapshot) => {
+  const evaluateAndNotify = () => {
     if (expiryTimerId) {
       clearTimeout(expiryTimerId);
       expiryTimerId = null;
     }
+    if (!lastSnapshot) return;
+
+    const summary = mergeMyActiveAccessFromSnapshot(lastSnapshot);
+    callback(summary);
 
     const now = Date.now();
-    let active: InventoryUpdateRequest | null = null;
-
-    for (const d of snapshot.docs) {
+    let minExpiryMs: number | null = null;
+    for (const d of lastSnapshot.docs) {
       const data = d.data();
       if (data.accessRevoked === true) continue;
       const exp = data.accessExpiresAt as Timestamp | undefined;
       const expMs = exp?.toMillis?.() ?? (exp ? new Date(exp as unknown as string).getTime() : 0);
-      if (expMs > now) {
-        active = docToRequest(d.id, data);
-        const delay = Math.max(0, expMs - now);
-        expiryTimerId = setTimeout(() => callback(null), delay);
-        break;
+      if (expMs > now && (minExpiryMs === null || expMs < minExpiryMs)) {
+        minExpiryMs = expMs;
       }
     }
-
-    if (!active) {
-      callback(null);
-    } else {
-      callback(active);
+    if (minExpiryMs !== null) {
+      const delay = Math.max(0, minExpiryMs - now);
+      expiryTimerId = setTimeout(() => evaluateAndNotify(), delay);
     }
   };
 
   const unsubscribe = onSnapshot(
     q,
-    (snapshot: QuerySnapshot) => evaluateAndNotify(snapshot),
+    (snapshot: QuerySnapshot) => {
+      lastSnapshot = snapshot;
+      evaluateAndNotify();
+    },
     (error) => {
       console.error('Error in subscribeToMyActiveAccess:', error);
       if (expiryTimerId) clearTimeout(expiryTimerId);
-      callback(null);
+      callback(empty);
     }
   );
 

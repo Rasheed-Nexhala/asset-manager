@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useCallback, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -34,6 +34,9 @@ import {
   selectAllCategories,
   selectItemsLoading,
   selectItemsTotalCount,
+  selectFilteredAndSearchedItems,
+  selectItemsHasMore,
+  selectItemsLoadingMore,
 } from '../../store/selectors/inventorySelectors';
 import {
   selectIsAdmin,
@@ -119,18 +122,23 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   const categories = useAppSelector(selectAllCategories);
   const isLoading = useAppSelector(selectItemsLoading);
   const totalCount = useAppSelector(selectItemsTotalCount);
+  const hasMore = useAppSelector(selectItemsHasMore);
+  const loadingMore = useAppSelector(selectItemsLoadingMore);
   const error = useInventoryError();
   const isAdmin = useAppSelector(selectIsAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
 
-  // Apply filters locally that the backend paginator doesn't handle natively
-  const filteredItems = useMemo(() => {
-    let items = allItems;
+  // Client-side search: case-insensitive name, SKU, category, description (same as web)
+  const filteredItems = useAppSelector((state) =>
+    selectFilteredAndSearchedItems(state, searchQuery)
+  );
+
+  const displayedItems = useMemo(() => {
     if (filters.stock === 'low_stock') {
-      items = items.filter((item) => isLowStock(item));
+      return filteredItems.filter((item) => isLowStock(item));
     }
-    return items;
-  }, [allItems, filters.stock]);
+    return filteredItems;
+  }, [filteredItems, filters.stock]);
 
   const hasActiveFilters = useMemo(
     () =>
@@ -160,11 +168,11 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   }, [filters.categoryId, filters.type]);
 
   useEffect(() => {
-    const itemFilters = toItemFilters(filters, debouncedSearch);
+    // Do not pass searchTerm to Firestore — use selectFilteredAndSearchedItems (case-insensitive)
+    const itemFilters = toItemFilters(filters, undefined);
     dispatch(setFilters(itemFilters));
-    // lowStockOnly is applied after fetch; paginated mode only has one page in Redux,
-    // so the low-stock list would match dashboard alerts — use full fetch like web.
-    const needsFullItemList = filters.stock === 'low_stock';
+    const hasClientSearch = debouncedSearch.trim().length > 0;
+    const needsFullItemList = hasClientSearch || filters.stock === 'low_stock';
     if (needsFullItemList) {
       dispatch(fetchItems(itemFilters));
     } else {
@@ -183,8 +191,9 @@ export const CentralStoreInventoryScreen: React.FC = () => {
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    const itemFilters = toItemFilters(filters, debouncedSearch);
-    const needsFullItemList = filters.stock === 'low_stock';
+    const itemFilters = toItemFilters(filters, undefined);
+    const hasClientSearch = debouncedSearch.trim().length > 0;
+    const needsFullItemList = hasClientSearch || filters.stock === 'low_stock';
     const refresh = needsFullItemList
       ? dispatch(fetchItems(itemFilters))
       : dispatch(fetchItemsPaginated());
@@ -197,10 +206,10 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   }, [dispatch, filters, debouncedSearch]);
 
   const handleLoadMore = useCallback(() => {
-    if (!isLoading && allItems.length < (totalCount ?? 0)) {
-      dispatch(loadMoreItems());
-    }
-  }, [isLoading, allItems.length, totalCount, dispatch]);
+    if (!hasMore || loadingMore) return;
+    if (totalCount != null && allItems.length >= totalCount) return;
+    dispatch(loadMoreItems());
+  }, [dispatch, hasMore, loadingMore, totalCount, allItems.length]);
 
   const handleAddItem = useCallback(() => {
     navigation.navigate('AddEditItem');
@@ -424,7 +433,7 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     );
   }
 
-  const hasNoItems = filteredItems.length === 0 && !isLoading;
+  const hasNoItems = displayedItems.length === 0 && !isLoading;
 
   return (
     <ScreenLayout edges={['top']}>
@@ -609,7 +618,7 @@ export const CentralStoreInventoryScreen: React.FC = () => {
       ) : (
         <View className="flex-1">
           <FlatList
-            data={filteredItems}
+            data={displayedItems}
             renderItem={renderItemCard}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
@@ -624,7 +633,7 @@ export const CentralStoreInventoryScreen: React.FC = () => {
             onEndReached={handleLoadMore}
             onEndReachedThreshold={0.5}
             ListFooterComponent={
-              isLoading && allItems.length > 0 ? (
+              loadingMore && allItems.length > 0 ? (
                 <View className="py-4 items-center justify-center">
                   <ActivityIndicator size="small" color="#1E40AF" />
                 </View>
@@ -639,11 +648,11 @@ export const CentralStoreInventoryScreen: React.FC = () => {
               <Text className="text-[15px] text-[#64748B]">
                 {totalCount != null ? (
                   <>
-                    Showing <Text className="text-[#0F172A] font-semibold">{filteredItems.length}</Text> of{' '}
+                    Showing <Text className="text-[#0F172A] font-semibold">{displayedItems.length}</Text> of{' '}
                     <Text className="text-[#0F172A] font-semibold">{totalCount}</Text>
                   </>
                 ) : (
-                  <Text className="text-[#0F172A] font-semibold">{filteredItems.length}</Text>
+                  <Text className="text-[#0F172A] font-semibold">{displayedItems.length}</Text>
                 )}{' '}
                 items
               </Text>

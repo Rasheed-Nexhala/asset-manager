@@ -10,6 +10,7 @@ import React from 'react';
 import { View, Text, Switch, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { InventoryUpdateRequest } from '../../types/inventoryUpdateRequest';
+import { formatInventoryUpdateAccessScopesLabel } from '../../types/inventoryUpdateRequest';
 
 export interface ActiveAccessCardProps {
   request: InventoryUpdateRequest;
@@ -46,6 +47,9 @@ export const ActiveAccessCard: React.FC<ActiveAccessCardProps> = ({
             {request.requestedByName}
           </Text>
           <Text className="text-[13px] text-[#64748B]">{request.requestedByRole}</Text>
+          <Text className="text-[12px] text-[#64748B] mt-1">
+            {formatInventoryUpdateAccessScopesLabel(request.accessScopes)}
+          </Text>
         </View>
         <View
           className={`px-2 py-1 rounded-full min-h-[28px] items-center justify-center ${

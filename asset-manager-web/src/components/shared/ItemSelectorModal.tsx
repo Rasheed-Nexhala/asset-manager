@@ -64,19 +64,32 @@ export function ItemSelectorModal({
   const fetchFirstPage = useCallback(async () => {
     setLoading(true);
     try {
-      const [countResult, listResult] = await Promise.all([
-        getItemsForSelectionCount(debouncedSearch || undefined, allowedItemTypes),
-        listItemsForSelectionPaginated(
-          debouncedSearch || undefined,
+      if (debouncedSearch) {
+        const listResult = await listItemsForSelectionPaginated(
+          debouncedSearch,
           SELECTION_ITEMS_PAGE_SIZE,
           undefined,
           allowedItemTypes
-        ),
-      ]);
-      setTotalCount(countResult);
-      setItems(listResult.items);
-      lastDocRef.current = listResult.lastDoc;
-      setLastDoc(listResult.lastDoc);
+        );
+        setTotalCount(listResult.items.length);
+        setItems(listResult.items);
+        lastDocRef.current = listResult.lastDoc;
+        setLastDoc(listResult.lastDoc);
+      } else {
+        const [countResult, listResult] = await Promise.all([
+          getItemsForSelectionCount(undefined, allowedItemTypes),
+          listItemsForSelectionPaginated(
+            undefined,
+            SELECTION_ITEMS_PAGE_SIZE,
+            undefined,
+            allowedItemTypes
+          ),
+        ]);
+        setTotalCount(countResult);
+        setItems(listResult.items);
+        lastDocRef.current = listResult.lastDoc;
+        setLastDoc(listResult.lastDoc);
+      }
     } catch (error) {
       console.error('Error fetching items for selection:', error);
       setItems([]);
@@ -186,7 +199,7 @@ export function ItemSelectorModal({
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by item name or SKU..."
+                placeholder="Search by name, SKU, or category..."
                 className="flex-1 bg-transparent text-[15px] text-slate-900 placeholder-slate-400 focus:outline-none"
                 aria-label="Search items"
               />
@@ -235,10 +248,10 @@ export function ItemSelectorModal({
               <p className="mt-2 text-[15px] text-slate-500">
                 {isForPO
                   ? debouncedSearch
-                    ? 'Try a different search term.'
+                    ? 'Try a different term (name, SKU, or category).'
                     : 'All items are above their minimum stock level.'
                   : debouncedSearch
-                    ? 'Try a different search term.'
+                    ? 'Try a different term (name, SKU, or category).'
                     : 'No active items in inventory.'}
               </p>
             </div>

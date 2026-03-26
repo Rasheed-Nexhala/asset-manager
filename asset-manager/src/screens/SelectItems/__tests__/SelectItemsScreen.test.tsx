@@ -86,7 +86,7 @@ describe('SelectItemsScreen', () => {
 
     await findByText('No items available');
 
-    expect(screen.getByPlaceholderText('Search by item name or SKU...')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Search by name, SKU, or category...')).toBeTruthy();
     expect(screen.getByText('Showing 0 of 0 items')).toBeTruthy();
   });
 

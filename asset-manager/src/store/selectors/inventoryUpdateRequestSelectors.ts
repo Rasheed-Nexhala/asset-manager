@@ -9,6 +9,11 @@ export const selectMyAccessGrantedUntil = createSelector(
   (s) => s.myAccessGrantedUntil
 );
 
+export const selectMyWriteOffAccessGrantedUntil = createSelector(
+  [selectInventoryUpdateRequestState],
+  (s) => s.myWriteOffAccessGrantedUntil
+);
+
 export const selectPendingRequests = createSelector(
   [selectInventoryUpdateRequestState],
   (s) => s.pendingRequests
@@ -38,5 +43,17 @@ export const selectCanStoreInchargeAdjustInventory = createSelector(
   (myAccessGrantedUntil) => {
     if (!myAccessGrantedUntil) return false;
     return new Date(myAccessGrantedUntil) > new Date();
+  }
+);
+
+/**
+ * Store Incharge can write off maintenance items when myWriteOffAccessGrantedUntil exists and > now.
+ * Admin always allowed (handled in writeOffItemThunk).
+ */
+export const selectCanStoreInchargeMaintenanceWriteOff = createSelector(
+  [selectMyWriteOffAccessGrantedUntil],
+  (until) => {
+    if (!until) return false;
+    return new Date(until) > new Date();
   }
 );

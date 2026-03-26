@@ -17,6 +17,7 @@ import steelMasterReducer from '../../../store/slices/steelMasterSlice';
 import maintenanceReducer from '../../../store/slices/maintenanceSlice';
 import activityLogReducer from '../../../store/slices/activityLogSlice';
 import purchaseOrderReducer from '../../../store/slices/purchaseOrderSlice';
+import inventoryUpdateRequestReducer from '../../../store/slices/inventoryUpdateRequestSlice';
 import type { RootState } from '../../../store';
 import type { Maintenance } from '../../../types/maintenance';
 
@@ -100,6 +101,23 @@ jest.mock('../../../store/thunks/steelMasterThunks', () => {
     deleteSteelMaster: createAsyncThunk('steelMaster/delete', async () => null),
   };
 });
+jest.mock('../../../store/thunks/inventoryUpdateRequestThunks', () => {
+  const { createAsyncThunk } = require('@reduxjs/toolkit');
+  return {
+    createInventoryUpdateRequest: createAsyncThunk(
+      'inventoryUpdateRequest/createRequest',
+      async () => 'req-mock'
+    ),
+    fetchMyActiveAccess: createAsyncThunk('inventoryUpdateRequest/fetchMyActiveAccess', async () => null),
+    fetchPendingRequests: createAsyncThunk('inventoryUpdateRequest/fetchPendingRequests', async () => []),
+    approveInventoryUpdateRequest: createAsyncThunk('inventoryUpdateRequest/approveRequest', async () => null),
+    rejectInventoryUpdateRequest: createAsyncThunk('inventoryUpdateRequest/rejectRequest', async () => null),
+    revokeInventoryUpdateAccess: createAsyncThunk('inventoryUpdateRequest/revokeAccess', async () => null),
+    restoreInventoryUpdateAccess: createAsyncThunk('inventoryUpdateRequest/restoreAccess', async () => null),
+    subscribeToMyActiveAccess: () => () => {},
+    unsubscribeFromMyActiveAccess: () => () => {},
+  };
+});
 jest.mock('../../../store/thunks/maintenanceThunks', () => {
   const { createAsyncThunk } = require('@reduxjs/toolkit');
   return {
@@ -171,6 +189,8 @@ const mockMaintenance: Maintenance = {
   sourceReturnDate: null,
 } as Maintenance;
 
+const futureWriteOffAccessIso = new Date(Date.now() + 86400000 * 365).toISOString();
+
 function renderWithStore(ui: React.ReactElement, preloadedState: Partial<RootState> = {}) {
   const store = configureStore({
     reducer: {
@@ -182,6 +202,7 @@ function renderWithStore(ui: React.ReactElement, preloadedState: Partial<RootSta
       maintenance: maintenanceReducer,
       activityLog: activityLogReducer,
       purchaseOrders: purchaseOrderReducer,
+      inventoryUpdateRequest: inventoryUpdateRequestReducer,
     } as Record<string, React.Reducer<unknown, { type: string }>>,
     preloadedState: preloadedState as Partial<RootState>,
   });
@@ -208,6 +229,14 @@ const defaultPreloadedState: Partial<RootState> = {
     error: null,
     errorTimestamp: null,
     filters: { status: 'all' },
+  },
+  inventoryUpdateRequest: {
+    myAccessGrantedUntil: null,
+    myWriteOffAccessGrantedUntil: futureWriteOffAccessIso,
+    pendingRequests: [],
+    activeApprovedRequests: [],
+    loading: false,
+    error: null,
   },
 };
 

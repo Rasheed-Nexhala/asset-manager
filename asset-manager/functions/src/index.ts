@@ -9,6 +9,7 @@ import { setGlobalOptions } from 'firebase-functions';
 import {
   onDocumentCreated,
   onDocumentUpdated,
+  onDocumentWritten,
 } from 'firebase-functions/v2/firestore';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
@@ -71,6 +72,30 @@ async function createActivityLog(
  * Firestore Trigger: Log Item Creation
  * Triggered when a new document is created in items collection
  */
+/**
+ * Keep nameSearch / skuSearch in sync for case-insensitive catalog search.
+ * Backfills legacy documents on any write; idempotent (skips when already correct).
+ */
+export const onItemSearchFieldsSync = onDocumentWritten('items/{itemId}', async (event) => {
+  const afterSnap = event.data?.after;
+  if (!afterSnap?.exists) {
+    return;
+  }
+  const d = afterSnap.data() as Record<string, unknown>;
+  const name = typeof d.name === 'string' ? d.name : '';
+  const sku = typeof d.sku === 'string' ? d.sku : '';
+  const nameSearch = name.toLowerCase();
+  const skuSearch = sku.toLowerCase();
+  if (d.nameSearch === nameSearch && d.skuSearch === skuSearch) {
+    return;
+  }
+  try {
+    await afterSnap.ref.update({ nameSearch, skuSearch });
+  } catch (e) {
+    logger.error('onItemSearchFieldsSync failed', { e, itemId: event.params.itemId });
+  }
+});
+
 export const onItemCreated = onDocumentCreated(
   'items/{itemId}',
   async (event) => {
@@ -1837,6 +1862,25 @@ export const logQuantityAdjusted = onCall(async (request) => {
   }
 });
 
+function inventoryRequestAccessScopeLine(accessScopes: unknown): string {
+  if (!Array.isArray(accessScopes) || accessScopes.length === 0) return '';
+  const labels: Record<string, string> = {
+    central_store: 'Central stock adjustments',
+    maintenance_writeoff: 'Maintenance write-off',
+  };
+  const parts = accessScopes.map((s) => labels[String(s)] ?? String(s));
+  return `Access scope: ${parts.join(', ')}`;
+}
+
+function appendInventoryRequestScopeToDetails(
+  base: string,
+  accessScopes: unknown
+): string {
+  const line = inventoryRequestAccessScopeLine(accessScopes);
+  if (!line) return base;
+  return base ? `${base}\n${line}` : line;
+}
+
 /**
  * Callable Function: Log Inventory Update Request Event
  * Called from client after create/approve/reject of inventory update request.
@@ -1891,13 +1935,21 @@ export const logInventoryUpdateRequest = onCall(async (request) => {
     userName = rest.requestedByName ?? displayName;
     userRole = rest.requestedByRole ?? 'StoreIncharge';
     summary = `Requested inventory update access: ${targetDisplay}`;
-    details = rest.reason ?? '';
+    details = appendInventoryRequestScopeToDetails(
+      typeof rest.reason === 'string' ? rest.reason : '',
+      rest.accessScopes
+    );
   } else if (actionType === 'inventory_update_request_approved') {
     userId = rest.approvedBy ?? request.auth.uid;
     userName = rest.approvedByName ?? displayName;
     userRole = 'Admin';
     summary = `Approved inventory update request: ${targetDisplay}`;
-    details = rest.expiresInHours != null ? `Access expires in ${rest.expiresInHours} hours` : '';
+    details = appendInventoryRequestScopeToDetails(
+      rest.expiresInHours != null
+        ? `Access expires in ${rest.expiresInHours} hours`
+        : '',
+      rest.accessScopes
+    );
     changes.push({
       field: 'status',
       fieldLabel: 'Status',
@@ -1909,7 +1961,10 @@ export const logInventoryUpdateRequest = onCall(async (request) => {
     userName = rest.approvedByName ?? displayName;
     userRole = 'Admin';
     summary = `Rejected inventory update request: ${targetDisplay}`;
-    details = rest.rejectionReason ?? '';
+    details = appendInventoryRequestScopeToDetails(
+      typeof rest.rejectionReason === 'string' ? rest.rejectionReason : '',
+      rest.accessScopes
+    );
     changes.push({
       field: 'status',
       fieldLabel: 'Status',

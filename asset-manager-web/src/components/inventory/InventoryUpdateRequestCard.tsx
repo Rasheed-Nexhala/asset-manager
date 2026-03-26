@@ -1,6 +1,7 @@
 import { Icon } from '../shared/Icon';
 import { LoadingSpinner } from '../shared/LoadingSpinner';
 import type { InventoryUpdateRequest, InventoryUpdateRequestStatus } from '../../types/inventoryUpdateRequest';
+import { formatInventoryUpdateAccessScopesLabel } from '../../types/inventoryUpdateRequest';
 
 const STATUS_CONFIG: Record<
   InventoryUpdateRequestStatus,
@@ -50,6 +51,9 @@ export function InventoryUpdateRequestCard({
         <div className="flex-1 min-w-0">
           <p className="text-[15px] font-semibold text-slate-900 truncate">{request.requestedByName}</p>
           <p className="text-[13px] text-slate-500">{request.requestedByRole}</p>
+          <p className="text-[12px] text-slate-500 mt-1">
+            {formatInventoryUpdateAccessScopesLabel(request.accessScopes)}
+          </p>
         </div>
         <span className={`px-2 py-1 rounded-full text-[12px] font-medium shrink-0 ${statusConfig.bg} ${statusConfig.text}`}>
           {statusConfig.label}

@@ -1,5 +1,6 @@
 import inventoryUpdateRequestReducer, {
   setMyAccessGrantedUntil,
+  setMyWriteOffAccessGrantedUntil,
   setPendingRequests,
   setActiveApprovedRequests,
   setLoading,
@@ -22,6 +23,7 @@ const mockInventoryUpdateRequest = {
 describe('inventoryUpdateRequestSlice', () => {
   const initialState = {
     myAccessGrantedUntil: null,
+    myWriteOffAccessGrantedUntil: null,
     pendingRequests: [],
     activeApprovedRequests: [],
     loading: false,
@@ -38,6 +40,14 @@ describe('inventoryUpdateRequestSlice', () => {
       setMyAccessGrantedUntil('2025-12-31T23:59:59Z')
     );
     expect(state.myAccessGrantedUntil).toBe('2025-12-31T23:59:59Z');
+  });
+
+  it('setMyWriteOffAccessGrantedUntil sets value', () => {
+    const state = inventoryUpdateRequestReducer(
+      initialState,
+      setMyWriteOffAccessGrantedUntil('2026-06-01T12:00:00Z')
+    );
+    expect(state.myWriteOffAccessGrantedUntil).toBe('2026-06-01T12:00:00Z');
   });
 
   it('setPendingRequests sets array', () => {
@@ -70,23 +80,25 @@ describe('inventoryUpdateRequestSlice', () => {
     expect(state.error).toBe(null);
   });
 
-  it('clearAccess resets myAccessGrantedUntil, pendingRequests, activeApprovedRequests, error', () => {
-    const withData = inventoryUpdateRequestReducer(
+  it('clearAccess resets access fields, pendingRequests, activeApprovedRequests, error', () => {
+    let state = inventoryUpdateRequestReducer(
       initialState,
       setMyAccessGrantedUntil('2025-12-31')
     );
-    const withRequests = inventoryUpdateRequestReducer(
-      withData,
-      setPendingRequests([mockInventoryUpdateRequest])
+    state = inventoryUpdateRequestReducer(
+      state,
+      setMyWriteOffAccessGrantedUntil('2026-01-01T00:00:00Z')
     );
-    const withActive = inventoryUpdateRequestReducer(
-      withRequests,
+    state = inventoryUpdateRequestReducer(state, setPendingRequests([mockInventoryUpdateRequest]));
+    state = inventoryUpdateRequestReducer(
+      state,
       setActiveApprovedRequests([mockInventoryUpdateRequest])
     );
-    const withError = inventoryUpdateRequestReducer(withActive, setError('Error'));
-    const state = inventoryUpdateRequestReducer(withError, clearAccess());
+    state = inventoryUpdateRequestReducer(state, setError('Error'));
+    state = inventoryUpdateRequestReducer(state, clearAccess());
 
     expect(state.myAccessGrantedUntil).toBe(null);
+    expect(state.myWriteOffAccessGrantedUntil).toBe(null);
     expect(state.pendingRequests).toEqual([]);
     expect(state.activeApprovedRequests).toEqual([]);
     expect(state.error).toBe(null);

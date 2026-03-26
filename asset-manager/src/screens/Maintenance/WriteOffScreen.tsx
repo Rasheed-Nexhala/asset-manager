@@ -14,15 +14,33 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import WriteOffReasonSelector from '../../components/Maintenance/WriteOffReasonSelector';
+import {
+  RequestAccessBanner,
+  RequestInventoryAccessModal,
+} from '../../components/Inventory';
+import type { RequestInventoryAccessSubmitData } from '../../components/Inventory/RequestInventoryAccessModal';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   fetchMaintenanceById,
   writeOffItemThunk,
 } from '../../store/thunks/maintenanceThunks';
 import { selectMaintenanceById } from '../../store/selectors/maintenanceSelectors';
-import { selectUserId, selectUserDisplayName } from '../../store/selectors/authSelectors';
+import {
+  selectUserId,
+  selectUserDisplayName,
+  selectIsAdmin,
+  selectIsStoreIncharge,
+} from '../../store/selectors/authSelectors';
+import { selectCanStoreInchargeMaintenanceWriteOff } from '../../store/selectors/inventoryUpdateRequestSelectors';
+import { createInventoryUpdateRequest } from '../../store/thunks/inventoryUpdateRequestThunks';
 import type { WriteOffData, WriteOffReason } from '../../types/maintenance';
 import type { MaintenanceStackParamList } from '../../navigation/MaintenanceStackParamList';
+
+const WRITE_OFF_ACCESS_REASON_OPTIONS = [
+  { value: 'Unrepairable damage', label: 'Unrepairable damage' },
+  { value: 'Obsolete / scrap', label: 'Obsolete / scrap' },
+  { value: 'Other', label: 'Other' },
+];
 
 type NavigationProp = StackNavigationProp<MaintenanceStackParamList, 'WriteOff'>;
 type RouteParamsProp = RouteProp<MaintenanceStackParamList, 'WriteOff'>;
@@ -41,12 +59,19 @@ export const WriteOffScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
+  const isAdmin = useAppSelector(selectIsAdmin);
+  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const canWriteOffAccess = useAppSelector(selectCanStoreInchargeMaintenanceWriteOff);
   const maintenance = useAppSelector((state) => selectMaintenanceById(maintenanceId)(state));
+
+  const canPerformWriteOff = isAdmin || (isStoreIncharge && canWriteOffAccess);
 
   const [writeOffQuantity, setWriteOffQuantity] = useState<number>(1);
   const [reason, setReason] = useState<WriteOffReason | null>(null);
   const [explanation, setExplanation] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showRequestAccessModal, setShowRequestAccessModal] = useState(false);
+  const [requestAccessSubmitting, setRequestAccessSubmitting] = useState(false);
 
   // Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -69,6 +94,24 @@ export const WriteOffScreen: React.FC = () => {
   const handleBack = useCallback(() => {
     navigation.goBack();
   }, [navigation]);
+
+  const handleRequestWriteOffAccess = useCallback(
+    async (data: RequestInventoryAccessSubmitData) => {
+      setRequestAccessSubmitting(true);
+      try {
+        await dispatch(
+          createInventoryUpdateRequest({
+            reason: data.reason,
+            notes: data.notes,
+            accessScopes: ['maintenance_writeoff'],
+          })
+        ).unwrap();
+      } finally {
+        setRequestAccessSubmitting(false);
+      }
+    },
+    [dispatch]
+  );
 
   const handleIncrement = useCallback(() => {
     if (maintenance && writeOffQuantity < maintenance.quantity) {
@@ -178,6 +221,48 @@ export const WriteOffScreen: React.FC = () => {
           <ActivityIndicator size="large" color="#1E40AF" />
           <Text className="text-[15px] text-[#64748B] mt-4">Loading...</Text>
         </View>
+      </ScreenLayout>
+    );
+  }
+
+  if (isStoreIncharge && !canPerformWriteOff) {
+    return (
+      <ScreenLayout edges={['top']}>
+        <ScreenHeader title="Write Off Item" showBack onBackPress={handleBack} />
+        <ScrollView className="flex-1 px-4" showsVerticalScrollIndicator={false}>
+          <View className="gap-4 py-4">
+            <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
+              <Text className="text-[15px] font-semibold text-[#0F172A] mb-2">
+                {maintenance.itemName}
+              </Text>
+              <Text className="text-[13px] text-[#64748B]">SKU: {maintenance.itemSku}</Text>
+              <View className="flex-row justify-between items-center mt-2">
+                <Text className="text-[13px] text-[#64748B]">Available Quantity</Text>
+                <Text className="text-[15px] font-semibold text-[#0F172A]">
+                  {maintenance.quantity} {displayUnit}
+                </Text>
+              </View>
+            </View>
+            <RequestAccessBanner
+              onRequestAccess={() => setShowRequestAccessModal(true)}
+              title="You need Admin approval to write off maintenance items."
+              subtitle="Submit a request. After approval, you can complete the write-off here."
+              buttonLabel="Request access"
+            />
+            <Text className="text-[14px] text-[#64748B]">
+              Admins approve requests from Inventory → Inventory Update Requests.
+            </Text>
+          </View>
+        </ScrollView>
+        <RequestInventoryAccessModal
+          visible={showRequestAccessModal}
+          onCancel={() => setShowRequestAccessModal(false)}
+          onSubmit={handleRequestWriteOffAccess}
+          loading={requestAccessSubmitting}
+          title="Request write-off access"
+          description="An Admin must approve before you can write off items from maintenance. Give a short reason."
+          reasonOptions={WRITE_OFF_ACCESS_REASON_OPTIONS}
+        />
       </ScreenLayout>
     );
   }

@@ -48,6 +48,14 @@ import { isLowStock } from '../../utils/inventoryUtils';
 
 // Collection names
 const ITEMS_COLLECTION = 'items';
+
+/** Lowercase copies of name/sku for case-insensitive Firestore prefix range queries */
+function itemSearchIndexFields(name: string, sku: string): { nameSearch: string; skuSearch: string } {
+  return {
+    nameSearch: (name ?? '').toLowerCase(),
+    skuSearch: (sku ?? '').toLowerCase(),
+  };
+}
 const INVENTORY_COLLECTION = 'inventory';
 
 const getInventoryDocId = (itemId: string, locationId: string): string =>
@@ -197,35 +205,79 @@ const buildItemsQueryConstraints = (filters?: ItemFilters): QueryConstraint[] =>
 
   const trimmed = filters?.searchTerm?.trim();
   if (trimmed) {
-    constraints.push(where('name', '>=', trimmed));
-    constraints.push(where('name', '<=', trimmed + '\uf8ff'));
+    const lowerPrefix = trimmed.toLowerCase();
+    constraints.push(where('nameSearch', '>=', lowerPrefix));
+    constraints.push(where('nameSearch', '<=', lowerPrefix + '\uf8ff'));
+    constraints.push(orderBy('nameSearch', 'asc'));
+  } else {
+    constraints.push(orderBy('name', 'asc'));
   }
-
-  constraints.push(orderBy('name', 'asc'));
   return constraints;
 };
 
 /**
- * Build query constraints for maintenance item selection.
- * Filters: type=non_consumable, optional name prefix search.
- * centralStoreQuantity > 0 is applied client-side.
- *
- * @param searchTerm - Optional prefix to filter by item name (case-sensitive in Firestore)
+ * Build query constraints for maintenance item selection (browse / paginated list only).
+ * Filters: type=non_consumable, order by name. Search uses client-side full-list filter instead.
  */
-const buildMaintenanceItemsQueryConstraints = (
-  searchTerm?: string
-): QueryConstraint[] => {
-  const constraints: QueryConstraint[] = [
-    where('type', '==', 'non_consumable'),
-  ];
-  const trimmed = searchTerm?.trim();
-  if (trimmed) {
-    constraints.push(where('name', '>=', trimmed));
-    constraints.push(where('name', '<=', trimmed + '\uf8ff'));
+const buildMaintenanceItemsQueryConstraints = (): QueryConstraint[] => [
+  where('type', '==', 'non_consumable'),
+  orderBy('name', 'asc'),
+];
+
+const filterItemsWithCentralStock = (items: Item[]): Item[] =>
+  items.filter((item) => (item.centralStoreQuantity || 0) > 0);
+
+/** Same fields as Redux selectItemsBySearchQuery — substring, case-insensitive. */
+function itemMatchesInventoryStyleSearch(item: Item, trimmedQuery: string): boolean {
+  const lowerQuery = trimmedQuery.toLowerCase();
+  return (
+    (item.name ?? '').toLowerCase().includes(lowerQuery) ||
+    (item.sku ?? '').toLowerCase().includes(lowerQuery) ||
+    Boolean(item.description && item.description.toLowerCase().includes(lowerQuery)) ||
+    Boolean(item.categoryName && item.categoryName.toLowerCase().includes(lowerQuery))
+  );
+}
+
+/**
+ * Full non-consumable catalog search for maintenance picker (parity with central store inventory search).
+ */
+async function listMaintenancePickerItemsClientSearch(searchTerm: string): Promise<Item[]> {
+  const trimmed = searchTerm.trim();
+  if (!trimmed) {
+    return [];
   }
-  constraints.push(orderBy('name', 'asc'));
-  return constraints;
-};
+  const all = await listItems({ type: 'non_consumable' });
+  const withStock = filterItemsWithCentralStock(all);
+  return withStock
+    .filter((item) => itemMatchesInventoryStyleSearch(item, trimmed))
+    .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+}
+
+function filterItemsByAllowedTypes(items: Item[], allowedItemTypes?: string[]): Item[] {
+  if (!allowedItemTypes || allowedItemTypes.length === 0) {
+    return items;
+  }
+  const allowed = new Set(allowedItemTypes);
+  return items.filter((item) => allowed.has(item.type));
+}
+
+/**
+ * Active items for request/PO picker — full-catalog substring search (parity with central store).
+ */
+async function listSelectionPickerItemsClientSearch(
+  searchTerm: string,
+  allowedItemTypes?: string[]
+): Promise<Item[]> {
+  const trimmed = searchTerm.trim();
+  if (!trimmed) {
+    return [];
+  }
+  const allActive = await listItems({ status: 'active' });
+  const pool = filterItemsByAllowedTypes(allActive, allowedItemTypes);
+  return pool
+    .filter((item) => itemMatchesInventoryStyleSearch(item, trimmed))
+    .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+}
 
 /** Default page size for paginated item lists */
 export const ITEMS_PAGE_SIZE = 10;
@@ -321,158 +373,7 @@ export const getItemsCount = async (
 export const MAINTENANCE_ITEMS_PAGE_SIZE = 15;
 
 /**
- * List items available for maintenance (non-consumable, central store quantity > 0
- * filtered client-side). Paginated with optional name prefix search.
- *
- * @param searchTerm - Optional prefix to filter by item name
- * @param pageSize - Items per page
- * @param lastDoc - Cursor for next page
- * @returns Items and cursor for next page (items with centralStoreQuantity <= 0 filtered out)
- */
-export const listItemsForMaintenancePaginated = async (
-  searchTerm: string | undefined,
-  pageSize: number,
-  lastDoc?: DocumentSnapshot
-): Promise<{ items: Item[]; lastDoc: DocumentSnapshot | null }> => {
-  try {
-    const constraints = buildMaintenanceItemsQueryConstraints(searchTerm);
-    if (lastDoc) {
-      constraints.push(startAfter(lastDoc));
-    }
-    constraints.push(limit(pageSize));
-
-    const q = query(collection(db, ITEMS_COLLECTION), ...constraints);
-    const snapshot = await getDocsFromServer(q);
-
-    const items: Item[] = snapshot.docs
-      .map((docSnap) => {
-        const data = docSnap.data();
-        const firestoreItem: FirestoreItem = {
-          id: docSnap.id,
-          name: data.name,
-          sku: data.sku,
-          description: data.description,
-          categoryId: data.categoryId,
-          categoryName: data.categoryName,
-          type: data.type,
-          unit: data.unit,
-          imageUrl: data.imageUrl,
-          minStockLevel: data.minStockLevel ?? 0,
-          status: data.status,
-          totalQuantity: data.totalQuantity || 0,
-          centralStoreQuantity: data.centralStoreQuantity || 0,
-          atSitesQuantity: data.atSitesQuantity || 0,
-          inMaintenanceQuantity: data.inMaintenanceQuantity || 0,
-          weightPerMeter: data.weightPerMeter,
-          lengthPerPiece: data.lengthPerPiece,
-        steelMasterId: data.steelMasterId,
-        steelMasterName: data.steelMasterName,
-        isWeightBased: data.isWeightBased,
-        standardUnitPrice: data.standardUnitPrice,
-        standardGstPercentage: data.standardGstPercentage,
-        createdAt: data.createdAt,
-        updatedAt: data.updatedAt,
-        };
-        return firestoreItemToItem(firestoreItem);
-      })
-      .filter((item) => (item.centralStoreQuantity || 0) > 0);
-
-    const newLastDoc =
-      snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
-
-    return { items, lastDoc: newLastDoc };
-  } catch (error) {
-    console.error('Error listing items for maintenance:', error);
-    throw error;
-  }
-};
-
-/**
- * Get total count of non-consumable items (for maintenance selection).
- * Uses same constraints as listItemsForMaintenancePaginated.
- * centralStoreQuantity > 0 is not applied — total reflects Firestore filters only.
- *
- * @param searchTerm - Optional prefix to filter by item name
- * @returns Total count from server
- */
-export const getItemsForMaintenanceCount = async (
-  searchTerm: string | undefined
-): Promise<number> => {
-  try {
-    const constraints = buildMaintenanceItemsQueryConstraints(searchTerm);
-    const q = query(collection(db, ITEMS_COLLECTION), ...constraints);
-    const snapshot = await getCountFromServer(q);
-    return snapshot.data().count;
-  } catch (error) {
-    console.error('Error getting items for maintenance count:', error);
-    throw error;
-  }
-};
-
-/**
- * Build query constraints for generic item selection (Requests, PO).
- * Filters: status=active, optional name prefix search.
- * Used when searchTerm is empty (single query) or for the name branch of dual-query search.
- *
- * @param searchTerm - Optional prefix to filter by item name (case-sensitive in Firestore)
- */
-const buildSelectionItemsQueryConstraints = (
-  searchTerm?: string,
-  allowedItemTypes?: string[]
-): QueryConstraint[] => {
-  const constraints: QueryConstraint[] = [where('status', '==', 'active')];
-
-  if (allowedItemTypes && allowedItemTypes.length > 0) {
-    constraints.push(where('type', 'in', allowedItemTypes));
-  }
-
-  const trimmed = searchTerm?.trim();
-  if (trimmed) {
-    constraints.push(where('name', '>=', trimmed));
-    constraints.push(where('name', '<=', trimmed + '\uf8ff'));
-  }
-  constraints.push(orderBy('name', 'asc'));
-  return constraints;
-};
-
-/**
- * Build query constraints for SKU prefix search (used in dual-query search).
- * Firestore does not support OR across different fields, so we run name + SKU
- * queries in parallel and merge results.
- *
- * @param searchTerm - Prefix to filter by SKU (case-sensitive in Firestore)
- */
-const buildSelectionItemsQueryConstraintsBySku = (
-  searchTerm: string,
-  allowedItemTypes?: string[]
-): QueryConstraint[] => {
-  const constraints: QueryConstraint[] = [where('status', '==', 'active')];
-
-  if (allowedItemTypes && allowedItemTypes.length > 0) {
-    constraints.push(where('type', 'in', allowedItemTypes));
-  }
-
-  const trimmed = searchTerm.trim();
-  constraints.push(where('sku', '>=', trimmed));
-  constraints.push(where('sku', '<=', trimmed + '\uf8ff'));
-  constraints.push(orderBy('sku', 'asc'));
-  return constraints;
-};
-
-/** Page size for item selection (Requests, PO) */
-export const SELECTION_ITEMS_PAGE_SIZE = 15;
-
-/**
- * Max items to fetch when using dual-query search (name + SKU).
- * When search is active, we fetch from both queries, merge by id, and return
- * up to this many unique items. No cursor-based "load more" — all results
- * are returned in one call. Tradeoff: scalable for typical catalogs (<200 matches);
- * for very large result sets, consider Algolia/Elasticsearch or a search index.
- */
-const SELECTION_SEARCH_MAX_FETCH = 200;
-
-/**
- * Map Firestore document snapshot to Item (shared by selection list helpers).
+ * Map Firestore document snapshot to Item (shared by maintenance + item selection list helpers).
  */
 const docSnapToItem = (docSnap: DocumentSnapshot): Item => {
   const data = docSnap.data();
@@ -506,15 +407,103 @@ const docSnapToItem = (docSnap: DocumentSnapshot): Item => {
 };
 
 /**
- * List active items for selection (Requests, PO). Paginated with optional
- * name/SKU prefix search. When search is active, runs two Firestore queries
- * (name + SKU) in parallel, merges by id, dedupes, sorts by name, and returns
- * up to SELECTION_SEARCH_MAX_FETCH items (no cursor-based load more).
+ * List items available for maintenance (non-consumable, central store quantity > 0
+ * filtered client-side). Paginated when not searching. When searching, loads all non-consumable
+ * items and filters like central-store inventory (substring on name, SKU, category, description).
  *
- * @param searchTerm - Optional prefix to filter by item name or SKU
- * @param pageSize - Items per page (ignored when search active; returns all up to max)
- * @param lastDoc - Cursor for next page (ignored when search active)
- * @returns Items and cursor for next page
+ * @param searchTerm - Optional search string (client-side contains match when non-empty)
+ * @param pageSize - Items per page (browse mode only)
+ * @param lastDoc - Cursor for next page (browse mode only)
+ * @returns Items and cursor for next page (items with centralStoreQuantity <= 0 filtered out)
+ */
+export const listItemsForMaintenancePaginated = async (
+  searchTerm: string | undefined,
+  pageSize: number,
+  lastDoc?: DocumentSnapshot
+): Promise<{ items: Item[]; lastDoc: DocumentSnapshot | null }> => {
+  try {
+    const trimmed = searchTerm?.trim();
+
+    if (trimmed) {
+      const items = await listMaintenancePickerItemsClientSearch(trimmed);
+      return { items, lastDoc: null };
+    }
+
+    const constraints = buildMaintenanceItemsQueryConstraints();
+    if (lastDoc) {
+      constraints.push(startAfter(lastDoc));
+    }
+    constraints.push(limit(pageSize));
+
+    const q = query(collection(db, ITEMS_COLLECTION), ...constraints);
+    const snapshot = await getDocsFromServer(q);
+
+    const items = filterItemsWithCentralStock(snapshot.docs.map(docSnapToItem));
+
+    const newLastDoc =
+      snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
+
+    return { items, lastDoc: newLastDoc };
+  } catch (error) {
+    console.error('Error listing items for maintenance:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get total count of non-consumable items (for maintenance selection).
+ * When searching: length of client-filtered list (with central stock > 0).
+ * When browsing: Firestore count (central stock not applied).
+ *
+ * @param searchTerm - Optional search string
+ * @returns Total count
+ */
+export const getItemsForMaintenanceCount = async (
+  searchTerm: string | undefined
+): Promise<number> => {
+  try {
+    const trimmed = searchTerm?.trim();
+
+    if (trimmed) {
+      const items = await listMaintenancePickerItemsClientSearch(trimmed);
+      return items.length;
+    }
+
+    const constraints = buildMaintenanceItemsQueryConstraints();
+    const q = query(collection(db, ITEMS_COLLECTION), ...constraints);
+    const snapshot = await getCountFromServer(q);
+    return snapshot.data().count;
+  } catch (error) {
+    console.error('Error getting items for maintenance count:', error);
+    throw error;
+  }
+};
+
+/**
+ * Build query constraints for generic item selection (Requests, PO) — browse / pagination only.
+ */
+const buildSelectionItemsQueryConstraints = (allowedItemTypes?: string[]): QueryConstraint[] => {
+  const constraints: QueryConstraint[] = [where('status', '==', 'active')];
+
+  if (allowedItemTypes && allowedItemTypes.length > 0) {
+    constraints.push(where('type', 'in', allowedItemTypes));
+  }
+
+  constraints.push(orderBy('name', 'asc'));
+  return constraints;
+};
+
+/** Page size for item selection (Requests, PO) */
+export const SELECTION_ITEMS_PAGE_SIZE = 15;
+
+/**
+ * List active items for selection (Requests, PO). Paginated when not searching.
+ * When searching, loads all active items (optional type filter) and applies the same
+ * substring search as central-store inventory (name, SKU, description, category).
+ *
+ * @param searchTerm - Optional search string (client-side contains when non-empty)
+ * @param pageSize - Items per page (browse mode only)
+ * @param lastDoc - Cursor (browse mode only)
  */
 export const listItemsForSelectionPaginated = async (
   searchTerm: string | undefined,
@@ -526,42 +515,11 @@ export const listItemsForSelectionPaginated = async (
     const trimmed = searchTerm?.trim();
 
     if (trimmed) {
-      // Dual-query search: name prefix + SKU prefix. Firestore has no OR across fields.
-      const fetchPerQuery = Math.ceil(SELECTION_SEARCH_MAX_FETCH / 2);
-      const [nameSnapshot, skuSnapshot] = await Promise.all([
-        getDocsFromServer(
-          query(
-            collection(db, ITEMS_COLLECTION),
-            ...buildSelectionItemsQueryConstraints(trimmed, allowedItemTypes),
-            limit(fetchPerQuery)
-          )
-        ),
-        getDocsFromServer(
-          query(
-            collection(db, ITEMS_COLLECTION),
-            ...buildSelectionItemsQueryConstraintsBySku(trimmed, allowedItemTypes),
-            limit(fetchPerQuery)
-          )
-        ),
-      ]);
-
-      const byId = new Map<string, Item>();
-      const addDoc = (docSnap: DocumentSnapshot) => {
-        if (!byId.has(docSnap.id)) {
-          byId.set(docSnap.id, docSnapToItem(docSnap));
-        }
-      };
-      nameSnapshot.docs.forEach(addDoc);
-      skuSnapshot.docs.forEach(addDoc);
-
-      const merged = Array.from(byId.values()).sort((a, b) =>
-        (a.name ?? '').localeCompare(b.name ?? '')
-      );
-      return { items: merged, lastDoc: null };
+      const items = await listSelectionPickerItemsClientSearch(trimmed, allowedItemTypes);
+      return { items, lastDoc: null };
     }
 
-    // No search: single query with cursor-based pagination
-    const constraints = buildSelectionItemsQueryConstraints(undefined, allowedItemTypes);
+    const constraints = buildSelectionItemsQueryConstraints(allowedItemTypes);
     if (lastDoc) {
       constraints.push(startAfter(lastDoc));
     }
@@ -583,11 +541,7 @@ export const listItemsForSelectionPaginated = async (
 
 /**
  * Get total count of active items for selection (Requests, PO).
- * When search is active: runs name + SKU count queries, fetches doc IDs,
- * merges to unique set, returns size. Capped by fetch limit for performance.
- *
- * @param searchTerm - Optional prefix to filter by item name or SKU
- * @returns Total count from server (or unique merged count when searching)
+ * When searching: length of client-filtered list. When browsing: Firestore count.
  */
 export const getItemsForSelectionCount = async (
   searchTerm: string | undefined,
@@ -597,31 +551,11 @@ export const getItemsForSelectionCount = async (
     const trimmed = searchTerm?.trim();
 
     if (trimmed) {
-      const fetchPerQuery = Math.ceil(SELECTION_SEARCH_MAX_FETCH / 2);
-      const [nameSnapshot, skuSnapshot] = await Promise.all([
-        getDocsFromServer(
-          query(
-            collection(db, ITEMS_COLLECTION),
-            ...buildSelectionItemsQueryConstraints(trimmed, allowedItemTypes),
-            limit(fetchPerQuery)
-          )
-        ),
-        getDocsFromServer(
-          query(
-            collection(db, ITEMS_COLLECTION),
-            ...buildSelectionItemsQueryConstraintsBySku(trimmed, allowedItemTypes),
-            limit(fetchPerQuery)
-          )
-        ),
-      ]);
-
-      const uniqueIds = new Set<string>();
-      nameSnapshot.docs.forEach((d) => uniqueIds.add(d.id));
-      skuSnapshot.docs.forEach((d) => uniqueIds.add(d.id));
-      return uniqueIds.size;
+      const items = await listSelectionPickerItemsClientSearch(trimmed, allowedItemTypes);
+      return items.length;
     }
 
-    const constraints = buildSelectionItemsQueryConstraints(undefined, allowedItemTypes);
+    const constraints = buildSelectionItemsQueryConstraints(allowedItemTypes);
     const q = query(collection(db, ITEMS_COLLECTION), ...constraints);
     const snapshot = await getCountFromServer(q);
     return snapshot.data().count;
@@ -847,6 +781,7 @@ export const createItem = async (
       const itemDocData: Record<string, unknown> = {
         name: itemData.name,
         sku: itemData.sku,
+        ...itemSearchIndexFields(itemData.name, itemData.sku),
         description: itemData.description || '',
         categoryId: finalCategoryId,
         categoryName: finalCategoryName,
@@ -1005,6 +940,12 @@ export const updateItem = async (
       if (updates.updatedBy) rawData.updatedBy = updates.updatedBy;
       if (updates.updatedByName) rawData.updatedByName = updates.updatedByName;
       if (updates.updatedByRole) rawData.updatedByRole = updates.updatedByRole;
+
+      const mergedName =
+        updates.name !== undefined ? updates.name : ((itemData.name as string) ?? '');
+      const mergedSku =
+        updates.sku !== undefined ? updates.sku : ((itemData.sku as string) ?? '');
+      Object.assign(rawData, itemSearchIndexFields(mergedName, mergedSku));
 
       const updateData = Object.fromEntries(
         Object.entries(rawData).filter(([, v]) => v !== undefined)

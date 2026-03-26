@@ -5,7 +5,7 @@ import {
   rejectRequest,
   revokeAccess as revokeAccessService,
   restoreAccess as restoreAccessService,
-  getMyActiveAccess,
+  getMyActiveAccessSummary,
   getPendingRequests,
   getActiveApprovedRequests,
   subscribeToMyActiveAccess as subscribeToMyActiveAccessService,
@@ -15,16 +15,27 @@ import type { RootState } from '../index';
 import type { AppDispatch } from '../index';
 import {
   setMyAccessGrantedUntil,
+  setMyWriteOffAccessGrantedUntil,
   setPendingRequests,
   setActiveApprovedRequests,
   setLoading,
   setError,
 } from '../slices/inventoryUpdateRequestSlice';
+import type { InventoryUpdateAccessScope } from '../../types/inventoryUpdateRequest';
+import { normalizeInventoryUpdateAccessScopes } from '../../types/inventoryUpdateRequest';
 
 /**
  * Subscription manager - stores unsubscribe function for my active access
  */
 let myActiveAccessUnsubscribe: (() => void) | null = null;
+
+export type CreateInventoryUpdateRequestPayload =
+  | string
+  | {
+      reason: string;
+      notes?: string;
+      accessScopes?: InventoryUpdateAccessScope[];
+    };
 
 /**
  * Create an inventory update request.
@@ -32,7 +43,7 @@ let myActiveAccessUnsubscribe: (() => void) | null = null;
  */
 export const createInventoryUpdateRequest = createAsyncThunk(
   'inventoryUpdateRequest/createRequest',
-  async (reason: string, { getState, dispatch, rejectWithValue }) => {
+  async (payload: CreateInventoryUpdateRequestPayload, { getState, dispatch, rejectWithValue }) => {
     try {
       const state = getState() as RootState;
       const { user, userRole } = state.auth;
@@ -44,10 +55,20 @@ export const createInventoryUpdateRequest = createAsyncThunk(
         return rejectWithValue('User must be authenticated to create request');
       }
 
+      const { reason, accessScopes } =
+        typeof payload === 'string'
+          ? { reason: payload, accessScopes: undefined as InventoryUpdateAccessScope[] | undefined }
+          : {
+              reason:
+                [payload.reason, payload.notes].filter(Boolean).join(' — ') || payload.reason,
+              accessScopes: payload.accessScopes,
+            };
+
       dispatch(setLoading(true));
       dispatch(setError(null));
 
-      const requestId = await createRequest(userId, userName, userRoleType, reason);
+      const requestId = await createRequest(userId, userName, userRoleType, reason, accessScopes);
+      const scopesLogged = normalizeInventoryUpdateAccessScopes(accessScopes);
 
       logInventoryUpdateRequestToCloud({
         actionType: 'inventory_update_request_created',
@@ -57,6 +78,7 @@ export const createInventoryUpdateRequest = createAsyncThunk(
         requestedByName: userName,
         requestedByRole: userRoleType,
         reason,
+        accessScopes: scopesLogged,
       }).catch(() => {});
 
       // Store Incharge creates; Admin fetches pending when viewing screen.
@@ -95,6 +117,9 @@ export const approveInventoryUpdateRequest = createAsyncThunk(
       dispatch(setLoading(true));
       dispatch(setError(null));
 
+      const pendingReq = state.inventoryUpdateRequest.pendingRequests.find((r) => r.id === requestId);
+      const scopesForLog = normalizeInventoryUpdateAccessScopes(pendingReq?.accessScopes);
+
       await approveRequest(requestId, adminId, adminName, expiresInHours);
 
       logInventoryUpdateRequestToCloud({
@@ -104,6 +129,7 @@ export const approveInventoryUpdateRequest = createAsyncThunk(
         approvedBy: adminId,
         approvedByName: adminName,
         expiresInHours,
+        accessScopes: scopesForLog,
       }).catch(() => {});
 
       // Refresh pending and active approved
@@ -148,6 +174,9 @@ export const rejectInventoryUpdateRequest = createAsyncThunk(
       dispatch(setLoading(true));
       dispatch(setError(null));
 
+      const pendingReq = state.inventoryUpdateRequest.pendingRequests.find((r) => r.id === requestId);
+      const scopesForLog = normalizeInventoryUpdateAccessScopes(pendingReq?.accessScopes);
+
       await rejectRequest(requestId, adminId, adminName, rejectionReason);
 
       logInventoryUpdateRequestToCloud({
@@ -157,6 +186,7 @@ export const rejectInventoryUpdateRequest = createAsyncThunk(
         approvedBy: adminId,
         approvedByName: adminName,
         rejectionReason,
+        accessScopes: scopesForLog,
       }).catch(() => {});
 
       // Refresh pending and active approved
@@ -190,22 +220,24 @@ export const fetchMyActiveAccess = createAsyncThunk(
       const userId = state.auth.user?.uid ?? null;
       if (!userId) {
         dispatch(setMyAccessGrantedUntil(null));
+        dispatch(setMyWriteOffAccessGrantedUntil(null));
         return null;
       }
 
       dispatch(setLoading(true));
       dispatch(setError(null));
 
-      const request = await getMyActiveAccess(userId);
-      const expiresAt = request?.accessExpiresAt ?? null;
-      dispatch(setMyAccessGrantedUntil(expiresAt));
+      const summary = await getMyActiveAccessSummary(userId);
+      dispatch(setMyAccessGrantedUntil(summary.centralStoreAccessExpiresAt));
+      dispatch(setMyWriteOffAccessGrantedUntil(summary.maintenanceWriteOffAccessExpiresAt));
       dispatch(setLoading(false));
-      return expiresAt;
+      return summary.centralStoreAccessExpiresAt;
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to fetch active access';
       dispatch(setError(errorMessage));
       dispatch(setMyAccessGrantedUntil(null));
+      dispatch(setMyWriteOffAccessGrantedUntil(null));
       dispatch(setLoading(false));
       return rejectWithValue(errorMessage);
     }
@@ -306,14 +338,14 @@ export const subscribeToMyActiveAccess = (userId: string) => {
 
     if (!userId) {
       dispatch(setMyAccessGrantedUntil(null));
+      dispatch(setMyWriteOffAccessGrantedUntil(null));
       return;
     }
 
-    myActiveAccessUnsubscribe = subscribeToMyActiveAccessService(userId, (request) => {
-        const expiresAt = request?.accessExpiresAt ?? null;
-        dispatch(setMyAccessGrantedUntil(expiresAt));
-      }
-    );
+    myActiveAccessUnsubscribe = subscribeToMyActiveAccessService(userId, (summary) => {
+      dispatch(setMyAccessGrantedUntil(summary.centralStoreAccessExpiresAt));
+      dispatch(setMyWriteOffAccessGrantedUntil(summary.maintenanceWriteOffAccessExpiresAt));
+    });
   };
 };
 

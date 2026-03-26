@@ -76,17 +76,26 @@ export const SelectItemForMaintenanceScreen: React.FC = () => {
   const fetchFirstPage = useCallback(async () => {
     setLoading(true);
     try {
-      const [countResult, listResult] = await Promise.all([
-        getItemsForMaintenanceCount(debouncedSearch || undefined),
-        listItemsForMaintenancePaginated(
-          debouncedSearch || undefined,
+      if (debouncedSearch) {
+        // Client-side full-catalog search — single fetch (avoid parallel count duplicating listItems)
+        const listResult = await listItemsForMaintenancePaginated(
+          debouncedSearch,
           MAINTENANCE_ITEMS_PAGE_SIZE
-        ),
-      ]);
-      setTotalCount(countResult);
-      setItems(listResult.items);
-      lastDocRef.current = listResult.lastDoc;
-      setLastDoc(listResult.lastDoc);
+        );
+        setTotalCount(listResult.items.length);
+        setItems(listResult.items);
+        lastDocRef.current = listResult.lastDoc;
+        setLastDoc(listResult.lastDoc);
+      } else {
+        const [countResult, listResult] = await Promise.all([
+          getItemsForMaintenanceCount(undefined),
+          listItemsForMaintenancePaginated(undefined, MAINTENANCE_ITEMS_PAGE_SIZE),
+        ]);
+        setTotalCount(countResult);
+        setItems(listResult.items);
+        lastDocRef.current = listResult.lastDoc;
+        setLastDoc(listResult.lastDoc);
+      }
     } catch (error) {
       console.error('Error fetching items for maintenance:', error);
       setItems([]);
@@ -202,7 +211,7 @@ export const SelectItemForMaintenanceScreen: React.FC = () => {
         </Text>
         <Text className="text-[15px] text-[#64748B] mt-2 text-center">
           {debouncedSearch
-            ? 'Try a different search term. Only non-consumable items with stock in central store are shown.'
+            ? 'Try a different term (name, SKU, or category). Only non-consumable items with central store stock are shown.'
             : 'Only non-consumable items with stock in central store can be added to maintenance.'}
         </Text>
       </View>
@@ -243,7 +252,7 @@ export const SelectItemForMaintenanceScreen: React.FC = () => {
           <Ionicons name="search" size={20} color="#94A3B8" />
           <TextInput
             className="flex-1 ml-3 text-[15px] text-[#0F172A]"
-            placeholder="Search by item name..."
+            placeholder="Search by name, SKU, or category..."
             placeholderTextColor="#94A3B8"
             value={searchQuery}
             onChangeText={setSearchQuery}

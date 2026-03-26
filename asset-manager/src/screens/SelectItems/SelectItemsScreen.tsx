@@ -79,19 +79,32 @@ export const SelectItemsScreen: React.FC = () => {
   const fetchFirstPage = useCallback(async () => {
     setLoading(true);
     try {
-      const [countResult, listResult] = await Promise.all([
-        getItemsForSelectionCount(debouncedSearch || undefined, allowedItemTypes),
-        listItemsForSelectionPaginated(
-          debouncedSearch || undefined,
+      if (debouncedSearch) {
+        const listResult = await listItemsForSelectionPaginated(
+          debouncedSearch,
           SELECTION_ITEMS_PAGE_SIZE,
           undefined,
           allowedItemTypes
-        ),
-      ]);
-      setTotalCount(countResult);
-      setItems(listResult.items);
-      lastDocRef.current = listResult.lastDoc;
-      setLastDoc(listResult.lastDoc);
+        );
+        setTotalCount(listResult.items.length);
+        setItems(listResult.items);
+        lastDocRef.current = listResult.lastDoc;
+        setLastDoc(listResult.lastDoc);
+      } else {
+        const [countResult, listResult] = await Promise.all([
+          getItemsForSelectionCount(undefined, allowedItemTypes),
+          listItemsForSelectionPaginated(
+            undefined,
+            SELECTION_ITEMS_PAGE_SIZE,
+            undefined,
+            allowedItemTypes
+          ),
+        ]);
+        setTotalCount(countResult);
+        setItems(listResult.items);
+        lastDocRef.current = listResult.lastDoc;
+        setLastDoc(listResult.lastDoc);
+      }
     } catch (error) {
       console.error('Error fetching items for selection:', error);
       setItems([]);
@@ -100,7 +113,7 @@ export const SelectItemsScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch, allowedItemTypes]);
 
   useEffect(() => {
     fetchFirstPage();
@@ -130,7 +143,7 @@ export const SelectItemsScreen: React.FC = () => {
     } finally {
       setLoadingMore(false);
     }
-  }, [debouncedSearch, loadingMore, hasMore]);
+  }, [debouncedSearch, loadingMore, hasMore, allowedItemTypes]);
 
   const toggleItem = useCallback((itemId: string) => {
     setSelectedIds((prev) => {
@@ -263,10 +276,10 @@ export const SelectItemsScreen: React.FC = () => {
         <Text className="text-[15px] text-[#64748B] mt-2 text-center">
           {isForPO
             ? debouncedSearch
-              ? 'Try a different search term. Only items below minimum stock are shown for purchase orders.'
+              ? 'Try a different term (name, SKU, or category). Only low-stock items are shown for purchase orders.'
               : 'All items are above their minimum stock level. No purchase order needed.'
             : debouncedSearch
-              ? 'Try a different search term. Only active items are shown.'
+              ? 'Try a different term (name, SKU, or category). Only active items are shown.'
               : 'No active items in inventory.'}
         </Text>
       </View>
@@ -308,7 +321,7 @@ export const SelectItemsScreen: React.FC = () => {
           <Ionicons name="search" size={20} color="#94A3B8" />
           <TextInput
             className="flex-1 ml-3 text-[15px] text-[#0F172A]"
-            placeholder="Search by item name or SKU..."
+            placeholder="Search by name, SKU, or category..."
             placeholderTextColor="#94A3B8"
             value={searchQuery}
             onChangeText={setSearchQuery}

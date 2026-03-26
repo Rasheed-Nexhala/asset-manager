@@ -1,6 +1,7 @@
 import { Icon } from '../shared/Icon';
 import { LoadingSpinner } from '../shared/LoadingSpinner';
 import type { InventoryUpdateRequest } from '../../types/inventoryUpdateRequest';
+import { formatInventoryUpdateAccessScopesLabel } from '../../types/inventoryUpdateRequest';
 
 function formatExpiry(isoString: string): string {
   return new Date(isoString).toLocaleString(undefined, {
@@ -33,6 +34,9 @@ export function ActiveAccessCard({
         <div className="flex-1 min-w-0">
           <p className="text-[15px] font-semibold text-slate-900 truncate">{request.requestedByName}</p>
           <p className="text-[13px] text-slate-500">{request.requestedByRole}</p>
+          <p className="text-[12px] text-slate-500 mt-1">
+            {formatInventoryUpdateAccessScopesLabel(request.accessScopes)}
+          </p>
         </div>
         <span
           className={`px-2 py-1 rounded-full min-h-[28px] flex items-center justify-center text-[12px] font-medium shrink-0 ${

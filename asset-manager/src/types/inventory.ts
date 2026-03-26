@@ -31,6 +31,10 @@ export interface FirestoreItem {
   id: string;                      // Firebase-generated document ID
   name: string;                    // Required, unique item name
   sku: string;                    // Required, unique SKU code
+  /** Lowercase copy of `name` for case-insensitive prefix search in Firestore */
+  nameSearch?: string;
+  /** Lowercase copy of `sku` for case-insensitive prefix search in Firestore */
+  skuSearch?: string;
   description?: string;            // Optional item description
   categoryId?: string | null;      // Optional reference to categories collection
   categoryName?: string | null;    // Optional denormalized category name
@@ -220,7 +224,7 @@ export interface ItemFilters {
   type?: ItemType;                 // Filter by item type
   lowStockOnly?: boolean;          // Show only items below minimum stock level
   status?: ItemStatus;             // Filter by status
-  searchTerm?: string;             // Optional search prefix for item name
+  searchTerm?: string;             // Optional search prefix (case-insensitive; uses nameSearch in Firestore)
 }
 
 /**

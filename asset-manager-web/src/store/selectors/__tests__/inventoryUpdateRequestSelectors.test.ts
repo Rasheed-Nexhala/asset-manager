@@ -1,10 +1,12 @@
 import {
   selectMyAccessGrantedUntil,
+  selectMyWriteOffAccessGrantedUntil,
   selectPendingRequests,
   selectActiveApprovedRequests,
   selectInventoryUpdateRequestLoading,
   selectInventoryUpdateRequestError,
   selectCanStoreInchargeAdjustInventory,
+  selectCanStoreInchargeMaintenanceWriteOff,
 } from '../inventoryUpdateRequestSelectors';
 import type { RootState } from '../../index';
 
@@ -84,6 +86,7 @@ const createMockState = (
     },
     inventoryUpdateRequest: {
       myAccessGrantedUntil: null,
+      myWriteOffAccessGrantedUntil: null,
       pendingRequests: [],
       activeApprovedRequests: [],
       loading: false,
@@ -107,6 +110,11 @@ describe('inventoryUpdateRequestSelectors', () => {
   it('selectMyAccessGrantedUntil returns value', () => {
     const state = createMockState({ myAccessGrantedUntil: '2025-12-31T23:59:59Z' });
     expect(selectMyAccessGrantedUntil(state)).toBe('2025-12-31T23:59:59Z');
+  });
+
+  it('selectMyWriteOffAccessGrantedUntil returns value', () => {
+    const state = createMockState({ myWriteOffAccessGrantedUntil: '2026-01-15T10:00:00Z' });
+    expect(selectMyWriteOffAccessGrantedUntil(state)).toBe('2026-01-15T10:00:00Z');
   });
 
   it('selectPendingRequests returns array', () => {
@@ -147,5 +155,22 @@ describe('inventoryUpdateRequestSelectors', () => {
     const pastDate = '2020-01-01T00:00:00Z';
     const state = createMockState({ myAccessGrantedUntil: pastDate });
     expect(selectCanStoreInchargeAdjustInventory(state)).toBe(false);
+  });
+
+  it('selectCanStoreInchargeMaintenanceWriteOff returns true when myWriteOffAccessGrantedUntil is in the future', () => {
+    const futureDate = new Date();
+    futureDate.setFullYear(futureDate.getFullYear() + 1);
+    const state = createMockState({ myWriteOffAccessGrantedUntil: futureDate.toISOString() });
+    expect(selectCanStoreInchargeMaintenanceWriteOff(state)).toBe(true);
+  });
+
+  it('selectCanStoreInchargeMaintenanceWriteOff returns false when myWriteOffAccessGrantedUntil is null', () => {
+    const state = createMockState({ myWriteOffAccessGrantedUntil: null });
+    expect(selectCanStoreInchargeMaintenanceWriteOff(state)).toBe(false);
+  });
+
+  it('selectCanStoreInchargeMaintenanceWriteOff returns false when myWriteOffAccessGrantedUntil is past', () => {
+    const state = createMockState({ myWriteOffAccessGrantedUntil: '2020-01-01T00:00:00Z' });
+    expect(selectCanStoreInchargeMaintenanceWriteOff(state)).toBe(false);
   });
 });

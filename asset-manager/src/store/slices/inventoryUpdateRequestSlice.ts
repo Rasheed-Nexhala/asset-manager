@@ -4,6 +4,8 @@ import type { InventoryUpdateRequest } from '../../types/inventoryUpdateRequest'
 export interface InventoryUpdateRequestState {
   /** ISO date string - when Store Incharge's temporary access to update central store expires */
   myAccessGrantedUntil: string | null;
+  /** ISO date string - when Store Incharge's temporary access to perform maintenance write-offs expires */
+  myWriteOffAccessGrantedUntil: string | null;
   /** Pending requests (for Admin to approve/reject) */
   pendingRequests: InventoryUpdateRequest[];
   /** Active approved requests (accessExpiresAt > now) for Admin revoke toggle */
@@ -14,6 +16,7 @@ export interface InventoryUpdateRequestState {
 
 const initialState: InventoryUpdateRequestState = {
   myAccessGrantedUntil: null,
+  myWriteOffAccessGrantedUntil: null,
   pendingRequests: [],
   activeApprovedRequests: [],
   loading: false,
@@ -26,6 +29,9 @@ const inventoryUpdateRequestSlice = createSlice({
   reducers: {
     setMyAccessGrantedUntil: (state, action: PayloadAction<string | null>) => {
       state.myAccessGrantedUntil = action.payload;
+    },
+    setMyWriteOffAccessGrantedUntil: (state, action: PayloadAction<string | null>) => {
+      state.myWriteOffAccessGrantedUntil = action.payload;
     },
     setPendingRequests: (state, action: PayloadAction<InventoryUpdateRequest[]>) => {
       state.pendingRequests = action.payload;
@@ -45,6 +51,7 @@ const inventoryUpdateRequestSlice = createSlice({
     /** Clear access on logout */
     clearAccess: (state) => {
       state.myAccessGrantedUntil = null;
+      state.myWriteOffAccessGrantedUntil = null;
       state.pendingRequests = [];
       state.activeApprovedRequests = [];
       state.error = null;
@@ -54,6 +61,7 @@ const inventoryUpdateRequestSlice = createSlice({
 
 export const {
   setMyAccessGrantedUntil,
+  setMyWriteOffAccessGrantedUntil,
   setPendingRequests,
   setActiveApprovedRequests,
   setLoading,

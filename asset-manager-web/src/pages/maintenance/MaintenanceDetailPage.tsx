@@ -10,6 +10,11 @@ import {
 } from '../../store/slices/maintenanceSlice';
 import { selectMaintenanceById, selectMaintenanceError } from '../../store/selectors/maintenanceSelectors';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import {
+  selectIsAdmin,
+  selectIsStoreIncharge,
+} from '../../store/selectors/authSelectors';
+import { selectCanStoreInchargeMaintenanceWriteOff } from '../../store/selectors/inventoryUpdateRequestSelectors';
 import { subscribeToMaintenanceById } from '../../services/firebase/maintenanceService';
 import { useAutoClearError } from '../../hooks/useAutoClearError';
 import { getDisplayWrittenOffUnits } from '../../utils/maintenanceWriteOffDisplay';
@@ -125,6 +130,11 @@ export function MaintenanceDetailPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
 
+  const isAdmin = useAppSelector(selectIsAdmin);
+  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const canWriteOffAccess = useAppSelector(selectCanStoreInchargeMaintenanceWriteOff);
+  const showWriteOffAction = isAdmin || (isStoreIncharge && canWriteOffAccess);
+
   const maintenance = useAppSelector((state) =>
     maintenanceId ? selectMaintenanceById(maintenanceId)(state) : null
   );
@@ -171,17 +181,19 @@ export function MaintenanceDetailPage() {
           <Icon name="arrow-uturn-left" className="h-5 w-5" />
           Return to Inventory
         </button>
-        <button
-          type="button"
-          onClick={handleWriteOff}
-          className="flex h-[50px] items-center justify-center gap-2 rounded-[10px] bg-red-600 text-[15px] font-semibold text-white hover:bg-red-700"
-        >
-          <Icon name="trash" className="h-5 w-5" />
-          Write Off
-        </button>
+        {showWriteOffAction && (
+          <button
+            type="button"
+            onClick={handleWriteOff}
+            className="flex h-[50px] items-center justify-center gap-2 rounded-[10px] bg-red-600 text-[15px] font-semibold text-white hover:bg-red-700"
+          >
+            <Icon name="trash" className="h-5 w-5" />
+            Write Off
+          </button>
+        )}
       </div>
     );
-  }, [maintenance, handleReturn, handleWriteOff]);
+  }, [maintenance, handleReturn, handleWriteOff, showWriteOffAction]);
 
   if (maintenanceId && !maintenance && !error) {
     return (

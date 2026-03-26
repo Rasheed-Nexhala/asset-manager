@@ -11,6 +11,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { InventoryUpdateRequest, InventoryUpdateRequestStatus } from '../../types/inventoryUpdateRequest';
+import { formatInventoryUpdateAccessScopesLabel } from '../../types/inventoryUpdateRequest';
 
 const STATUS_CONFIG: Record<
   InventoryUpdateRequestStatus,
@@ -62,6 +63,9 @@ export const InventoryUpdateRequestCard: React.FC<InventoryUpdateRequestCardProp
         <View className="flex-1">
           <Text className="text-[15px] font-semibold text-[#0F172A]">{request.requestedByName}</Text>
           <Text className="text-[13px] text-[#64748B]">{request.requestedByRole}</Text>
+          <Text className="text-[12px] text-[#64748B] mt-1">
+            {formatInventoryUpdateAccessScopesLabel(request.accessScopes)}
+          </Text>
         </View>
         <View className={`px-2 py-1 rounded-full ${statusConfig.bg}`}>
           <Text className={`text-[12px] font-medium ${statusConfig.text}`}>{statusConfig.label}</Text>

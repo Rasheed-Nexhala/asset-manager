@@ -15,6 +15,7 @@ import steelMasterReducer from '../../../store/slices/steelMasterSlice';
 import maintenanceReducer from '../../../store/slices/maintenanceSlice';
 import activityLogReducer from '../../../store/slices/activityLogSlice';
 import purchaseOrderReducer from '../../../store/slices/purchaseOrderSlice';
+import inventoryUpdateRequestReducer from '../../../store/slices/inventoryUpdateRequestSlice';
 import type { RootState } from '../../../store';
 import type { Maintenance } from '../../../types/maintenance';
 
@@ -166,6 +167,8 @@ const createMockMaintenance = (overrides: Partial<Maintenance> = {}): Maintenanc
   ...overrides,
 });
 
+const futureWriteOffAccessIso = new Date(Date.now() + 86400000 * 365).toISOString();
+
 function renderWithStore(ui: React.ReactElement, preloadedState: Partial<RootState> = {}) {
   const store = configureStore({
     reducer: {
@@ -177,6 +180,7 @@ function renderWithStore(ui: React.ReactElement, preloadedState: Partial<RootSta
       maintenance: maintenanceReducer,
       activityLog: activityLogReducer,
       purchaseOrders: purchaseOrderReducer,
+      inventoryUpdateRequest: inventoryUpdateRequestReducer,
     } as Record<string, React.Reducer<unknown, { type: string }>>,
     preloadedState: preloadedState as Partial<RootState>,
   });
@@ -195,6 +199,14 @@ const defaultPreloadedState: Partial<RootState> = {
     authInitialized: false,
     error: null,
     isAuthenticated: true,
+  },
+  inventoryUpdateRequest: {
+    myAccessGrantedUntil: null,
+    myWriteOffAccessGrantedUntil: futureWriteOffAccessIso,
+    pendingRequests: [],
+    activeApprovedRequests: [],
+    loading: false,
+    error: null,
   },
 };
 

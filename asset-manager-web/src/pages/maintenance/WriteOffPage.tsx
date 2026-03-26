@@ -1,8 +1,15 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Icon } from '../../components/shared/Icon';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { WriteOffReasonSelector } from '../../components/maintenance';
+import {
+  RequestAccessBanner,
+  RequestInventoryAccessModal,
+} from '../../components/inventory';
+import type { RequestInventoryAccessSubmitData } from '../../components/inventory/RequestInventoryAccessModal';
+import { createInventoryUpdateRequest } from '../../store/thunks/inventoryUpdateRequestThunks';
+import { selectCanStoreInchargeMaintenanceWriteOff } from '../../store/selectors/inventoryUpdateRequestSelectors';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   fetchMaintenanceById,
@@ -11,6 +18,12 @@ import {
 import { selectMaintenanceById } from '../../store/selectors/maintenanceSelectors';
 import { selectUserId, selectUserDisplayName, selectIsAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
 import type { WriteOffData, WriteOffReason } from '../../types/maintenance';
+
+const WRITE_OFF_ACCESS_REASON_OPTIONS = [
+  { value: 'Unrepairable damage', label: 'Unrepairable damage' },
+  { value: 'Obsolete / scrap', label: 'Obsolete / scrap' },
+  { value: 'Other', label: 'Other' },
+];
 
 export function WriteOffPage() {
   const { maintenanceId } = useParams<{ maintenanceId: string }>();
@@ -21,11 +34,13 @@ export function WriteOffPage() {
   const userName = useAppSelector(selectUserDisplayName);
   const isAdmin = useAppSelector(selectIsAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const canWriteOffAccess = useAppSelector(selectCanStoreInchargeMaintenanceWriteOff);
   const maintenance = useAppSelector((state) =>
     maintenanceId ? selectMaintenanceById(maintenanceId)(state) : null
   );
 
-  const canWriteOff = isAdmin || isStoreIncharge;
+  const hasMaintenanceRole = isAdmin || isStoreIncharge;
+  const canPerformWriteOff = isAdmin || (isStoreIncharge && canWriteOffAccess);
 
   const [writeOffQuantity, setWriteOffQuantity] = useState(1);
   const [reason, setReason] = useState<WriteOffReason | null>(null);
@@ -33,6 +48,8 @@ export function WriteOffPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showRequestAccessModal, setShowRequestAccessModal] = useState(false);
+  const [requestAccessSubmitting, setRequestAccessSubmitting] = useState(false);
 
   const displayUnit = maintenance?.unit || 'Pcs';
 
@@ -66,6 +83,24 @@ export function WriteOffPage() {
     if (!validateForm()) return;
     setShowConfirm(true);
   }, [validateForm]);
+
+  const handleRequestWriteOffAccess = useCallback(
+    async (data: RequestInventoryAccessSubmitData) => {
+      setRequestAccessSubmitting(true);
+      try {
+        await dispatch(
+          createInventoryUpdateRequest({
+            reason: data.reason,
+            notes: data.notes,
+            accessScopes: ['maintenance_writeoff'],
+          })
+        ).unwrap();
+      } finally {
+        setRequestAccessSubmitting(false);
+      }
+    },
+    [dispatch]
+  );
 
   const submitWriteOff = useCallback(async () => {
     if (!maintenance || !userId || !userName || !reason || !maintenanceId) return;
@@ -128,7 +163,7 @@ export function WriteOffPage() {
     );
   }
 
-  if (!canWriteOff) {
+  if (!hasMaintenanceRole) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -156,6 +191,60 @@ export function WriteOffPage() {
             Back to Maintenance
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (isStoreIncharge && !canPerformWriteOff) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50"
+            aria-label="Go back"
+          >
+            <Icon name="arrow-left" className="h-5 w-5 text-slate-700" />
+          </button>
+          <h1 className="text-[22px] font-semibold text-slate-900">Write Off Item</h1>
+        </div>
+
+        <div className="rounded-[10px] border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-[15px] font-semibold text-slate-900">{maintenance.itemName}</p>
+          <p className="text-[13px] text-slate-500">SKU: {maintenance.itemSku}</p>
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-[13px] text-slate-500">Available Quantity</span>
+            <span className="text-[15px] font-semibold text-slate-900">
+              {maintenance.quantity} {displayUnit}
+            </span>
+          </div>
+        </div>
+
+        <RequestAccessBanner
+          onRequestAccess={() => setShowRequestAccessModal(true)}
+          title="You need Admin approval to write off maintenance items."
+          subtitle="Submit a request. After approval, you can complete the write-off here."
+          buttonLabel="Request access"
+        />
+
+        <p className="text-[14px] text-slate-600">
+          Admins review requests under{' '}
+          <Link to="/inventory/update-requests" className="font-semibold text-blue-800 underline">
+            Inventory → Inventory update requests
+          </Link>
+          .
+        </p>
+
+        <RequestInventoryAccessModal
+          visible={showRequestAccessModal}
+          onCancel={() => setShowRequestAccessModal(false)}
+          onSubmit={handleRequestWriteOffAccess}
+          loading={requestAccessSubmitting}
+          title="Request write-off access"
+          description="An Admin must approve before you can write off items from maintenance. Give a short reason."
+          reasonOptions={WRITE_OFF_ACCESS_REASON_OPTIONS}
+        />
       </div>
     );
   }

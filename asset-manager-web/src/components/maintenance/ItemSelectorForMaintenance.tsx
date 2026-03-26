@@ -54,17 +54,25 @@ export function ItemSelectorForMaintenance({
   const fetchFirstPage = useCallback(async () => {
     setLoading(true);
     try {
-      const [countResult, listResult] = await Promise.all([
-        getItemsForMaintenanceCount(debouncedSearch || undefined),
-        listItemsForMaintenancePaginated(
-          debouncedSearch || undefined,
+      if (debouncedSearch) {
+        const listResult = await listItemsForMaintenancePaginated(
+          debouncedSearch,
           MAINTENANCE_ITEMS_PAGE_SIZE
-        ),
-      ]);
-      setTotalCount(countResult);
-      setItems(listResult.items);
-      lastDocRef.current = listResult.lastDoc;
-      setLastDoc(listResult.lastDoc);
+        );
+        setTotalCount(listResult.items.length);
+        setItems(listResult.items);
+        lastDocRef.current = listResult.lastDoc;
+        setLastDoc(listResult.lastDoc);
+      } else {
+        const [countResult, listResult] = await Promise.all([
+          getItemsForMaintenanceCount(undefined),
+          listItemsForMaintenancePaginated(undefined, MAINTENANCE_ITEMS_PAGE_SIZE),
+        ]);
+        setTotalCount(countResult);
+        setItems(listResult.items);
+        lastDocRef.current = listResult.lastDoc;
+        setLastDoc(listResult.lastDoc);
+      }
     } catch (error) {
       console.error('Error fetching items for maintenance:', error);
       setItems([]);
@@ -160,7 +168,7 @@ export function ItemSelectorForMaintenance({
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by item name..."
+                placeholder="Search by name, SKU, or category..."
                 className="flex-1 bg-transparent text-[15px] text-slate-900 placeholder-slate-400 focus:outline-none"
                 aria-label="Search items"
               />
@@ -199,7 +207,7 @@ export function ItemSelectorForMaintenance({
               </h3>
               <p className="mt-2 text-[15px] text-slate-500">
                 {debouncedSearch
-                  ? 'Try a different search term. Only non-consumable items with stock in central store are shown.'
+                  ? 'Try a different term (name, SKU, or category). Only non-consumable items with central store stock are shown.'
                   : 'Only non-consumable items with stock in central store can be added to maintenance.'}
               </p>
             </div>

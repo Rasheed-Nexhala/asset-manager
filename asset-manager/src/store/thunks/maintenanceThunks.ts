@@ -1,4 +1,5 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
+import type { RootState } from '../index';
 import {
   addToMaintenance as addToMaintenanceService,
   returnFromMaintenance as returnFromMaintenanceService,
@@ -16,6 +17,11 @@ import {
   WriteOffData,
   MaintenanceStatus,
 } from '../../types/maintenance';
+
+const ROLE_LOADING_MESSAGE = 'Loading your permissions. Please wait and try again.';
+const ROLE_NOT_LOADED_MESSAGE = 'Your role could not be verified. Please sign in again.';
+const STORE_INCHARGE_WRITE_OFF_ACCESS_REQUIRED_MESSAGE =
+  'You need Admin approval to write off maintenance items. Use Request access on the write-off screen, then try again after approval.';
 
 /**
  * Fetch all maintenance records
@@ -142,9 +148,29 @@ export const writeOffItemThunk = createAsyncThunk(
       userId: string;
       userName: string;
     },
-    { rejectWithValue }
+    { getState, rejectWithValue }
   ) => {
     try {
+      const state = getState() as RootState;
+      const { user, userRole, isRoleLoading } = state.auth;
+      const roleType = userRole?.role;
+
+      if (user && isRoleLoading) {
+        return rejectWithValue(ROLE_LOADING_MESSAGE);
+      }
+      if (user && !isRoleLoading && roleType == null) {
+        return rejectWithValue(ROLE_NOT_LOADED_MESSAGE);
+      }
+
+      if (roleType === 'StoreIncharge') {
+        const until = state.inventoryUpdateRequest.myWriteOffAccessGrantedUntil ?? null;
+        const expiry = until ? new Date(until) : null;
+        const now = new Date();
+        if (!expiry || expiry <= now) {
+          return rejectWithValue(STORE_INCHARGE_WRITE_OFF_ACCESS_REQUIRED_MESSAGE);
+        }
+      }
+
       await writeOffItemService(maintenanceId, writeOffData, userId, userName);
       return maintenanceId;
     } catch (error: any) {

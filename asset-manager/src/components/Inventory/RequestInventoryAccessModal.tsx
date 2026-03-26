@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const REASON_OPTIONS = [
+const DEFAULT_REASON_OPTIONS = [
   { value: 'Physical count variation', label: 'Physical count variation' },
   { value: 'Stock discrepancy', label: 'Stock discrepancy' },
   { value: 'Other', label: 'Other' },
@@ -34,6 +34,9 @@ export interface RequestInventoryAccessModalProps {
   onSubmit: (data: RequestInventoryAccessSubmitData) => Promise<void>;
   onCancel: () => void;
   loading?: boolean;
+  title?: string;
+  description?: string;
+  reasonOptions?: { value: string; label: string }[];
 }
 
 export const RequestInventoryAccessModal: React.FC<RequestInventoryAccessModalProps> = ({
@@ -41,6 +44,9 @@ export const RequestInventoryAccessModal: React.FC<RequestInventoryAccessModalPr
   onSubmit,
   onCancel,
   loading = false,
+  title = 'Request Inventory Access',
+  description = 'You need Admin approval to update central store inventory. Submit a request with a reason.',
+  reasonOptions = DEFAULT_REASON_OPTIONS,
 }) => {
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
@@ -87,7 +93,7 @@ export const RequestInventoryAccessModal: React.FC<RequestInventoryAccessModalPr
           <View className="w-10 h-1 bg-[#E2E8F0] rounded-full self-center mt-3" />
 
           <View className="p-4 border-b border-[#E2E8F0] flex-row items-center justify-between">
-            <Text className="text-[22px] font-semibold text-[#0F172A]">Request Inventory Access</Text>
+            <Text className="text-[22px] font-semibold text-[#0F172A]">{title}</Text>
             <TouchableOpacity
               onPress={handleClose}
               className="min-w-[48px] min-h-[48px] w-12 h-12 items-center justify-center"
@@ -101,16 +107,14 @@ export const RequestInventoryAccessModal: React.FC<RequestInventoryAccessModalPr
 
           <ScrollView className="p-4" showsVerticalScrollIndicator={false}>
             <View className="gap-4">
-              <Text className="text-[15px] text-[#64748B]">
-                You need Admin approval to update central store inventory. Submit a request with a reason.
-              </Text>
+              <Text className="text-[15px] text-[#64748B]">{description}</Text>
 
               <View className="gap-1.5">
                 <Text className="text-[15px] text-[#0F172A]">
                   Reason <Text className="text-[#DC2626]">*</Text>
                 </Text>
                 <View className="flex-row flex-wrap gap-3">
-                  {REASON_OPTIONS.map((opt) => (
+                  {reasonOptions.map((opt) => (
                     <TouchableOpacity
                       key={opt.value}
                       className={`px-4 py-2.5 rounded-full border min-h-[48px] items-center justify-center ${

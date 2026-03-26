@@ -29,7 +29,13 @@ import {
 } from '../../store/selectors/maintenanceSelectors';
 import { subscribeToMaintenanceById } from '../../services/firebase/maintenanceService';
 import { getDisplayWrittenOffUnits } from '../../utils/maintenanceWriteOffDisplay';
-import { selectUserId, selectUserDisplayName } from '../../store/selectors/authSelectors';
+import {
+  selectUserId,
+  selectUserDisplayName,
+  selectIsAdmin,
+  selectIsStoreIncharge,
+} from '../../store/selectors/authSelectors';
+import { selectCanStoreInchargeMaintenanceWriteOff } from '../../store/selectors/inventoryUpdateRequestSelectors';
 import type {
   MaintenanceStatus,
   IssueType,
@@ -155,6 +161,10 @@ export const MaintenanceDetailScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
+  const isAdmin = useAppSelector(selectIsAdmin);
+  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const canWriteOffAccess = useAppSelector(selectCanStoreInchargeMaintenanceWriteOff);
+  const showWriteOffAction = isAdmin || (isStoreIncharge && canWriteOffAccess);
   const maintenance = useAppSelector((state) => selectMaintenanceById(maintenanceId)(state));
   const error = useAppSelector(selectMaintenanceError);
 
@@ -206,7 +216,7 @@ export const MaintenanceDetailScreen: React.FC = () => {
       return null;
     }
 
-    // Active states (pending or partial_return): Show Return and Write Off
+    // Active states (pending or partial_return): Return always; Write Off only with Admin or approved Store Incharge access
     return (
       <View className="mb-6 mt-2 gap-3">
         <TouchableOpacity
@@ -219,19 +229,21 @@ export const MaintenanceDetailScreen: React.FC = () => {
           <Ionicons name="arrow-undo" size={20} color="#FFFFFF" />
           <Text className="text-[15px] font-semibold text-white">Return to Inventory</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          className="bg-[#DC2626] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
-          onPress={handleWriteOff}
-          activeOpacity={0.7}
-          accessibilityLabel="Write off item"
-          accessibilityRole="button"
-        >
-          <Ionicons name="trash" size={20} color="#FFFFFF" />
-          <Text className="text-[15px] font-semibold text-white">Write Off</Text>
-        </TouchableOpacity>
+        {showWriteOffAction && (
+          <TouchableOpacity
+            className="bg-[#DC2626] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
+            onPress={handleWriteOff}
+            activeOpacity={0.7}
+            accessibilityLabel="Write off item"
+            accessibilityRole="button"
+          >
+            <Ionicons name="trash" size={20} color="#FFFFFF" />
+            <Text className="text-[15px] font-semibold text-white">Write Off</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
-  }, [maintenance, handleReturnToInventory, handleWriteOff]);
+  }, [maintenance, handleReturnToInventory, handleWriteOff, showWriteOffAction]);
 
   // Loading state (waiting for snapshot or initial load)
   if (maintenanceId && !maintenance && !error) {
