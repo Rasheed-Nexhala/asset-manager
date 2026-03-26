@@ -19,12 +19,12 @@ import {
   selectItemsTotalCount,
   selectItemsHasMore,
   selectItemsLoadingMore,
-  selectLowStockCount,
   selectFilteredAndSearchedItems,
 } from '../../store/selectors/inventorySelectors';
 import { selectIsAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
 import { useInventoryError } from '../../hooks/useInventoryError';
 import { subscribeCategories } from '../../services/firebase/categoryService';
+import { countLowStockItems } from '../../services/firebase/inventoryService';
 import { isLowStock } from '../../utils/inventoryUtils';
 import type { ItemFilters, ItemType } from '../../types/inventory';
 import type { Category } from '../../types/inventory';
@@ -62,6 +62,8 @@ export function CentralStoreInventoryPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  /** Full-catalog low-stock count (same scope as category/type filters), not paginated Redux */
+  const [catalogLowStockCount, setCatalogLowStockCount] = useState(0);
 
   const allItems = useAppSelector(selectAllItems);
   const categories = useAppSelector(selectAllCategories);
@@ -70,7 +72,6 @@ export function CentralStoreInventoryPage() {
   const hasMore = useAppSelector(selectItemsHasMore);
   const loadingMore = useAppSelector(selectItemsLoadingMore);
   const error = useInventoryError();
-  const lowStockCount = useAppSelector(selectLowStockCount);
   const isAdmin = useAppSelector(selectIsAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
 
@@ -92,10 +93,32 @@ export function CentralStoreInventoryPage() {
     return filteredItems;
   }, [filteredItems, filters.stock]);
 
-  const filteredLowStockCount = useMemo(
-    () => displayedItems.filter((item) => isLowStock(item)).length,
-    [displayedItems]
+  const hasActiveFilters = useMemo(
+    () =>
+      filters.categoryId !== undefined ||
+      filters.type !== undefined ||
+      filters.stock !== 'all' ||
+      searchQuery.trim().length > 0,
+    [filters.categoryId, filters.type, filters.stock, searchQuery]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const n = await countLowStockItems({
+          categoryId: filters.categoryId,
+          type: filters.type,
+        });
+        if (!cancelled) setCatalogLowStockCount(n);
+      } catch {
+        if (!cancelled) setCatalogLowStockCount(0);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [filters.categoryId, filters.type]);
 
   useEffect(() => {
     if (lowStockFromUrl && filters.stock !== 'low_stock') {
@@ -139,6 +162,10 @@ export function CentralStoreInventoryPage() {
       dispatch(fetchItemsPaginated());
     }
     dispatch(fetchCategories());
+    void countLowStockItems({ categoryId: filters.categoryId, type: filters.type }).then(
+      setCatalogLowStockCount,
+      () => setCatalogLowStockCount(0)
+    );
   }, [dispatch, filters, debouncedSearch]);
 
   const handleLoadMore = useCallback(() => {
@@ -220,13 +247,19 @@ export function CentralStoreInventoryPage() {
           <button
             type="button"
             onClick={() => setShowFilters(!showFilters)}
-            className="w-12 h-12 flex items-center justify-center rounded-[10px]"
-            aria-label="Toggle filters"
+            className="relative w-12 h-12 flex items-center justify-center rounded-[10px]"
+            aria-label={hasActiveFilters ? 'Toggle filters, filters active' : 'Toggle filters'}
           >
             <Icon
               name="funnel"
               className={`w-5 h-5 ${showFilters ? 'text-blue-800' : 'text-slate-500'}`}
             />
+            {hasActiveFilters && (
+              <span
+                className="pointer-events-none absolute top-2 right-2 h-2 w-2 rounded-full bg-blue-800 ring-2 ring-white"
+                aria-hidden
+              />
+            )}
           </button>
           <button
             type="button"
@@ -485,9 +518,9 @@ export function CentralStoreInventoryPage() {
                 )}{' '}
                 items
               </p>
-              {filteredLowStockCount > 0 && (
+              {catalogLowStockCount > 0 && (
                 <span className="px-2 py-1 rounded-full bg-amber-600/15 text-[12px] font-medium text-amber-600">
-                  {filteredLowStockCount} Low Stock
+                  {catalogLowStockCount} Low Stock
                 </span>
               )}
             </div>

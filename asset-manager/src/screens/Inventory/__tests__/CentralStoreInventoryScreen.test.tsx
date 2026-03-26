@@ -39,6 +39,7 @@ let mockSubscribeItemsInvokeImmediately = true;
 jest.mock('../../../services/firebase/inventoryService', () => ({
   listItemsPaginated: jest.fn(),
   getItemsCount: jest.fn(),
+  countLowStockItems: jest.fn().mockResolvedValue(0),
   subscribeItems: jest.fn((callback: (items: Item[]) => void) => {
     if (mockSubscribeItemsInvokeImmediately) {
       callback(mockItemsToReturn);

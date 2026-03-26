@@ -31,11 +31,9 @@ import {
 } from '../../store/thunks/inventoryThunks';
 import {
   selectAllItems,
-  selectItemsBySearchQuery,
   selectAllCategories,
   selectItemsLoading,
   selectItemsTotalCount,
-  selectLowStockCount,
 } from '../../store/selectors/inventorySelectors';
 import {
   selectIsAdmin,
@@ -43,6 +41,7 @@ import {
 } from '../../store/selectors/authSelectors';
 import { useInventoryError } from '../../hooks/useInventoryError';
 import { subscribeCategories } from '../../services/firebase/categoryService';
+import { countLowStockItems } from '../../services/firebase/inventoryService';
 import { setCategories } from '../../store/slices/inventorySlice';
 import type { ItemFilters } from '../../types/inventory';
 import { isLowStock } from '../../utils/inventoryUtils';
@@ -83,6 +82,8 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   const [showFilters, setShowFilters] = useState<boolean>(lowStockFilterFromNav);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [showMoreMenu, setShowMoreMenu] = useState<boolean>(false);
+  /** Full-catalog low-stock count (same scope as category/type filters), not paginated Redux */
+  const [catalogLowStockCount, setCatalogLowStockCount] = useState(0);
 
   const handleToggleMoreMenu = useCallback(() => {
     setShowMoreMenu(prev => !prev);
@@ -119,7 +120,6 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   const isLoading = useAppSelector(selectItemsLoading);
   const totalCount = useAppSelector(selectItemsTotalCount);
   const error = useInventoryError();
-  const lowStockCount = useAppSelector(selectLowStockCount);
   const isAdmin = useAppSelector(selectIsAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
 
@@ -132,9 +132,32 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     return items;
   }, [allItems, filters.stock]);
 
-  const filteredLowStockCount = useMemo(() => {
-    return filteredItems.filter((item) => isLowStock(item)).length;
-  }, [filteredItems]);
+  const hasActiveFilters = useMemo(
+    () =>
+      filters.categoryId !== undefined ||
+      filters.type !== undefined ||
+      filters.stock !== 'all' ||
+      searchQuery.trim().length > 0,
+    [filters.categoryId, filters.type, filters.stock, searchQuery]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const n = await countLowStockItems({
+          categoryId: filters.categoryId,
+          type: filters.type,
+        });
+        if (!cancelled) setCatalogLowStockCount(n);
+      } catch {
+        if (!cancelled) setCatalogLowStockCount(0);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [filters.categoryId, filters.type]);
 
   useEffect(() => {
     const itemFilters = toItemFilters(filters, debouncedSearch);
@@ -167,6 +190,10 @@ export const CentralStoreInventoryScreen: React.FC = () => {
       : dispatch(fetchItemsPaginated());
     refresh.finally(() => setRefreshing(false));
     dispatch(fetchCategories());
+    void countLowStockItems({ categoryId: filters.categoryId, type: filters.type }).then(
+      setCatalogLowStockCount,
+      () => setCatalogLowStockCount(0)
+    );
   }, [dispatch, filters, debouncedSearch]);
 
   const handleLoadMore = useCallback(() => {
@@ -306,17 +333,27 @@ export const CentralStoreInventoryScreen: React.FC = () => {
           )}
         </TouchableOpacity>
         <TouchableOpacity
-          className="w-12 h-12 items-center justify-center rounded-[10px]"
+          className="relative w-12 h-12 items-center justify-center rounded-[10px]"
           onPress={handleToggleFilters}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="Toggle filters"
+          accessibilityLabel={
+            hasActiveFilters ? 'Toggle filters, filters active' : 'Toggle filters'
+          }
         >
-          <Ionicons 
-            name={showFilters ? "filter" : "filter-outline"} 
-            size={22} 
-            color={showFilters ? "#1E40AF" : "#64748B"} 
+          <Ionicons
+            name={showFilters ? 'filter' : 'filter-outline'}
+            size={22}
+            color={showFilters ? '#1E40AF' : '#64748B'}
           />
+          {hasActiveFilters && (
+            <View
+              className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[#1E40AF]"
+              pointerEvents="none"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            />
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           className="w-12 h-12 items-center justify-center rounded-[10px]"
@@ -610,11 +647,11 @@ export const CentralStoreInventoryScreen: React.FC = () => {
                 )}{' '}
                 items
               </Text>
-              {filteredLowStockCount > 0 && (
+              {catalogLowStockCount > 0 && (
                 <View className="flex-row items-center gap-2">
                   <View className="px-2 py-1 rounded-full bg-[#D97706]/15">
                     <Text className="text-[12px] font-medium text-[#D97706]">
-                      {filteredLowStockCount} Low Stock
+                      {catalogLowStockCount} Low Stock
                     </Text>
                   </View>
                 </View>

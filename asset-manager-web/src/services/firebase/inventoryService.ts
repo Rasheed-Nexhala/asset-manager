@@ -159,6 +159,17 @@ export const listItems = async (filters?: ItemFilters): Promise<Item[]> => {
 };
 
 /**
+ * Count items in low stock across the catalog (not paginated). Uses full listItems + isLowStock.
+ * Optional category/type/status scope matches listItems filters.
+ */
+export const countLowStockItems = async (
+  scope?: Pick<ItemFilters, 'categoryId' | 'type' | 'status'>
+): Promise<number> => {
+  const items = await listItems({ ...scope, lowStockOnly: true });
+  return items.length;
+};
+
+/**
  * Build Firestore query constraints for items (shared by listItemsPaginated and getItemsCount).
  * Excludes lowStockOnly — that filter is applied client-side.
  */
