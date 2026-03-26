@@ -108,7 +108,13 @@ export function CentralStoreInventoryPage() {
     // case-insensitive "contains" matching across name, SKU, category, description
     const itemFilters = toItemFilters(filters, undefined);
     dispatch(setFilters(itemFilters));
-    if (debouncedSearch.trim()) {
+    const hasClientSearch = debouncedSearch.trim().length > 0;
+    // Low-stock filter is applied in memory after fetch (see inventoryService.listItems).
+    // Pagination only loads ITEMS_PAGE_SIZE rows from Firestore (ordered by name), so
+    // filtering those few rows to low stock misses most alerts — same as dashboard's
+    // full listItems() vs paginated slice. Load the full list when showing low stock.
+    const needsFullItemList = hasClientSearch || filters.stock === 'low_stock';
+    if (needsFullItemList) {
       dispatch(fetchItems(itemFilters));
     } else {
       dispatch(fetchItemsPaginated());
@@ -124,9 +130,16 @@ export function CentralStoreInventoryPage() {
   }, [dispatch]);
 
   const handleRefresh = useCallback(() => {
-    dispatch(fetchItemsPaginated());
+    const itemFilters = toItemFilters(filters, undefined);
+    const hasClientSearch = debouncedSearch.trim().length > 0;
+    const needsFullItemList = hasClientSearch || filters.stock === 'low_stock';
+    if (needsFullItemList) {
+      dispatch(fetchItems(itemFilters));
+    } else {
+      dispatch(fetchItemsPaginated());
+    }
     dispatch(fetchCategories());
-  }, [dispatch]);
+  }, [dispatch, filters, debouncedSearch]);
 
   const handleLoadMore = useCallback(() => {
     if (!hasMore || loadingMore) return;

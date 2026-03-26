@@ -23,10 +23,11 @@ import {
   setFilters,
   setLoading,
 } from '../../store/slices/inventorySlice';
-import { 
-  fetchItemsPaginated, 
-  loadMoreItems, 
-  exportInventoryThunk 
+import {
+  fetchItems,
+  fetchItemsPaginated,
+  loadMoreItems,
+  exportInventoryThunk,
 } from '../../store/thunks/inventoryThunks';
 import {
   selectAllItems,
@@ -138,7 +139,14 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   useEffect(() => {
     const itemFilters = toItemFilters(filters, debouncedSearch);
     dispatch(setFilters(itemFilters));
-    dispatch(fetchItemsPaginated());
+    // lowStockOnly is applied after fetch; paginated mode only has one page in Redux,
+    // so the low-stock list would match dashboard alerts — use full fetch like web.
+    const needsFullItemList = filters.stock === 'low_stock';
+    if (needsFullItemList) {
+      dispatch(fetchItems(itemFilters));
+    } else {
+      dispatch(fetchItemsPaginated());
+    }
   }, [dispatch, filters, debouncedSearch]);
 
   // Subscribe to categories for real-time updates
@@ -152,9 +160,14 @@ export const CentralStoreInventoryScreen: React.FC = () => {
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    dispatch(fetchItemsPaginated()).finally(() => setRefreshing(false));
+    const itemFilters = toItemFilters(filters, debouncedSearch);
+    const needsFullItemList = filters.stock === 'low_stock';
+    const refresh = needsFullItemList
+      ? dispatch(fetchItems(itemFilters))
+      : dispatch(fetchItemsPaginated());
+    refresh.finally(() => setRefreshing(false));
     dispatch(fetchCategories());
-  }, [dispatch]);
+  }, [dispatch, filters, debouncedSearch]);
 
   const handleLoadMore = useCallback(() => {
     if (!isLoading && allItems.length < (totalCount ?? 0)) {
