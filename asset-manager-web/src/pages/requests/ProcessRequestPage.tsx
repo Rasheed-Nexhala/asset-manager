@@ -27,6 +27,10 @@ import type {
   ItemAvailability,
   ItemCondition,
 } from '../../types/request';
+import {
+  printTransferSlip,
+  canPrintTransferSlip,
+} from '../../utils/transferSlipPdfUtils';
 
 const CONDITION_LABELS: Record<ItemCondition, string> = {
   good: 'Good',
@@ -87,6 +91,7 @@ export function ProcessRequestPage() {
     null
   );
   const [retryKey, setRetryKey] = useState(0);
+  const [slipPrinting, setSlipPrinting] = useState(false);
 
   const canProcess = isStoreIncharge || isAdmin;
   const allSufficient =
@@ -338,6 +343,21 @@ export function ProcessRequestPage() {
     isRequestOwner &&
     !canProcess &&
     hasItemsToReturn;
+  const showTransferSlipPrint = request ? canPrintTransferSlip(request) : false;
+
+  const handlePrintTransferSlip = useCallback(async () => {
+    if (!request) return;
+    setSlipPrinting(true);
+    try {
+      await printTransferSlip(request);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Could not open print dialog'
+      );
+    } finally {
+      setSlipPrinting(false);
+    }
+  }, [request, toast]);
 
   if (!request) {
     return (
@@ -615,6 +635,29 @@ export function ProcessRequestPage() {
           </button>
           <p className="text-[13px] text-slate-500 mt-2 text-center">
             Items physically delivered? Confirm to update inventory.
+          </p>
+        </div>
+      )}
+
+      {showTransferSlipPrint && (
+        <div className="bg-white border-t border-slate-200 pt-4">
+          <button
+            type="button"
+            onClick={handlePrintTransferSlip}
+            disabled={slipPrinting}
+            className="w-full border-2 border-slate-300 rounded-[10px] h-[50px] flex items-center justify-center gap-2 text-[15px] font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+          >
+            {slipPrinting ? (
+              <LoadingSpinner size="sm" />
+            ) : (
+              <>
+                <Icon name="arrow-down-tray" className="h-5 w-5" />
+                Print transfer slip
+              </>
+            )}
+          </button>
+          <p className="text-[13px] text-slate-500 mt-2 text-center">
+            Proof of transfer with company details and a unique slip number.
           </p>
         </div>
       )}

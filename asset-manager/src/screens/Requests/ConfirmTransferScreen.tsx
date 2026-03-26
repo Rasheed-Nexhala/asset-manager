@@ -18,6 +18,10 @@ import { useWeightViewPreference } from '../../hooks/useWeightViewPreference';
 import { isWeightBasedItem } from '../../utils/weightConversionUtils';
 import { transferRequest } from '../../store/thunks/requestThunks';
 import { requestService } from '../../services/firebase/requestService';
+import {
+  printTransferSlip,
+  canPrintTransferSlip,
+} from '../../utils/transferSlipPdfUtils';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   selectUserId,
@@ -123,7 +127,7 @@ export const ConfirmTransferScreen: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      await dispatch(
+      const updated = await dispatch(
         transferRequest({
           requestId,
           transferData: {
@@ -135,9 +139,22 @@ export const ConfirmTransferScreen: React.FC = () => {
         })
       ).unwrap();
 
-      Alert.alert('Success', 'Transfer confirmed successfully', [
-        { text: 'OK', onPress: () => navigation.navigate('RequestQueue') },
-      ]);
+      if (updated && canPrintTransferSlip(updated)) {
+        try {
+          await printTransferSlip(updated);
+        } catch (printErr) {
+          Alert.alert(
+            'Transfer saved',
+            printErr instanceof Error
+              ? printErr.message
+              : 'You can print the transfer slip from the request details.',
+            [{ text: 'OK', onPress: () => navigation.navigate('RequestQueue') }]
+          );
+          return;
+        }
+      }
+
+      navigation.navigate('RequestQueue');
     } catch (error: unknown) {
       Alert.alert(
         'Error',

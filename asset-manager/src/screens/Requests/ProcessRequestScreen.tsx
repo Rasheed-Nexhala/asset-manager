@@ -36,6 +36,10 @@ import { fetchItems } from '../../store/thunks/inventoryThunks';
 import { selectRequestById } from '../../store/selectors/requestSelectors';
 import type { Request, ItemAvailability, ItemCondition } from '../../types/request';
 import type { RequestStackParamList } from '../../navigation/RequestStackParamList';
+import {
+  printTransferSlip,
+  canPrintTransferSlip,
+} from '../../utils/transferSlipPdfUtils';
 
 type RouteParams = RouteProp<RequestStackParamList, 'ProcessRequest'>;
 type NavigationProp = StackNavigationProp<RequestStackParamList, 'ProcessRequest'>;
@@ -100,6 +104,7 @@ export const ProcessRequestScreen: React.FC = () => {
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(true);
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const [slipPrinting, setSlipPrinting] = useState(false);
 
   // Set up real-time subscription for this specific request
   useEffect(() => {
@@ -382,6 +387,22 @@ export const ProcessRequestScreen: React.FC = () => {
     isRequestOwner &&
     !canProcess &&
     hasItemsToReturn;
+  const showTransferSlipPrint = request ? canPrintTransferSlip(request) : false;
+
+  const handlePrintTransferSlip = useCallback(async () => {
+    if (!request) return;
+    setSlipPrinting(true);
+    try {
+      await printTransferSlip(request);
+    } catch (err) {
+      Alert.alert(
+        'Could not share slip',
+        err instanceof Error ? err.message : 'Please try again.'
+      );
+    } finally {
+      setSlipPrinting(false);
+    }
+  }, [request]);
 
   if (!request) {
     return (
@@ -821,6 +842,33 @@ export const ProcessRequestScreen: React.FC = () => {
           </TouchableOpacity>
           <Text className="text-[13px] text-[#64748B] mt-2 text-center">
             Items physically delivered? Confirm to update inventory.
+          </Text>
+        </View>
+      )}
+
+      {showTransferSlipPrint && (
+        <View className="bg-white border-t border-[#E2E8F0] px-4 py-3">
+          <TouchableOpacity
+            onPress={handlePrintTransferSlip}
+            disabled={slipPrinting}
+            className="border-2 border-[#CBD5E1] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2"
+            style={{ opacity: slipPrinting ? 0.6 : 1 }}
+            accessibilityRole="button"
+            accessibilityLabel="Share or print transfer slip PDF"
+          >
+            {slipPrinting ? (
+              <ActivityIndicator size="small" color="#0F172A" />
+            ) : (
+              <>
+                <Ionicons name="download-outline" size={20} color="#0F172A" />
+                <Text className="text-[15px] font-semibold text-[#0F172A]">
+                  Transfer slip (PDF)
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <Text className="text-[13px] text-[#64748B] mt-2 text-center">
+            Proof of transfer with company details and a unique slip number.
           </Text>
         </View>
       )}

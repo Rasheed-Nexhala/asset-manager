@@ -19,6 +19,10 @@ import { Icon } from '../../components/shared/Icon';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { useToast } from '../../contexts/ToastContext';
 import type { Request } from '../../types/request';
+import {
+  printTransferSlip,
+  canPrintTransferSlip,
+} from '../../utils/transferSlipPdfUtils';
 
 export function ConfirmTransferPage() {
   const { requestId } = useParams<{ requestId: string }>();
@@ -94,7 +98,7 @@ export function ConfirmTransferPage() {
       return;
     setIsSubmitting(true);
     try {
-      await dispatch(
+      const updated = await dispatch(
         transferRequest({
           requestId,
           transferData: {
@@ -106,6 +110,17 @@ export function ConfirmTransferPage() {
         })
       ).unwrap();
       toast.success('Transfer confirmed successfully');
+      if (updated && canPrintTransferSlip(updated)) {
+        try {
+          await printTransferSlip(updated);
+        } catch (printErr) {
+          toast.error(
+            printErr instanceof Error
+              ? printErr.message
+              : 'Transfer saved. Print the slip from the request when ready.'
+          );
+        }
+      }
       navigate('/requests/queue');
     } catch (error: unknown) {
       toast.error(

@@ -1,7 +1,7 @@
 /**
  * Confirm Transfer flow
  * Tests loading state, form render for approved requests, non-approved Alert/goBack,
- * validation (receivedBy required), submit with transferRequest thunk, success Alert, back button.
+ * validation (receivedBy required), submit with transferRequest thunk, navigate to queue, back button.
  */
 import React from 'react';
 import { Alert } from 'react-native';
@@ -161,6 +161,11 @@ jest.mock('../../../store/thunks/purchaseOrderThunks', () => {
   };
 });
 
+jest.mock('../../../utils/transferSlipPdfUtils', () => ({
+  printTransferSlip: jest.fn().mockResolvedValue(undefined),
+  canPrintTransferSlip: jest.fn().mockReturnValue(false),
+}));
+
 const createMockRequestItem = (overrides: Partial<RequestItem> = {}): RequestItem => ({
   itemId: 'item1',
   itemName: 'Steel Bar',
@@ -301,7 +306,7 @@ describe('ConfirmTransferScreen', () => {
     expect(screen.getByText('Received by is required')).toBeTruthy();
   });
 
-  it('submit dispatches transferRequest and success Alert', async () => {
+  it('submit dispatches transferRequest and navigates to RequestQueue', async () => {
     renderWithStore(<ConfirmTransferScreen />, defaultPreloadedState);
 
     mockGetRequestByIdResolve!(createMockRequest());
@@ -319,7 +324,7 @@ describe('ConfirmTransferScreen', () => {
     mockTransferRequestResolve!();
 
     await waitFor(() => {
-      expect(Alert.alert).toHaveBeenCalledWith('Success', 'Transfer confirmed successfully', expect.any(Array));
+      expect(mockNavigate).toHaveBeenCalledWith('RequestQueue');
     });
   });
 
