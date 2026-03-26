@@ -19,6 +19,7 @@ import {
   DashboardGreeting,
   QuickStatsRow,
   LowStockAlertWidget,
+  DASHBOARD_LOW_STOCK_PREVIEW_LIMIT,
   PendingRequestsWidget,
 } from '../components/Dashboard';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
@@ -366,7 +367,8 @@ export const DashboardScreen: React.FC = () => {
               </TouchableOpacity>
               {(lowStockItemsWidget.length > 0 || isInitialLoad || dashboardLoading) && (
                 <LowStockAlertWidget
-                  items={lowStockItemsWidget}
+                  items={lowStockItemsWidget.slice(0, DASHBOARD_LOW_STOCK_PREVIEW_LIMIT)}
+                  totalAlertCount={lowStockItemsWidget.length}
                   onViewAll={() =>
                     tabNav?.navigate('Inventory', {
                       screen: 'CentralStoreInventory',
@@ -408,7 +410,8 @@ export const DashboardScreen: React.FC = () => {
               )}
               {showInventory && (lowStockItemsWidget.length > 0 || isInitialLoad || dashboardLoading) && (
                 <LowStockAlertWidget
-                  items={lowStockItemsWidget}
+                  items={lowStockItemsWidget.slice(0, DASHBOARD_LOW_STOCK_PREVIEW_LIMIT)}
+                  totalAlertCount={lowStockItemsWidget.length}
                   onViewAll={() =>
                     tabNav?.navigate('Inventory', {
                       screen: 'CentralStoreInventory',

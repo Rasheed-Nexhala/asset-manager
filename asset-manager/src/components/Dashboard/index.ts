@@ -2,7 +2,10 @@ export { DashboardGreeting } from './DashboardGreeting';
 export type { DashboardGreetingProps } from './DashboardGreeting';
 export { QuickStatsRow } from './QuickStatsRow';
 export type { QuickStatsRowProps, QuickStat } from './QuickStatsRow';
-export { LowStockAlertWidget } from './LowStockAlertWidget';
+export {
+  LowStockAlertWidget,
+  DASHBOARD_LOW_STOCK_PREVIEW_LIMIT,
+} from './LowStockAlertWidget';
 export type {
   LowStockAlertWidgetProps,
   LowStockItem,

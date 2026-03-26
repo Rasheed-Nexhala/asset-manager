@@ -8,8 +8,13 @@ export interface LowStockItem {
   minQty: number;
 }
 
+/** Max rows shown in the dashboard preview; full list via View All Alerts */
+export const DASHBOARD_LOW_STOCK_PREVIEW_LIMIT = 5;
+
 export interface LowStockAlertWidgetProps {
   items: LowStockItem[];
+  /** Total low-stock items (for header); when set, can exceed `items.length` when preview is capped */
+  totalAlertCount?: number;
   onViewAll: () => void;
   onCreatePO?: (itemId: string) => void;
   loading?: boolean;
@@ -20,11 +25,12 @@ export interface LowStockAlertWidgetProps {
  */
 export function LowStockAlertWidget({
   items,
+  totalAlertCount,
   onViewAll,
   onCreatePO,
   loading = false,
 }: LowStockAlertWidgetProps) {
-  const count = items.length;
+  const headerCount = totalAlertCount ?? items.length;
 
   if (loading) {
     return (
@@ -39,7 +45,7 @@ export function LowStockAlertWidget({
     <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
       <View className="flex-row justify-between items-center mb-3">
         <Text className="text-[17px] font-semibold text-[#0F172A]">
-          LOW STOCK ALERTS ({count})
+          LOW STOCK ALERTS ({headerCount})
         </Text>
       </View>
       <View className="gap-3">

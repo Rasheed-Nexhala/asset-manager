@@ -54,6 +54,7 @@ export {
   DashboardGreeting,
   QuickStatsRow,
   LowStockAlertWidget,
+  DASHBOARD_LOW_STOCK_PREVIEW_LIMIT,
   PendingRequestsWidget,
 } from './Dashboard';
 export type {

@@ -43,6 +43,7 @@ import {
   DashboardGreeting,
   QuickStatsRow,
   LowStockAlertWidget,
+  DASHBOARD_LOW_STOCK_PREVIEW_LIMIT,
   PendingRequestsWidget,
   MyRecentActivityWidget,
 } from '../components/dashboard';
@@ -281,7 +282,8 @@ export function DashboardPage() {
               <>
                 {(lowStockItemsWidget.length > 0 || isInitialLoad || dashboardLoading) && (
                   <LowStockAlertWidget
-                    items={lowStockItemsWidget}
+                    items={lowStockItemsWidget.slice(0, DASHBOARD_LOW_STOCK_PREVIEW_LIMIT)}
+                    totalAlertCount={lowStockItemsWidget.length}
                     onViewAll={() => navigate('/inventory/central?lowStockFilter=true')}
                     onCreatePO={(itemId) => {
                       const item = lowStockItemsWidget.find((i) => i.id === itemId);
