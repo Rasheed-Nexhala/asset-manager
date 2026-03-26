@@ -7,6 +7,7 @@ import {
   selectUserRole,
   selectAuthError,
   selectIsAuthenticated,
+  selectCanCreatePurchaseOrder,
 } from '../authSelectors';
 import type { RootState } from '../../index';
 
@@ -100,5 +101,31 @@ describe('authSelectors', () => {
   it('selectIsAuthenticated returns isAuthenticated', () => {
     const state = createMockState({ isAuthenticated: true });
     expect(selectIsAuthenticated(state)).toBe(true);
+  });
+
+  it('selectCanCreatePurchaseOrder is true for Store Incharge', () => {
+    const state = createMockState({
+      userRole: { role: 'StoreIncharge', isActive: true, permissions: [] },
+    });
+    expect(selectCanCreatePurchaseOrder(state)).toBe(true);
+  });
+
+  it('selectCanCreatePurchaseOrder is true for super admin', () => {
+    const state = createMockState({
+      userRole: {
+        role: 'Admin',
+        isActive: true,
+        permissions: [],
+        isSuperadmin: true,
+      },
+    });
+    expect(selectCanCreatePurchaseOrder(state)).toBe(true);
+  });
+
+  it('selectCanCreatePurchaseOrder is false for Admin without super flag', () => {
+    const state = createMockState({
+      userRole: { role: 'Admin', isActive: true, permissions: [] },
+    });
+    expect(selectCanCreatePurchaseOrder(state)).toBe(false);
   });
 });

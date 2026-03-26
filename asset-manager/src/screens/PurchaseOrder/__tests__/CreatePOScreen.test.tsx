@@ -240,7 +240,7 @@ function renderWithStore(ui: React.ReactElement, preloadedState: Partial<RootSta
 const defaultPreloadedState: Partial<RootState> = {
   auth: {
     user: { uid: 'user1', email: 'user@test.com', displayName: 'Test User' } as import('firebase/auth').User,
-    userRole: null,
+    userRole: { role: 'StoreIncharge', isActive: true, permissions: [] },
     isLoading: false,
     isRoleLoading: false,
     authInitialized: false,

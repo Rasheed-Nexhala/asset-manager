@@ -34,8 +34,8 @@ import {
 import {
   selectUserId,
   selectUserDisplayName,
-  selectIsAdmin,
   selectIsStoreIncharge,
+  selectCanCreatePurchaseOrder,
 } from '../../store/selectors/authSelectors';
 import {
   selectVendors,
@@ -76,8 +76,8 @@ export function CreatePOPage() {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
-  const isAdmin = useAppSelector(selectIsAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const canCreatePO = useAppSelector(selectCanCreatePurchaseOrder);
   const vendors = useAppSelector(selectVendors);
   const poFromStore = useAppSelector((state) =>
     poId ? selectPOById(poId)(state) : null
@@ -167,6 +167,14 @@ export function CreatePOPage() {
   useEffect(() => {
     assignedAdminRef.current = { assignedToAdminId, assignedToAdminName };
   }, [assignedToAdminId, assignedToAdminName]);
+
+  useEffect(() => {
+    if (canCreatePO || poId) return;
+    toast.error(
+      'Only Store Incharge or super admin can create purchase orders.'
+    );
+    navigate('/purchase-orders', { replace: true });
+  }, [canCreatePO, poId, navigate, toast]);
 
   // Pre-fill from Dashboard low-stock "Create PO" (matches React Native behavior)
   useEffect(() => {
@@ -265,6 +273,17 @@ export function CreatePOPage() {
         navigate(`/purchase-orders/${po.id}/approve`);
         return;
       }
+      if (
+        !canCreatePO &&
+        userId &&
+        po.createdBy !== userId
+      ) {
+        toast.error(
+          'Only Store Incharge or super admin can create purchase orders.'
+        );
+        navigate('/purchase-orders', { replace: true });
+        return;
+      }
       setSelectedVendorId(po.vendorId);
       setVendorName(po.vendorName);
       setVendorContact(po.vendorContact);
@@ -316,7 +335,15 @@ export function CreatePOPage() {
         );
       })
       .finally(() => setIsLoadingPO(false));
-  }, [poId, poFromStore?.id, loadPORetryTrigger, navigate]);
+  }, [
+    poId,
+    poFromStore?.id,
+    loadPORetryTrigger,
+    navigate,
+    canCreatePO,
+    userId,
+    toast,
+  ]);
 
   const validate = useCallback((): boolean => {
     const e: Record<string, string> = {};
@@ -1283,8 +1310,6 @@ export function CreatePOPage() {
           >
             {isSubmitting && !isDraft ? (
               <LoadingSpinner size="sm" className="!border-white/30 !border-t-white" />
-            ) : isAdmin ? (
-              'Submit PO'
             ) : (
               'Submit for Approval'
             )}

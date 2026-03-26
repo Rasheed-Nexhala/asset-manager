@@ -220,6 +220,19 @@ const defaultPOState = {
   filters: { status: 'all' },
 };
 
+/** User who may see New / Create PO (Store Incharge or super admin). */
+const preloadedAuthCanCreatePO: Partial<RootState> = {
+  auth: {
+    user: { uid: 'test-user', email: 't@t.com', displayName: 'Test' } as import('firebase/auth').User,
+    userRole: { role: 'StoreIncharge', isActive: true, permissions: [] },
+    isLoading: false,
+    isRoleLoading: false,
+    authInitialized: true,
+    error: null,
+    isAuthenticated: true,
+  },
+};
+
 describe('PurchaseOrderListScreen', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
@@ -237,6 +250,7 @@ describe('PurchaseOrderListScreen', () => {
 
   it('renders New button in header', () => {
     renderWithStore(<PurchaseOrderListScreen />, {
+      ...preloadedAuthCanCreatePO,
       purchaseOrders: defaultPOState,
     });
 
@@ -245,6 +259,7 @@ describe('PurchaseOrderListScreen', () => {
 
   it('navigates to CreatePO when New button pressed', () => {
     renderWithStore(<PurchaseOrderListScreen />, {
+      ...preloadedAuthCanCreatePO,
       purchaseOrders: defaultPOState,
     });
 
@@ -376,6 +391,7 @@ describe('PurchaseOrderListScreen', () => {
 
   it('shows Create Purchase Order button when empty', async () => {
     renderWithStore(<PurchaseOrderListScreen />, {
+      ...preloadedAuthCanCreatePO,
       purchaseOrders: defaultPOState,
     });
 

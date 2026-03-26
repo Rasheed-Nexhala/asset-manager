@@ -21,12 +21,13 @@ import {
   DocumentSnapshot,
   QueryConstraint,
 } from 'firebase/firestore';
-import type { DocumentData } from 'firebase/firestore';
+import type { DocumentData, Transaction } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import { getLocationId } from '../../utils/locationUtils';
 import type {
   PurchaseOrder,
   PurchaseOrderFirestore,
+  PurchaseOrderGrrReceiptFirestore,
   CreatePurchaseOrderData,
   ReceivePOData,
   ApprovePOData,
@@ -40,6 +41,7 @@ import {
 
 const PURCHASE_ORDERS_COLLECTION = 'purchaseOrders';
 const PO_COUNTERS_COLLECTION = 'poCounters';
+const GRR_COUNTERS_COLLECTION = 'grrCounters';
 const INVENTORY_COLLECTION = 'inventory';
 const ITEMS_COLLECTION = 'items';
 const USERS_COLLECTION = 'users';
@@ -103,16 +105,44 @@ const isPoNumberTaken = async (
   return true;
 };
 
-const ensureAdminUser = async (userId: string): Promise<void> => {
+type PoActorFlags = { isSuperAdmin: boolean };
+
+const fetchPoUserFlags = async (
+  userId: string
+): Promise<{ role: string | undefined; isSuperAdmin: boolean }> => {
   const userRef = doc(db, USERS_COLLECTION, userId);
   const userSnap = await getDocFromServer(userRef);
   if (!userSnap.exists()) {
     throw new Error('User not found');
   }
-  const role = userSnap.data()?.role;
-  if (role !== 'Admin') {
-    throw new Error('Only Admin can approve or reject purchase orders');
+  const data = userSnap.data();
+  return {
+    role: data?.role as string | undefined,
+    isSuperAdmin: data?.isSuperadmin === true,
+  };
+};
+
+/** Store Incharge or super admin (regular Admin without flag cannot create POs). */
+const ensureCanCreatePO = async (userId: string): Promise<void> => {
+  const { role, isSuperAdmin } = await fetchPoUserFlags(userId);
+  if (role !== 'StoreIncharge' && !isSuperAdmin) {
+    throw new Error(
+      'Only Store Incharge or super admin can create purchase orders'
+    );
   }
+};
+
+/** Admin or super admin; returns flags for assigned-admin bypass when super admin. */
+const ensureCanApproveRejectPO = async (
+  userId: string
+): Promise<PoActorFlags> => {
+  const { role, isSuperAdmin } = await fetchPoUserFlags(userId);
+  if (role !== 'Admin' && !isSuperAdmin) {
+    throw new Error(
+      'Only Admin or super admin can approve or reject purchase orders'
+    );
+  }
+  return { isSuperAdmin };
 };
 
 const ensureCanReceive = async (userId: string): Promise<void> => {
@@ -125,6 +155,41 @@ const ensureCanReceive = async (userId: string): Promise<void> => {
   if (role !== 'Admin' && role !== 'StoreIncharge') {
     throw new Error('Only Admin or Store Incharge can receive POs');
   }
+};
+
+const normalizeGrrReceiptsForRead = (
+  raw: unknown
+): PurchaseOrderGrrReceiptFirestore[] => {
+  if (!Array.isArray(raw)) return [];
+  const out: PurchaseOrderGrrReceiptFirestore[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const r = entry as Record<string, unknown>;
+    const grrNumber = typeof r.grrNumber === 'string' ? r.grrNumber : '';
+    if (!grrNumber) continue;
+    let receivedAt: Timestamp;
+    const rawAt = r.receivedAt;
+    if (rawAt instanceof Timestamp) {
+      receivedAt = rawAt;
+    } else if (
+      rawAt &&
+      typeof rawAt === 'object' &&
+      'toDate' in rawAt &&
+      typeof (rawAt as { toDate: unknown }).toDate === 'function'
+    ) {
+      receivedAt = Timestamp.fromDate((rawAt as { toDate: () => Date }).toDate());
+    } else {
+      receivedAt = Timestamp.now();
+    }
+    out.push({
+      grrNumber,
+      receivedAt,
+      receivedBy: typeof r.receivedBy === 'string' ? r.receivedBy : '',
+      receivedByName:
+        typeof r.receivedByName === 'string' ? r.receivedByName : '',
+    });
+  }
+  return out;
 };
 
 /**
@@ -212,6 +277,7 @@ const mapFirestoreDocToPOFirestore = (
     receivedBy: data.receivedBy ?? null,
     receivedByName: data.receivedByName ?? null,
     receivedNotes: data.receivedNotes ?? null,
+    grrReceipts: normalizeGrrReceiptsForRead(data.grrReceipts),
     updatedAt: data.updatedAt,
   };
 };
@@ -249,6 +315,27 @@ const generatePoNumber = async (): Promise<string> => {
     console.error('Error generating PO number:', error);
     throw new Error('Failed to generate PO number. Please try again.');
   }
+};
+
+/** Next PO-RCV-YYYY-NNNN inside an existing transaction (year from receipt date; NNNN = 4-digit seq per year). */
+const generateGrrNumberInTransaction = async (
+  transaction: Transaction,
+  forDate: Date
+): Promise<string> => {
+  const year = forDate.getFullYear();
+  const counterDocId = `year_${year}`;
+  const counterRef = doc(db, GRR_COUNTERS_COLLECTION, counterDocId);
+  const counterSnap = await transaction.get(counterRef);
+  const lastNumber = counterSnap.exists()
+    ? (counterSnap.data()?.lastNumber ?? 0)
+    : 0;
+  const nextNumber = lastNumber + 1;
+  transaction.set(counterRef, {
+    year,
+    lastNumber: nextNumber,
+    updatedAt: serverTimestamp(),
+  });
+  return `PO-RCV-${year}-${String(nextNumber).padStart(4, '0')}`;
 };
 
 /**
@@ -306,6 +393,7 @@ export const createPO = async (
   createdByRole?: string
 ): Promise<string> => {
   try {
+    await ensureCanCreatePO(userId);
     validatePoItemQuantities(data.items);
     if (!isDraft) {
       const assignedId = data.assignedToAdminId?.trim();
@@ -467,10 +555,13 @@ export const updatePO = async (
   userName?: string
 ): Promise<PurchaseOrder | null> => {
   try {
-    validatePoItemQuantities(data.items);
     if (!userId) {
       throw new Error('User ID is required to update a purchase order');
     }
+    if (!isDraft) {
+      await ensureCanCreatePO(userId);
+    }
+    validatePoItemQuantities(data.items);
     if (!isDraft) {
       const assignedId = data.assignedToAdminId?.trim();
       const assignedName = data.assignedToAdminName?.trim();
@@ -587,7 +678,7 @@ export const recordPODownloadForSigning = async (
   adminName: string
 ): Promise<void> => {
   try {
-    await ensureAdminUser(adminId);
+    await ensureCanApproveRejectPO(adminId);
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
     const poSnap = await getDoc(poRef);
 
@@ -620,7 +711,7 @@ export const setSignedPdfUrl = async (
   signedPdfUrl: string
 ): Promise<PurchaseOrder | null> => {
   try {
-    await ensureAdminUser(adminId);
+    const { isSuperAdmin } = await ensureCanApproveRejectPO(adminId);
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
     const poSnap = await getDoc(poRef);
 
@@ -633,7 +724,11 @@ export const setSignedPdfUrl = async (
       throw new Error('Signed document can only be uploaded for pending approval POs');
     }
     const assignedId = poData.assignedToAdminId?.trim();
-    if (assignedId && assignedId !== adminId) {
+    if (
+      assignedId &&
+      assignedId !== adminId &&
+      !isSuperAdmin
+    ) {
       throw new Error('Only the assigned admin can upload the signed document for this PO.');
     }
 
@@ -658,7 +753,7 @@ export const clearSignedPdfUrl = async (
   adminId: string
 ): Promise<PurchaseOrder | null> => {
   try {
-    await ensureAdminUser(adminId);
+    const { isSuperAdmin } = await ensureCanApproveRejectPO(adminId);
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
     const poSnap = await getDoc(poRef);
 
@@ -671,7 +766,11 @@ export const clearSignedPdfUrl = async (
       throw new Error('Signed document can only be removed from pending approval POs');
     }
     const assignedId = poData.assignedToAdminId?.trim();
-    if (assignedId && assignedId !== adminId) {
+    if (
+      assignedId &&
+      assignedId !== adminId &&
+      !isSuperAdmin
+    ) {
       throw new Error('Only the assigned admin can remove the signed document for this PO.');
     }
 
@@ -699,7 +798,7 @@ export const approvePO = async (
   data?: ApprovePOData
 ): Promise<void> => {
   try {
-    await ensureAdminUser(adminId);
+    const { isSuperAdmin } = await ensureCanApproveRejectPO(adminId);
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
 
     await runTransaction(db, async (transaction) => {
@@ -715,7 +814,11 @@ export const approvePO = async (
         );
       }
       const assignedId = poData.assignedToAdminId?.trim();
-      if (assignedId && assignedId !== adminId) {
+      if (
+        assignedId &&
+        assignedId !== adminId &&
+        !isSuperAdmin
+      ) {
         throw new Error('Only the assigned admin can approve this PO.');
       }
 
@@ -745,7 +848,7 @@ export const rejectPO = async (
   data: RejectPOData
 ): Promise<void> => {
   try {
-    await ensureAdminUser(adminId);
+    const { isSuperAdmin } = await ensureCanApproveRejectPO(adminId);
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
 
     await runTransaction(db, async (transaction) => {
@@ -761,7 +864,11 @@ export const rejectPO = async (
         );
       }
       const assignedId = poData.assignedToAdminId?.trim();
-      if (assignedId && assignedId !== adminId) {
+      if (
+        assignedId &&
+        assignedId !== adminId &&
+        !isSuperAdmin
+      ) {
         throw new Error('Only the assigned admin can reject this PO.');
       }
 
@@ -789,7 +896,7 @@ export const receivePO = async (
   receiveData: ReceivePOData,
   userId: string,
   userName: string
-): Promise<void> => {
+): Promise<{ grrNumber: string }> => {
   const storeLocationId = getLocationId('store');
   await ensureCanReceive(userId);
   const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
@@ -814,6 +921,8 @@ export const receivePO = async (
   const receivedByQty = new Map(
     receiveData.receivedQuantities.map((r) => [r.itemId, r.receivedQuantity])
   );
+
+  let mintedGrrNumber = '';
 
   await runTransaction(db, async (transaction) => {
     // 1. Re-read PO document
@@ -927,6 +1036,22 @@ export const receivePO = async (
       new Date(receiveData.receivedDate)
     );
 
+    const nextGrr = await generateGrrNumberInTransaction(
+      transaction,
+      new Date(receiveData.receivedDate)
+    );
+    mintedGrrNumber = nextGrr;
+
+    const existingGrr = Array.isArray(poData.grrReceipts)
+      ? poData.grrReceipts
+      : [];
+    const newGrrReceipt: PurchaseOrderGrrReceiptFirestore = {
+      grrNumber: nextGrr,
+      receivedAt: receivedAtTimestamp,
+      receivedBy: userId,
+      receivedByName: userName,
+    };
+
     let allFullyReceived = true;
     const updatedItems = poData.items.map((item: any) => {
       const newlyReceived = receivedByQty.get(item.itemId) ?? 0;
@@ -952,6 +1077,7 @@ export const receivePO = async (
       receivedNotes: receiveData.receivedNotes?.trim() ?? null,
       documents: [...(poData.documents ?? []), ...documents],
       items: updatedItems,
+      grrReceipts: [...existingGrr, newGrrReceipt],
       updatedAt: serverTimestamp(),
     });
 
@@ -961,6 +1087,8 @@ export const receivePO = async (
       receivedAtTimestamp
     );
   });
+
+  return { grrNumber: mintedGrrNumber };
 };
 
 /**

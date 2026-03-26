@@ -258,6 +258,18 @@ const defaultPreloadedState: Partial<RootState> = {
   },
 };
 
+const superAdminPreloadedState: Partial<RootState> = {
+  auth: {
+    ...defaultPreloadedState.auth!,
+    userRole: {
+      role: 'Admin',
+      isActive: true,
+      permissions: [],
+      isSuperadmin: true,
+    },
+  },
+};
+
 describe('ApprovePOScreen — PO Approval flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -382,5 +394,45 @@ describe('ApprovePOScreen — PO Approval flow', () => {
     expect(screen.getByText('REJECTION DETAILS')).toBeTruthy();
     expect(screen.getByText('Budget exceeded')).toBeTruthy();
     expect(screen.getByText('Please revise')).toBeTruthy();
+  });
+
+  it('hides approve actions when Admin is not the assigned approver', async () => {
+    renderWithStore(<ApprovePOScreen />, defaultPreloadedState);
+
+    mockGetPOByIdResolve!(
+      createMockPO({
+        assignedToAdminId: 'other-admin',
+        assignedToAdminName: 'Other Admin',
+      })
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Only the assigned admin can approve or reject this PO.')
+      ).toBeTruthy();
+    });
+
+    expect(screen.queryByText('Approve')).toBeNull();
+    expect(screen.queryByText('Reject')).toBeNull();
+  });
+
+  it('shows approve actions for super admin even when assigned to another admin', async () => {
+    renderWithStore(<ApprovePOScreen />, superAdminPreloadedState);
+
+    mockGetPOByIdResolve!(
+      createMockPO({
+        assignedToAdminId: 'other-admin',
+        assignedToAdminName: 'Other Admin',
+      })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Approve')).toBeTruthy();
+    });
+
+    expect(screen.getByText('Reject')).toBeTruthy();
+    expect(
+      screen.queryByText('Only the assigned admin can approve or reject this PO.')
+    ).toBeNull();
   });
 });

@@ -162,7 +162,7 @@ export function ReceivePOPage() {
 
     setSaving(true);
     try {
-      await dispatch(
+      const { grrNumber } = await dispatch(
         receivePO({
           poId,
           receiveData: {
@@ -185,7 +185,9 @@ export function ReceivePOPage() {
           userName,
         })
       ).unwrap();
-      toast.success('Purchase order received. Inventory updated.');
+      toast.success(
+        `Purchase order received. GRR: ${grrNumber}. Inventory updated.`
+      );
       navigate(-1);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to receive PO');

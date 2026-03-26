@@ -89,6 +89,12 @@ export const selectIsStoreIncharge = createSelector(
   (role) => role === 'StoreIncharge'
 );
 
+/** Store Incharge or super admin may create new POs (not regular Admin). */
+export const selectCanCreatePurchaseOrder = createSelector(
+  [selectIsStoreIncharge, selectIsSuperAdmin],
+  (isStoreIncharge, isSuperAdmin) => isStoreIncharge || isSuperAdmin
+);
+
 export const selectIsSiteManager = createSelector(
   [selectUserRoleType],
   (role) => role === 'SiteManager'

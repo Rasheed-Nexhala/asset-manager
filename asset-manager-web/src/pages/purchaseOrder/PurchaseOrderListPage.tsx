@@ -25,6 +25,7 @@ import {
   selectPurchaseOrderHasMore,
   selectPurchaseOrderError,
 } from '../../store/selectors/purchaseOrderSelectors';
+import { selectCanCreatePurchaseOrder } from '../../store/selectors/authSelectors';
 import type { PurchaseOrder } from '../../types/purchaseOrder';
 
 function getPONavigateTo(po: PurchaseOrder): string {
@@ -49,6 +50,7 @@ export function PurchaseOrderListPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [retryTrigger, setRetryTrigger] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
+  const canCreatePO = useAppSelector(selectCanCreatePurchaseOrder);
 
   const orders = useAppSelector((state) =>
     selectFilteredPurchaseOrdersForViewer(state, searchQuery)
@@ -111,13 +113,15 @@ export function PurchaseOrderListPage() {
               )}
               Export
             </button>
-            <Link
-              to="/purchase-orders/new"
-              className="flex h-[50px] items-center justify-center gap-2 rounded-[10px] bg-blue-800 px-6 text-[15px] font-semibold text-white transition-colors hover:bg-blue-900"
-            >
-              <Icon name="plus" className="h-5 w-5" />
-              New
-            </Link>
+            {canCreatePO && (
+              <Link
+                to="/purchase-orders/new"
+                className="flex h-[50px] items-center justify-center gap-2 rounded-[10px] bg-blue-800 px-6 text-[15px] font-semibold text-white transition-colors hover:bg-blue-900"
+              >
+                <Icon name="plus" className="h-5 w-5" />
+                New
+              </Link>
+            )}
           </div>
         </div>
 
@@ -152,13 +156,15 @@ export function PurchaseOrderListPage() {
             )}
             Export
           </button>
-          <Link
-            to="/purchase-orders/new"
-            className="flex h-[50px] items-center justify-center gap-2 rounded-[10px] bg-blue-800 px-6 text-[15px] font-semibold text-white transition-colors hover:bg-blue-900"
-          >
-            <Icon name="plus" className="h-5 w-5" />
-            New
-          </Link>
+          {canCreatePO && (
+            <Link
+              to="/purchase-orders/new"
+              className="flex h-[50px] items-center justify-center gap-2 rounded-[10px] bg-blue-800 px-6 text-[15px] font-semibold text-white transition-colors hover:bg-blue-900"
+            >
+              <Icon name="plus" className="h-5 w-5" />
+              New
+            </Link>
+          )}
         </div>
       </div>
 
@@ -260,7 +266,9 @@ export function PurchaseOrderListPage() {
                   ? 'Try adjusting your filters to see more orders.'
                   : 'Create your first purchase order to get started.'}
           </p>
-          {(filters.status === 'all' || error) && !searchQuery.trim() && (
+          {(filters.status === 'all' || error) &&
+            !searchQuery.trim() &&
+            canCreatePO && (
             <Link
               to="/purchase-orders/new"
               className="mt-6 flex h-[50px] items-center justify-center rounded-[10px] bg-blue-800 px-6 text-[15px] font-semibold text-white transition-colors hover:bg-blue-900"

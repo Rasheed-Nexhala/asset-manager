@@ -184,20 +184,28 @@ service cloud.firestore {
     
     /**
      * Purchase Orders collection
-     * Admin and Store Incharge can read and write (create, update) purchase orders
+     * Read: Admin and Store Incharge (review, receive, list)
+     * Create: Store Incharge or super admin only (not regular Admin)
+     * Update: Admin or Store Incharge; approval/rejection requires Admin or super admin
      * Delete: Creator can delete own draft POs only
      */
     match /purchaseOrders/{poId} {
-      allow read, create: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge();
+      allow read: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge();
+      allow create: if isAuthenticated() && isUserActive() && (isStoreIncharge() || isSuperAdmin());
+      // Draft submit (draft -> pending_approval): same as create — Store Incharge or super admin only.
+      // Approve/reject: Admin or super admin. Other updates: Admin or Store Incharge.
       allow update: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge() &&
         (
-          // Admin-only for approval/rejection transitions.
-          (
-            request.resource.data.status != resource.data.status &&
-            request.resource.data.status in ['approved', 'rejected']
-          )
-          ? isAdmin()
-          : true
+          (resource.data.status == 'draft' && request.resource.data.status == 'pending_approval')
+            ? (isStoreIncharge() || isSuperAdmin())
+            : (
+                (
+                  request.resource.data.status != resource.data.status &&
+                  request.resource.data.status in ['approved', 'rejected']
+                )
+                  ? (isAdmin() || isSuperAdmin())
+                  : true
+              )
         );
       allow delete: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge() &&
         resource.data.status == 'draft' && resource.data.createdBy == request.auth.uid;
@@ -217,7 +225,14 @@ service cloud.firestore {
      * Purpose: Atomic counter for generating unique PO numbers (PO-YYYY-NNNN)
      */
     match /poCounters/{counterId} {
-      allow read, write: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge();
+      allow read, write: if isAuthenticated() && isUserActive() && (isStoreIncharge() || isSuperAdmin());
+    }
+    
+    /**
+     * GRR Counters — atomic sequence for Goods Receipt Register numbers (PO-RCV-YYYY-NNNN)
+     */
+    match /grrCounters/{counterId} {
+      allow read, write: if isAuthenticated() && isUserActive() && (isAdmin() || isStoreIncharge());
     }
     
     // ============================================

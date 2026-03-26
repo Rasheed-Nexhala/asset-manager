@@ -26,6 +26,11 @@ export function POCard({ po, to }: POCardProps) {
   const hasAnyPrice = (po?.items ?? []).some(
     (i) => (Number(i.unitPrice) || 0) > 0
   );
+  const grrReceipts = po.grrReceipts ?? [];
+  const latestGrr =
+    grrReceipts.length > 0 ? grrReceipts[grrReceipts.length - 1] : null;
+  const moreGrrCount =
+    grrReceipts.length > 1 ? grrReceipts.length - 1 : 0;
 
   return (
     <Link
@@ -38,6 +43,13 @@ export function POCard({ po, to }: POCardProps) {
         </span>
         <POStatusBadge status={po.status} />
       </div>
+
+      {latestGrr && (
+        <p className="mb-3 text-[13px] text-slate-600">
+          GRR: {latestGrr.grrNumber}
+          {moreGrrCount > 0 ? ` (+${moreGrrCount} more)` : ''}
+        </p>
+      )}
 
       <div className="mb-3 flex gap-4">
         <div className="flex-1">

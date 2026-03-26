@@ -15,6 +15,7 @@ import {
   selectUserId,
   selectUserDisplayName,
   selectIsAdmin,
+  selectIsSuperAdmin,
 } from '../../store/selectors/authSelectors';
 import { selectPurchaseOrderError } from '../../store/selectors/purchaseOrderSelectors';
 import { PODocumentCard } from '../../components/purchaseOrder';
@@ -43,6 +44,7 @@ export function ApprovePOPage() {
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
   const isAdmin = useAppSelector(selectIsAdmin);
+  const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
   const reduxError = useAppSelector(selectPurchaseOrderError);
 
   const [po, setPo] = useState<PurchaseOrder | null>(null);
@@ -196,6 +198,27 @@ export function ApprovePOPage() {
           <Icon name="arrow-left" className="h-5 w-5" />
           Back
         </button>
+        {(po.grrReceipts?.length ?? 0) > 0 && (
+          <div className="rounded-[10px] border border-slate-200 bg-white p-4">
+            <h2 className="mb-2 text-[15px] font-semibold text-slate-900">
+              GOODS RECEIPT REGISTER (GRR)
+            </h2>
+            <ul className="space-y-2">
+              {po.grrReceipts!.map((r) => (
+                <li
+                  key={`${r.grrNumber}-${r.receivedAt}`}
+                  className="text-[14px] text-slate-900"
+                >
+                  <span className="font-semibold">{r.grrNumber}</span>
+                  <span className="text-[13px] text-slate-500">
+                    {' '}
+                    · {formatDate(r.receivedAt)} · {r.receivedByName ?? '—'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <p className="text-[15px] text-slate-500">
             This PO has been partially received. You can receive it from the list.
@@ -225,14 +248,18 @@ export function ApprovePOPage() {
     );
   }
 
+  const canApproveReject = isAdmin || isSuperAdmin;
   const isAssignedAdmin =
-    po.assignedToAdminId != null && po.assignedToAdminId.trim() !== ''
+    isSuperAdmin ||
+    (po.assignedToAdminId != null && po.assignedToAdminId.trim() !== ''
       ? po.assignedToAdminId === userId
-      : isAdmin;
+      : isAdmin);
   const showApproveReject =
-    po.status === 'pending_approval' && isAdmin && isAssignedAdmin;
+    po.status === 'pending_approval' && canApproveReject && isAssignedAdmin;
   const isOtherAdminViewing =
-    po.status === 'pending_approval' && isAdmin && !isAssignedAdmin;
+    po.status === 'pending_approval' &&
+    canApproveReject &&
+    !isAssignedAdmin;
   const isReadOnly = ['received', 'rejected'].includes(po.status);
   const hasAnyPrice = (po.items ?? []).some(
     (i) => (Number(i.unitPrice) || 0) > 0
@@ -293,12 +320,36 @@ export function ApprovePOPage() {
                     : 'text-amber-600'
             }`}
           >
-            {po.status === 'pending_approval' && isAdmin ? 'PENDING APPROVAL' : ''}
+            {po.status === 'pending_approval' && canApproveReject
+              ? 'PENDING APPROVAL'
+              : ''}
             {po.status === 'approved' && 'Approved'}
             {po.status === 'received' && 'Received'}
             {po.status === 'rejected' && 'Rejected'}
           </p>
         </div>
+
+        {po.status === 'received' && (po.grrReceipts?.length ?? 0) > 0 && (
+          <div className="rounded-[10px] border border-slate-200 bg-white p-4">
+            <h2 className="mb-2 text-[15px] font-semibold text-slate-900">
+              GOODS RECEIPT REGISTER (GRR)
+            </h2>
+            <ul className="space-y-2">
+              {po.grrReceipts!.map((r) => (
+                <li
+                  key={`${r.grrNumber}-${r.receivedAt}`}
+                  className="text-[14px] text-slate-900"
+                >
+                  <span className="font-semibold">{r.grrNumber}</span>
+                  <span className="text-[13px] text-slate-500">
+                    {' '}
+                    · {formatDate(r.receivedAt)} · {r.receivedByName ?? '—'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {isOtherAdminViewing && (po.assignedToAdminId || po.assignedToAdminName) && (
           <div className="rounded-[10px] border border-amber-200 bg-amber-50 p-4">

@@ -39,6 +39,7 @@ import {
   selectPurchaseOrderHasMore,
   selectPurchaseOrderError,
 } from '../../store/selectors/purchaseOrderSelectors';
+import { selectCanCreatePurchaseOrder } from '../../store/selectors/authSelectors';
 import type { PurchaseOrder } from '../../types/purchaseOrder';
 import type { PurchaseOrderStackParamList } from '../../navigation/PurchaseOrderStackParamList';
 
@@ -66,6 +67,7 @@ export const PurchaseOrderListScreen: React.FC = () => {
   const hasMore = useAppSelector(selectPurchaseOrderHasMore);
   const error = useAppSelector(selectPurchaseOrderError);
   const filters = useAppSelector(selectPurchaseOrderFilters);
+  const canCreatePO = useAppSelector(selectCanCreatePurchaseOrder);
 
   // Fetch purchase orders with pagination when screen is focused or filters change
   useEffect(() => {
@@ -155,6 +157,27 @@ export const PurchaseOrderListScreen: React.FC = () => {
     [handlePOPress]
   );
 
+  const listHeaderActions = React.useMemo(
+    () => [
+      {
+        icon: 'download-outline' as const,
+        onPress: handleExport,
+        loading: isExporting,
+        accessibilityLabel: 'Export purchase orders',
+      },
+      ...(canCreatePO
+        ? [
+            {
+              icon: 'add' as const,
+              onPress: () => navigation.navigate('CreatePO', {}),
+              label: 'New',
+            },
+          ]
+        : []),
+    ],
+    [handleExport, isExporting, canCreatePO, navigation]
+  );
+
   const isInitialOrRefetching =
     orders.length === 0 && totalCount === null && !error;
   if (isInitialOrRefetching || (isLoading && orders.length === 0)) {
@@ -162,19 +185,7 @@ export const PurchaseOrderListScreen: React.FC = () => {
       <ScreenLayout edges={['top']}>
         <ScreenHeader
           title="Purchase Orders"
-          rightActions={[
-            {
-              icon: 'download-outline',
-              onPress: handleExport,
-              loading: isExporting,
-              accessibilityLabel: 'Export purchase orders',
-            },
-            {
-              icon: 'add',
-              onPress: () => navigation.navigate('CreatePO', {}),
-              label: 'New',
-            }
-          ]}
+          rightActions={listHeaderActions}
         />
         <View
           className="flex-1 items-center justify-center px-4"
@@ -194,19 +205,7 @@ export const PurchaseOrderListScreen: React.FC = () => {
     <ScreenLayout edges={['top']}>
       <ScreenHeader
         title="Purchase Orders"
-        rightActions={[
-          {
-            icon: 'download-outline',
-            onPress: handleExport,
-            loading: isExporting,
-            accessibilityLabel: 'Export purchase orders',
-          },
-          {
-            icon: 'add',
-            onPress: () => navigation.navigate('CreatePO', {}),
-            label: 'New',
-          }
-        ]}
+        rightActions={listHeaderActions}
       />
 
       {error && (
@@ -303,7 +302,9 @@ export const PurchaseOrderListScreen: React.FC = () => {
                   ? 'Try adjusting your filters to see more orders.'
                   : 'Create your first purchase order to get started.'}
           </Text>
-          {(filters.status === 'all' || error) && !searchQuery.trim() && (
+          {(filters.status === 'all' || error) &&
+            !searchQuery.trim() &&
+            canCreatePO && (
             <TouchableOpacity
               onPress={() => navigation.navigate('CreatePO', {})}
               className="bg-[#1E40AF] rounded-[10px] h-[50px] px-6 items-center justify-center"

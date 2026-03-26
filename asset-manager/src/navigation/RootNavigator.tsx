@@ -13,6 +13,7 @@ import {
   selectAuthInitialized,
   selectIsAdmin,
   selectIsStoreIncharge,
+  selectIsSuperAdmin,
 } from '../store/selectors/authSelectors';
 import { AuthFlowScreen } from '../screens/Authentication/AuthFlowScreen';
 import { AuthCheckingScreen } from '../screens/Authentication/AuthCheckingScreen';
@@ -40,13 +41,14 @@ function handleNotificationNavigation(
   data: NotificationData | undefined,
   canNavigateToMain: boolean,
   isAdmin: boolean,
-  isStoreIncharge: boolean
+  isStoreIncharge: boolean,
+  isSuperAdmin: boolean
 ): void {
   if (!data || !canNavigateToMain || !navigationRef.isReady()) return;
 
   const canManageRequests = isAdmin || isStoreIncharge;
   const canManagePo = isAdmin || isStoreIncharge;
-  const canReviewPo = isAdmin;
+  const canReviewPo = isAdmin || isSuperAdmin;
 
   if (data.screen === 'ProcessRequest' && data.requestId && canManageRequests) {
     const { navigateToProcessRequest } = require('./navigationUtils');
@@ -199,7 +201,8 @@ function useNotificationResponseHandler(
   isAuthenticated: boolean,
   isRoleLoading: boolean,
   isAdmin: boolean,
-  isStoreIncharge: boolean
+  isStoreIncharge: boolean,
+  isSuperAdmin: boolean
 ): void {
   const [coldStartData, setColdStartData] = useState<NotificationData | null>(null);
   const canNavigateToMain = isAuthenticated && !isRoleLoading;
@@ -216,10 +219,16 @@ function useNotificationResponseHandler(
 
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as NotificationData | undefined;
-      handleNotificationNavigation(data, canNavigateToMain, isAdmin, isStoreIncharge);
+      handleNotificationNavigation(
+        data,
+        canNavigateToMain,
+        isAdmin,
+        isStoreIncharge,
+        isSuperAdmin
+      );
     });
     return () => sub.remove();
-  }, [canNavigateToMain, isAdmin, isStoreIncharge]);
+  }, [canNavigateToMain, isAdmin, isStoreIncharge, isSuperAdmin]);
 
   // Process cold start when auth, role loaded, and nav are ready (may lag behind initial mount)
   useEffect(() => {
@@ -228,7 +237,13 @@ function useNotificationResponseHandler(
     const tryNavigate = (attempt = 0): void => {
       const maxAttempts = 50; // ~5s max wait
       if (navigationRef.isReady()) {
-        handleNotificationNavigation(coldStartData, canNavigateToMain, isAdmin, isStoreIncharge);
+        handleNotificationNavigation(
+          coldStartData,
+          canNavigateToMain,
+          isAdmin,
+          isStoreIncharge,
+          isSuperAdmin
+        );
         Notifications.clearLastNotificationResponseAsync();
         setColdStartData(null);
       } else if (attempt < maxAttempts) {
@@ -237,7 +252,7 @@ function useNotificationResponseHandler(
     };
 
     tryNavigate();
-  }, [canNavigateToMain, coldStartData, isAdmin, isStoreIncharge]);
+  }, [canNavigateToMain, coldStartData, isAdmin, isStoreIncharge, isSuperAdmin]);
 }
 
 export const RootNavigator: React.FC = () => {
@@ -246,12 +261,14 @@ export const RootNavigator: React.FC = () => {
   const isRoleLoading = useAppSelector(selectRoleLoading);
   const isAdmin = useAppSelector(selectIsAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
 
   useNotificationResponseHandler(
     isAuthenticated,
     isRoleLoading,
     isAdmin,
-    isStoreIncharge
+    isStoreIncharge,
+    isSuperAdmin
   );
 
   return (

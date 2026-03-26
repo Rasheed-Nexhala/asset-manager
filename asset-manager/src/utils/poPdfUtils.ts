@@ -243,6 +243,33 @@ export function generatePOHtml(
   const justificationText = (po.justification ?? '').trim();
   const justificationBodyHtml = `<div style="margin-top:4px;font-size:10px;line-height:1.5;color:#000;white-space:pre-wrap;">${justificationText ? escapeHtml(justificationText) : '—'}</div>`;
 
+  const grrList = po.grrReceipts ?? [];
+  const grrSectionHtml =
+    grrList.length > 0
+      ? `<div style="margin-top:14px;border:1px solid #000;padding:12px 14px;background:#fafafa;">
+    <div style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#000;">Goods Receipt Register (GRR)</div>
+    <table style="width:100%;border-collapse:collapse;font-size:10px;">
+      <thead><tr>
+        <th style="text-align:left;border-bottom:1px solid #000;padding:4px 6px;">GRR No.</th>
+        <th style="text-align:left;border-bottom:1px solid #000;padding:4px 6px;">Date</th>
+        <th style="text-align:left;border-bottom:1px solid #000;padding:4px 6px;">Received by</th>
+      </tr></thead>
+      <tbody>
+        ${grrList
+          .map(
+            (r) =>
+              `<tr>
+          <td style="padding:6px 6px;border-bottom:1px solid #eee;vertical-align:top;">${escapeHtml(r.grrNumber)}</td>
+          <td style="padding:6px 6px;border-bottom:1px solid #eee;vertical-align:top;">${escapeHtml(formatDdMmYyyy(r.receivedAt))}</td>
+          <td style="padding:6px 6px;border-bottom:1px solid #eee;vertical-align:top;">${escapeHtml(r.receivedByName ?? '—')}</td>
+        </tr>`
+          )
+          .join('')}
+      </tbody>
+    </table>
+  </div>`
+      : '';
+
   const logoImg = logoBase64
     ? `<img src="data:image/png;base64,${logoBase64}" alt="Logo" style="height:96px;max-width:100%;width:auto;display:block;object-fit:contain;" />`
     : '';
@@ -362,6 +389,8 @@ export function generatePOHtml(
     </thead>
     <tbody>${itemRows}${totalsFooterRow}</tbody>
   </table>
+
+  ${grrSectionHtml}
 
   <!-- Terms + remarks (same bordered box) -->
   <div style="margin-top:14px;border:1px solid #000;padding:14px 14px;background:#fff;">
@@ -504,7 +533,7 @@ export async function printPurchaseOrder(
       const sanitizedPoNumber = sanitizePoNumberForPath(po.poNumber);
       const localPath = `${documentDir}signed_${sanitizedPoNumber}_${Date.now()}.${ext}`;
       const parentDir = localPath.substring(0, localPath.lastIndexOf('/') + 1);
-      const dirInfo = await FileSystem.getInfoAsync(parentDir, { size: false });
+      const dirInfo = await FileSystem.getInfoAsync(parentDir);
       if (!dirInfo.exists) {
         await FileSystem.makeDirectoryAsync(parentDir, { intermediates: true });
       }

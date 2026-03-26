@@ -25,6 +25,7 @@ import {
   selectUserId,
   selectUserDisplayName,
   selectIsAdmin,
+  selectIsSuperAdmin,
 } from '../../store/selectors/authSelectors';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { clearError, setError } from '../../store/slices/purchaseOrderSlice';
@@ -57,6 +58,32 @@ const formatCurrencyOrOptional = (n: number) =>
 const formatGstOrOptional = (pct: number | undefined) =>
   pct != null && pct > 0 ? `${pct}%` : '—';
 
+const GrrReceiptsSection: React.FC<{
+  receipts: PurchaseOrder['grrReceipts'];
+}> = ({ receipts }) => {
+  const list = receipts ?? [];
+  if (list.length === 0) return null;
+  return (
+    <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-4">
+      <Text className="text-[15px] font-semibold text-[#0F172A] mb-2">
+        GOODS RECEIPT REGISTER (GRR)
+      </Text>
+      {list.map((r) => (
+        <Text
+          key={`${r.grrNumber}-${r.receivedAt}`}
+          className="text-[14px] text-[#0F172A] mb-2"
+        >
+          <Text className="font-semibold">{r.grrNumber}</Text>
+          <Text className="text-[13px] text-[#64748B]">
+            {' '}
+            · {formatDate(r.receivedAt)} · {r.receivedByName ?? '—'}
+          </Text>
+        </Text>
+      ))}
+    </View>
+  );
+};
+
 export const ApprovePOScreen: React.FC = () => {
   const route = useRoute<RouteParams>();
   const navigation = useNavigation<NavigationProp>();
@@ -66,6 +93,7 @@ export const ApprovePOScreen: React.FC = () => {
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
   const isAdmin = useAppSelector(selectIsAdmin);
+  const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
   const reduxError = useAppSelector(selectPurchaseOrderError);
 
   const [po, setPo] = useState<PurchaseOrder | null>(null);
@@ -233,11 +261,17 @@ export const ApprovePOScreen: React.FC = () => {
             accessibilityLabel: 'Print purchase order',
           }}
         />
-        <View className="flex-1 items-center justify-center px-4">
-          <Text className="text-[15px] text-[#64748B] text-center">
-            This PO has been partially received. You can receive it from the list.
-          </Text>
-        </View>
+        <ScrollView
+          className="flex-1 bg-[#F8FAFC]"
+          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+        >
+          <GrrReceiptsSection receipts={po.grrReceipts} />
+          <View className="items-center justify-center py-8 px-2">
+            <Text className="text-[15px] text-[#64748B] text-center">
+              This PO has been partially received. You can receive it from the list.
+            </Text>
+          </View>
+        </ScrollView>
       </ScreenLayout>
     );
   }
@@ -265,28 +299,30 @@ export const ApprovePOScreen: React.FC = () => {
     );
   }
 
+  const canApproveReject = isAdmin || isSuperAdmin;
   const isAssignedAdmin =
-    po.assignedToAdminId != null && po.assignedToAdminId.trim() !== ''
+    isSuperAdmin ||
+    (po.assignedToAdminId != null && po.assignedToAdminId.trim() !== ''
       ? po.assignedToAdminId === userId
-      : isAdmin;
+      : isAdmin);
   const showApproveReject =
-    po.status === 'pending_approval' && isAdmin && isAssignedAdmin;
+    po.status === 'pending_approval' && canApproveReject && isAssignedAdmin;
   const isOtherAdminViewing =
-    po.status === 'pending_approval' && isAdmin && !isAssignedAdmin;
+    po.status === 'pending_approval' &&
+    canApproveReject &&
+    !isAssignedAdmin;
   const isReadOnly =
-    po.status === 'received' || po.status === 'partially_received' || po.status === 'rejected';
+    po.status === 'received' || po.status === 'rejected';
   const statusBadge =
     po.status === 'pending_approval'
-      ? isAdmin
+      ? canApproveReject
         ? 'PENDING APPROVAL'
         : 'Sent for approval'
       : po.status === 'approved'
         ? 'Approved'
         : po.status === 'received'
           ? 'Received'
-          : po.status === 'partially_received'
-            ? 'Partially Received'
-            : 'Rejected';
+          : 'Rejected';
 
   const hasAnyPrice = (po.items ?? []).some(
     (i) => (Number(i.unitPrice) || 0) > 0
@@ -297,7 +333,7 @@ export const ApprovePOScreen: React.FC = () => {
   return (
     <ScreenLayout edges={['top']}>
       <ScreenHeader
-        title={isAdmin ? `Review ${po.poNumber}` : po.poNumber}
+        title={canApproveReject ? `Review ${po.poNumber}` : po.poNumber}
         showBack
         onBackPress={handleBack}
         rightAction={
@@ -341,19 +377,21 @@ export const ApprovePOScreen: React.FC = () => {
             className={`text-[13px] mt-1 font-medium ${
               po.status === 'received'
                 ? 'text-[#16A34A]'
-                : po.status === 'partially_received'
-                  ? 'text-[#D97706]'
-                  : po.status === 'rejected'
-                    ? 'text-[#DC2626]'
-                    : po.status === 'approved'
-                      ? 'text-[#1E40AF]'
-                      : 'text-[#D97706]'
+                : po.status === 'rejected'
+                  ? 'text-[#DC2626]'
+                  : po.status === 'approved'
+                    ? 'text-[#1E40AF]'
+                    : 'text-[#D97706]'
             }`}
           >
-            {po.status === 'pending_approval' && isAdmin ? '⏳ ' : ''}
+            {po.status === 'pending_approval' && canApproveReject ? '⏳ ' : ''}
             {statusBadge}
           </Text>
         </View>
+
+        {po.status === 'received' && (
+          <GrrReceiptsSection receipts={po.grrReceipts} />
+        )}
 
         {isOtherAdminViewing && (po.assignedToAdminId || po.assignedToAdminName) && (
           <View className="mb-4 rounded-[10px] bg-[#FEF3C7] border border-[#FCD34D] p-4">

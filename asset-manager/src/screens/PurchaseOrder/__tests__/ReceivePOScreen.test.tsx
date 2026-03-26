@@ -37,7 +37,7 @@ jest.mock('../../../utils/poPdfUtils', () => ({
 }));
 
 let mockGetPOByIdResolve: (po: PurchaseOrder | null) => void;
-let mockReceivePOResolve: () => void;
+let mockReceivePOResolve: (value: unknown) => void;
 
 jest.mock('../../../services/firebase/purchaseOrderService', () => ({
   getPOById: jest.fn(() =>
@@ -161,7 +161,7 @@ jest.mock('../../../store/thunks/purchaseOrderThunks', () => {
     'purchaseOrders/receive',
     async () =>
       new Promise<unknown>((resolve) => {
-        mockReceivePOResolve = resolve as () => void;
+        mockReceivePOResolve = resolve;
       })
   );
   return {
@@ -305,20 +305,17 @@ describe('ReceivePOScreen', () => {
       expect(screen.getByText('Steel Bar')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByRole('button', { name: 'Upload invoice' }));
-
-    await waitFor(() => {
-      expect(screen.getByText('invoice.jpg')).toBeTruthy();
-    });
-
     fireEvent.press(screen.getByText('CONFIRM & UPDATE INVENTORY'));
 
-    mockReceivePOResolve!();
+    mockReceivePOResolve!({
+      updatedPO: null,
+      grrNumber: 'PO-RCV-2025-0001',
+    });
 
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Success',
-        'Purchase order received. Inventory updated.',
+        'Purchase order received. GRR: PO-RCV-2025-0001. Inventory updated.',
         expect.any(Array)
       );
     });

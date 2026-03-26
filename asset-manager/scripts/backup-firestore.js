@@ -36,6 +36,7 @@ const TOP_LEVEL_COLLECTIONS = [
   'purchaseOrders',
   'vendors',
   'poCounters',
+  'grrCounters',
   'requests',
   'requestCounters',
   'activityLogs',

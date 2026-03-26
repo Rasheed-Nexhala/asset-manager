@@ -186,7 +186,7 @@ export const ReceivePOScreen: React.FC = () => {
 
     setSaving(true);
     try {
-      await dispatch(
+      const { grrNumber } = await dispatch(
         receivePO({
           poId,
           receiveData: {
@@ -206,9 +206,11 @@ export const ReceivePOScreen: React.FC = () => {
           userName,
         })
       ).unwrap();
-      Alert.alert('Success', 'Purchase order received. Inventory updated.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      Alert.alert(
+        'Success',
+        `Purchase order received. GRR: ${grrNumber}. Inventory updated.`,
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to receive PO';
       Alert.alert('Error', msg);

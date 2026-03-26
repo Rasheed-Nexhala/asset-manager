@@ -51,6 +51,24 @@ export interface PurchaseOrderDocument {
   uploadedAt: Timestamp;
 }
 
+/** One goods-receipt register entry (Firestore) */
+export interface PurchaseOrderGrrReceiptFirestore {
+  /** e.g. PO-RCV-2026-0001 (year + per-year sequence) */
+  grrNumber: string;
+  receivedAt: Timestamp;
+  receivedBy: string;
+  receivedByName: string;
+}
+
+/** One goods-receipt register entry (client / Redux, ISO dates) */
+export interface PurchaseOrderGrrReceipt {
+  /** e.g. PO-RCV-2026-0001 */
+  grrNumber: string;
+  receivedAt: string;
+  receivedBy: string;
+  receivedByName: string;
+}
+
 /**
  * Firestore document structure (uses Timestamp)
  */
@@ -115,6 +133,9 @@ export interface PurchaseOrderFirestore {
   receivedBy: string | null;
   receivedByName: string | null;
   receivedNotes: string | null;
+
+  /** Append-only GRR entries minted on each Receive confirmation */
+  grrReceipts?: PurchaseOrderGrrReceiptFirestore[];
 
   updatedAt: Timestamp;
 }
@@ -184,6 +205,8 @@ export interface PurchaseOrder {
   receivedByName: string | null;
   receivedNotes: string | null;
 
+  grrReceipts?: PurchaseOrderGrrReceipt[];
+
   updatedAt: string;
 }
 
@@ -198,6 +221,12 @@ export const firestorePOToPO = (doc: PurchaseOrderFirestore): PurchaseOrder => (
   documents: doc.documents.map((d) => ({
     ...d,
     uploadedAt: timestampToISO(d.uploadedAt),
+  })),
+  grrReceipts: (doc.grrReceipts ?? []).map((r) => ({
+    grrNumber: r.grrNumber,
+    receivedBy: r.receivedBy,
+    receivedByName: r.receivedByName,
+    receivedAt: timestampToISO(r.receivedAt),
   })),
   createdAt: timestampToISO(doc.createdAt),
   reviewedAt: doc.reviewedAt ? timestampToISO(doc.reviewedAt) : null,

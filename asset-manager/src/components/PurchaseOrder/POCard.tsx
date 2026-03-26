@@ -27,6 +27,11 @@ export const POCard: React.FC<POCardProps> = ({ po, onPress }) => {
   const hasAnyPrice = (po?.items ?? []).some(
     (i) => (Number(i.unitPrice) || 0) > 0
   );
+  const grrReceipts = po.grrReceipts ?? [];
+  const latestGrr =
+    grrReceipts.length > 0 ? grrReceipts[grrReceipts.length - 1] : null;
+  const moreGrrCount =
+    grrReceipts.length > 1 ? grrReceipts.length - 1 : 0;
 
   return (
     <TouchableOpacity
@@ -42,6 +47,13 @@ export const POCard: React.FC<POCardProps> = ({ po, onPress }) => {
         </Text>
         <POStatusBadge status={po.status} />
       </View>
+
+      {latestGrr && (
+        <Text className="text-[13px] text-[#64748B] mb-3">
+          GRR: {latestGrr.grrNumber}
+          {moreGrrCount > 0 ? ` (+${moreGrrCount} more)` : ''}
+        </Text>
+      )}
 
       <View className="flex-row gap-4 mb-3">
         <View className="flex-1">

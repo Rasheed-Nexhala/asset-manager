@@ -51,4 +51,28 @@ describe('POCard', () => {
     render(<POCard po={poWithNoItems} onPress={jest.fn()} />);
     expect(screen.getByText('0')).toBeTruthy();
   });
+
+  it('shows latest GRR and extra receipt count when grrReceipts present', () => {
+    const po = {
+      ...mockPO,
+      grrReceipts: [
+        {
+          grrNumber: 'PO-RCV-2025-0001',
+          receivedAt: '2025-01-01T00:00:00.000Z',
+          receivedBy: 'a',
+          receivedByName: 'User A',
+        },
+        {
+          grrNumber: 'PO-RCV-2025-0002',
+          receivedAt: '2025-01-02T00:00:00.000Z',
+          receivedBy: 'b',
+          receivedByName: 'User B',
+        },
+      ],
+    } as import('../../../types/purchaseOrder').PurchaseOrder;
+    render(<POCard po={po} onPress={jest.fn()} />);
+    expect(
+      screen.getByText('GRR: PO-RCV-2025-0002 (+1 more)')
+    ).toBeTruthy();
+  });
 });

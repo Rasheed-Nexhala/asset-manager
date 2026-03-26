@@ -12,6 +12,7 @@ import {
   selectIsAdmin,
   selectIsStoreIncharge,
   selectIsSiteManager,
+  selectIsSuperAdmin,
 } from '../store/selectors/authSelectors';
 import { selectPendingRequestsCount } from '../store/selectors/requestSelectors';
 import { selectPendingApprovalCount } from '../store/selectors/purchaseOrderSelectors';
@@ -36,6 +37,7 @@ export const BottomTabNavigator: React.FC = () => {
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, TAB_BAR_MIN_BOTTOM_PADDING);
   const isAdmin = useAppSelector(selectIsAdmin);
+  const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const isSiteManager = useAppSelector(selectIsSiteManager);
   const pendingRequestsCount = useAppSelector(selectPendingRequestsCount);
@@ -187,7 +189,10 @@ export const BottomTabNavigator: React.FC = () => {
               <Ionicons name="receipt-outline" size={size} color={color} />
             ),
             tabBarLabel: 'Purchase',
-            tabBarBadge: isAdmin && pendingApprovalCount > 0 ? pendingApprovalCount : undefined,
+            tabBarBadge:
+              (isAdmin || isSuperAdmin) && pendingApprovalCount > 0
+                ? pendingApprovalCount
+                : undefined,
           }}
           listeners={purchaseOrdersTabListeners}
         />

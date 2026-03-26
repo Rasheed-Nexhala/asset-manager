@@ -5,7 +5,12 @@ import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { POStatusBadge, PODocumentCard } from '../../components/purchaseOrder';
 import { useAppSelector } from '../../store/hooks';
 import { selectPOById } from '../../store/selectors/purchaseOrderSelectors';
-import { selectIsAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
+import {
+  selectIsAdmin,
+  selectIsStoreIncharge,
+  selectIsSuperAdmin,
+  selectUserId,
+} from '../../store/selectors/authSelectors';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
 import type { PurchaseOrder } from '../../types/purchaseOrder';
 
@@ -30,7 +35,9 @@ export function PurchaseOrderDetailPage() {
   const poFromStore = useAppSelector((state) =>
     poId ? selectPOById(poId)(state) : null
   );
+  const userId = useAppSelector(selectUserId);
   const isAdmin = useAppSelector(selectIsAdmin);
+  const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
 
   const [po, setPo] = useState<PurchaseOrder | null>(poFromStore ?? null);
@@ -107,7 +114,12 @@ export function PurchaseOrderDetailPage() {
     (i) => (Number(i.unitPrice) || 0) > 0
   );
 
-  const canApprove = po.status === 'pending_approval' && isAdmin;
+  const assignedId = po.assignedToAdminId?.trim() ?? '';
+  const canApprove =
+    po.status === 'pending_approval' &&
+    (isSuperAdmin ||
+      (isAdmin &&
+        (!assignedId || assignedId === userId)));
   const canReceive =
     (po.status === 'approved' || po.status === 'ordered' || po.status === 'partially_received') &&
     (isAdmin || isStoreIncharge);
@@ -158,6 +170,28 @@ export function PurchaseOrderDetailPage() {
           <POStatusBadge status={po.status} />
         </div>
       </div>
+
+      {(po.grrReceipts?.length ?? 0) > 0 && (
+        <div className="rounded-[10px] border border-slate-200 bg-white p-4 lg:p-6">
+          <h2 className="mb-3 text-[17px] font-semibold text-slate-900">
+            GOODS RECEIPT REGISTER (GRR)
+          </h2>
+          <ul className="space-y-2">
+            {po.grrReceipts!.map((r) => (
+              <li
+                key={`${r.grrNumber}-${r.receivedAt}`}
+                className="border-b border-slate-100 pb-2 text-[15px] text-slate-900 last:border-b-0 last:pb-0"
+              >
+                <span className="font-semibold">{r.grrNumber}</span>
+                <span className="text-[13px] text-slate-500">
+                  {' '}
+                  · {formatDate(r.receivedAt)} · {r.receivedByName ?? '—'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Vendor */}
       <div className="rounded-[10px] border border-slate-200 bg-white p-4 lg:p-6">

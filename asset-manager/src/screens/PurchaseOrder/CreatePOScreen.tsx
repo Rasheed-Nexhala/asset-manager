@@ -43,7 +43,7 @@ import { setVendors, clearError, setError } from '../../store/slices/purchaseOrd
 import {
   selectUserId,
   selectUserDisplayName,
-  selectIsAdmin,
+  selectCanCreatePurchaseOrder,
 } from '../../store/selectors/authSelectors';
 import {
   selectVendors,
@@ -81,7 +81,7 @@ export const CreatePOScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const canCreatePO = useAppSelector(selectCanCreatePurchaseOrder);
   const vendors = useAppSelector(selectVendors);
 
   const poFromStore = useAppSelector((state) =>
@@ -207,6 +207,15 @@ export const CreatePOScreen: React.FC = () => {
   }, [selectedVendorId, vendors]);
 
   useEffect(() => {
+    if (canCreatePO || poId) return;
+    Alert.alert(
+      'Cannot create purchase order',
+      'Only Store Incharge or super admin can create purchase orders.',
+      [{ text: 'OK', onPress: () => navigation.replace('PurchaseOrderList') }]
+    );
+  }, [canCreatePO, poId, navigation]);
+
+  useEffect(() => {
     if (!poId) {
       setEditingPOStatus(null);
       return;
@@ -215,6 +224,18 @@ export const CreatePOScreen: React.FC = () => {
     const loadPO = (po: PurchaseOrder) => {
       if (po.status !== 'draft') {
         navigation.replace('ApprovePO', { poId: po.id });
+        return;
+      }
+      if (
+        !canCreatePO &&
+        userId &&
+        po.createdBy !== userId
+      ) {
+        Alert.alert(
+          'Cannot open draft',
+          'Only Store Incharge or super admin can create purchase orders.',
+          [{ text: 'OK', onPress: () => navigation.replace('PurchaseOrderList') }]
+        );
         return;
       }
       setSelectedVendorId(po.vendorId);
@@ -298,7 +319,14 @@ export const CreatePOScreen: React.FC = () => {
         );
       })
       .finally(() => setIsLoadingPO(false));
-  }, [poId, poFromStore?.id, loadPORetryTrigger, navigation]);
+  }, [
+    poId,
+    poFromStore?.id,
+    loadPORetryTrigger,
+    navigation,
+    canCreatePO,
+    userId,
+  ]);
 
   useEffect(() => {
     if (!poId && initialStateHash === null) {
@@ -1379,7 +1407,7 @@ export const CreatePOScreen: React.FC = () => {
                 <ActivityIndicator size="small" color="white" />
               ) : (
                 <Text className="text-[15px] font-semibold text-white">
-                  {isAdmin ? 'Submit PO' : 'Submit for Approval'}
+                  Submit for Approval
                 </Text>
               )}
             </TouchableOpacity>
