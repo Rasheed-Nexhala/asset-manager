@@ -98,6 +98,8 @@ export interface MaintenanceFirestore {
   writtenOffAt: Timestamp | null;
   writeOffReason: WriteOffReason | null;
   writeOffExplanation: string | null;
+  /** Cumulative count of units written off on this line (incremented each write-off). */
+  writtenOffUnitsTotal?: number | null;
   
   // Metadata
   addedBy: string;

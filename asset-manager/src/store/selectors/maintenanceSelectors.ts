@@ -34,10 +34,23 @@ export const selectActiveMaintenanceRecords = createSelector(
     )
 );
 
-// Written off records
+/** Statuses that belong on the written-off register (disposal / partial disposal). */
+const WRITTEN_OFF_REGISTER_STATUSES: MaintenanceStatus[] = [
+  'written_off',
+  'partially_returned_and_written_off',
+];
+
+// Written off records (strict terminal status only — used where full write-off count matters)
 export const selectWrittenOffRecords = createSelector(
   [selectMaintenanceRecords],
   (records) => records.filter((record) => record.status === 'written_off')
+);
+
+/** Register list: all maintenance lines that include a write-off (including partial return + write-off). */
+export const selectWrittenOffRegisterRecords = createSelector(
+  [selectMaintenanceRecords],
+  (records) =>
+    records.filter((record) => WRITTEN_OFF_REGISTER_STATUSES.includes(record.status))
 );
 
 // Returned records
@@ -81,7 +94,9 @@ export const selectMaintenanceStats = createSelector(
     );
     const pending = records.filter((r) => r.status === 'pending');
     const partialReturn = records.filter((r) => r.status === 'partial_return');
-    const writtenOff = records.filter((r) => r.status === 'written_off');
+    const writtenOff = records.filter((r) =>
+      WRITTEN_OFF_REGISTER_STATUSES.includes(r.status)
+    );
 
     return {
       total: records.length,

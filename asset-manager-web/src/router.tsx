@@ -116,6 +116,7 @@ export const router = createBrowserRouter([
               { path: 'requests/:requestId/confirm-transfer', element: <ConfirmTransferPage /> },
               { path: 'maintenance', element: <MaintenancePage /> },
               { path: 'maintenance/add', element: <AddToMaintenancePage /> },
+              { path: 'maintenance/written-off', element: <MaintenancePage /> },
               { path: 'maintenance/:maintenanceId', element: <MaintenanceDetailPage /> },
               { path: 'maintenance/:maintenanceId/return', element: <ReturnFromMaintenancePage /> },
               { path: 'maintenance/:maintenanceId/write-off', element: <WriteOffPage /> },

@@ -72,11 +72,15 @@ function firestoreToMaintenance(doc: any): Maintenance {
   const data = doc.data() as MaintenanceFirestore;
   const updates = (data.updates || []).filter(Boolean).map(serializeUpdate);
   const photos = (data.photos || []).filter(Boolean).map(serializePhoto);
+  const writtenOffUnitsTotal =
+    typeof data.writtenOffUnitsTotal === 'number' ? data.writtenOffUnitsTotal : null;
+
   return {
     ...data,
     id: doc.id,
     updates,
     photos,
+    writtenOffUnitsTotal,
     addedAt: data.addedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
     updatedAt: data.updatedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
     returnedAt: data.returnedAt?.toDate?.()?.toISOString() || null,
@@ -171,6 +175,7 @@ export async function addToMaintenance(
         writtenOffAt: null,
         writeOffReason: null,
         writeOffExplanation: null,
+        writtenOffUnitsTotal: 0,
         addedBy: userId,
         addedByName: userName,
         addedAt: Timestamp.now(),
@@ -436,12 +441,14 @@ export async function writeOffItem(
       }
 
       const explanationText = writeOffData.explanation?.trim() || null;
+      const priorWrittenOff = maintenanceData.writtenOffUnitsTotal ?? 0;
       transaction.update(maintenanceRef, {
         quantity: remainingQuantity,
         status: newStatus,
         writtenOffAt: Timestamp.now(),
         writeOffReason: writeOffData.reason,
         writeOffExplanation: explanationText,
+        writtenOffUnitsTotal: priorWrittenOff + writeOffData.writeOffQuantity,
         updatedAt: Timestamp.now(),
         updates: [
           ...maintenanceData.updates,

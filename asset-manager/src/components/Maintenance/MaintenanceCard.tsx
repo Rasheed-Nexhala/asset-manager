@@ -3,6 +3,10 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Maintenance, IssueType } from '../../types/maintenance';
 import MaintenanceStatusBadge from './MaintenanceStatusBadge';
+import {
+  getDisplayWrittenOffUnits,
+  isWrittenOffRegisterStatus,
+} from '../../utils/maintenanceWriteOffDisplay';
 
 interface MaintenanceCardProps {
   maintenance: Maintenance;
@@ -30,6 +34,9 @@ function formatDate(dateString: string): string {
 
 export default function MaintenanceCard({ maintenance, onPress }: MaintenanceCardProps) {
   const displayUnit = maintenance.unit || 'Pcs';
+  const showWrittenOffUnits = isWrittenOffRegisterStatus(maintenance.status);
+  const writtenOffUnits = getDisplayWrittenOffUnits(maintenance);
+
   return (
     <TouchableOpacity
       className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-3"
@@ -54,8 +61,16 @@ export default function MaintenanceCard({ maintenance, onPress }: MaintenanceCar
             <Text className="text-[15px] text-[#0F172A]">{maintenance.itemSku}</Text>
           </View>
           <View className="flex-1">
-            <Text className="text-[13px] text-[#64748B]">Quantity</Text>
-            <Text className="text-[15px] text-[#0F172A]">{maintenance.quantity} {displayUnit}</Text>
+            <Text className="text-[13px] text-[#64748B]">
+              {showWrittenOffUnits ? 'Units written off' : 'Quantity'}
+            </Text>
+            <Text className="text-[15px] text-[#0F172A]">
+              {showWrittenOffUnits
+                ? writtenOffUnits != null
+                  ? `${writtenOffUnits} ${displayUnit}`
+                  : '—'
+                : `${maintenance.quantity} ${displayUnit}`}
+            </Text>
           </View>
         </View>
         

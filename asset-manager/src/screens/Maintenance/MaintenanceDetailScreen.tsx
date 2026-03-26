@@ -28,6 +28,7 @@ import {
   selectMaintenanceError,
 } from '../../store/selectors/maintenanceSelectors';
 import { subscribeToMaintenanceById } from '../../services/firebase/maintenanceService';
+import { getDisplayWrittenOffUnits } from '../../utils/maintenanceWriteOffDisplay';
 import { selectUserId, selectUserDisplayName } from '../../store/selectors/authSelectors';
 import type {
   MaintenanceStatus,
@@ -303,6 +304,7 @@ export const MaintenanceDetailScreen: React.FC = () => {
     label: 'Unknown',
   };
   const displayUnit = maintenance.unit || 'Pcs';
+  const unitsWrittenOffDisplay = getDisplayWrittenOffUnits(maintenance);
 
   return (
     <ScreenLayout edges={['top']}>
@@ -329,13 +331,23 @@ export const MaintenanceDetailScreen: React.FC = () => {
             <Text className="text-[13px] text-[#64748B]">SKU: {maintenance.itemSku}</Text>
           </View>
 
-          {/* Quantity */}
+          {/* Quantity / remaining on line */}
           <View className="flex-row justify-between items-center">
-            <Text className="text-[13px] text-[#64748B]">Quantity in Maintenance</Text>
+            <Text className="text-[13px] text-[#64748B]">
+              {unitsWrittenOffDisplay != null ? 'Remaining on line' : 'Quantity in Maintenance'}
+            </Text>
             <Text className="text-[15px] font-semibold text-[#0F172A]">
               {maintenance.quantity} {displayUnit}
             </Text>
           </View>
+          {unitsWrittenOffDisplay != null ? (
+            <View className="mt-2 flex-row items-center justify-between border-t border-[#E2E8F0] pt-2">
+              <Text className="text-[13px] text-[#64748B]">Units written off</Text>
+              <Text className="text-[15px] font-semibold text-[#DC2626]">
+                {unitsWrittenOffDisplay} {displayUnit}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         {/* Issue Details Section */}

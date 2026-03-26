@@ -12,6 +12,7 @@ import { selectMaintenanceById, selectMaintenanceError } from '../../store/selec
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { subscribeToMaintenanceById } from '../../services/firebase/maintenanceService';
 import { useAutoClearError } from '../../hooks/useAutoClearError';
+import { getDisplayWrittenOffUnits } from '../../utils/maintenanceWriteOffDisplay';
 import type {
   MaintenanceStatus,
   IssueType,
@@ -273,6 +274,7 @@ export function MaintenanceDetailPage() {
       label: 'Unknown',
     };
   const displayUnit = maintenance.unit || 'Pcs';
+  const unitsWrittenOffDisplay = getDisplayWrittenOffUnits(maintenance);
 
   return (
     <div className="space-y-6">
@@ -299,11 +301,21 @@ export function MaintenanceDetailPage() {
           <p className="mt-1 text-[15px] font-semibold text-slate-900">{maintenance.itemName}</p>
           <p className="text-[13px] text-slate-500">SKU: {maintenance.itemSku}</p>
           <div className="mt-2 flex items-center justify-between">
-            <span className="text-[13px] text-slate-500">Quantity in Maintenance</span>
+            <span className="text-[13px] text-slate-500">
+              {unitsWrittenOffDisplay != null ? 'Remaining on line' : 'Quantity in Maintenance'}
+            </span>
             <span className="text-[15px] font-semibold text-slate-900">
               {maintenance.quantity} {displayUnit}
             </span>
           </div>
+          {unitsWrittenOffDisplay != null ? (
+            <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2">
+              <span className="text-[13px] text-slate-500">Units written off</span>
+              <span className="text-[15px] font-semibold text-red-700">
+                {unitsWrittenOffDisplay} {displayUnit}
+              </span>
+            </div>
+          ) : null}
         </div>
 
         <div className="rounded-[10px] border border-slate-200 bg-white p-4 shadow-sm">

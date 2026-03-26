@@ -2,6 +2,10 @@ import { Link } from 'react-router-dom';
 import { Icon } from '../shared/Icon';
 import { MaintenanceStatusBadge } from './MaintenanceStatusBadge';
 import type { Maintenance, IssueType } from '../../types/maintenance';
+import {
+  getDisplayWrittenOffUnits,
+  isWrittenOffRegisterStatus,
+} from '../../utils/maintenanceWriteOffDisplay';
 
 interface MaintenanceCardProps {
   maintenance: Maintenance;
@@ -26,6 +30,8 @@ function formatDate(dateString: string): string {
 
 export function MaintenanceCard({ maintenance }: MaintenanceCardProps) {
   const displayUnit = maintenance.unit || 'Pcs';
+  const showWrittenOffUnits = isWrittenOffRegisterStatus(maintenance.status);
+  const writtenOffUnits = getDisplayWrittenOffUnits(maintenance);
 
   return (
     <Link
@@ -47,9 +53,15 @@ export function MaintenanceCard({ maintenance }: MaintenanceCardProps) {
             <p className="text-[15px] text-slate-900">{maintenance.itemSku}</p>
           </div>
           <div className="flex-1">
-            <p className="text-[13px] text-slate-500">Quantity</p>
+            <p className="text-[13px] text-slate-500">
+              {showWrittenOffUnits ? 'Units written off' : 'Quantity'}
+            </p>
             <p className="text-[15px] text-slate-900">
-              {maintenance.quantity} {displayUnit}
+              {showWrittenOffUnits
+                ? writtenOffUnits != null
+                  ? `${writtenOffUnits} ${displayUnit}`
+                  : '—'
+                : `${maintenance.quantity} ${displayUnit}`}
             </p>
           </div>
         </div>

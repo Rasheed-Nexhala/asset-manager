@@ -13,6 +13,7 @@ import {
   selectMaintenanceStats,
   selectMaintenanceByStatus,
   selectMaintenanceById,
+  selectWrittenOffRegisterRecords,
 } from '../maintenanceSelectors';
 import type { RootState } from '../../index';
 
@@ -98,6 +99,17 @@ describe('maintenanceSelectors', () => {
     expect(selectWrittenOffRecords(state)[0].status).toBe('written_off');
   });
 
+  it('selectWrittenOffRegisterRecords includes written_off and partially_returned_and_written_off', () => {
+    const records = [
+      mockRecord('1', 'written_off'),
+      mockRecord('2', 'partially_returned_and_written_off'),
+      mockRecord('3', 'returned'),
+    ];
+    const state = createMockState({ maintenanceRecords: records });
+    const result = selectWrittenOffRegisterRecords(state);
+    expect(result).toHaveLength(2);
+  });
+
   it('selectReturnedRecords filters returned', () => {
     const records = [mockRecord('1', 'returned'), mockRecord('2', 'pending')];
     const state = createMockState({ maintenanceRecords: records });
@@ -159,14 +171,15 @@ describe('maintenanceSelectors', () => {
       mockRecord('1', 'pending'),
       mockRecord('2', 'partial_return'),
       mockRecord('3', 'written_off'),
+      mockRecord('4', 'partially_returned_and_written_off'),
     ];
     const state = createMockState({ maintenanceRecords: records });
     const stats = selectMaintenanceStats(state);
-    expect(stats.total).toBe(3);
+    expect(stats.total).toBe(4);
     expect(stats.active).toBe(2);
     expect(stats.pending).toBe(1);
     expect(stats.partialReturn).toBe(1);
-    expect(stats.writtenOff).toBe(1);
+    expect(stats.writtenOff).toBe(2);
   });
 
   it('selectMaintenanceByStatus filters by status', () => {
