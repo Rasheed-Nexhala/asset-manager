@@ -120,7 +120,15 @@ function TestConsumer({ autoClearMs = 5000 }: { autoClearMs?: number }) {
 
 const basePreloadedState: Partial<RootState> = {
   auth: { user: null, userRole: null, isAuthenticated: false, isLoading: false, isRoleLoading: false, authInitialized: false, error: null },
-  sites: { sites: [], isLoading: false, error: null, searchQuery: '', validationLoading: false, lastValidationAt: null },
+  sites: {
+    sites: [],
+    isLoading: false,
+    error: null,
+    searchQuery: '',
+    validationLoading: false,
+    lastValidationAt: null,
+    activeManagedSiteId: null,
+  },
   inventory: { items: [], categories: [], inventoryByLocation: {}, lowStockItemIds: [], loading: false, error: null, errorTimestamp: null, filters: null },
   requests: { requests: [], myRequests: [], selectedRequest: null, loading: false, error: null, errorTimestamp: null, filters: { status: 'all', priority: 'all', siteId: 'all' } },
   steelMaster: { steelMasters: [], selectedSteelMaster: null, loading: false, error: null },

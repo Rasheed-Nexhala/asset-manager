@@ -6,6 +6,7 @@ import { useAuthStateSync } from './hooks/useAuthStateSync';
 import { useUserRoleSync } from './hooks/useUserRoleSync';
 import { useInventoryAccessSync } from './hooks/useInventoryAccessSync';
 import { useManagerValidationSync } from './hooks/useManagerValidationSync';
+import { useSiteManagerActiveSiteSync } from './hooks/useSiteManagerActiveSiteSync';
 import { WeightViewPreferenceProvider } from './hooks/useWeightViewPreference';
 import { ToastProvider } from './contexts/ToastContext';
 import { router } from './router';
@@ -19,6 +20,7 @@ function AppContent() {
   useUserRoleSync(userId);
   useInventoryAccessSync();
   useManagerValidationSync();
+  useSiteManagerActiveSiteSync();
 
   if (!authInitialized) {
     return <AuthCheckingPage />;

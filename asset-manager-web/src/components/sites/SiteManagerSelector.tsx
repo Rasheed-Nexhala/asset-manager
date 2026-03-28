@@ -1,9 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { subscribeToSiteManagers } from '../../services/firebase/userRoleService';
-import { findSiteByManagerId } from '../../services/firebase/siteService';
-import { ManagerReassignmentConfirmationModal } from './ManagerReassignmentConfirmationModal';
 import type { UserListItem } from '../../types/roles';
-import type { Site } from '../../types/sites';
 import { Icon } from '../shared/Icon';
 import { LoadingSpinner } from '../shared/LoadingSpinner';
 
@@ -17,16 +14,11 @@ export interface SiteManagerSelectorProps {
 export function SiteManagerSelector({
   value,
   onChange,
-  excludeSiteId,
   error,
 }: SiteManagerSelectorProps) {
   const [managers, setManagers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  const [confirmationVisible, setConfirmationVisible] = useState(false);
-  const [pendingManagerId, setPendingManagerId] = useState<string | null>(null);
-  const [conflictingSite, setConflictingSite] = useState<Site | null>(null);
-  const [checkingAssignment, setCheckingAssignment] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -41,59 +33,17 @@ export function SiteManagerSelector({
   }, []);
 
   const handleSelect = useCallback(
-    async (managerId: string | null) => {
-      if (managerId === null || managerId === value) {
-        onChange(managerId);
-        setModalVisible(false);
-        return;
-      }
-
-      try {
-        setCheckingAssignment(true);
-        const existingSite = await findSiteByManagerId(managerId, excludeSiteId);
-        if (existingSite) {
-          setPendingManagerId(managerId);
-          setConflictingSite(existingSite);
-          setConfirmationVisible(true);
-          setModalVisible(false);
-        } else {
-          onChange(managerId);
-          setModalVisible(false);
-        }
-      } catch (err) {
-        console.error('Error checking manager assignment:', err);
-        onChange(managerId);
-        setModalVisible(false);
-      } finally {
-        setCheckingAssignment(false);
-      }
+    (managerId: string | null) => {
+      onChange(managerId);
+      setModalVisible(false);
     },
-    [onChange, value, excludeSiteId]
+    [onChange]
   );
-
-  const handleConfirmReassignment = useCallback(() => {
-    if (pendingManagerId !== null) onChange(pendingManagerId);
-    setConfirmationVisible(false);
-    setPendingManagerId(null);
-    setConflictingSite(null);
-  }, [onChange, pendingManagerId]);
-
-  const handleCancelReassignment = useCallback(() => {
-    setConfirmationVisible(false);
-    setPendingManagerId(null);
-    setConflictingSite(null);
-  }, []);
 
   const selectedManager = value ? managers.find((m) => m.id === value) : null;
   const displayText = selectedManager
     ? selectedManager.displayName || selectedManager.email || 'Unknown'
     : 'Select Manager';
-
-  const pendingManagerName = useMemo(() => {
-    if (!pendingManagerId) return 'This manager';
-    const manager = managers.find((m) => m.id === pendingManagerId);
-    return manager?.displayName || manager?.email || 'This manager';
-  }, [pendingManagerId, managers]);
 
   const hasError = Boolean(error);
 
@@ -126,13 +76,14 @@ export function SiteManagerSelector({
           {error}
         </p>
       ) : (
-        <div className="flex items-center gap-1">
-          <Icon name="question-mark-circle" className="h-[18px] w-[18px] text-slate-500" />
-          <span className="text-[13px] text-slate-500">Can be assigned later</span>
+        <div className="flex items-start gap-1">
+          <Icon name="question-mark-circle" className="mt-0.5 h-[18px] w-[18px] shrink-0 text-slate-500" />
+          <span className="text-[13px] text-slate-500">
+            Can be assigned later. One person may manage several sites.
+          </span>
         </div>
       )}
 
-      {/* Manager selection modal */}
       {modalVisible && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 md:items-center"
@@ -170,7 +121,7 @@ export function SiteManagerSelector({
                 )}
               </button>
 
-              {loading || checkingAssignment ? (
+              {loading ? (
                 <div className="flex flex-col items-center py-8">
                   <LoadingSpinner size="lg" />
                 </div>
@@ -227,14 +178,6 @@ export function SiteManagerSelector({
           </div>
         </div>
       )}
-
-      <ManagerReassignmentConfirmationModal
-        visible={confirmationVisible}
-        managerName={pendingManagerName}
-        siteName={conflictingSite?.name || 'another site'}
-        onConfirm={handleConfirmReassignment}
-        onCancel={handleCancelReassignment}
-      />
     </div>
   );
 }

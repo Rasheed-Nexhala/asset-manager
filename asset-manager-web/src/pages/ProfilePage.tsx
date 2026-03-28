@@ -11,7 +11,11 @@ import {
   selectIsActive,
   selectUserPermissions,
 } from '../store/selectors/authSelectors';
-import { selectAssignedSiteIdForUser, selectSiteById } from '../store/selectors/sitesSelectors';
+import {
+  selectAssignedSiteIdForUser,
+  selectSiteById,
+  selectManagedSitesForUser,
+} from '../store/selectors/sitesSelectors';
 import type { RootState } from '../store';
 import { useMemo } from 'react';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
@@ -28,6 +32,7 @@ export function ProfilePage() {
   const permissions = useAppSelector(selectUserPermissions);
 
   const assignedSiteId = useAppSelector(selectAssignedSiteIdForUser(userId));
+  const managedSites = useAppSelector(selectManagedSitesForUser(userId));
   const assignedSiteSelector = useMemo(
     () =>
       assignedSiteId
@@ -36,7 +41,7 @@ export function ProfilePage() {
     [assignedSiteId]
   );
   const assignedSite = useAppSelector(assignedSiteSelector);
-  const siteName = assignedSite?.name ?? null;
+  const activeSiteName = assignedSite?.name ?? null;
 
   const handleLogout = useCallback(async () => {
     try {
@@ -105,10 +110,24 @@ export function ProfilePage() {
               </div>
             )}
 
-            {siteName && (
+            {role === 'SiteManager' && managedSites.length > 0 && (
               <div>
-                <p className="mb-1 text-[13px] text-slate-500">Assigned Site</p>
-                <p className="text-[15px] text-slate-900">{siteName}</p>
+                <p className="mb-1 text-[13px] text-slate-500">Managed sites</p>
+                {activeSiteName && (
+                  <p className="mb-2 text-[13px] text-slate-600">
+                    Active: <span className="font-medium text-slate-900">{activeSiteName}</span>
+                  </p>
+                )}
+                <ul className="list-none space-y-2 pl-0">
+                  {managedSites.map((site) => (
+                    <li key={site.id} className="text-[15px] text-slate-900">
+                      {site.name}
+                      {site.address ? (
+                        <span className="mt-0.5 block text-[13px] text-slate-500">{site.address}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
 

@@ -1,11 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { subscribeToSiteManagers } from '../../services/firebase/userRoleService';
-import { findSiteByManagerId } from '../../services/firebase/siteService';
-import { ManagerReassignmentConfirmationModal } from './ManagerReassignmentConfirmationModal';
 import type { UserListItem } from '../../types/roles';
-import type { Site } from '../../types/sites';
 
 export interface SiteManagerSelectorProps {
   value: string | null;
@@ -17,16 +14,11 @@ export interface SiteManagerSelectorProps {
 export const SiteManagerSelector: React.FC<SiteManagerSelectorProps> = ({
   value,
   onChange,
-  excludeSiteId,
   error,
 }) => {
   const [managers, setManagers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [modalVisible, setModalVisible] = useState<boolean>(false);
-  const [confirmationVisible, setConfirmationVisible] = useState<boolean>(false);
-  const [pendingManagerId, setPendingManagerId] = useState<string | null>(null);
-  const [conflictingSite, setConflictingSite] = useState<Site | null>(null);
-  const [checkingAssignment, setCheckingAssignment] = useState<boolean>(false);
 
   useEffect(() => {
     setLoading(true);
@@ -38,8 +30,8 @@ export const SiteManagerSelector: React.FC<SiteManagerSelectorProps> = ({
         );
         setManagers(siteManagers);
         setLoading(false);
-      } catch (error) {
-        console.error('Error processing managers:', error);
+      } catch (err) {
+        console.error('Error processing managers:', err);
         setLoading(false);
       }
     });
@@ -50,63 +42,12 @@ export const SiteManagerSelector: React.FC<SiteManagerSelectorProps> = ({
   }, []);
 
   const handleSelect = useCallback(
-    async (managerId: string | null) => {
-      // If selecting "Not Assigned", proceed immediately
-      if (managerId === null) {
-        onChange(null);
-        setModalVisible(false);
-        return;
-      }
-
-      // If selecting the same manager already assigned, proceed immediately
-      if (managerId === value) {
-        onChange(managerId);
-        setModalVisible(false);
-        return;
-      }
-
-      // Check if manager is already assigned to another site
-      try {
-        setCheckingAssignment(true);
-        const existingSite = await findSiteByManagerId(managerId, excludeSiteId);
-        
-        if (existingSite) {
-          // Manager is assigned to another site - show confirmation
-          setPendingManagerId(managerId);
-          setConflictingSite(existingSite);
-          setConfirmationVisible(true);
-          setModalVisible(false);
-        } else {
-          // Manager is not assigned elsewhere - proceed immediately
-          onChange(managerId);
-          setModalVisible(false);
-        }
-      } catch (error) {
-        console.error('Error checking manager assignment:', error);
-        // On error, proceed anyway (fail gracefully)
-        onChange(managerId);
-        setModalVisible(false);
-      } finally {
-        setCheckingAssignment(false);
-      }
+    (managerId: string | null) => {
+      onChange(managerId);
+      setModalVisible(false);
     },
-    [onChange, value, excludeSiteId]
+    [onChange]
   );
-
-  const handleConfirmReassignment = useCallback(() => {
-    if (pendingManagerId !== null) {
-      onChange(pendingManagerId);
-    }
-    setConfirmationVisible(false);
-    setPendingManagerId(null);
-    setConflictingSite(null);
-  }, [onChange, pendingManagerId]);
-
-  const handleCancelReassignment = useCallback(() => {
-    setConfirmationVisible(false);
-    setPendingManagerId(null);
-    setConflictingSite(null);
-  }, []);
 
   const selectedManager = value
     ? managers.find((m) => m.id === value)
@@ -114,12 +55,6 @@ export const SiteManagerSelector: React.FC<SiteManagerSelectorProps> = ({
   const displayText = selectedManager
     ? selectedManager.displayName || selectedManager.email || 'Unknown'
     : 'Select Manager';
-
-  const pendingManagerName = useMemo(() => {
-    if (!pendingManagerId) return 'This manager';
-    const manager = managers.find((m) => m.id === pendingManagerId);
-    return manager?.displayName || manager?.email || 'This manager';
-  }, [pendingManagerId, managers]);
 
   const hasError = Boolean(error);
 
@@ -149,9 +84,13 @@ export const SiteManagerSelector: React.FC<SiteManagerSelectorProps> = ({
           {error}
         </Text>
       ) : (
-        <View className="flex-row items-center gap-1">
-          <Ionicons name="information-circle-outline" size={18} color="#64748B" />
-          <Text className="text-[13px] text-[#64748B]">Can be assigned later</Text>
+        <View className="gap-2">
+          <View className="flex-row items-center gap-1">
+            <Ionicons name="information-circle-outline" size={18} color="#64748B" />
+            <Text className="text-[13px] text-[#64748B] flex-1">
+              Can be assigned later. One person may manage several sites.
+            </Text>
+          </View>
         </View>
       )}
 
@@ -191,12 +130,10 @@ export const SiteManagerSelector: React.FC<SiteManagerSelectorProps> = ({
                 {value === null && <Ionicons name="checkmark" size={20} color="#1E40AF" />}
               </TouchableOpacity>
 
-              {loading || checkingAssignment ? (
+              {loading ? (
                 <View className="py-8 items-center">
                   <ActivityIndicator size="large" color="#1E40AF" />
-                  <Text className="text-[15px] text-[#64748B] mt-4">
-                    {loading ? 'Loading managers...' : 'Checking assignment...'}
-                  </Text>
+                  <Text className="text-[15px] text-[#64748B] mt-4">Loading managers...</Text>
                 </View>
               ) : managers.length === 0 ? (
                 <View className="py-8 items-center">
@@ -207,7 +144,7 @@ export const SiteManagerSelector: React.FC<SiteManagerSelectorProps> = ({
               ) : (
                 managers.map((manager) => {
                   const isSelected = value === manager.id;
-                  const displayName = manager.displayName || manager.email || 'Unknown';
+                  const name = manager.displayName || manager.email || 'Unknown';
 
                   return (
                     <TouchableOpacity
@@ -217,7 +154,7 @@ export const SiteManagerSelector: React.FC<SiteManagerSelectorProps> = ({
                       }`}
                       onPress={() => handleSelect(manager.id)}
                       activeOpacity={0.7}
-                      accessibilityLabel={`Select manager: ${displayName}`}
+                      accessibilityLabel={`Select manager: ${name}`}
                       accessibilityRole="button"
                       accessibilityState={{ selected: isSelected }}
                     >
@@ -227,7 +164,7 @@ export const SiteManagerSelector: React.FC<SiteManagerSelectorProps> = ({
                             isSelected ? 'text-[#1E40AF]' : 'text-[#0F172A]'
                           }`}
                         >
-                          {displayName}
+                          {name}
                         </Text>
                         {manager.email && manager.displayName && (
                           <Text className="text-[13px] text-[#64748B]">{manager.email}</Text>
@@ -252,15 +189,6 @@ export const SiteManagerSelector: React.FC<SiteManagerSelectorProps> = ({
           </View>
         </View>
       </Modal>
-
-      {/* Confirmation Modal */}
-      <ManagerReassignmentConfirmationModal
-        visible={confirmationVisible}
-        managerName={pendingManagerName}
-        siteName={conflictingSite?.name || 'another site'}
-        onConfirm={handleConfirmReassignment}
-        onCancel={handleCancelReassignment}
-      />
     </View>
   );
 };

@@ -41,9 +41,16 @@ import { selectAllRequests, selectMyRequests, selectRequestsLoading, selectReque
 import { selectLowStockItems, selectItemsLoading } from '../store/selectors/inventorySelectors';
 import { selectMaintenanceError } from '../store/selectors/maintenanceSelectors';
 import { selectPurchaseOrders, selectPurchaseOrderLoading, selectPurchaseOrderError } from '../store/selectors/purchaseOrderSelectors';
-import { selectAllSites, selectSiteById } from '../store/selectors/sitesSelectors';
+import {
+  selectAllSites,
+  selectSiteById,
+  selectAssignedSiteIdForUser,
+  selectManagedSitesForUser,
+} from '../store/selectors/sitesSelectors';
 import { selectAllItems, selectInventoryByLocation, selectEmptyInventory } from '../store/selectors/inventorySelectors';
-import { selectAssignedSiteIdForUser } from '../store/selectors/sitesSelectors';
+import { setActiveManagedSiteId } from '../store/slices/sitesSlice';
+import { saveActiveManagedSiteId } from '../utils/activeManagedSiteStorage';
+import { ManagedSiteSwitcher } from '../components/shared/ManagedSiteSwitcher';
 import { selectActivityLogError } from '../store/selectors/activityLogSelectors';
 import { clearError } from '../store/slices/activityLogSlice';
 import {
@@ -116,12 +123,23 @@ export const DashboardScreen: React.FC = () => {
   const role = roleType ?? 'Unassigned';
   const isActive = useAppSelector(selectIsActive);
   const assignedSiteId = useAppSelector(selectAssignedSiteIdForUser(userId));
+  const managedSitesSm = useAppSelector(selectManagedSitesForUser(userId));
   const assignedSiteSelector = useMemo(
     () => (assignedSiteId ? selectSiteById(assignedSiteId) : (_state: RootState) => null),
     [assignedSiteId]
   );
   const assignedSite = useAppSelector(assignedSiteSelector);
   const siteName = assignedSite?.name ?? null;
+
+  const handleDashboardWorkingSiteChange = useCallback(
+    (siteId: string) => {
+      dispatch(setActiveManagedSiteId(siteId));
+      if (userId) {
+        void saveActiveManagedSiteId(userId, siteId);
+      }
+    },
+    [dispatch, userId]
+  );
 
   const sites = useAppSelector(selectAllSites);
   const activityLogError = useAppSelector(selectActivityLogError);
@@ -368,6 +386,22 @@ export const DashboardScreen: React.FC = () => {
             siteName={siteName ?? undefined}
           />
 
+          {isSiteManager && managedSitesSm.length > 0 && (
+            <ManagedSiteSwitcher
+              managedSites={managedSitesSm}
+              activeSiteId={assignedSiteId}
+              onSiteChange={handleDashboardWorkingSiteChange}
+            />
+          )}
+
+          {isSiteManager && managedSitesSm.length === 0 && !isInitialLoad && (
+            <View className="rounded-[10px] border border-[#E2E8F0] bg-white p-4">
+              <Text className="text-[15px] text-[#64748B]">
+                You are not assigned to any active site yet. Contact an administrator.
+              </Text>
+            </View>
+          )}
+
           {isAdminOrSuperAdmin && (
             <>
               <QuickStatsRow
@@ -476,6 +510,7 @@ export const DashboardScreen: React.FC = () => {
 
           {isSiteManager && (
             <>
+              {managedSitesSm.length > 0 && (
               <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
                 <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">
                   My Inventory Summary
@@ -495,6 +530,7 @@ export const DashboardScreen: React.FC = () => {
                   </View>
                 </View>
               </View>
+              )}
               {(recentPendingRequests.length > 0 || isInitialLoad || dashboardLoading) && (
                 <PendingRequestsWidget
                   requests={recentPendingRequests}

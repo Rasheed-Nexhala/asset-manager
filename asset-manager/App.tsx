@@ -14,6 +14,7 @@ import { useAuthStateSync } from './src/hooks/useAuthStateSync';
 import { useUserRoleSync } from './src/hooks/useUserRoleSync';
 import { useInventoryAccessSync } from './src/hooks/useInventoryAccessSync';
 import { useManagerValidationSync } from './src/hooks/useManagerValidationSync';
+import { useSiteManagerActiveSiteSync } from './src/hooks/useSiteManagerActiveSiteSync';
 import { usePushTokenRegistration } from './src/hooks/usePushTokenRegistration';
 import { useAppSelector } from './src/store/hooks';
 import { selectUserId, selectAuthInitialized } from './src/store/selectors/authSelectors';
@@ -57,6 +58,7 @@ function AppContent() {
   useUserRoleSync(userId);
   useInventoryAccessSync();
   useManagerValidationSync();
+  useSiteManagerActiveSiteSync();
   usePushTokenRegistration(userId);
   const { isOffline, retry } = useNetworkStatus();
 

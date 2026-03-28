@@ -33,7 +33,7 @@ import {
   selectIsSiteManager,
   selectAuthInitialized,
 } from '../../store/selectors/authSelectors';
-import { selectAllSites } from '../../store/selectors/sitesSelectors';
+import { selectAllSites, selectAssignedSiteIdForUser } from '../../store/selectors/sitesSelectors';
 import { fetchSites } from '../../store/slices/sitesSlice';
 import { navigateToProcessRequest } from '../../navigation/navigationUtils';
 import type { Request } from '../../types/request';
@@ -67,6 +67,7 @@ export const MyRequestsScreen: React.FC = () => {
   const authInitialized = useAppSelector(selectAuthInitialized);
   const isSiteManager = useAppSelector(selectIsSiteManager);
   const sites = useAppSelector(selectAllSites);
+  const effectiveSiteId = useAppSelector(selectAssignedSiteIdForUser(userId));
   const status = activeTab === 'all' ? 'all' : activeTab;
   const filteredRequests = useAppSelector((state) =>
     selectMyRequestsByStatusAndSearch(state, status, searchQuery)
@@ -77,9 +78,9 @@ export const MyRequestsScreen: React.FC = () => {
   const loadingMore = useAppSelector(selectMyRequestsLoadingMore);
 
   const currentSite = useMemo(() => {
-    if (!userId || sites.length === 0) return null;
-    return sites.find((site) => site.managerId === userId) || null;
-  }, [userId, sites]);
+    if (!effectiveSiteId) return null;
+    return sites.find((site) => site.id === effectiveSiteId) ?? null;
+  }, [sites, effectiveSiteId]);
 
   useEffect(() => {
     const handler = setTimeout(() => {

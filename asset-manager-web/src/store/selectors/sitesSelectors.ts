@@ -4,6 +4,9 @@ import type { Site } from '../../types/sites';
 
 const selectSitesState = (state: RootState) => state.sites;
 
+export const selectActiveManagedSiteId = (state: RootState) =>
+  state.sites.activeManagedSiteId;
+
 export const selectAllSites = createSelector(
   [selectSitesState],
   (sitesState) => sitesState.sites
@@ -69,14 +72,31 @@ export const selectFilteredInactiveSites = createSelector(
 );
 
 /**
- * Get the assigned site ID for a Site Manager (site where managerId matches userId).
+ * Active sites managed by the user (Site Manager), sorted by name.
  */
-export const selectAssignedSiteIdForUser = (userId: string | null) =>
+export const selectManagedSitesForUser = (userId: string | null) =>
+  createSelector([selectAllSites], (sites) => {
+    if (!userId) return [];
+    return sites
+      .filter((s) => s.managerId === userId && s.status === 'active')
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  });
+
+/**
+ * Effective working site for Site Manager UI: persisted active id if still managed, else first managed site.
+ */
+export const selectEffectiveManagedSiteIdForUser = (userId: string | null) =>
   createSelector(
-    [selectAllSites],
-    (sites) => {
-      if (!userId) return null;
-      const site = sites.find((s) => s.managerId === userId);
-      return site?.id ?? null;
+    [selectManagedSitesForUser(userId), selectActiveManagedSiteId],
+    (managed, activeId) => {
+      const ids = new Set(managed.map((s) => s.id));
+      if (activeId && ids.has(activeId)) return activeId;
+      return managed[0]?.id ?? null;
     }
   );
+
+/**
+ * @deprecated Prefer selectEffectiveManagedSiteIdForUser — kept for existing call sites.
+ */
+export const selectAssignedSiteIdForUser = (userId: string | null) =>
+  selectEffectiveManagedSiteIdForUser(userId);

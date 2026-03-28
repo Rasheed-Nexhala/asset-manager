@@ -3,6 +3,7 @@ export { ViewModeToggle } from './ViewModeToggle';
 export { InventoryListItem } from './InventoryListItem';
 export { ItemCard } from './ItemCard';
 export { InventorySubNav } from './InventorySubNav';
+export { ManagedSiteSwitcher } from './ManagedSiteSwitcher';
 export { CategoryPicker } from './CategoryPicker';
 export { ItemForm } from './ItemForm';
 export { SteelMasterForm } from './SteelMasterForm';

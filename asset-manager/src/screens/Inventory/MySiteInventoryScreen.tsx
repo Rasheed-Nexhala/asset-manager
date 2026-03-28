@@ -14,7 +14,15 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectUserId } from '../../store/selectors/authSelectors';
-import { selectAllSites, selectSitesLoading } from '../../store/selectors/sitesSelectors';
+import {
+  selectAllSites,
+  selectSitesLoading,
+  selectAssignedSiteIdForUser,
+  selectManagedSitesForUser,
+} from '../../store/selectors/sitesSelectors';
+import { setActiveManagedSiteId } from '../../store/slices/sitesSlice';
+import { saveActiveManagedSiteId } from '../../utils/activeManagedSiteStorage';
+import { ManagedSiteSwitcher } from '../../components/shared/ManagedSiteSwitcher';
 import { selectAllItems, selectInventoryByLocation, selectItemsLoading } from '../../store/selectors/inventorySelectors';
 import { setInventoryForLocation } from '../../store/slices/inventorySlice';
 import { fetchSites, setSites } from '../../store/slices/sitesSlice';
@@ -49,10 +57,11 @@ export const MySiteInventoryScreen: React.FC = () => {
   const isLoading = useAppSelector(selectItemsLoading);
   const sitesLoading = useAppSelector(selectSitesLoading);
   
+  const managedSites = useAppSelector(selectManagedSitesForUser(userId));
+  const effectiveSiteId = useAppSelector(selectAssignedSiteIdForUser(userId));
+
   // Local state
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [currentSite, setCurrentSite] = useState<Site | null>(null);
-  const [isLoadingSite, setIsLoadingSite] = useState<boolean>(true);
   const [showOtherSitesModal, setShowOtherSitesModal] = useState<boolean>(false);
   
   // Fetch sites and set up real-time listener
@@ -70,18 +79,21 @@ export const MySiteInventoryScreen: React.FC = () => {
     };
   }, [dispatch]);
   
-  // Find the user's site by matching managerId
-  useEffect(() => {
+  const currentSite = useMemo((): Site | null => {
+    if (!effectiveSiteId) return null;
     const safeSites = Array.isArray(sites) ? sites : [];
-    if (userId && safeSites.length > 0) {
-      const userSite = safeSites.find((site) => site.managerId === userId);
-      setCurrentSite(userSite || null);
-      setIsLoadingSite(false);
-    } else if (!sitesLoading && safeSites.length === 0) {
-      // Only mark as loaded if sites have finished loading and still empty
-      setIsLoadingSite(false);
-    }
-  }, [userId, sites, sitesLoading]);
+    return safeSites.find((site) => site.id === effectiveSiteId) ?? null;
+  }, [sites, effectiveSiteId]);
+
+  const handleWorkingSiteChange = useCallback(
+    (siteId: string) => {
+      dispatch(setActiveManagedSiteId(siteId));
+      if (userId) {
+        void saveActiveManagedSiteId(userId, siteId);
+      }
+    },
+    [dispatch, userId]
+  );
   
   // Subscribe to real-time inventory updates when site is found
   // Use currentSite.id to avoid re-subscribing when site object reference changes (e.g. from sites array updates)
@@ -173,12 +185,17 @@ export const MySiteInventoryScreen: React.FC = () => {
     });
   }, [enrichedInventory, searchQuery]);
   
-  // Get other sites (excluding current site)
+  const managedIds = useMemo(
+    () => new Set(managedSites.map((s) => s.id)),
+    [managedSites]
+  );
+
   const otherSites = useMemo(() => {
     const safeSites = Array.isArray(sites) ? sites : [];
-    if (!currentSite) return safeSites;
-    return safeSites.filter((site) => site.id !== currentSite.id && site.status === 'active');
-  }, [sites, currentSite]);
+    return safeSites.filter(
+      (site) => !managedIds.has(site.id) && site.status === 'active'
+    );
+  }, [sites, managedIds]);
   
   // Navigation handlers
   const handleNavigateToOtherSite = useCallback(
@@ -197,8 +214,7 @@ export const MySiteInventoryScreen: React.FC = () => {
     setShowOtherSitesModal(false);
   }, []);
   
-  // Loading state
-  if (isLoadingSite || sitesLoading) {
+  if (sitesLoading) {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader title="My Inventory" />
@@ -214,8 +230,7 @@ export const MySiteInventoryScreen: React.FC = () => {
     );
   }
   
-  // No site assigned state
-  if (!currentSite) {
+  if (managedSites.length === 0) {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader title="My Inventory" />
@@ -254,6 +269,14 @@ export const MySiteInventoryScreen: React.FC = () => {
         contentContainerClassName="pb-6"
         showsVerticalScrollIndicator={false}
       >
+        <View className="px-4 pt-3">
+          <ManagedSiteSwitcher
+            managedSites={managedSites}
+            activeSiteId={effectiveSiteId}
+            onSiteChange={handleWorkingSiteChange}
+          />
+        </View>
+
         {/* Search Bar */}
         <View className="px-4 pt-4 pb-3">
           <View className="bg-[#F1F5F9] rounded-full h-12 px-4 flex-row items-center">

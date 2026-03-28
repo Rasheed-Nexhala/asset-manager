@@ -19,7 +19,14 @@ import { selectPurchaseOrderError } from '../store/selectors/purchaseOrderSelect
 import { selectMaintenanceError } from '../store/selectors/maintenanceSelectors';
 import { selectAllSites } from '../store/selectors/sitesSelectors';
 import { selectInventoryByLocation, selectEmptyInventory } from '../store/selectors/inventorySelectors';
-import { selectAssignedSiteIdForUser, selectSiteById } from '../store/selectors/sitesSelectors';
+import {
+  selectAssignedSiteIdForUser,
+  selectSiteById,
+  selectManagedSitesForUser,
+} from '../store/selectors/sitesSelectors';
+import { setActiveManagedSiteId } from '../store/slices/sitesSlice';
+import { saveActiveManagedSiteId } from '../utils/activeManagedSiteStorage';
+import { ManagedSiteSwitcher } from '../components/inventory/ManagedSiteSwitcher';
 import { selectActivityLogError } from '../store/selectors/activityLogSelectors';
 import { clearError } from '../store/slices/activityLogSlice';
 import {
@@ -91,12 +98,23 @@ export function DashboardPage() {
   const role = roleType ?? 'Unassigned';
   const isActive = useAppSelector(selectIsActive);
   const assignedSiteId = useAppSelector(selectAssignedSiteIdForUser(userId));
+  const managedSitesSm = useAppSelector(selectManagedSitesForUser(userId));
   const assignedSiteSelector = useMemo(
     () => (assignedSiteId ? selectSiteById(assignedSiteId) : (_state: RootState) => null),
     [assignedSiteId]
   );
   const assignedSite = useAppSelector(assignedSiteSelector);
   const siteName = assignedSite?.name ?? null;
+
+  const handleDashboardWorkingSiteChange = useCallback(
+    (siteId: string) => {
+      dispatch(setActiveManagedSiteId(siteId));
+      if (userId) {
+        saveActiveManagedSiteId(userId, siteId);
+      }
+    },
+    [dispatch, userId]
+  );
 
   const sites = useAppSelector(selectAllSites);
   const activityLogError = useAppSelector(selectActivityLogError);
@@ -277,6 +295,22 @@ export function DashboardPage() {
           siteName={siteName ?? undefined}
         />
 
+        {isSiteManager && managedSitesSm.length > 0 && (
+          <ManagedSiteSwitcher
+            managedSites={managedSitesSm}
+            activeSiteId={assignedSiteId}
+            onSiteChange={handleDashboardWorkingSiteChange}
+          />
+        )}
+
+        {isSiteManager && managedSitesSm.length === 0 && !isInitialLoad && (
+          <div className="rounded-[10px] border border-slate-200 bg-white p-4">
+            <p className="text-[15px] text-slate-500">
+              You are not assigned to any active site yet. Contact an administrator.
+            </p>
+          </div>
+        )}
+
         {/* KPI Section - Full Width */}
         {(isAdminOrSuperAdmin || (isStoreIncharge && statsForStore.length > 0)) && (
           <QuickStatsRow
@@ -331,6 +365,7 @@ export function DashboardPage() {
 
             {isSiteManager && !isAdminOrSuperAdmin && !isStoreIncharge && (
               <>
+                {managedSitesSm.length > 0 && (
                 <div className="bg-white rounded-[10px] p-4 lg:p-6 border border-slate-200 shadow-sm">
                   <h3 className="text-[17px] font-semibold text-slate-900 mb-3">
                     My Inventory Summary
@@ -350,6 +385,7 @@ export function DashboardPage() {
                     </div>
                   </div>
                 </div>
+                )}
                 {(recentPendingRequests.length > 0 || isInitialLoad || dashboardLoading) && (
                   <PendingRequestsWidget
                     requests={recentPendingRequests}

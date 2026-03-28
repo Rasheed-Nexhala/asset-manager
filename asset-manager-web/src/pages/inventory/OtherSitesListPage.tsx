@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectUserId } from '../../store/selectors/authSelectors';
-import { selectAllSites } from '../../store/selectors/sitesSelectors';
+import { selectAllSites, selectManagedSitesForUser } from '../../store/selectors/sitesSelectors';
 import { fetchSites, setSites } from '../../store/slices/sitesSlice';
 import { subscribeToSites } from '../../services/firebase/siteService';
 import type { Site } from '../../types/sites';
@@ -14,6 +14,7 @@ export function OtherSitesListPage() {
   const dispatch = useAppDispatch();
   const userId = useAppSelector(selectUserId);
   const sites = useAppSelector(selectAllSites);
+  const managedSites = useAppSelector(selectManagedSitesForUser(userId));
 
   useEffect(() => {
     dispatch(fetchSites());
@@ -21,17 +22,15 @@ export function OtherSitesListPage() {
     return () => unsubscribe();
   }, [dispatch]);
 
-  const mySiteId = useMemo(() => {
-    if (!userId) return null;
-    const site = sites.find((s) => s.managerId === userId);
-    return site?.id ?? null;
-  }, [userId, sites]);
+  const managedIds = useMemo(
+    () => new Set(managedSites.map((s) => s.id)),
+    [managedSites]
+  );
 
   const otherSites = useMemo(() => {
     const safe = Array.isArray(sites) ? sites : [];
-    if (!mySiteId) return safe;
-    return safe.filter((s) => s.id !== mySiteId && s.status === 'active');
-  }, [sites, mySiteId]);
+    return safe.filter((s) => !managedIds.has(s.id) && s.status === 'active');
+  }, [sites, managedIds]);
 
   return (
     <div className="flex flex-col h-full">
@@ -39,7 +38,8 @@ export function OtherSitesListPage() {
       <div className="flex-1 overflow-y-auto p-4">
         <h2 className="text-[22px] font-semibold text-slate-900 mb-4">Other Sites</h2>
         <p className="text-[15px] text-slate-500 mb-4">
-          Select a site to view its inventory. You can request transfers to your site.
+          Sites you don&apos;t manage — view only. Request transfers to your active working site from
+          inventory actions.
         </p>
         {otherSites.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">

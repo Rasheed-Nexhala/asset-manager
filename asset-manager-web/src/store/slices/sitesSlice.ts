@@ -14,6 +14,8 @@ interface SitesState {
   searchQuery: string;
   validationLoading: boolean;
   lastValidationAt: string | null;
+  /** Site Manager working context: which managed site is active in UI */
+  activeManagedSiteId: string | null;
 }
 
 const initialState: SitesState = {
@@ -23,6 +25,7 @@ const initialState: SitesState = {
   searchQuery: '',
   validationLoading: false,
   lastValidationAt: null,
+  activeManagedSiteId: null,
 };
 
 const sitesSlice = createSlice({
@@ -53,6 +56,9 @@ const sitesSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    setActiveManagedSiteId: (state, action: PayloadAction<string | null>) => {
+      state.activeManagedSiteId = action.payload;
+    },
     /** Reset sites state (e.g. on sign-out) */
     clearSites: (state) => {
       state.sites = [];
@@ -61,6 +67,7 @@ const sitesSlice = createSlice({
       state.searchQuery = '';
       state.validationLoading = false;
       state.lastValidationAt = null;
+      state.activeManagedSiteId = null;
     },
   },
   extraReducers: (builder) => {
@@ -162,6 +169,7 @@ export const {
   setError,
   setSearchQuery,
   clearError,
+  setActiveManagedSiteId,
   clearSites,
 } = sitesSlice.actions;
 

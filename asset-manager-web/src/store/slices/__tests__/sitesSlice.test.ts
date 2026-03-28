@@ -28,6 +28,7 @@ import sitesReducer, {
   setLoading,
   setError,
   clearError,
+  setActiveManagedSiteId,
   clearSites,
 } from '../sitesSlice';
 import { fetchSites } from '../../thunks/sitesThunks';
@@ -47,6 +48,7 @@ describe('sitesSlice', () => {
     searchQuery: '',
     validationLoading: false,
     lastValidationAt: null,
+    activeManagedSiteId: null,
   };
 
   it('has correct initial state', () => {
@@ -93,12 +95,21 @@ describe('sitesSlice', () => {
   });
 
   it('clearSites resets to initial state', () => {
-    const withData = sitesReducer(initialState, setSites([mockSite]));
+    const withData = sitesReducer(
+      sitesReducer(initialState, setActiveManagedSiteId('site1')),
+      setSites([mockSite])
+    );
     const state = sitesReducer(withData, clearSites());
     expect(state.sites).toEqual([]);
     expect(state.isLoading).toBe(false);
     expect(state.error).toBe(null);
     expect(state.searchQuery).toBe('');
+    expect(state.activeManagedSiteId).toBe(null);
+  });
+
+  it('setActiveManagedSiteId sets active managed site', () => {
+    const state = sitesReducer(initialState, setActiveManagedSiteId('abc'));
+    expect(state.activeManagedSiteId).toBe('abc');
   });
 
   it('fetchSites.fulfilled sets sites', () => {

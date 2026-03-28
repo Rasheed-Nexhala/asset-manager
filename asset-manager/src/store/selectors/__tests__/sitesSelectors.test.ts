@@ -22,6 +22,7 @@ const createMockState = (sites: Partial<RootState['sites']>): RootState =>
       searchQuery: '',
       validationLoading: false,
       lastValidationAt: null,
+      activeManagedSiteId: null,
       ...sites,
     },
     inventory: { items: [], categories: [], inventoryByLocation: {}, lowStockItemIds: [], loading: false, error: null, errorTimestamp: null, filters: null },
@@ -151,5 +152,15 @@ describe('sitesSelectors', () => {
     const state = createMockState({ sites: [mockSite('1')] });
     const selector = selectAssignedSiteIdForUser(null);
     expect(selector(state)).toBeNull();
+  });
+
+  it('selectAssignedSiteIdForUser prefers activeManagedSiteId when valid', () => {
+    const sites = [
+      mockSite('a', { name: 'A Site', managerId: 'user1' }),
+      mockSite('b', { name: 'B Site', managerId: 'user1' }),
+    ];
+    const state = createMockState({ sites, activeManagedSiteId: 'b' });
+    const selector = selectAssignedSiteIdForUser('user1');
+    expect(selector(state)).toBe('b');
   });
 });

@@ -4,7 +4,6 @@ import {
   updateSite as updateSiteService,
   getSites,
   checkSiteNameExists,
-  findSiteByManagerId,
   getSite,
 } from '../../services/firebase/siteService';
 import { getAllUsers } from '../../services/firebase/userRoleService';
@@ -40,20 +39,9 @@ export const createSite = createAsyncThunk(
         return rejectWithValue('Site name already exists. Please choose a different name.');
       }
 
-      // Handle manager assignment
+      // Handle manager assignment (same manager may manage multiple sites)
       let managerName: string | null = null;
       if (formData.managerId) {
-        // Check if manager is already assigned to another site
-        const existingSite = await findSiteByManagerId(formData.managerId);
-        if (existingSite) {
-          // Remove manager from previous site
-          await updateSiteService(existingSite.id, {
-            managerId: null,
-            managerName: null,
-          });
-        }
-
-        // Get manager name from users collection
         const users = await getAllUsers();
         const manager = users.find((user) => user.id === formData.managerId);
         if (manager) {
@@ -107,20 +95,9 @@ export const updateSite = createAsyncThunk(
     try {
       // Site name cannot be changed when editing — no name uniqueness check needed
 
-      // Handle manager assignment
+      // Handle manager assignment (same manager may manage multiple sites)
       let managerName: string | null = null;
       if (formData.managerId) {
-        // Check if manager is already assigned to another site
-        const existingSite = await findSiteByManagerId(formData.managerId, siteId);
-        if (existingSite) {
-          // Remove manager from previous site
-          await updateSiteService(existingSite.id, {
-            managerId: null,
-            managerName: null,
-          });
-        }
-
-        // Get manager name from users collection
         const users = await getAllUsers();
         const manager = users.find((user) => user.id === formData.managerId);
         if (manager) {

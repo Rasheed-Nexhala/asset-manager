@@ -1,7 +1,14 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectUserId } from '../../store/selectors/authSelectors';
-import { selectAllSites, selectSitesLoading } from '../../store/selectors/sitesSelectors';
+import {
+  selectAllSites,
+  selectSitesLoading,
+  selectAssignedSiteIdForUser,
+  selectManagedSitesForUser,
+} from '../../store/selectors/sitesSelectors';
+import { setActiveManagedSiteId } from '../../store/slices/sitesSlice';
+import { saveActiveManagedSiteId } from '../../utils/activeManagedSiteStorage';
 import {
   selectAllItems,
   selectInventoryByLocation,
@@ -18,7 +25,7 @@ import { getLocationId } from '../../utils/locationUtils';
 import { runNonCriticalTask } from '../../utils/nonCriticalTask';
 import type { InventoryEntry, ItemType } from '../../types/inventory';
 import type { Site } from '../../types/sites';
-import { InventorySubNav } from '../../components/inventory';
+import { InventorySubNav, ManagedSiteSwitcher } from '../../components/inventory';
 import { InventoryListItem } from '../../components/inventory/InventoryListItem';
 import { Icon } from '../../components/shared/Icon';
 import { InventoryLoadingState } from '../../components/shared/InventoryLoadingState';
@@ -30,10 +37,10 @@ export function MySiteInventoryPage() {
   const items = useAppSelector(selectAllItems);
   const isLoading = useAppSelector(selectItemsLoading);
   const sitesLoading = useAppSelector(selectSitesLoading);
+  const managedSites = useAppSelector(selectManagedSitesForUser(userId));
+  const effectiveSiteId = useAppSelector(selectAssignedSiteIdForUser(userId));
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentSite, setCurrentSite] = useState<Site | null>(null);
-  const [isLoadingSite, setIsLoadingSite] = useState(true);
 
   useEffect(() => {
     dispatch(fetchSites());
@@ -43,16 +50,21 @@ export function MySiteInventoryPage() {
     return () => unsubscribe();
   }, [dispatch]);
 
-  useEffect(() => {
+  const currentSite = useMemo((): Site | null => {
+    if (!effectiveSiteId) return null;
     const safeSites = Array.isArray(sites) ? sites : [];
-    if (userId && safeSites.length > 0) {
-      const userSite = safeSites.find((s) => s.managerId === userId);
-      setCurrentSite(userSite ?? null);
-      setIsLoadingSite(false);
-    } else if (!sitesLoading && safeSites.length === 0) {
-      setIsLoadingSite(false);
-    }
-  }, [userId, sites, sitesLoading]);
+    return safeSites.find((site) => site.id === effectiveSiteId) ?? null;
+  }, [sites, effectiveSiteId]);
+
+  const handleWorkingSiteChange = useCallback(
+    (siteId: string) => {
+      dispatch(setActiveManagedSiteId(siteId));
+      if (userId) {
+        saveActiveManagedSiteId(userId, siteId);
+      }
+    },
+    [dispatch, userId]
+  );
 
   const siteId = currentSite?.id ?? null;
   useEffect(() => {
@@ -109,7 +121,7 @@ export function MySiteInventoryPage() {
     });
   }, [enrichedInventory, searchQuery]);
 
-  if (isLoadingSite || sitesLoading) {
+  if (sitesLoading) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <InventorySubNav />
@@ -118,7 +130,7 @@ export function MySiteInventoryPage() {
     );
   }
 
-  if (!currentSite) {
+  if (managedSites.length === 0) {
     return (
       <div className="flex flex-col h-full">
         <InventorySubNav />
@@ -139,6 +151,13 @@ export function MySiteInventoryPage() {
     <div className="flex flex-col h-full">
       <InventorySubNav />
       <div className="flex-1 overflow-y-auto">
+        <div className="px-4 pt-3">
+          <ManagedSiteSwitcher
+            managedSites={managedSites}
+            activeSiteId={effectiveSiteId}
+            onSiteChange={handleWorkingSiteChange}
+          />
+        </div>
         <div className="px-4 pt-4 pb-3">
           <div className="bg-slate-100 rounded-full h-12 px-4 flex items-center gap-3">
             <Icon name="magnifying-glass" className="w-5 h-5 text-slate-400" />

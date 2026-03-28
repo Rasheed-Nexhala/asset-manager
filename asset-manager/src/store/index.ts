@@ -105,6 +105,7 @@ export const store = configureStore({
         ignoredPaths: [
           'auth.user',
           'sites.sites',
+          'sites.activeManagedSiteId',
           'inventory.items',
           'inventory.categories',
           'inventory.inventoryByLocation',
