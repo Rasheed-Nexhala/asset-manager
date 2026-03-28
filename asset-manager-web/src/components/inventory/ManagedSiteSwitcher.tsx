@@ -20,6 +20,8 @@ export function ManagedSiteSwitcher({
 
   const active =
     managedSites.find((s) => s.id === activeSiteId) ?? managedSites[0] ?? null;
+  /** When Redux is still catching up, treat first site as selected so the list matches the header. */
+  const effectiveActiveId = activeSiteId ?? managedSites[0]?.id ?? null;
 
   const handlePick = useCallback(
     (siteId: string) => {
@@ -37,7 +39,7 @@ export function ManagedSiteSwitcher({
     return (
       <div className="mb-3 flex flex-row items-center">
         <span className="max-w-full rounded-full bg-amber-700/15 px-3 py-1.5 text-[12px] font-medium text-amber-800">
-          {active.name}
+          {active.name?.trim() || 'Site'}
         </span>
       </div>
     );
@@ -51,11 +53,13 @@ export function ManagedSiteSwitcher({
         className="flex min-h-[48px] w-full items-center justify-between rounded-[10px] border border-slate-200 bg-white px-4 py-2 text-left"
         aria-expanded={open}
         aria-haspopup="listbox"
-        aria-label={`Working site ${active.name}. Open to switch site.`}
+        aria-label={`Working site ${active.name?.trim() || 'Site'}. Open to switch site.`}
       >
         <div className="min-w-0 flex-1 pr-2">
           <p className="text-[13px] text-slate-500">Working site</p>
-          <p className="truncate text-[15px] font-semibold text-slate-900">{active.name}</p>
+          <p className="truncate text-[15px] font-semibold text-slate-900">
+            {active.name?.trim() || 'Site'}
+          </p>
         </div>
         <span className="rounded-full bg-amber-700/15 px-2 py-1 text-[12px] font-medium text-amber-800">
           Switch
@@ -77,7 +81,7 @@ export function ManagedSiteSwitcher({
             aria-label="Select working site"
           >
             {managedSites.map((site) => {
-              const selected = site.id === activeSiteId;
+              const selected = effectiveActiveId != null && site.id === effectiveActiveId;
               return (
                 <li key={site.id} role="option" aria-selected={selected}>
                   <button
@@ -93,7 +97,7 @@ export function ManagedSiteSwitcher({
                           selected ? 'text-blue-800' : 'text-slate-900'
                         }`}
                       >
-                        {site.name}
+                        {site.name?.trim() || 'Site'}
                       </span>
                       {site.address ? (
                         <span className="mt-0.5 block truncate text-[13px] text-slate-500">

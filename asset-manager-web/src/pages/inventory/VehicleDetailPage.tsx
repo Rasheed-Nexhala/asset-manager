@@ -51,14 +51,24 @@ export function VehicleDetailPage() {
   );
 
   const load = useCallback(async () => {
-    const v = await getVehicleById(vehicleId);
-    setVehicle(v);
-    const rows = await listAssignmentsByVehicle(vehicleId);
-    setAssignments(rows);
-    const items = await listItems({ type: 'fuel', status: 'active' });
-    setFuelItems(items);
-    setLoading(false);
-  }, [vehicleId]);
+    try {
+      const v = await getVehicleById(vehicleId);
+      setVehicle(v);
+      const rows = await listAssignmentsByVehicle(vehicleId);
+      setAssignments(rows);
+      const items = await listItems({ type: 'fuel', status: 'active' });
+      setFuelItems(items);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to load vehicle';
+      console.error('VehicleDetailPage load:', e);
+      toast.error(msg);
+      setVehicle(null);
+      setAssignments([]);
+      setFuelItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [vehicleId, toast]);
 
   useEffect(() => {
     dispatch(fetchSites());

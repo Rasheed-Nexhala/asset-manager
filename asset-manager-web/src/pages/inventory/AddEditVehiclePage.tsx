@@ -28,6 +28,7 @@ export function AddEditVehiclePage() {
   const [assignmentCount, setAssignmentCount] = useState(0);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+  const [notFound, setNotFound] = useState(false);
 
   const vehicleNumberLocked = isEdit && assignmentCount > 0;
 
@@ -41,16 +42,28 @@ export function AddEditVehiclePage() {
   useEffect(() => {
     if (!vehicleId) return;
     let cancelled = false;
+    setNotFound(false);
+    setLoading(true);
     (async () => {
       try {
         const [v, count] = await Promise.all([
           getVehicleById(vehicleId),
           countAssignmentsForVehicle(vehicleId),
         ]);
-        if (cancelled || !v) return;
+        if (cancelled) return;
+        if (!v) {
+          setNotFound(true);
+          return;
+        }
         setVehicleNumber(v.vehicleNumber);
         setNotes(v.notes ?? '');
         setAssignmentCount(count);
+      } catch (e) {
+        if (!cancelled) {
+          const msg = e instanceof Error ? e.message : 'Failed to load vehicle';
+          console.error('AddEditVehiclePage load:', e);
+          toast.error(msg);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -58,7 +71,7 @@ export function AddEditVehiclePage() {
     return () => {
       cancelled = true;
     };
-  }, [vehicleId]);
+  }, [vehicleId, toast]);
 
   const handleSave = useCallback(async () => {
     const num = vehicleNumber.trim();
@@ -86,6 +99,20 @@ export function AddEditVehiclePage() {
   }, [vehicleNumber, notes, isEdit, vehicleId, vehicleNumberLocked, navigate, toast]);
 
   if (!canManage) return null;
+
+  if (isEdit && notFound && !loading) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col bg-slate-50">
+        <InventorySubNav />
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-16 text-center">
+          <p className="text-[17px] font-semibold text-slate-900">Vehicle not found</p>
+          <Link to="/inventory/vehicles" className="text-[15px] font-semibold text-blue-800 hover:underline">
+            Back to vehicles
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

@@ -47,23 +47,38 @@ export function AllocateItemsToSupervisorsPage() {
   const [qty, setQty] = useState('1');
   const [submitting, setSubmitting] = useState(false);
 
+  const handleSubscriptionError = useCallback(
+    (err: Error) => {
+      toast.error(err.message);
+    },
+    [toast]
+  );
+
   useEffect(() => {
     if (!siteId || !userId) {
       setLoading(false);
       return;
     }
-    const unsubReq = requestService.subscribeToRequests({ userId, siteId }, (list) => {
-      setRequests(
-        list.filter((r) => r.status === 'transferred' || r.status === 'partially_returned')
-      );
-      setLoading(false);
-    });
-    const unsubSup = siteSupervisorService.subscribeSiteSupervisors(siteId, setSupervisors);
+    const unsubReq = requestService.subscribeToRequests(
+      { userId, siteId },
+      (list) => {
+        setRequests(
+          list.filter((r) => r.status === 'transferred' || r.status === 'partially_returned')
+        );
+        setLoading(false);
+      },
+      handleSubscriptionError
+    );
+    const unsubSup = siteSupervisorService.subscribeSiteSupervisors(
+      siteId,
+      setSupervisors,
+      handleSubscriptionError
+    );
     return () => {
       unsubReq();
       unsubSup();
     };
-  }, [siteId, userId]);
+  }, [siteId, userId, handleSubscriptionError]);
 
   const selectedRequest = useMemo(
     () => requests.find((r) => r.id === selectedRequestId) ?? null,
@@ -142,6 +157,7 @@ export function AllocateItemsToSupervisorsPage() {
     navigate,
     toast,
     userDisplayName,
+    userId,
   ]);
 
   if (!siteId) {

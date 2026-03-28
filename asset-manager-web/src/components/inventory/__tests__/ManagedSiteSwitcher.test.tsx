@@ -41,6 +41,25 @@ describe('ManagedSiteSwitcher', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('treats first site as selected when activeSiteId is null (Redux catching up)', async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <ManagedSiteSwitcher
+        managedSites={[base('s1', 'Alpha'), base('s2', 'Beta')]}
+        activeSiteId={null}
+        onSiteChange={vi.fn()}
+      />
+    );
+
+    const toggle = screen.getByRole('button', {
+      name: /Working site Alpha\. Open to switch site\./i,
+    });
+    await user.click(toggle);
+
+    expect(screen.getByRole('option', { name: /Alpha/i })).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('shows switcher for two sites and calls onSiteChange when picking another', async () => {
     const user = userEvent.setup();
     const onSiteChange = vi.fn();

@@ -24,6 +24,14 @@ vi.mock('../../../services/firebase/vehicleFuelAssignmentService', () => ({
 
 vi.mock('../../../config/firebase', () => ({ auth: {}, db: {} }));
 
+vi.mock('../../../contexts/ToastContext', () => ({
+  useToast: () => ({
+    error: vi.fn(),
+    success: vi.fn(),
+    info: vi.fn(),
+  }),
+}));
+
 describe('VehiclesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();

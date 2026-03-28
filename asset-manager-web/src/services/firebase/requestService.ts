@@ -1249,7 +1249,8 @@ export const subscribeToRequests = (
     siteId?: string;
     userId?: string; // For Site Manager's own requests
   },
-  callback: (requests: Request[]) => void
+  callback: (requests: Request[]) => void,
+  onError?: (error: Error) => void
 ): (() => void) => {
   try {
     let q = query(collection(db, REQUESTS_COLLECTION));
@@ -1313,12 +1314,16 @@ export const subscribeToRequests = (
       (error) => {
         console.error('Error in requests subscription:', error);
         callback([]);
+        const err = error instanceof Error ? error : new Error(String(error));
+        onError?.(err);
       }
     );
     
     return unsubscribe;
   } catch (error) {
     console.error('Error setting up requests subscription:', error);
+    const err = error instanceof Error ? error : new Error(String(error));
+    onError?.(err);
     return () => {};
   }
 };

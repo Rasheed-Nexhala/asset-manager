@@ -35,7 +35,8 @@ function allocationsCol(siteId: string) {
 
 export function subscribeSiteSupervisors(
   siteId: string,
-  onSnapshotCb: (rows: SiteSupervisor[]) => void
+  onSnapshotCb: (rows: SiteSupervisor[]) => void,
+  onError?: (error: Error) => void
 ): () => void {
   const q = query(supervisorsCol(siteId), orderBy('name'));
   return onSnapshot(
@@ -55,7 +56,11 @@ export function subscribeSiteSupervisors(
       });
       onSnapshotCb(rows);
     },
-    () => onSnapshotCb([])
+    (err) => {
+      console.error('subscribeSiteSupervisors:', err);
+      onSnapshotCb([]);
+      onError?.(err instanceof Error ? err : new Error(String(err)));
+    }
   );
 }
 

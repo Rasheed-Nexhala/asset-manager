@@ -1,7 +1,11 @@
 import { useEffect, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { selectUserId, selectIsSiteManager } from '../store/selectors/authSelectors';
-import { selectAllSites, selectActiveManagedSiteId } from '../store/selectors/sitesSelectors';
+import {
+  selectAllSites,
+  selectActiveManagedSiteId,
+  selectSitesLoading,
+} from '../store/selectors/sitesSelectors';
 import { setActiveManagedSiteId } from '../store/slices/sitesSlice';
 import {
   loadActiveManagedSiteId,
@@ -16,6 +20,7 @@ export function useSiteManagerActiveSiteSync(): void {
   const userId = useAppSelector(selectUserId);
   const isSiteManager = useAppSelector(selectIsSiteManager);
   const sites = useAppSelector(selectAllSites);
+  const sitesLoading = useAppSelector(selectSitesLoading);
   const activeManagedSiteId = useAppSelector(selectActiveManagedSiteId);
 
   const managedSites = useMemo(() => {
@@ -30,6 +35,11 @@ export function useSiteManagerActiveSiteSync(): void {
       if (activeManagedSiteId !== null) {
         dispatch(setActiveManagedSiteId(null));
       }
+      return;
+    }
+
+    // Avoid clearing active site while sites are still loading (empty list is ambiguous).
+    if (sitesLoading) {
       return;
     }
 
@@ -53,5 +63,5 @@ export function useSiteManagerActiveSiteSync(): void {
     const first = managedSites[0].id;
     dispatch(setActiveManagedSiteId(first));
     saveActiveManagedSiteId(userId, first);
-  }, [isSiteManager, userId, managedSites, activeManagedSiteId, dispatch]);
+  }, [isSiteManager, userId, managedSites, sitesLoading, activeManagedSiteId, dispatch]);
 }

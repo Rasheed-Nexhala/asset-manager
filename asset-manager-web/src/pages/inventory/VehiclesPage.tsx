@@ -8,27 +8,41 @@ import type { Vehicle } from '../../types/vehicle';
 import { Icon } from '../../components/shared/Icon';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { InventorySubNav } from '../../components/inventory/InventorySubNav';
+import { useToast } from '../../contexts/ToastContext';
 
 export function VehiclesPage() {
   const canManage = useAppSelector(selectIsStoreIncharge);
   const isOverview = useAppSelector(selectIsAdminOrSuperAdmin) && !canManage;
+  const toast = useToast();
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [totals, setTotals] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const list = await listVehicles();
-    setVehicles(list);
-    const t: Record<string, number> = {};
-    await Promise.all(
-      list.map(async (v) => {
-        t[v.id] = await getTotalLitersAssignedToVehicle(v.id);
-      })
-    );
-    setTotals(t);
-    setLoading(false);
-  }, []);
+    setLoadError(null);
+    try {
+      const list = await listVehicles();
+      setVehicles(list);
+      const t: Record<string, number> = {};
+      await Promise.all(
+        list.map(async (v) => {
+          t[v.id] = await getTotalLitersAssignedToVehicle(v.id);
+        })
+      );
+      setTotals(t);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to load vehicles';
+      console.error('VehiclesPage load:', e);
+      setLoadError(msg);
+      toast.error(msg);
+      setVehicles([]);
+      setTotals({});
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
     void load();
@@ -79,6 +93,21 @@ export function VehiclesPage() {
             <div className="flex flex-col items-center justify-center gap-4 py-16" aria-busy="true" aria-live="polite">
               <LoadingSpinner size="lg" />
               <p className="text-[15px] text-slate-500">Loading vehicles…</p>
+            </div>
+          ) : loadError ? (
+            <div className="flex flex-col items-center py-12 text-center md:py-16">
+              <p className="text-[17px] font-semibold text-slate-900">Could not load vehicles</p>
+              <p className="mt-2 max-w-md text-[15px] text-slate-500">{loadError}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoading(true);
+                  void load();
+                }}
+                className="mt-6 rounded-[10px] bg-blue-800 px-4 py-2.5 text-[15px] font-semibold text-white hover:bg-blue-900"
+              >
+                Try again
+              </button>
             </div>
           ) : vehicles.length === 0 ? (
             <div className="flex flex-col items-center py-12 text-center md:py-16">
