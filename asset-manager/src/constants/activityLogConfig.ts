@@ -96,6 +96,11 @@ export const ACTION_TYPE_CONFIG: Record<
     icon: 'arrow-forward-outline',
     category: 'inventory',
   },
+  item_deleted: {
+    label: 'Item Deleted',
+    icon: 'trash-outline',
+    category: 'inventory',
+  },
   steel_master_created: {
     label: 'Custom Item Created',
     icon: 'resize-outline',
@@ -104,6 +109,11 @@ export const ACTION_TYPE_CONFIG: Record<
   steel_master_updated: {
     label: 'Custom Item Updated',
     icon: 'create-outline',
+    category: 'inventory',
+  },
+  steel_master_deleted: {
+    label: 'Custom Item Deleted',
+    icon: 'trash-outline',
     category: 'inventory',
   },
   inventory_update_request_created: {
@@ -173,6 +183,11 @@ export const ACTION_TYPE_CONFIG: Record<
   po_created: {
     label: 'PO Created',
     icon: 'document-text-outline',
+    category: 'purchase_orders',
+  },
+  po_submitted: {
+    label: 'PO Submitted for Approval',
+    icon: 'send-outline',
     category: 'purchase_orders',
   },
   po_approved: {

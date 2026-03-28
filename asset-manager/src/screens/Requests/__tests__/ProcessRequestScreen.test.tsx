@@ -510,4 +510,89 @@ describe('ProcessRequestScreen', () => {
       expect(screen.getByText('Site Beta')).toBeTruthy();
     });
   });
+
+  it('shows View Request title when status is rejected', async () => {
+    const mockRequest = createMockRequest({ status: 'rejected' });
+    renderWithStore(<ProcessRequestScreen />, {
+      ...defaultPreloadedState,
+      requests: {
+        requests: [mockRequest],
+        myRequests: [],
+        selectedRequest: null,
+        loading: false,
+        error: null,
+        errorTimestamp: null,
+        filters: { status: 'all', priority: 'all', siteId: 'all' },
+      },
+    });
+    mockSubscribeCallback?.(mockRequest);
+    await waitFor(() => {
+      expect(screen.getByText('View Request')).toBeTruthy();
+    });
+  });
+
+  it('shows View Request title when status is transferred', async () => {
+    const mockRequest = createMockRequest({ status: 'transferred' });
+    renderWithStore(<ProcessRequestScreen />, {
+      ...defaultPreloadedState,
+      requests: {
+        requests: [mockRequest],
+        myRequests: [],
+        selectedRequest: null,
+        loading: false,
+        error: null,
+        errorTimestamp: null,
+        filters: { status: 'all', priority: 'all', siteId: 'all' },
+      },
+    });
+    mockSubscribeCallback?.(mockRequest);
+    await waitFor(() => {
+      expect(screen.getByText('View Request')).toBeTruthy();
+    });
+  });
+
+  it('shows Process Request title when status is pending (actionable)', async () => {
+    const mockRequest = createMockRequest({ status: 'pending' });
+    renderWithStore(<ProcessRequestScreen />, {
+      ...defaultPreloadedState,
+      requests: {
+        requests: [mockRequest],
+        myRequests: [],
+        selectedRequest: null,
+        loading: false,
+        error: null,
+        errorTimestamp: null,
+        filters: { status: 'all', priority: 'all', siteId: 'all' },
+      },
+    });
+    mockSubscribeCallback?.(mockRequest);
+    await waitFor(() => {
+      expect(screen.getByText('Process Request')).toBeTruthy();
+    });
+  });
+
+  it('does not show Approve for plain Admin (read-only request detail)', async () => {
+    const mockRequest = createMockRequest({ status: 'pending' });
+    renderWithStore(<ProcessRequestScreen />, {
+      ...defaultPreloadedState,
+      auth: {
+        ...defaultPreloadedState.auth!,
+        userRole: { role: 'Admin', isActive: true, permissions: [] },
+      },
+      requests: {
+        requests: [mockRequest],
+        myRequests: [],
+        selectedRequest: null,
+        loading: false,
+        error: null,
+        errorTimestamp: null,
+        filters: { status: 'all', priority: 'all', siteId: 'all' },
+      },
+    });
+    mockSubscribeCallback?.(mockRequest);
+    await waitFor(() => {
+      expect(screen.getByText('REQ-2025-0001')).toBeTruthy();
+    });
+    expect(screen.queryByRole('button', { name: 'Approve request' })).toBeNull();
+  });
 });

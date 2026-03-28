@@ -1,10 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import * as Notifications from 'expo-notifications';
-import {
-  NavigationContainer,
-  createNavigationContainerRef,
-  type ParamListBase,
-} from '@react-navigation/native';
+import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useAppSelector } from '../store/hooks';
 import {
@@ -23,8 +19,9 @@ import { BottomTabNavigator } from './BottomTabNavigator';
 import { UpdatePasswordScreen } from '../screens/Users/UpdatePasswordScreen';
 import { DeleteAccountScreen } from '../screens/Users/DeleteAccountScreen';
 import { NotificationCenterScreen } from '../screens/Notifications/NotificationCenterScreen';
+import { navigationRef } from './navigationRef';
 
-export const navigationRef = createNavigationContainerRef<ParamListBase>();
+export { navigationRef };
 
 type NotificationData = {
   screen?: string;

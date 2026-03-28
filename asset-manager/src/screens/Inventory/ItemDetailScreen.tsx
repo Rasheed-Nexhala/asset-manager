@@ -467,6 +467,24 @@ export const ItemDetailScreen: React.FC = () => {
           </View>
         </View>
 
+        <TouchableOpacity
+          className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-3 flex-row items-center justify-between min-h-[48px]"
+          onPress={() =>
+            navigation.navigate('ItemActivityHistory', {
+              itemId,
+              itemName: item.name,
+            })
+          }
+          activeOpacity={0.7}
+          accessibilityLabel="View item activity history"
+          accessibilityRole="button"
+        >
+          <Text className="text-[17px] font-semibold text-[#0F172A]">
+            Item activity history
+          </Text>
+          <Ionicons name="chevron-forward" size={20} color="#64748B" />
+        </TouchableOpacity>
+
         {/* Stock Distribution Section - hidden for Fuel; By Location remains for all */}
         <View className="mb-3">
           {/* Stock Distribution KPI cards - hidden for Fuel */}

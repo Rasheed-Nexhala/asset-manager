@@ -40,8 +40,10 @@ export type ActionType =
   | 'item_updated'
   | 'quantity_adjusted'
   | 'item_transferred'
+  | 'item_deleted'
   | 'steel_master_created'
   | 'steel_master_updated'
+  | 'steel_master_deleted'
   // Inventory Update Requests (Store Incharge access to central store)
   | 'inventory_update_request_created'
   | 'inventory_update_request_approved'
@@ -58,6 +60,7 @@ export type ActionType =
   | 'request_cancelled'
   // Purchase Orders
   | 'po_created'
+  | 'po_submitted'
   | 'po_approved'
   | 'po_rejected'
   | 'po_received'
@@ -163,6 +166,9 @@ export interface ActivityLogFiltersBase {
   actionCategory?: ActionCategory | 'all';
   actionType?: ActionType | 'all';
   searchQuery?: string;
+  /** When set (with targetId), restricts logs to a specific entity (e.g. inventory item). */
+  targetType?: TargetType | 'all';
+  targetId?: string | null;
 }
 
 /**

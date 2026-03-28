@@ -10,6 +10,8 @@ interface ActivityLogFilterPanelProps {
   isOpen: boolean;
   filters: ActivityLogFiltersStore;
   onClose: () => void;
+  /** When set, Apply sends filters here instead of Redux (e.g. item-scoped history). */
+  onApplyExternal?: (filters: ActivityLogFiltersStore) => void;
 }
 
 const INITIAL_FILTERS_UI: ActivityLogFiltersUI = {
@@ -21,7 +23,12 @@ const INITIAL_FILTERS_UI: ActivityLogFiltersUI = {
   searchQuery: '',
 };
 
-export function ActivityLogFilterPanel({ isOpen, filters, onClose }: ActivityLogFilterPanelProps) {
+export function ActivityLogFilterPanel({
+  isOpen,
+  filters,
+  onClose,
+  onApplyExternal,
+}: ActivityLogFilterPanelProps) {
   const dispatch = useAppDispatch();
   const [localFilters, setLocalFilters] = useState<ActivityLogFiltersUI>(filtersToUI(filters) as ActivityLogFiltersUI);
 
@@ -36,7 +43,12 @@ export function ActivityLogFilterPanel({ isOpen, filters, onClose }: ActivityLog
   const categories = Object.keys(ACTION_CATEGORY_CONFIG) as ActionCategory[];
 
   const handleApply = () => {
-    dispatch(setFilters(filtersToStore(localFilters)));
+    const stored = filtersToStore(localFilters);
+    if (onApplyExternal) {
+      onApplyExternal(stored);
+    } else {
+      dispatch(setFilters(stored));
+    }
     onClose();
   };
 

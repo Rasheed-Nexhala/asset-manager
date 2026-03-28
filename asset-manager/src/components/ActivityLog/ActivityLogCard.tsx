@@ -9,10 +9,16 @@ import {
   CATEGORY_TEXT_CLASS,
   CATEGORY_COLOR_MAP,
 } from '../../constants/activityLogConfig';
+import {
+  getItemHistoryPrimaryLine,
+  getItemHistoryStockLines,
+} from '../../utils/itemActivityHistoryDisplay';
 
 interface ActivityLogCardProps {
   log: ActivityLog;
   onPress: () => void;
+  /** Richer layout for inventory item audit trail (summary + central store line) */
+  variant?: 'default' | 'itemHistory';
 }
 
 /** Format timestamp as relative time (e.g., "2h ago", "Just now") */
@@ -36,7 +42,11 @@ function formatTimestamp(timestamp: string): string {
   });
 }
 
-export default function ActivityLogCard({ log, onPress }: ActivityLogCardProps) {
+export default function ActivityLogCard({
+  log,
+  onPress,
+  variant = 'default',
+}: ActivityLogCardProps) {
   const actionConfig = ACTION_TYPE_CONFIG[log.actionType] ?? {
     label: log.actionType,
     icon: 'document-text-outline',
@@ -53,12 +63,22 @@ export default function ActivityLogCard({ log, onPress }: ActivityLogCardProps) 
     CATEGORY_TEXT_CLASS[category as keyof typeof CATEGORY_TEXT_CLASS] ??
     'text-[#475569]';
 
+  const primaryLine =
+    variant === 'itemHistory' ? getItemHistoryPrimaryLine(log) : null;
+  const stockLines =
+    variant === 'itemHistory' ? getItemHistoryStockLines(log) : [];
+
+  const a11ySummary =
+    variant === 'itemHistory'
+      ? `${actionConfig.label}. ${primaryLine ?? log.summary}. By ${log.userName}.${stockLines.length > 0 ? ` ${stockLines.join(' ')}` : ''}`
+      : `${actionConfig.label}. ${log.summary}. By ${log.userName}.`;
+
   return (
     <TouchableOpacity
       className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-3 min-h-[120px]"
       activeOpacity={0.7}
       onPress={onPress}
-      accessibilityLabel={`Activity: ${actionConfig.label}. ${log.summary}. By ${log.userName}. Tap for details.`}
+      accessibilityLabel={`Activity: ${a11ySummary} Tap for details.`}
       accessibilityRole="button"
     >
       {/* Top Row: Title + Status Badge (status first per CIAMS) */}
@@ -92,26 +112,62 @@ export default function ActivityLogCard({ log, onPress }: ActivityLogCardProps) 
         </View>
       </View>
 
-      {/* Middle: Key-Value Grid (User, Target) */}
-      <View className="flex-row gap-4 mb-3">
-        <View className="flex-1 min-w-0">
-          <Text className="text-[13px] text-[#64748B] mb-1">User</Text>
+      {variant === 'itemHistory' && primaryLine ? (
+        <View className="mb-3">
+          <Text className="text-[13px] text-[#64748B] mb-1">What happened</Text>
+          <Text className="text-[15px] text-[#0F172A] leading-snug">
+            {primaryLine}
+          </Text>
+        </View>
+      ) : null}
+
+      {variant === 'itemHistory' && stockLines.length > 0 ? (
+        <View className="bg-[#F1F5F9] rounded-lg px-3 py-2.5 mb-3 border border-[#E2E8F0]">
+          <Text className="text-[12px] font-semibold text-[#64748B] uppercase tracking-wide mb-2">
+            Stock & quantities
+          </Text>
+          {stockLines.map((line, idx) => (
+            <Text
+              key={idx}
+              className="text-[15px] text-[#0F172A] leading-snug mb-1.5 last:mb-0"
+            >
+              {line}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+
+      {/* Middle: user (item history: full width; default: user + target) */}
+      <View
+        className={
+          variant === 'itemHistory' ? 'mb-3' : 'flex-row gap-4 mb-3'
+        }
+      >
+        <View className={variant === 'itemHistory' ? 'w-full' : 'flex-1 min-w-0'}>
+          <Text className="text-[13px] text-[#64748B] mb-1">Recorded by</Text>
           <Text
             className="text-[15px] text-[#0F172A]"
             numberOfLines={1}
           >
             {log.userName}
           </Text>
+          {log.userRole ? (
+            <Text className="text-[13px] text-[#64748B] mt-0.5" numberOfLines={1}>
+              {log.userRole}
+            </Text>
+          ) : null}
         </View>
-        <View className="flex-1 min-w-0">
-          <Text className="text-[13px] text-[#64748B] mb-1">Target</Text>
-          <Text
-            className="text-[15px] text-[#1E40AF] font-medium"
-            numberOfLines={1}
-          >
-            {log.targetDisplay}
-          </Text>
-        </View>
+        {variant === 'default' ? (
+          <View className="flex-1 min-w-0">
+            <Text className="text-[13px] text-[#64748B] mb-1">Target</Text>
+            <Text
+              className="text-[15px] text-[#1E40AF] font-medium"
+              numberOfLines={1}
+            >
+              {log.targetDisplay}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Bottom Row: Timestamp */}

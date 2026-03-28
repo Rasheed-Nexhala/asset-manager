@@ -9,6 +9,7 @@ export { InventoryScreen } from './InventoryScreen';
 export { CentralStoreInventoryScreen } from './Inventory/CentralStoreInventoryScreen';
 export { AddEditItemScreen } from './Inventory/AddEditItemScreen';
 export { ItemDetailScreen } from './Inventory/ItemDetailScreen';
+export { ItemActivityHistoryScreen } from './Inventory/ItemActivityHistoryScreen';
 export { SteelMasterScreen } from './Inventory/SteelMasterScreen';
 export { AddEditCustomItemScreen } from './Inventory/AddEditCustomItemScreen';
 export { MySiteInventoryScreen } from './Inventory/MySiteInventoryScreen';

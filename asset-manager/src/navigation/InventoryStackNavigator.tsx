@@ -11,6 +11,7 @@ import {
   AddEditItemScreen,
   AddEditCustomItemScreen,
   ItemDetailScreen,
+  ItemActivityHistoryScreen,
   MySiteInventoryScreen,
   OtherSiteInventoryScreen,
   SteelMasterScreen,
@@ -28,6 +29,7 @@ export type InventoryStackParamList = {
   CentralStoreInventory: { lowStockFilter?: boolean } | undefined;
   AddEditItem: { itemId?: string; selectedCategoryId?: string } | undefined;
   ItemDetail: { itemId: string };
+  ItemActivityHistory: { itemId: string; itemName?: string };
   SteelMaster: undefined;
   AddEditCustomItem: { customItemId?: string } | undefined;
   Maintenance: undefined;
@@ -109,6 +111,14 @@ export const InventoryStackNavigator: React.FC = () => {
             }}
           />
           <Stack.Screen
+            name="ItemActivityHistory"
+            component={ItemActivityHistoryScreen}
+            options={{
+              presentation: 'card',
+              gestureEnabled: true,
+            }}
+          />
+          <Stack.Screen
             name="SteelMaster"
             component={SteelMasterScreen}
             options={{
@@ -169,6 +179,14 @@ export const InventoryStackNavigator: React.FC = () => {
           <Stack.Screen
             name="ItemDetail"
             component={ItemDetailScreen}
+            options={{
+              presentation: 'card',
+              gestureEnabled: true,
+            }}
+          />
+          <Stack.Screen
+            name="ItemActivityHistory"
+            component={ItemActivityHistoryScreen}
             options={{
               presentation: 'card',
               gestureEnabled: true,

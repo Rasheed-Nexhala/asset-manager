@@ -21,7 +21,7 @@ import {
   DocumentSnapshot,
   QueryConstraint,
 } from 'firebase/firestore';
-import type { DocumentData, Transaction } from 'firebase/firestore';
+import type { DocumentData } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import { getLocationId } from '../../utils/locationUtils';
 import type {
@@ -34,10 +34,7 @@ import type {
   RejectPOData,
 } from '../../types/purchaseOrder';
 import { firestorePOToPO } from '../../types/purchaseOrder';
-import {
-  incrementVendorPoCountInTransaction,
-  updateVendorLastPoDateInTransaction,
-} from './vendorService';
+import { incrementVendorPoCountInTransaction } from './vendorService';
 
 const PURCHASE_ORDERS_COLLECTION = 'purchaseOrders';
 const PO_COUNTERS_COLLECTION = 'poCounters';
@@ -45,6 +42,7 @@ const GRR_COUNTERS_COLLECTION = 'grrCounters';
 const INVENTORY_COLLECTION = 'inventory';
 const ITEMS_COLLECTION = 'items';
 const USERS_COLLECTION = 'users';
+const VENDORS_COLLECTION = 'vendors';
 
 const DEFAULT_GST_PERCENTAGE = 18;
 
@@ -315,27 +313,6 @@ const generatePoNumber = async (): Promise<string> => {
     console.error('Error generating PO number:', error);
     throw new Error('Failed to generate PO number. Please try again.');
   }
-};
-
-/** Next PO-RCV-YYYY-NNNN inside an existing transaction (year from receipt date; NNNN = 4-digit seq per year). */
-const generateGrrNumberInTransaction = async (
-  transaction: Transaction,
-  forDate: Date
-): Promise<string> => {
-  const year = forDate.getFullYear();
-  const counterDocId = `year_${year}`;
-  const counterRef = doc(db, GRR_COUNTERS_COLLECTION, counterDocId);
-  const counterSnap = await transaction.get(counterRef);
-  const lastNumber = counterSnap.exists()
-    ? (counterSnap.data()?.lastNumber ?? 0)
-    : 0;
-  const nextNumber = lastNumber + 1;
-  transaction.set(counterRef, {
-    year,
-    lastNumber: nextNumber,
-    updatedAt: serverTimestamp(),
-  });
-  return `PO-RCV-${year}-${String(nextNumber).padStart(4, '0')}`;
 };
 
 /**
@@ -995,6 +972,24 @@ export const receivePO = async (
       });
     }
 
+    // 2b. GRR counter + vendor — MUST be read before any write (Firestore: all reads before writes).
+    const receivedDateForGrr = new Date(receiveData.receivedDate);
+    const grrYear = receivedDateForGrr.getFullYear();
+    const grrCounterRef = doc(
+      db,
+      GRR_COUNTERS_COLLECTION,
+      `year_${grrYear}`
+    );
+    const grrCounterSnap = await transaction.get(grrCounterRef);
+    const lastGrrSeq = grrCounterSnap.exists()
+      ? (grrCounterSnap.data()?.lastNumber ?? 0)
+      : 0;
+    const nextGrrSeq = lastGrrSeq + 1;
+    mintedGrrNumber = `PO-RCV-${grrYear}-${String(nextGrrSeq).padStart(4, '0')}`;
+
+    const vendorRef = doc(db, VENDORS_COLLECTION, initialPoData.vendorId);
+    const vendorSnap = await transaction.get(vendorRef);
+
     // 3. Perform all writes
     const now = serverTimestamp();
     for (const data of readsData) {
@@ -1036,17 +1031,11 @@ export const receivePO = async (
       new Date(receiveData.receivedDate)
     );
 
-    const nextGrr = await generateGrrNumberInTransaction(
-      transaction,
-      new Date(receiveData.receivedDate)
-    );
-    mintedGrrNumber = nextGrr;
-
     const existingGrr = Array.isArray(poData.grrReceipts)
       ? poData.grrReceipts
       : [];
     const newGrrReceipt: PurchaseOrderGrrReceiptFirestore = {
-      grrNumber: nextGrr,
+      grrNumber: mintedGrrNumber,
       receivedAt: receivedAtTimestamp,
       receivedBy: userId,
       receivedByName: userName,
@@ -1069,6 +1058,12 @@ export const receivePO = async (
 
     const newStatus = allFullyReceived ? 'received' : 'partially_received';
 
+    transaction.set(grrCounterRef, {
+      year: grrYear,
+      lastNumber: nextGrrSeq,
+      updatedAt: now,
+    });
+
     transaction.update(poRef, {
       status: newStatus,
       receivedAt: receivedAtTimestamp,
@@ -1081,11 +1076,12 @@ export const receivePO = async (
       updatedAt: serverTimestamp(),
     });
 
-    updateVendorLastPoDateInTransaction(
-      transaction,
-      initialPoData.vendorId,
-      receivedAtTimestamp
-    );
+    if (vendorSnap.exists()) {
+      transaction.update(vendorRef, {
+        lastPoDate: receivedAtTimestamp,
+        updatedAt: now,
+      });
+    }
   });
 
   return { grrNumber: mintedGrrNumber };

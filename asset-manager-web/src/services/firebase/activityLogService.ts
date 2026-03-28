@@ -40,6 +40,13 @@ function buildActivityLogQueryConstraints(
 ): QueryConstraint[] {
   const constraints: QueryConstraint[] = [];
 
+  if (filters?.targetType && filters.targetType !== 'all') {
+    constraints.push(where('targetType', '==', filters.targetType));
+  }
+  if (filters?.targetId) {
+    constraints.push(where('targetId', '==', filters.targetId));
+  }
+
   // Normalize dates to local timezone: start of day for startDate, end of day for endDate
   const startDate = filters?.startDate ? isoToDate(filters.startDate) : null;
   const endDate = filters?.endDate ? isoToDate(filters.endDate) : null;

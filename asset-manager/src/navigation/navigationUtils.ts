@@ -1,4 +1,4 @@
-import { navigationRef } from './RootNavigator';
+import { navigationRef } from './navigationRef';
 import type { RequestStackParamList } from './RequestStackParamList';
 
 /**

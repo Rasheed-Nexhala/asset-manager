@@ -1,12 +1,10 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
-import {
-  DashboardScreen,
-  ActivityLogScreen,
-  MyActivityScreen,
-  ProfileScreen,
-  UsersScreen,
-} from '../screens';
+import { DashboardScreen } from '../screens/DashboardScreen';
+import { ActivityLogScreen } from '../screens/ActivityLog/ActivityLogScreen';
+import { MyActivityScreen } from '../screens/ActivityLog/MyActivityScreen';
+import { ProfileScreen } from '../screens/Users/ProfileScreen';
+import { UsersScreen } from '../screens/Users/UsersScreen';
 import { useAppSelector } from '../store/hooks';
 import { selectIsAdminOrSuperAdmin } from '../store/selectors/authSelectors';
 import type { DashboardStackParamList } from './DashboardStackParamList';

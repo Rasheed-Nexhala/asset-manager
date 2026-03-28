@@ -422,6 +422,22 @@ service cloud.firestore {
       allow read: if isAuthenticated() &&
         resource.data.userId == request.auth.uid;
 
+      // Inventory item audit: logs whose target is an item (catalog item or steel master custom spec)
+      // Store Incharge / Admin / SuperAdmin / Site Manager — same roles that can use the item catalog.
+      allow read: if isAuthenticated() && isUserActive() &&
+        resource.data.targetType == 'item' &&
+        (
+          exists(/databases/$(database)/documents/items/$(resource.data.targetId)) ||
+          exists(/databases/$(database)/documents/steelMaster/$(resource.data.targetId))
+        ) &&
+        (hasInventoryAccess() || isSiteManager());
+
+      // Tombstone logs (deleted catalog / steel master): target doc no longer exists
+      allow read: if isAuthenticated() && isUserActive() &&
+        resource.data.targetType == 'item' &&
+        resource.data.actionType in ['item_deleted', 'steel_master_deleted'] &&
+        (hasInventoryAccess() || isSiteManager());
+
       // No client writes allowed - only Cloud Functions create logs
       allow create, update, delete: if false;
     }

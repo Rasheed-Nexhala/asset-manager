@@ -13,6 +13,7 @@ import { OtherSitesListPage } from './pages/inventory/OtherSitesListPage';
 import { OtherSiteInventoryPage } from './pages/inventory/OtherSiteInventoryPage';
 import { SteelMasterPage } from './pages/inventory/SteelMasterPage';
 import { ItemDetailPage } from './pages/inventory/ItemDetailPage';
+import { ItemActivityHistoryPage } from './pages/inventory/ItemActivityHistoryPage';
 import { AddEditItemPage } from './pages/inventory/AddEditItemPage';
 import { AddEditCustomItemPage } from './pages/inventory/AddEditCustomItemPage';
 import { CategoryManagementPage } from './pages/inventory/CategoryManagementPage';
@@ -136,6 +137,10 @@ export const router = createBrowserRouter([
               { path: 'maintenance/:maintenanceId/return', element: <ReturnFromMaintenancePage /> },
               { path: 'maintenance/:maintenanceId/write-off', element: <WriteOffPage /> },
             ],
+          },
+          {
+            path: 'inventory/:itemId/history',
+            element: <ItemActivityHistoryPage />,
           },
           {
             path: 'inventory/:itemId',

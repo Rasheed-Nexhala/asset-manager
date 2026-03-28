@@ -10,6 +10,7 @@ import {
   onDocumentCreated,
   onDocumentUpdated,
   onDocumentWritten,
+  onDocumentDeleted,
 } from 'firebase-functions/v2/firestore';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
@@ -70,6 +71,583 @@ async function createActivityLog(
   }
 }
 
+type ActivityChangeEntry = {
+  field: string;
+  fieldLabel: string;
+  oldValue: unknown;
+  newValue: unknown;
+};
+
+/** True if changes already describe central store (delta or snapshot). */
+function hasCentralStoreDeltaOrSnapshot(changes: ActivityChangeEntry[]): boolean {
+  const f = new Set(changes.map((c) => String(c.field ?? '').toLowerCase()));
+  return f.has('centralstorequantity') || f.has('contextcentralstore');
+}
+
+/**
+ * When an item-targeted log has no central-store row yet, append a snapshot of
+ * `items/{itemId}.centralStoreQuantity` so Item History can show how much was in
+ * central store for that item at log time.
+ */
+async function ensureCentralStoreContextInChanges(
+  changes: ActivityChangeEntry[],
+  itemId: string
+): Promise<ActivityChangeEntry[]> {
+  if (hasCentralStoreDeltaOrSnapshot(changes)) {
+    return changes;
+  }
+  const itemSnap = await db.collection('items').doc(itemId).get();
+  if (!itemSnap.exists) {
+    return changes;
+  }
+  const raw = itemSnap.data()?.centralStoreQuantity;
+  const n = typeof raw === 'number' && !Number.isNaN(raw) ? raw : null;
+  if (n == null) {
+    return changes;
+  }
+  return [
+    ...changes,
+    {
+      field: 'contextCentralStore',
+      fieldLabel: 'Item master — central store total',
+      oldValue: n,
+      newValue: n,
+    },
+  ];
+}
+
+/**
+ * When PO line receivedQuantity increases, emit one activity log per line with
+ * targetType `item` so Item History shows PO receipts (full and partial).
+ */
+async function logPoReceiptDeltasForItemHistory(
+  before: admin.firestore.DocumentData,
+  after: admin.firestore.DocumentData,
+  poId: string
+): Promise<void> {
+  const beforeItems = Array.isArray(before.items) ? before.items : [];
+  const afterItems = Array.isArray(after.items) ? after.items : [];
+  const beforeQty = new Map<string, number>();
+  for (const row of beforeItems) {
+    const rec = row as { itemId?: unknown; receivedQuantity?: unknown };
+    const id = typeof rec.itemId === 'string' ? rec.itemId : '';
+    if (!id) continue;
+    const rq = rec.receivedQuantity;
+    const n = typeof rq === 'number' && !Number.isNaN(rq) ? rq : 0;
+    beforeQty.set(id, n);
+  }
+
+  const beforeGrrLen = Array.isArray(before.grrReceipts) ? before.grrReceipts.length : 0;
+  const afterGrr = Array.isArray(after.grrReceipts) ? after.grrReceipts : [];
+  const newGrr =
+    afterGrr.length > beforeGrrLen
+      ? (afterGrr[afterGrr.length - 1] as { grrNumber?: string })
+      : undefined;
+  const grrSuffix = newGrr?.grrNumber ? ` · GRR ${newGrr.grrNumber}` : '';
+
+  const poNum = typeof after.poNumber === 'string' ? after.poNumber : poId;
+  const vendorName = typeof after.vendorName === 'string' ? after.vendorName : 'Vendor';
+  const receivedBy = typeof after.receivedBy === 'string' ? after.receivedBy : 'system';
+  const receivedByName =
+    typeof after.receivedByName === 'string' ? after.receivedByName : 'System';
+
+  for (const row of afterItems) {
+    const rec = row as { itemId?: unknown; itemName?: unknown; itemSku?: unknown; receivedQuantity?: unknown };
+    const itemId = typeof rec.itemId === 'string' ? rec.itemId : '';
+    if (!itemId) continue;
+    const prev = beforeQty.get(itemId) ?? 0;
+    const rq = rec.receivedQuantity;
+    const next = typeof rq === 'number' && !Number.isNaN(rq) ? rq : 0;
+    const delta = next - prev;
+    if (delta <= 0) continue;
+
+    const itemName = typeof rec.itemName === 'string' ? rec.itemName : 'Item';
+    const itemSku = typeof rec.itemSku === 'string' ? rec.itemSku : '';
+    const display = itemSku ? `${itemName} (${itemSku})` : itemName;
+
+    const itemSnap = await db.collection('items').doc(itemId).get();
+    const afterCentralRaw = itemSnap.data()?.centralStoreQuantity;
+    const afterCentral =
+      typeof afterCentralRaw === 'number' && !Number.isNaN(afterCentralRaw)
+        ? afterCentralRaw
+        : null;
+    const beforeCentral =
+      afterCentral != null ? afterCentral - delta : null;
+
+    const summary = `Received +${delta} on PO ${poNum} at Central Store${grrSuffix}`;
+    const details = [
+      `Vendor: ${vendorName}`,
+      `PO: ${poNum}`,
+      `Quantity this receipt: ${delta} (cumulative on PO: ${next})`,
+      'Stock added at: Central Store',
+      beforeCentral != null && afterCentral != null
+        ? `Central store when updating: ${beforeCentral} → ${afterCentral} after`
+        : '',
+    ]
+      .filter((s) => s.length > 0)
+      .join('\n');
+
+    const changes: Array<{
+      field: string;
+      fieldLabel: string;
+      oldValue: unknown;
+      newValue: unknown;
+    }> = [
+      {
+        field: 'receivedQuantity',
+        fieldLabel: 'Received quantity on PO',
+        oldValue: prev,
+        newValue: next,
+      },
+    ];
+    if (beforeCentral != null && afterCentral != null) {
+      changes.push({
+        field: 'centralStoreQuantity',
+        fieldLabel: 'Central store quantity',
+        oldValue: beforeCentral,
+        newValue: afterCentral,
+      });
+    }
+
+    await createActivityLog({
+      userId: receivedBy,
+      userName: receivedByName,
+      userRole: 'StoreIncharge',
+      actionType: 'po_received',
+      actionCategory: 'purchase_orders',
+      targetType: 'item',
+      targetId: itemId,
+      targetDisplay: display,
+      summary,
+      details,
+      changes,
+    });
+  }
+}
+
+/**
+ * When a request moves to transferred, emit one item-scoped log per line so
+ * Item History shows site / central-store movements with destination (and source for site→site).
+ */
+async function logRequestTransferItemsForItemHistory(
+  before: admin.firestore.DocumentData,
+  after: admin.firestore.DocumentData,
+  requestId: string
+): Promise<void> {
+  if (before.status === 'transferred' || after.status !== 'transferred') {
+    return;
+  }
+  const items = Array.isArray(after.items) ? after.items : [];
+  const requestNumber =
+    typeof after.requestNumber === 'string' ? after.requestNumber : requestId;
+  const dest =
+    typeof after.siteName === 'string' && after.siteName.trim().length > 0
+      ? after.siteName
+      : 'Site';
+  const isSiteTransfer = after.requestType === 'site_transfer';
+  const sourceLabel = isSiteTransfer
+    ? typeof after.sourceSiteName === 'string' && after.sourceSiteName.trim().length > 0
+      ? after.sourceSiteName
+      : 'Source site'
+    : 'Central Store';
+
+  const uid =
+    (typeof after.transferredBy === 'string' && after.transferredBy
+      ? after.transferredBy
+      : typeof after.processedBy === 'string'
+        ? after.processedBy
+        : null) ?? 'unknown';
+  const uname =
+    (typeof after.transferredByName === 'string' && after.transferredByName
+      ? after.transferredByName
+      : typeof after.processedByName === 'string'
+        ? after.processedByName
+        : null) ?? 'Unknown';
+
+  for (const line of items) {
+    const row = line as {
+      itemId?: unknown;
+      itemName?: unknown;
+      itemSku?: unknown;
+      quantityApproved?: unknown;
+      quantityRequested?: unknown;
+    };
+    const itemId = typeof row.itemId === 'string' ? row.itemId : '';
+    if (!itemId) continue;
+    const qa = row.quantityApproved;
+    const qr = row.quantityRequested;
+    const qty =
+      typeof qa === 'number' && qa > 0
+        ? qa
+        : typeof qr === 'number' && qr > 0
+          ? qr
+          : 0;
+    if (qty <= 0) continue;
+
+    const itemName = typeof row.itemName === 'string' ? row.itemName : 'Item';
+    const itemSku = typeof row.itemSku === 'string' ? row.itemSku : '';
+    const display = itemSku ? `${itemName} (${itemSku})` : itemName;
+
+    const summary = `Transferred ${qty} to ${dest}`;
+    const details = isSiteTransfer
+      ? `Request ${requestNumber}: ${sourceLabel} → ${dest} (site-to-site)`
+      : `Request ${requestNumber}: Central store → ${dest}`;
+
+    let changes: ActivityChangeEntry[] = [];
+
+    if (!isSiteTransfer) {
+      const itemSnap = await db.collection('items').doc(itemId).get();
+      const afterCentralRaw = itemSnap.data()?.centralStoreQuantity;
+      const afterCentral =
+        typeof afterCentralRaw === 'number' && !Number.isNaN(afterCentralRaw)
+          ? afterCentralRaw
+          : null;
+      if (afterCentral != null) {
+        const beforeCentral = afterCentral + qty;
+        changes.push({
+          field: 'centralStoreQuantity',
+          fieldLabel: 'Central store quantity',
+          oldValue: beforeCentral,
+          newValue: afterCentral,
+        });
+      }
+    }
+
+    changes = await ensureCentralStoreContextInChanges(changes, itemId);
+
+    await createActivityLog({
+      userId: uid,
+      userName: uname,
+      userRole: 'StoreIncharge',
+      actionType: 'item_transferred',
+      actionCategory: 'inventory',
+      targetType: 'item',
+      targetId: itemId,
+      targetDisplay: display,
+      summary,
+      details,
+      changes,
+    });
+  }
+}
+
+/**
+ * When returnHistory grows, emit one item-targeted log per returned line (site → central store).
+ */
+async function logRequestReturnDeltasForItemHistory(
+  before: admin.firestore.DocumentData,
+  after: admin.firestore.DocumentData,
+  requestId: string
+): Promise<void> {
+  const beforeHist = Array.isArray(before.returnHistory) ? before.returnHistory : [];
+  const afterHist = Array.isArray(after.returnHistory) ? after.returnHistory : [];
+  if (afterHist.length <= beforeHist.length) {
+    return;
+  }
+
+  const newEvents = afterHist.slice(beforeHist.length) as Array<{
+    returnedBy?: unknown;
+    returnedByName?: unknown;
+    items?: unknown;
+    returnNotes?: unknown;
+  }>;
+
+  const requestNumber =
+    typeof after.requestNumber === 'string' ? after.requestNumber : requestId;
+  const siteName =
+    typeof after.siteName === 'string' && after.siteName.trim().length > 0
+      ? after.siteName
+      : 'Site';
+
+  for (const ev of newEvents) {
+    const uid =
+      typeof ev.returnedBy === 'string' && ev.returnedBy ? ev.returnedBy : 'unknown';
+    const uname =
+      typeof ev.returnedByName === 'string' && ev.returnedByName
+        ? ev.returnedByName
+        : 'Unknown';
+    const notes =
+      ev.returnNotes != null && String(ev.returnNotes).trim().length > 0
+        ? String(ev.returnNotes)
+        : '';
+    const items = Array.isArray(ev.items) ? ev.items : [];
+
+    for (const line of items) {
+      const row = line as {
+        itemId?: unknown;
+        itemName?: unknown;
+        quantityReturned?: unknown;
+        condition?: unknown;
+      };
+      const itemId = typeof row.itemId === 'string' ? row.itemId : '';
+      if (!itemId) continue;
+      const qty =
+        typeof row.quantityReturned === 'number' && !Number.isNaN(row.quantityReturned)
+          ? row.quantityReturned
+          : 0;
+      if (qty <= 0) continue;
+
+      const itemName = typeof row.itemName === 'string' ? row.itemName : 'Item';
+      const cond =
+        typeof row.condition === 'string' && row.condition ? row.condition : 'n/a';
+
+      const summary = `Returned ${qty} from ${siteName} to Central Store`;
+      const itemSnap = await db.collection('items').doc(itemId).get();
+      const afterCentralRaw = itemSnap.data()?.centralStoreQuantity;
+      const afterCentral =
+        typeof afterCentralRaw === 'number' && !Number.isNaN(afterCentralRaw)
+          ? afterCentralRaw
+          : null;
+      const beforeCentral =
+        afterCentral != null ? afterCentral - qty : null;
+
+      const details = [
+        `Request ${requestNumber}`,
+        `Condition: ${cond}`,
+        notes ? `Notes: ${notes}` : '',
+        beforeCentral != null && afterCentral != null
+          ? `Central store when updating: ${beforeCentral} → ${afterCentral} after`
+          : '',
+      ]
+        .filter((s) => s.length > 0)
+        .join('\n');
+
+      const changes: Array<{
+        field: string;
+        fieldLabel: string;
+        oldValue: unknown;
+        newValue: unknown;
+      }> = [];
+      if (beforeCentral != null && afterCentral != null) {
+        changes.push({
+          field: 'centralStoreQuantity',
+          fieldLabel: 'Central store quantity',
+          oldValue: beforeCentral,
+          newValue: afterCentral,
+        });
+      }
+
+      await createActivityLog({
+        userId: uid,
+        userName: uname,
+        userRole: 'StoreIncharge',
+        actionType: 'items_returned',
+        actionCategory: 'requests',
+        targetType: 'item',
+        targetId: itemId,
+        targetDisplay: itemName,
+        summary,
+        details,
+        changes,
+      });
+    }
+  }
+}
+
+/**
+ * PO draft → pending_approval: item-level "submitted for approval" lines.
+ */
+async function logPoSubmittedLineItemsForItemHistory(
+  before: admin.firestore.DocumentData,
+  after: admin.firestore.DocumentData,
+  poId: string
+): Promise<void> {
+  if (before.status !== 'draft' || after.status !== 'pending_approval') {
+    return;
+  }
+  await emitPoSubmittedItemLogs(after, poId);
+}
+
+/** New PO created already in pending_approval (no draft step). */
+async function logPoCreatedPendingLineItemsForItemHistory(
+  po: admin.firestore.DocumentData,
+  poId: string
+): Promise<void> {
+  if (po.status !== 'pending_approval') {
+    return;
+  }
+  await emitPoSubmittedItemLogs(po, poId);
+}
+
+async function emitPoSubmittedItemLogs(
+  po: admin.firestore.DocumentData,
+  poId: string
+): Promise<void> {
+  const items = Array.isArray(po.items) ? po.items : [];
+  const poNum = typeof po.poNumber === 'string' ? po.poNumber : poId;
+  const vendorName = typeof po.vendorName === 'string' ? po.vendorName : 'Vendor';
+  const uid = typeof po.createdBy === 'string' ? po.createdBy : 'system';
+  const uname = typeof po.createdByName === 'string' ? po.createdByName : 'System';
+  const role = (po.createdByRole as string) ?? 'StoreIncharge';
+
+  for (const row of items) {
+    const rec = row as {
+      itemId?: unknown;
+      itemName?: unknown;
+      itemSku?: unknown;
+      quantity?: unknown;
+    };
+    const itemId = typeof rec.itemId === 'string' ? rec.itemId : '';
+    if (!itemId) continue;
+    const qty = typeof rec.quantity === 'number' && !Number.isNaN(rec.quantity) ? rec.quantity : 0;
+    if (qty <= 0) continue;
+    const itemName = typeof rec.itemName === 'string' ? rec.itemName : 'Item';
+    const itemSku = typeof rec.itemSku === 'string' ? rec.itemSku : '';
+    const display = itemSku ? `${itemName} (${itemSku})` : itemName;
+
+    const changes = await ensureCentralStoreContextInChanges([], itemId);
+
+    await createActivityLog({
+      userId: uid,
+      userName: uname,
+      userRole: role,
+      actionType: 'po_submitted',
+      actionCategory: 'purchase_orders',
+      targetType: 'item',
+      targetId: itemId,
+      targetDisplay: display,
+      summary: `Listed on PO ${poNum} (pending approval) · qty ${qty}`,
+      details: `Vendor: ${vendorName}\nPO ${poNum} submitted for approval.`,
+      changes,
+    });
+  }
+}
+
+/**
+ * PO approved: item-level lines (procurement intent approved; not yet received).
+ */
+async function logPoApprovedLineItemsForItemHistory(
+  before: admin.firestore.DocumentData,
+  after: admin.firestore.DocumentData,
+  poId: string
+): Promise<void> {
+  if (before.status === 'approved' || after.status !== 'approved') {
+    return;
+  }
+  const items = Array.isArray(after.items) ? after.items : [];
+  const poNum = typeof after.poNumber === 'string' ? after.poNumber : poId;
+  const vendorName = typeof after.vendorName === 'string' ? after.vendorName : 'Vendor';
+  const uid = typeof after.reviewedBy === 'string' ? after.reviewedBy : 'system';
+  const uname = typeof after.reviewedByName === 'string' ? after.reviewedByName : 'System';
+
+  for (const row of items) {
+    const rec = row as {
+      itemId?: unknown;
+      itemName?: unknown;
+      itemSku?: unknown;
+      quantity?: unknown;
+    };
+    const itemId = typeof rec.itemId === 'string' ? rec.itemId : '';
+    if (!itemId) continue;
+    const qty = typeof rec.quantity === 'number' && !Number.isNaN(rec.quantity) ? rec.quantity : 0;
+    if (qty <= 0) continue;
+    const itemName = typeof rec.itemName === 'string' ? rec.itemName : 'Item';
+    const itemSku = typeof rec.itemSku === 'string' ? rec.itemSku : '';
+    const display = itemSku ? `${itemName} (${itemSku})` : itemName;
+
+    const changes = await ensureCentralStoreContextInChanges([], itemId);
+
+    await createActivityLog({
+      userId: uid,
+      userName: uname,
+      userRole: 'Admin',
+      actionType: 'po_approved',
+      actionCategory: 'purchase_orders',
+      targetType: 'item',
+      targetId: itemId,
+      targetDisplay: display,
+      summary: `Approved on PO ${poNum} · ordered qty ${qty}`,
+      details: `Vendor: ${vendorName}\nPO ${poNum} approved (not yet received).`,
+      changes,
+    });
+  }
+}
+
+/**
+ * Mirror maintenance events to item-targeted logs for Item History.
+ */
+async function logMaintenanceItemScopedMirror(
+  maintenance: admin.firestore.DocumentData,
+  maintenanceId: string,
+  kind: 'added' | 'returned' | 'written_off'
+): Promise<void> {
+  const itemId = typeof maintenance.itemId === 'string' ? maintenance.itemId : '';
+  if (!itemId) return;
+
+  const itemName = typeof maintenance.itemName === 'string' ? maintenance.itemName : 'Item';
+  const itemSku = typeof maintenance.itemSku === 'string' ? maintenance.itemSku : '';
+  const display = itemSku ? `${itemName} (${itemSku})` : itemName;
+  const qty =
+    typeof maintenance.quantity === 'number' && !Number.isNaN(maintenance.quantity)
+      ? maintenance.quantity
+      : 0;
+
+  const uid = typeof maintenance.addedBy === 'string' ? maintenance.addedBy : 'unknown';
+  const uname = typeof maintenance.addedByName === 'string' ? maintenance.addedByName : 'Unknown';
+
+  if (kind === 'added') {
+    const changes = await ensureCentralStoreContextInChanges([], itemId);
+    await createActivityLog({
+      userId: uid,
+      userName: uname,
+      userRole: 'StoreIncharge',
+      actionType: 'maintenance_added',
+      actionCategory: 'maintenance',
+      targetType: 'item',
+      targetId: itemId,
+      targetDisplay: display,
+      summary: `Sent ${qty} unit(s) to maintenance (ticket ${maintenanceId})`,
+      details: typeof maintenance.issueDescription === 'string' ? maintenance.issueDescription : '',
+      changes,
+    });
+    return;
+  }
+
+  if (kind === 'returned') {
+    const returnedQty =
+      typeof maintenance.returnedQuantity === 'number' && !Number.isNaN(maintenance.returnedQuantity)
+        ? maintenance.returnedQuantity
+        : qty;
+    const repair =
+      typeof maintenance.repairSummary === 'string' ? maintenance.repairSummary : '';
+    const changes = await ensureCentralStoreContextInChanges([], itemId);
+    await createActivityLog({
+      userId: uid,
+      userName: uname,
+      userRole: 'StoreIncharge',
+      actionType: 'maintenance_returned',
+      actionCategory: 'maintenance',
+      targetType: 'item',
+      targetId: itemId,
+      targetDisplay: display,
+      summary: `Returned ${returnedQty} unit(s) from maintenance to Central Store`,
+      details: repair,
+      changes,
+    });
+    return;
+  }
+
+  // written_off
+  const reason =
+    typeof maintenance.writeOffReason === 'string' ? maintenance.writeOffReason : 'N/A';
+  const expl =
+    typeof maintenance.writeOffExplanation === 'string' ? maintenance.writeOffExplanation : '';
+  const changes = await ensureCentralStoreContextInChanges([], itemId);
+  await createActivityLog({
+    userId: uid,
+    userName: uname,
+    userRole: 'StoreIncharge',
+    actionType: 'item_written_off',
+    actionCategory: 'maintenance',
+    targetType: 'item',
+    targetId: itemId,
+    targetDisplay: display,
+    summary: `Written off from maintenance (${reason})`,
+    details: expl,
+    changes,
+  });
+}
+
 /**
  * Firestore Trigger: Log Item Creation
  * Triggered when a new document is created in items collection
@@ -110,6 +688,10 @@ export const onItemCreated = onDocumentCreated(
     const item = snapshot.data();
     const itemId = event.params.itemId;
 
+    const csRaw = item.centralStoreQuantity;
+    const cs =
+      typeof csRaw === 'number' && !Number.isNaN(csRaw) ? csRaw : 0;
+
     await createActivityLog({
       userId: item.createdBy ?? 'system',
       userName: item.createdByName ?? 'System',
@@ -121,7 +703,14 @@ export const onItemCreated = onDocumentCreated(
       targetDisplay: `${item.name ?? 'Item'} (${item.sku ?? itemId})`,
       summary: `Created item: ${item.name ?? 'Item'}`,
       details: `Added new ${item.type ?? 'item'} to ${item.categoryName ?? 'category'}`,
-      changes: [],
+      changes: [
+        {
+          field: 'contextCentralStore',
+          fieldLabel: 'Item master — central store total',
+          oldValue: cs,
+          newValue: cs,
+        },
+      ],
     });
   }
 );
@@ -194,6 +783,8 @@ export const onRequestUpdated = onDocumentUpdated(
 
     const requestId = event.params.requestId;
 
+    await logRequestReturnDeltasForItemHistory(before, after, requestId);
+
     // Log status changes
     if (before.status !== after.status) {
       let actionType = 'request_edited';
@@ -236,6 +827,8 @@ export const onRequestUpdated = onDocumentUpdated(
           },
         ],
       });
+
+      await logRequestTransferItemsForItemHistory(before, after, requestId);
 
       // Push notifications for request status changes (exclude actor: don't notify processedBy)
       const requestNumber = after.requestNumber ?? requestId;
@@ -413,6 +1006,8 @@ export const onMaintenanceAdded = onDocumentCreated(
       details: maintenance.issueDescription ?? '',
       changes: [],
     });
+
+    await logMaintenanceItemScopedMirror(maintenance, maintenanceId, 'added');
 
     try {
       const addedBy = maintenance.addedBy as string | undefined;
@@ -788,12 +1383,19 @@ export const onItemUpdated = onDocumentUpdated(
       'type',
       'status',
       'totalQuantity',
+      'centralStoreQuantity',
+      'atSitesQuantity',
     ];
+    const fieldLabelMap: Record<string, string> = {
+      centralStoreQuantity: 'Central store quantity',
+      atSitesQuantity: 'Quantity at sites',
+      totalQuantity: 'Total quantity',
+    };
     for (const field of fieldsToCompare) {
       if (JSON.stringify(before[field]) !== JSON.stringify(after[field])) {
         changes.push({
           field,
-          fieldLabel: field.charAt(0).toUpperCase() + field.slice(1),
+          fieldLabel: fieldLabelMap[field] ?? field.charAt(0).toUpperCase() + field.slice(1),
           oldValue: before[field],
           newValue: after[field],
         });
@@ -993,6 +1595,97 @@ export const onSteelMasterUpdated = onDocumentUpdated(
 );
 
 /**
+ * Tombstone: catalog item removed (audit / admin feed; item doc no longer exists).
+ */
+export const onItemDeleted = onDocumentDeleted('items/{itemId}', async (event) => {
+  const snap = event.data;
+  if (!snap) {
+    return;
+  }
+  const d = snap.data();
+  const itemId = event.params.itemId;
+  const name = typeof d.name === 'string' ? d.name : 'Item';
+  const sku = typeof d.sku === 'string' ? d.sku : '';
+  const display = sku ? `${name} (${sku})` : name;
+  const uid =
+    typeof d.updatedBy === 'string'
+      ? d.updatedBy
+      : typeof d.createdBy === 'string'
+        ? d.createdBy
+        : 'system';
+  const uname =
+    typeof d.updatedByName === 'string'
+      ? d.updatedByName
+      : typeof d.createdByName === 'string'
+        ? d.createdByName
+        : 'System';
+
+  const delChanges: ActivityChangeEntry[] = [];
+  const lastCentral = d.centralStoreQuantity;
+  if (typeof lastCentral === 'number' && !Number.isNaN(lastCentral)) {
+    delChanges.push({
+      field: 'contextCentralStore',
+      fieldLabel: 'Last recorded central store total (before delete)',
+      oldValue: lastCentral,
+      newValue: lastCentral,
+    });
+  }
+
+  await createActivityLog({
+    userId: uid,
+    userName: uname,
+    userRole: (d.updatedByRole as string) ?? (d.createdByRole as string) ?? 'Admin',
+    actionType: 'item_deleted',
+    actionCategory: 'inventory',
+    targetType: 'item',
+    targetId: itemId,
+    targetDisplay: display,
+    summary: `Catalog item deleted: ${name}`,
+    details: sku ? `SKU: ${sku}` : '',
+    changes: delChanges,
+  });
+});
+
+/**
+ * Tombstone: custom steel spec removed.
+ */
+export const onSteelMasterDeleted = onDocumentDeleted('steelMaster/{steelMasterId}', async (event) => {
+  const snap = event.data;
+  if (!snap) {
+    return;
+  }
+  const d = snap.data();
+  const steelMasterId = event.params.steelMasterId;
+  const name = typeof d.name === 'string' ? d.name : steelMasterId;
+  const uid =
+    typeof d.updatedBy === 'string'
+      ? d.updatedBy
+      : typeof d.createdBy === 'string'
+        ? d.createdBy
+        : 'system';
+  const uname =
+    typeof d.updatedByName === 'string'
+      ? d.updatedByName
+      : typeof d.createdByName === 'string'
+        ? d.createdByName
+        : 'System';
+
+  await createActivityLog({
+    userId: uid,
+    userName: uname,
+    userRole: (d.updatedByRole as string) ?? (d.createdByRole as string) ?? 'Admin',
+    actionType: 'steel_master_deleted',
+    actionCategory: 'inventory',
+    targetType: 'item',
+    targetId: steelMasterId,
+    targetDisplay: name,
+    summary: `Custom item deleted: ${name}`,
+    details: '',
+    changes: [],
+  });
+});
+
+/**
  * Firestore Trigger: Log Maintenance Updates
  * Triggered when a maintenance document is updated (status changes or update notes)
  */
@@ -1040,6 +1733,12 @@ export const onMaintenanceUpdated = onDocumentUpdated(
           },
         ],
       });
+
+      if (after.status === 'returned') {
+        await logMaintenanceItemScopedMirror(after, maintenanceId, 'returned');
+      } else if (after.status === 'written_off') {
+        await logMaintenanceItemScopedMirror(after, maintenanceId, 'written_off');
+      }
 
       try {
         const afterUpdates = Array.isArray(after.updates) ? after.updates : [];
@@ -1141,6 +1840,8 @@ export const onPurchaseOrderCreated = onDocumentCreated(
       details: `PO for ${po.vendorName ?? 'vendor'}, ${itemsCount} items, ₹${po.totalAmount ?? 0}`,
       changes: [],
     });
+
+    await logPoCreatedPendingLineItemsForItemHistory(po, poId);
 
     if (po.status === 'pending_approval') {
       try {
@@ -1322,11 +2023,15 @@ export const onPurchaseOrderUpdated = onDocumentUpdated(
       return;
     }
 
+    const poId = event.params.poId;
+    await logPoReceiptDeltasForItemHistory(before, after, poId);
+    await logPoSubmittedLineItemsForItemHistory(before, after, poId);
+    await logPoApprovedLineItemsForItemHistory(before, after, poId);
+
     if (before.status === after.status) {
       return;
     }
 
-    const poId = event.params.poId;
     const poNum = after.poNumber ?? poId;
 
     if (before.status === 'draft' && after.status === 'pending_approval') {
@@ -1826,6 +2531,25 @@ export const logQuantityAdjusted = onCall(async (request) => {
     const summary = `Adjusted quantity: ${safeOldQty}→${safeNewQty} (${sign}${effectiveQty})`;
     const details = `${String(reason)}${notes ? `. ${String(notes)}` : ''}`;
 
+    const baseChanges: ActivityChangeEntry[] = [
+      {
+        field: 'locationName',
+        fieldLabel: 'Location',
+        oldValue: String(locationName),
+        newValue: String(locationName),
+      },
+      {
+        field: 'quantity',
+        fieldLabel: 'Quantity',
+        oldValue: safeOldQty,
+        newValue: safeNewQty,
+      },
+    ];
+    const changes = await ensureCentralStoreContextInChanges(
+      baseChanges,
+      String(itemId)
+    );
+
     await createActivityLog({
       userId: request.auth.uid,
       userName: (userName as string) ?? displayName,
@@ -1837,14 +2561,7 @@ export const logQuantityAdjusted = onCall(async (request) => {
       targetDisplay: `${String(itemName)} (${String(itemSku)})`,
       summary,
       details,
-      changes: [
-        {
-          field: 'quantity',
-          fieldLabel: 'Quantity',
-          oldValue: safeOldQty,
-          newValue: safeNewQty,
-        },
-      ],
+      changes,
     });
 
     return { success: true };

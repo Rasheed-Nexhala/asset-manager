@@ -8,11 +8,15 @@ import {
 } from '../../constants/activityLogConfig';
 import { Icon } from '../shared/Icon';
 import { getActivityIconName } from './activityLogIconMap';
-import type { IconName } from '../shared/Icon';
+import {
+  getItemHistoryPrimaryLine,
+  getItemHistoryStockLines,
+} from '../../utils/itemActivityHistoryDisplay';
 
 interface ActivityLogCardProps {
   log: ActivityLog;
   onPress: () => void;
+  variant?: 'default' | 'itemHistory';
 }
 
 /** Format timestamp as relative time */
@@ -36,7 +40,11 @@ function formatTimestamp(timestamp: string): string {
   });
 }
 
-export function ActivityLogCard({ log, onPress }: ActivityLogCardProps) {
+export function ActivityLogCard({
+  log,
+  onPress,
+  variant = 'default',
+}: ActivityLogCardProps) {
   const actionConfig = ACTION_TYPE_CONFIG[log.actionType] ?? {
     label: log.actionType,
     icon: 'document-text-outline',
@@ -53,12 +61,22 @@ export function ActivityLogCard({ log, onPress }: ActivityLogCardProps) {
     'text-[#475569]';
   const iconName = getActivityIconName(actionConfig.icon);
 
+  const primaryLine =
+    variant === 'itemHistory' ? getItemHistoryPrimaryLine(log) : null;
+  const stockLines =
+    variant === 'itemHistory' ? getItemHistoryStockLines(log) : [];
+
+  const a11ySummary =
+    variant === 'itemHistory'
+      ? `${actionConfig.label}. ${primaryLine ?? log.summary}. By ${log.userName}.${stockLines.length > 0 ? ` ${stockLines.join(' ')}` : ''}`
+      : `${actionConfig.label}. ${log.summary}. By ${log.userName}.`;
+
   return (
     <button
       type="button"
       onClick={onPress}
       className="bg-white rounded-[10px] p-4 border border-slate-200 shadow-sm min-h-[120px] w-full text-left hover:bg-slate-50 transition-colors"
-      aria-label={`Activity: ${actionConfig.label}. ${log.summary}. By ${log.userName}. Tap for details.`}
+      aria-label={`Activity: ${a11ySummary} Tap for details.`}
     >
       <div className="flex justify-between items-center gap-3 mb-3">
         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -78,17 +96,49 @@ export function ActivityLogCard({ log, onPress }: ActivityLogCardProps) {
         </div>
       </div>
 
-      <div className="flex gap-4 mb-3">
-        <div className="flex-1 min-w-0">
-          <p className="text-[13px] text-slate-500 mb-1">User</p>
-          <p className="text-[15px] text-slate-900 truncate">{log.userName}</p>
+      {variant === 'itemHistory' && primaryLine ? (
+        <div className="mb-3">
+          <p className="text-[13px] text-slate-500 mb-1">What happened</p>
+          <p className="text-[15px] text-slate-900 leading-snug">{primaryLine}</p>
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[13px] text-slate-500 mb-1">Target</p>
-          <p className="text-[15px] text-blue-800 font-medium truncate">
-            {log.targetDisplay}
+      ) : null}
+
+      {variant === 'itemHistory' && stockLines.length > 0 ? (
+        <div className="bg-slate-100 rounded-lg px-3 py-2.5 mb-3 border border-slate-200">
+          <p className="text-[12px] font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            Stock & quantities
           </p>
+          {stockLines.map((line, idx) => (
+            <p
+              key={idx}
+              className="text-[15px] text-slate-900 leading-snug mb-1.5 last:mb-0"
+            >
+              {line}
+            </p>
+          ))}
         </div>
+      ) : null}
+
+      <div
+        className={
+          variant === 'itemHistory' ? 'mb-3' : 'flex gap-4 mb-3'
+        }
+      >
+        <div className={variant === 'itemHistory' ? 'w-full' : 'flex-1 min-w-0'}>
+          <p className="text-[13px] text-slate-500 mb-1">Recorded by</p>
+          <p className="text-[15px] text-slate-900 truncate">{log.userName}</p>
+          {log.userRole ? (
+            <p className="text-[13px] text-slate-500 mt-0.5 truncate">{log.userRole}</p>
+          ) : null}
+        </div>
+        {variant === 'default' ? (
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] text-slate-500 mb-1">Target</p>
+            <p className="text-[15px] text-blue-800 font-medium truncate">
+              {log.targetDisplay}
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <div className="border-t border-slate-200 pt-3">

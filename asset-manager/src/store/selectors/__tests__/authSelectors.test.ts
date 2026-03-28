@@ -4,6 +4,7 @@ import {
   selectIsSuperAdmin,
   selectIsAdminOrSuperAdmin,
   selectCanManageRequests,
+  selectCanViewRequestQueue,
   selectIsStoreIncharge,
   selectIsSiteManager,
   selectUserDisplayName,
@@ -140,6 +141,37 @@ describe('authSelectors', () => {
       selectIsAdminOrSuperAdmin(
         createMockState({
           userRole: { role: 'StoreIncharge', isActive: true, permissions: [] },
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('selectCanViewRequestQueue is true for Admin, SuperAdmin, and StoreIncharge', () => {
+    expect(
+      selectCanViewRequestQueue(
+        createMockState({
+          userRole: { role: 'Admin', isActive: true, permissions: [] },
+        })
+      )
+    ).toBe(true);
+    expect(
+      selectCanViewRequestQueue(
+        createMockState({
+          userRole: { role: 'SuperAdmin', isActive: true, permissions: [] },
+        })
+      )
+    ).toBe(true);
+    expect(
+      selectCanViewRequestQueue(
+        createMockState({
+          userRole: { role: 'StoreIncharge', isActive: true, permissions: [] },
+        })
+      )
+    ).toBe(true);
+    expect(
+      selectCanViewRequestQueue(
+        createMockState({
+          userRole: { role: 'SiteManager', isActive: true, permissions: [] },
         })
       )
     ).toBe(false);
