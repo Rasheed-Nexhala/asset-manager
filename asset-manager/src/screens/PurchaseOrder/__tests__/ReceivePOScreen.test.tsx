@@ -323,6 +323,31 @@ describe('ReceivePOScreen', () => {
     expect(mockGoBack).toHaveBeenCalled();
   });
 
+  it('shows partial receipt message when updated PO status is partially_received', async () => {
+    renderWithStore(<ReceivePOScreen />, defaultPreloadedState);
+
+    mockGetPOByIdResolve!(createMockPO());
+
+    await waitFor(() => {
+      expect(screen.getByText('Steel Bar')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText('CONFIRM & UPDATE INVENTORY'));
+
+    mockReceivePOResolve!({
+      updatedPO: { status: 'partially_received' } as PurchaseOrder,
+      grrNumber: 'PO-RCV-2025-0002',
+    });
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Success',
+        expect.stringContaining('Partial receipt saved'),
+        expect.any(Array)
+      );
+    });
+  });
+
   it('back button calls goBack', async () => {
     renderWithStore(<ReceivePOScreen />, defaultPreloadedState);
 

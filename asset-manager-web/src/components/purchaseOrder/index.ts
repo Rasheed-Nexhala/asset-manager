@@ -3,3 +3,4 @@ export { POStatusBadge } from './POStatusBadge';
 export { VendorSelector } from './VendorSelector';
 export { POItemCard } from './POItemCard';
 export { PODocumentCard } from './PODocumentCard';
+export { GrrReceiptsList } from './GrrReceiptsList';

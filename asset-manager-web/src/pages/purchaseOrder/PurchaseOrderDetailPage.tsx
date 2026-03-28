@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Icon } from '../../components/shared/Icon';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
-import { POStatusBadge, PODocumentCard } from '../../components/purchaseOrder';
+import {
+  POStatusBadge,
+  PODocumentCard,
+  GrrReceiptsList,
+} from '../../components/purchaseOrder';
 import { useAppSelector } from '../../store/hooks';
 import { selectPOById } from '../../store/selectors/purchaseOrderSelectors';
 import {
@@ -172,98 +176,59 @@ export function PurchaseOrderDetailPage() {
 
       {(po.grrReceipts?.length ?? 0) > 0 && (
         <div className="rounded-[10px] border border-slate-200 bg-white p-4 lg:p-6">
-          <h2 className="mb-3 text-[17px] font-semibold text-slate-900">
-            GOODS RECEIPT REGISTER (GRR)
-          </h2>
-          <ul className="space-y-2">
-            {po.grrReceipts!.map((r) => (
-              <li
-                key={`${r.grrNumber}-${r.receivedAt}`}
-                className="border-b border-slate-100 pb-2 text-[15px] text-slate-900 last:border-b-0 last:pb-0"
-              >
-                <span className="font-semibold">{r.grrNumber}</span>
-                <span className="text-[13px] text-slate-500">
-                  {' '}
-                  · {formatDate(r.receivedAt)} · {r.receivedByName ?? '—'}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <GrrReceiptsList receipts={po.grrReceipts} />
         </div>
       )}
 
       {/* Vendor */}
       <div className="rounded-[10px] border border-slate-200 bg-white p-4 lg:p-6">
-        <h2 className="mb-3 text-[17px] font-semibold text-slate-900">VENDOR</h2>
-        <p className="text-[15px] text-slate-900">{po.vendorName}</p>
-        <p className="mt-1 flex items-center gap-1 text-[13px] text-slate-500">
-          <Icon name="phone" className="h-4 w-4" />
-          {po.vendorContact}
+        <h2 className="mb-3 text-[17px] font-semibold text-[#0F172A]">Vendor</h2>
+        <p className="text-[15px] font-semibold text-[#0F172A]">{po.vendorName}</p>
+        <p className="mt-1 flex flex-wrap items-center gap-x-1 text-[13px] text-[#64748B]">
+          <span className="inline-flex items-center gap-1">
+            <Icon name="phone" className="h-4 w-4 shrink-0" />
+            {po.vendorContact}
+          </span>
+          {po.vendorEmail?.trim() ? (
+            <span>
+              <span className="text-[#94A3B8]"> · </span>
+              {po.vendorEmail}
+            </span>
+          ) : null}
         </p>
-        {po.vendorEmail && (
-          <p className="mt-4 text-[13px] text-slate-500">{po.vendorEmail}</p>
-        )}
       </div>
 
       {/* Items */}
       <div className="rounded-[10px] border border-slate-200 bg-white p-4 lg:p-6">
-        <h2 className="mb-3 text-[17px] font-semibold text-slate-900">ITEMS</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <th className="pb-2 text-left text-[13px] font-medium text-slate-500">
-                  Item
-                </th>
-                <th className="pb-2 text-left text-[13px] font-medium text-slate-500">
-                  Qty
-                </th>
-                <th className="pb-2 text-right text-[13px] font-medium text-slate-500">
-                  Unit Price
-                </th>
-                <th className="pb-2 text-right text-[13px] font-medium text-slate-500">
-                  GST %
-                </th>
-                <th className="pb-2 text-right text-[13px] font-medium text-slate-500">
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {po.items.map((item, i) => (
-                <tr
-                  key={item.itemId + i}
-                  className={`border-b border-slate-100 last:border-b-0 ${
-                    i === po.items.length - 1 ? '' : ''
-                  }`}
-                >
-                  <td className="py-3">
-                    <p className="text-[15px] font-medium text-slate-900 truncate max-w-[200px]">
-                      {item.itemName}
-                    </p>
-                  </td>
-                  <td className="py-3 text-[15px] text-slate-900">
-                    {item.orderedQuantity != null && item.orderedUnit
-                      ? `${item.orderedQuantity} ${item.orderedUnit}`
-                      : `${item.quantity} ${item.unit || 'Pcs'}`}
-                  </td>
-                  <td className="py-3 text-right text-[15px] text-slate-900">
-                    {formatCurrencyOrOptional(item.unitPrice ?? 0)}
-                  </td>
-                  <td className="py-3 text-right text-[15px] text-slate-900">
-                    {formatGstOrOptional(item.gstPercentage)}
-                  </td>
-                  <td className="py-3 text-right text-[15px] font-semibold text-slate-900">
-                    {formatCurrencyOrOptional(
-                      item.amount +
-                        (item.gstAmount ??
-                          Math.round((item.amount * (item.gstPercentage ?? 0)) / 100))
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <h2 className="mb-3 text-[17px] font-semibold text-[#0F172A]">Items</h2>
+        <div className="space-y-3">
+          {po.items.map((item, i) => {
+            const lineTotal =
+              item.amount +
+              (item.gstAmount ??
+                Math.round((item.amount * (item.gstPercentage ?? 0)) / 100));
+            const qtyStr =
+              item.orderedQuantity != null && item.orderedUnit
+                ? `${item.orderedQuantity} ${item.orderedUnit}`
+                : `${item.quantity} ${item.unit || 'Pcs'}`;
+            return (
+              <div
+                key={item.itemId + i}
+                className="border-b border-slate-100 pb-3 last:border-b-0 last:pb-0"
+              >
+                <p className="text-[15px] font-semibold text-[#0F172A]">
+                  {item.itemName}
+                </p>
+                <p className="mt-1 text-[13px] text-[#64748B]">
+                  {qtyStr} · {formatCurrencyOrOptional(item.unitPrice ?? 0)} · GST{' '}
+                  {formatGstOrOptional(item.gstPercentage)} ·{' '}
+                  <span className="font-medium text-[#0F172A]">
+                    {formatCurrencyOrOptional(lineTotal)}
+                  </span>
+                </p>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -297,10 +262,10 @@ export function PurchaseOrderDetailPage() {
 
       {/* Justification */}
       <div className="rounded-[10px] border border-slate-200 bg-white p-4 lg:p-6">
-        <p className="text-[13px] text-slate-500">
+        <p className="text-[13px] text-[#64748B]">
           Justification
         </p>
-        <p className="mt-1 text-[15px] text-slate-900">
+        <p className="mt-1 text-[15px] text-[#0F172A]">
           {po.justification || '—'}
         </p>
       </div>
@@ -308,12 +273,9 @@ export function PurchaseOrderDetailPage() {
       {/* Attached Documents */}
       {(po.documents?.length ?? 0) > 0 && (
         <div className="rounded-[10px] border border-slate-200 bg-white p-4 lg:p-6">
-          <h2 className="mb-1 text-[17px] font-semibold text-slate-900">
-            ATTACHED DOCUMENTS
+          <h2 className="mb-3 text-[17px] font-semibold text-[#0F172A]">
+            Documents
           </h2>
-          <p className="mb-3 text-[13px] text-slate-500">
-            Invoice and bills attached at receipt
-          </p>
           <div className="space-y-3">
             {po.documents!.map((doc, i) => (
               <PODocumentCard

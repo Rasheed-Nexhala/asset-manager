@@ -231,23 +231,34 @@ export function generatePOHtml(
   const grrSectionHtml =
     grrList.length > 0
       ? `<div style="margin-top:14px;border:1px solid #000;padding:12px 14px;background:#fafafa;">
-    <div style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#000;">Goods Receipt Register (GRR)</div>
+    <div style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#000;">Receipts</div>
     <table style="width:100%;border-collapse:collapse;font-size:10px;">
       <thead><tr>
-        <th style="text-align:left;border-bottom:1px solid #000;padding:4px 6px;">GRR No.</th>
-        <th style="text-align:left;border-bottom:1px solid #000;padding:4px 6px;">Date</th>
-        <th style="text-align:left;border-bottom:1px solid #000;padding:4px 6px;">Received by</th>
+        <th style="text-align:left;border-bottom:1px solid #000;padding:4px 6px;width:18%;">GRR</th>
+        <th style="text-align:left;border-bottom:1px solid #000;padding:4px 6px;width:14%;">Date</th>
+        <th style="text-align:left;border-bottom:1px solid #000;padding:4px 6px;width:18%;">By</th>
+        <th style="text-align:left;border-bottom:1px solid #000;padding:4px 6px;">Received</th>
       </tr></thead>
       <tbody>
         ${grrList
-          .map(
-            (r) =>
-              `<tr>
+          .map((r) => {
+            const lines = r.lineItems?.filter((li) => li.quantityReceived > 0) ?? [];
+            const receivedCell =
+              lines.length > 0
+                ? lines
+                    .map((li) => {
+                      const u = li.unit?.trim() ? escapeHtml(li.unit) : 'Pcs';
+                      return `${escapeHtml(li.itemName)} ${li.quantityReceived} ${u}`;
+                    })
+                    .join(' · ')
+                : '—';
+            return `<tr>
           <td style="padding:6px 6px;border-bottom:1px solid #eee;vertical-align:top;">${escapeHtml(r.grrNumber)}</td>
           <td style="padding:6px 6px;border-bottom:1px solid #eee;vertical-align:top;">${escapeHtml(formatDdMmYyyy(r.receivedAt))}</td>
           <td style="padding:6px 6px;border-bottom:1px solid #eee;vertical-align:top;">${escapeHtml(r.receivedByName ?? '—')}</td>
-        </tr>`
-          )
+          <td style="padding:6px 6px;border-bottom:1px solid #eee;vertical-align:top;line-height:1.4;">${receivedCell}</td>
+        </tr>`;
+          })
           .join('')}
       </tbody>
     </table>

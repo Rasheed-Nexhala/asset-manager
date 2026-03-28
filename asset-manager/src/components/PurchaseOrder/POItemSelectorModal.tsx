@@ -1,7 +1,10 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
 import { ItemSelectorModal } from '../Requests/ItemSelectorModal';
-import { selectIsStoreIncharge } from '../../store/selectors/authSelectors';
+import {
+  selectIsStoreIncharge,
+  selectIsSuperAdmin,
+} from '../../store/selectors/authSelectors';
 import type { Item } from '../../types/inventory';
 
 interface POItemSelectorModalProps {
@@ -19,5 +22,11 @@ export const POItemSelectorModal: React.FC<POItemSelectorModalProps> = (
   props
 ) => {
   const isStoreIncharge = useSelector(selectIsStoreIncharge);
-  return <ItemSelectorModal {...props} restrictToLowStock={isStoreIncharge} />;
+  const isSuperAdmin = useSelector(selectIsSuperAdmin);
+  return (
+    <ItemSelectorModal
+      {...props}
+      restrictToLowStock={isStoreIncharge && !isSuperAdmin}
+    />
+  );
 };

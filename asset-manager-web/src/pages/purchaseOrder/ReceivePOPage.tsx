@@ -162,7 +162,7 @@ export function ReceivePOPage() {
 
     setSaving(true);
     try {
-      const { grrNumber } = await dispatch(
+      const { grrNumber, updatedPO } = await dispatch(
         receivePO({
           poId,
           receiveData: {
@@ -185,8 +185,11 @@ export function ReceivePOPage() {
           userName,
         })
       ).unwrap();
+      const isPartial = updatedPO?.status === 'partially_received';
       toast.success(
-        `Purchase order received. GRR: ${grrNumber}. Inventory updated.`
+        isPartial
+          ? `Partial receipt saved. GRR: ${grrNumber}. Inventory updated. You can receive the rest in another receipt when it arrives.`
+          : `Purchase order received. GRR: ${grrNumber}. Inventory updated.`
       );
       navigate(-1);
     } catch (err) {
@@ -356,7 +359,7 @@ export function ReceivePOPage() {
         </h2>
         <p className="mb-3 text-[13px] text-slate-500">
           Enter the actual quantity received. Partial or excess delivery is
-          allowed.
+          allowed. You can record multiple receipts until every line is fulfilled.
         </p>
         <div className="space-y-3">
           {po.items.map((item) => {

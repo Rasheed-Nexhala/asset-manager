@@ -65,20 +65,43 @@ const GrrReceiptsSection: React.FC<{
   if (list.length === 0) return null;
   return (
     <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-4">
-      <Text className="text-[15px] font-semibold text-[#0F172A] mb-2">
-        GOODS RECEIPT REGISTER (GRR)
+      <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">
+        Receipts
       </Text>
       {list.map((r) => (
-        <Text
+        <View
           key={`${r.grrNumber}-${r.receivedAt}`}
-          className="text-[14px] text-[#0F172A] mb-2"
+          className="mb-3 rounded-[10px] border border-[#E2E8F0] bg-[#F8FAFC] p-3 last:mb-0"
         >
-          <Text className="font-semibold">{r.grrNumber}</Text>
-          <Text className="text-[13px] text-[#64748B]">
-            {' '}
-            · {formatDate(r.receivedAt)} · {r.receivedByName ?? '—'}
-          </Text>
-        </Text>
+          <View className="flex-col gap-0.5">
+            <Text className="text-[15px] font-semibold text-[#0F172A]">
+              {r.grrNumber}
+            </Text>
+            <Text className="text-[13px] text-[#64748B]">
+              {formatDate(r.receivedAt)} · {r.receivedByName?.trim() || '—'}
+            </Text>
+          </View>
+          {r.lineItems && r.lineItems.length > 0 ? (
+            <View className="mt-3 border-t border-[#E2E8F0] pt-2">
+              {r.lineItems.map((li) => (
+                <View
+                  key={`${r.grrNumber}-${li.itemId}`}
+                  className="mb-2 flex-row items-baseline justify-between gap-3 last:mb-0"
+                >
+                  <Text
+                    className="flex-1 text-[15px] font-medium text-[#0F172A]"
+                    numberOfLines={2}
+                  >
+                    {li.itemName}
+                  </Text>
+                  <Text className="text-[15px] text-[#64748B]">
+                    {li.quantityReceived} {li.unit?.trim() || 'Pcs'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </View>
       ))}
     </View>
   );
@@ -267,9 +290,20 @@ export const ApprovePOScreen: React.FC = () => {
         >
           <GrrReceiptsSection receipts={po.grrReceipts} />
           <View className="items-center justify-center py-8 px-2">
-            <Text className="text-[15px] text-[#64748B] text-center">
-              This PO has been partially received. You can receive it from the list.
+            <Text className="text-[15px] text-[#64748B] text-center mb-4">
+              This PO has been partially received. Record another receipt when more
+              goods arrive, or open Receive from the list.
             </Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ReceivePO', { poId })}
+              className="bg-[#1E40AF] rounded-[10px] px-6 py-3"
+              accessibilityRole="button"
+              accessibilityLabel="Continue receiving purchase order"
+            >
+              <Text className="text-[15px] font-semibold text-white text-center">
+                Continue receiving
+              </Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </ScreenLayout>

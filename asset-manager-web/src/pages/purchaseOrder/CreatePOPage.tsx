@@ -35,6 +35,7 @@ import {
   selectUserId,
   selectUserDisplayName,
   selectIsStoreIncharge,
+  selectIsSuperAdmin,
   selectCanCreatePurchaseOrder,
 } from '../../store/selectors/authSelectors';
 import {
@@ -77,6 +78,7 @@ export function CreatePOPage() {
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
   const canCreatePO = useAppSelector(selectCanCreatePurchaseOrder);
   const vendors = useAppSelector(selectVendors);
   const poFromStore = useAppSelector((state) =>
@@ -1338,7 +1340,7 @@ export function CreatePOPage() {
         onClose={() => setItemSelectorOpen(false)}
         onSelect={handleItemSelect}
         excludeItemIds={items.map((i) => i.itemId)}
-        restrictToLowStock={isStoreIncharge}
+        restrictToLowStock={isStoreIncharge && !isSuperAdmin}
       />
 
       {addVendorModalOpen && (

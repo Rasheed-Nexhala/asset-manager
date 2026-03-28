@@ -20,6 +20,8 @@ import {
 import { CommonActions, useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { isLowStock } from '../../utils/inventoryUtils';
+import { useAppSelector } from '../../store/hooks';
+import { selectIsStoreIncharge } from '../../store/selectors/authSelectors';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import {
@@ -58,11 +60,14 @@ export const SelectItemsScreen: React.FC = () => {
   const lastDocRef = useRef<DocumentSnapshot | null>(null);
 
   const isForPO = returnScreen === 'CreatePO';
+  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  /** Store Incharge PO flow: pick from low-stock items only. SuperAdmin / others see full catalog. */
+  const poSelectionLowStockOnly = isForPO && isStoreIncharge;
 
   const hasMore = items.length < (totalCount ?? 0) && lastDoc != null;
   const filteredItems = items
     .filter((item) => !excludeItemIds.includes(item.id))
-    .filter((item) => (isForPO ? isLowStock(item) : true));
+    .filter((item) => (poSelectionLowStockOnly ? isLowStock(item) : true));
 
   // Debounce search input
   useEffect(() => {
@@ -265,7 +270,7 @@ export const SelectItemsScreen: React.FC = () => {
       <View className="flex-1 items-center justify-center py-16 px-4">
         <Ionicons name="cube-outline" size={64} color="#94A3B8" />
         <Text className="text-[22px] font-semibold text-[#0F172A] mt-4 text-center">
-          {isForPO
+          {poSelectionLowStockOnly
             ? debouncedSearch
               ? 'No low-stock items match your search'
               : 'No items below minimum stock'
@@ -274,7 +279,7 @@ export const SelectItemsScreen: React.FC = () => {
               : 'No items available'}
         </Text>
         <Text className="text-[15px] text-[#64748B] mt-2 text-center">
-          {isForPO
+          {poSelectionLowStockOnly
             ? debouncedSearch
               ? 'Try a different term (name, SKU, or category). Only low-stock items are shown for purchase orders.'
               : 'All items are above their minimum stock level. No purchase order needed.'
@@ -284,7 +289,7 @@ export const SelectItemsScreen: React.FC = () => {
         </Text>
       </View>
     );
-  }, [loading, items.length, debouncedSearch, isForPO]);
+  }, [loading, items.length, debouncedSearch, poSelectionLowStockOnly]);
 
   const isInitialLoad = loading && items.length === 0 && totalCount === null;
   const selectedCount = filteredItems.filter((i) => selectedIds.has(i.id)).length;
@@ -341,7 +346,7 @@ export const SelectItemsScreen: React.FC = () => {
         </View>
         {totalCount != null && (
           <Text className="text-[13px] text-[#64748B] mt-2">
-            {isForPO
+            {poSelectionLowStockOnly
               ? `${filteredItems.length} item${filteredItems.length === 1 ? '' : 's'} below minimum stock`
               : `Showing ${filteredItems.length} of ${totalCount} items`}
           </Text>

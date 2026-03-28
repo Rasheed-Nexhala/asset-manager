@@ -27,6 +27,7 @@ import { getLocationId } from '../../utils/locationUtils';
 import type {
   PurchaseOrder,
   PurchaseOrderFirestore,
+  PurchaseOrderGrrLineItem,
   PurchaseOrderGrrReceiptFirestore,
   CreatePurchaseOrderData,
   ReceivePOData,
@@ -37,6 +38,7 @@ import { firestorePOToPO } from '../../types/purchaseOrder';
 import type { VendorLedgerDateRange } from '../../utils/vendorLedgerUtils';
 export type { VendorLedgerDateRange } from '../../utils/vendorLedgerUtils';
 import { incrementVendorPoCountInTransaction } from './vendorService';
+import { mapPoItemsAfterReceive } from '../../utils/poReceiveUtils';
 
 const PURCHASE_ORDERS_COLLECTION = 'purchaseOrders';
 const PO_COUNTERS_COLLECTION = 'poCounters';
@@ -161,6 +163,28 @@ const ensureCanReceive = async (userId: string): Promise<void> => {
 /**
  * Normalize items when reading from Firestore (backward compat for old POs without per-item GST)
  */
+const normalizeGrrLineItems = (raw: unknown): PurchaseOrderGrrLineItem[] | undefined => {
+  if (!Array.isArray(raw)) return undefined;
+  const out: PurchaseOrderGrrLineItem[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue;
+    const o = row as Record<string, unknown>;
+    const qty = Number(o.quantityReceived);
+    if (!Number.isFinite(qty) || qty <= 0) continue;
+    const itemId = typeof o.itemId === 'string' ? o.itemId : '';
+    if (!itemId) continue;
+    const itemName = typeof o.itemName === 'string' ? o.itemName : '';
+    const unit = typeof o.unit === 'string' && o.unit ? (o.unit as string) : undefined;
+    out.push({
+      itemId,
+      itemName: itemName || itemId,
+      quantityReceived: qty,
+      ...(unit ? { unit } : {}),
+    });
+  }
+  return out.length > 0 ? out : undefined;
+};
+
 const normalizeGrrReceiptsForRead = (
   raw: unknown
 ): PurchaseOrderGrrReceiptFirestore[] => {
@@ -185,12 +209,14 @@ const normalizeGrrReceiptsForRead = (
     } else {
       receivedAt = Timestamp.now();
     }
+    const lineItems = normalizeGrrLineItems(r.lineItems);
     out.push({
       grrNumber,
       receivedAt,
       receivedBy: typeof r.receivedBy === 'string' ? r.receivedBy : '',
       receivedByName:
         typeof r.receivedByName === 'string' ? r.receivedByName : '',
+      ...(lineItems ? { lineItems } : {}),
     });
   }
   return out;
@@ -1038,27 +1064,34 @@ export const receivePO = async (
     const existingGrr = Array.isArray(poData.grrReceipts)
       ? poData.grrReceipts
       : [];
+    const grrLineItems: PurchaseOrderGrrLineItem[] = [];
+    for (const item of poData.items as Array<{
+      itemId: string;
+      itemName?: string;
+      unit?: string;
+    }>) {
+      const qty = receivedByQty.get(item.itemId) ?? 0;
+      if (qty <= 0) continue;
+      grrLineItems.push({
+        itemId: item.itemId,
+        itemName: item.itemName ?? item.itemId,
+        quantityReceived: qty,
+        ...(item.unit ? { unit: item.unit } : {}),
+      });
+    }
+
     const newGrrReceipt: PurchaseOrderGrrReceiptFirestore = {
       grrNumber: mintedGrrNumber,
       receivedAt: receivedAtTimestamp,
       receivedBy: userId,
       receivedByName: userName,
+      ...(grrLineItems.length > 0 ? { lineItems: grrLineItems } : {}),
     };
 
-    let allFullyReceived = true;
-    const updatedItems = poData.items.map((item: any) => {
-      const newlyReceived = receivedByQty.get(item.itemId) ?? 0;
-      const totalReceived = (item.receivedQuantity ?? 0) + newlyReceived;
-      
-      if (totalReceived < item.quantity) {
-        allFullyReceived = false;
-      }
-
-      return {
-        ...item,
-        receivedQuantity: totalReceived,
-      };
-    });
+    const { updatedItems, allFullyReceived } = mapPoItemsAfterReceive(
+      poData.items,
+      receivedByQty
+    );
 
     const newStatus = allFullyReceived ? 'received' : 'partially_received';
 

@@ -16,14 +16,16 @@ import maintenanceReducer from '../../../store/slices/maintenanceSlice';
 import activityLogReducer from '../../../store/slices/activityLogSlice';
 import purchaseOrderReducer from '../../../store/slices/purchaseOrderSlice';
 import type { RootState } from '../../../store';
+import type { Item } from '../../../types/inventory';
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
-const mockRouteParams = {
+const defaultRouteParams = {
   returnScreen: 'CreateRequest',
   returnParams: { siteId: 'site1' },
   excludeItemIds: [] as string[],
 };
+let mockRouteParams: typeof defaultRouteParams = { ...defaultRouteParams };
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack }),
   useRoute: () => ({ params: mockRouteParams }),
@@ -64,9 +66,57 @@ function renderWithStore(ui: React.ReactElement, preloadedState: Partial<RootSta
   };
 }
 
+const iso = '2024-01-01T00:00:00.000Z';
+
+/** Low stock per isLowStock: centralStoreQuantity <= minStockLevel */
+function makeItem(overrides: Partial<Item> & { id: string; name: string }): Item {
+  return {
+    sku: `SKU-${overrides.id}`,
+    description: '',
+    categoryId: null,
+    categoryName: 'Cat',
+    type: 'consumable',
+    unit: 'pcs',
+    minStockLevel: 20,
+    status: 'active',
+    totalQuantity: 50,
+    centralStoreQuantity: 5,
+    atSitesQuantity: 30,
+    inMaintenanceQuantity: 15,
+    createdAt: iso,
+    updatedAt: iso,
+    ...overrides,
+  } as Item;
+}
+
+const lowStockItem = makeItem({
+  id: 'item-low',
+  name: 'Low Stock Bolt',
+  centralStoreQuantity: 5,
+  minStockLevel: 20,
+});
+
+const notLowStockItem = makeItem({
+  id: 'item-ok',
+  name: 'Well Stocked Nut',
+  centralStoreQuantity: 100,
+  minStockLevel: 20,
+});
+
+const authBase: NonNullable<RootState['auth']> = {
+  user: { uid: 'u1', email: 'u@test.com', displayName: 'User' } as import('firebase/auth').User,
+  isLoading: false,
+  isRoleLoading: false,
+  authInitialized: true,
+  error: null,
+  isAuthenticated: true,
+  userRole: null,
+};
+
 describe('SelectItemsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockRouteParams = { ...defaultRouteParams };
     mockListItems.mockResolvedValue({ items: [], lastDoc: null });
     mockGetCount.mockResolvedValue(0);
   });
@@ -97,5 +147,46 @@ describe('SelectItemsScreen', () => {
     fireEvent.press(screen.getByLabelText('Go back'));
 
     expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  describe('PO flow (CreatePO): StoreIncharge vs SuperAdmin low-stock filter', () => {
+    beforeEach(() => {
+      mockRouteParams = {
+        returnScreen: 'CreatePO',
+        returnParams: {},
+        excludeItemIds: [],
+      };
+      mockListItems.mockResolvedValue({
+        items: [lowStockItem, notLowStockItem],
+        lastDoc: null,
+      });
+      mockGetCount.mockResolvedValue(2);
+    });
+
+    it('StoreIncharge: after load, only low-stock item appears in the list', async () => {
+      const { findByText, queryByText } = renderWithStore(<SelectItemsScreen />, {
+        auth: {
+          ...authBase,
+          userRole: { role: 'StoreIncharge', isActive: true, permissions: [] },
+        },
+      });
+
+      await findByText('Low Stock Bolt');
+      expect(queryByText('Well Stocked Nut')).toBeNull();
+      await findByText('1 item below minimum stock');
+    });
+
+    it('SuperAdmin: after load, non-low-stock item is visible alongside low-stock', async () => {
+      const { findByText } = renderWithStore(<SelectItemsScreen />, {
+        auth: {
+          ...authBase,
+          userRole: { role: 'SuperAdmin', isActive: true, permissions: [] },
+        },
+      });
+
+      await findByText('Low Stock Bolt');
+      await findByText('Well Stocked Nut');
+      await findByText('Showing 2 of 2 items');
+    });
   });
 });

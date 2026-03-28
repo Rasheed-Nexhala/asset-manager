@@ -186,7 +186,7 @@ export const ReceivePOScreen: React.FC = () => {
 
     setSaving(true);
     try {
-      const { grrNumber } = await dispatch(
+      const { grrNumber, updatedPO } = await dispatch(
         receivePO({
           poId,
           receiveData: {
@@ -206,11 +206,13 @@ export const ReceivePOScreen: React.FC = () => {
           userName,
         })
       ).unwrap();
-      Alert.alert(
-        'Success',
-        `Purchase order received. GRR: ${grrNumber}. Inventory updated.`,
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      const isPartial = updatedPO?.status === 'partially_received';
+      const message = isPartial
+        ? `Partial receipt saved. GRR: ${grrNumber}. Inventory updated. You can receive the rest in another receipt when it arrives.`
+        : `Purchase order received. GRR: ${grrNumber}. Inventory updated.`;
+      Alert.alert('Success', message, [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to receive PO';
       Alert.alert('Error', msg);
@@ -344,6 +346,7 @@ export const ReceivePOScreen: React.FC = () => {
           </Text>
           <Text className="text-[13px] text-[#64748B] mb-3">
             Enter the actual quantity received. Partial or excess delivery is allowed.
+            You can record multiple receipts until every line is fulfilled.
           </Text>
           {po.items.map((item) => {
             const raw = receivedQtys[item.itemId] ?? '';

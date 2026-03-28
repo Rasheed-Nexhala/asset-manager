@@ -51,6 +51,14 @@ export interface PurchaseOrderDocument {
   uploadedAt: Timestamp;
 }
 
+/** Quantities received in a single GRR event (one line per PO item with qty &gt; 0 this receipt). */
+export interface PurchaseOrderGrrLineItem {
+  itemId: string;
+  itemName: string;
+  quantityReceived: number;
+  unit?: string;
+}
+
 /** One goods-receipt register entry (Firestore) */
 export interface PurchaseOrderGrrReceiptFirestore {
   /** e.g. PO-RCV-2026-0001 (year + per-year sequence) */
@@ -58,6 +66,8 @@ export interface PurchaseOrderGrrReceiptFirestore {
   receivedAt: Timestamp;
   receivedBy: string;
   receivedByName: string;
+  /** Per-item quantities recorded for this receipt (optional for legacy GRR rows). */
+  lineItems?: PurchaseOrderGrrLineItem[];
 }
 
 /** One goods-receipt register entry (client / Redux, ISO dates) */
@@ -67,6 +77,7 @@ export interface PurchaseOrderGrrReceipt {
   receivedAt: string;
   receivedBy: string;
   receivedByName: string;
+  lineItems?: PurchaseOrderGrrLineItem[];
 }
 
 /**
@@ -227,6 +238,9 @@ export const firestorePOToPO = (doc: PurchaseOrderFirestore): PurchaseOrder => (
     receivedBy: r.receivedBy,
     receivedByName: r.receivedByName,
     receivedAt: timestampToISO(r.receivedAt),
+    ...(Array.isArray(r.lineItems) && r.lineItems.length > 0
+      ? { lineItems: r.lineItems }
+      : {}),
   })),
   createdAt: timestampToISO(doc.createdAt),
   reviewedAt: doc.reviewedAt ? timestampToISO(doc.reviewedAt) : null,

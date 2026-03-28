@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Icon } from '../../components/shared/Icon';
 import { useToast } from '../../contexts/ToastContext';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
@@ -18,7 +18,7 @@ import {
   selectIsSuperAdmin,
 } from '../../store/selectors/authSelectors';
 import { selectPurchaseOrderError } from '../../store/selectors/purchaseOrderSelectors';
-import { PODocumentCard } from '../../components/purchaseOrder';
+import { PODocumentCard, GrrReceiptsList } from '../../components/purchaseOrder';
 import type { PurchaseOrder } from '../../types/purchaseOrder';
 
 const formatDate = (iso: string | null | undefined): string => {
@@ -200,29 +200,20 @@ export function ApprovePOPage() {
         </button>
         {(po.grrReceipts?.length ?? 0) > 0 && (
           <div className="rounded-[10px] border border-slate-200 bg-white p-4">
-            <h2 className="mb-2 text-[15px] font-semibold text-slate-900">
-              GOODS RECEIPT REGISTER (GRR)
-            </h2>
-            <ul className="space-y-2">
-              {po.grrReceipts!.map((r) => (
-                <li
-                  key={`${r.grrNumber}-${r.receivedAt}`}
-                  className="text-[14px] text-slate-900"
-                >
-                  <span className="font-semibold">{r.grrNumber}</span>
-                  <span className="text-[13px] text-slate-500">
-                    {' '}
-                    · {formatDate(r.receivedAt)} · {r.receivedByName ?? '—'}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <GrrReceiptsList receipts={po.grrReceipts} />
           </div>
         )}
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-[15px] text-slate-500">
-            This PO has been partially received. You can receive it from the list.
+          <p className="mb-4 text-[15px] text-slate-500">
+            This PO has been partially received. Record another receipt when more
+            goods arrive, or open Receive from the list.
           </p>
+          <Link
+            to={`/purchase-orders/${poId}/receive`}
+            className="inline-flex h-[50px] items-center justify-center rounded-[10px] bg-blue-800 px-6 text-[15px] font-semibold text-white transition-colors hover:bg-blue-900"
+          >
+            Continue receiving
+          </Link>
         </div>
       </div>
     );
@@ -331,23 +322,7 @@ export function ApprovePOPage() {
 
         {po.status === 'received' && (po.grrReceipts?.length ?? 0) > 0 && (
           <div className="rounded-[10px] border border-slate-200 bg-white p-4">
-            <h2 className="mb-2 text-[15px] font-semibold text-slate-900">
-              GOODS RECEIPT REGISTER (GRR)
-            </h2>
-            <ul className="space-y-2">
-              {po.grrReceipts!.map((r) => (
-                <li
-                  key={`${r.grrNumber}-${r.receivedAt}`}
-                  className="text-[14px] text-slate-900"
-                >
-                  <span className="font-semibold">{r.grrNumber}</span>
-                  <span className="text-[13px] text-slate-500">
-                    {' '}
-                    · {formatDate(r.receivedAt)} · {r.receivedByName ?? '—'}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <GrrReceiptsList receipts={po.grrReceipts} />
           </div>
         )}
 
@@ -367,60 +342,44 @@ export function ApprovePOPage() {
         )}
 
         <div className="rounded-[10px] border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 text-[17px] font-semibold text-slate-900">VENDOR</h2>
-          <p className="text-[15px] text-slate-900">{po.vendorName}</p>
-          <p className="mt-1 flex items-center gap-1 text-[13px] text-slate-500">
-            <Icon name="phone" className="h-4 w-4" />
+          <h2 className="mb-3 text-[17px] font-semibold text-[#0F172A]">Vendor</h2>
+          <p className="text-[15px] font-semibold text-[#0F172A]">{po.vendorName}</p>
+          <p className="mt-1 flex items-center gap-1 text-[13px] text-[#64748B]">
+            <Icon name="phone" className="h-4 w-4 shrink-0" />
             {po.vendorContact}
           </p>
         </div>
 
         <div className="rounded-[10px] border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 text-[17px] font-semibold text-slate-900">ITEMS</h2>
+          <h2 className="mb-3 text-[17px] font-semibold text-[#0F172A]">Items</h2>
           <div className="space-y-3">
-            {po.items.map((item, i) => (
-              <div
-                key={item.itemId + i}
-                className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] text-slate-500">Item</p>
-                  <p className="text-[15px] font-medium text-slate-900 truncate">
+            {po.items.map((item, i) => {
+              const lineTotal =
+                item.amount +
+                (item.gstAmount ??
+                  Math.round((item.amount * (item.gstPercentage ?? 0)) / 100));
+              const qtyStr =
+                item.orderedQuantity != null && item.orderedUnit
+                  ? `${item.orderedQuantity} ${item.orderedUnit}`
+                  : `${item.quantity} ${item.unit || 'Pcs'}`;
+              return (
+                <div
+                  key={item.itemId + i}
+                  className="border-b border-slate-100 pb-3 last:border-b-0 last:pb-0"
+                >
+                  <p className="text-[15px] font-semibold text-[#0F172A]">
                     {item.itemName}
                   </p>
-                </div>
-                <div className="shrink-0">
-                  <p className="text-[13px] text-slate-500">Qty</p>
-                  <p className="text-[15px] text-slate-900">
-                    {item.orderedQuantity != null && item.orderedUnit
-                      ? `${item.orderedQuantity} ${item.orderedUnit}`
-                      : `${item.quantity} ${item.unit || 'Pcs'}`}
+                  <p className="mt-1 text-[13px] text-[#64748B]">
+                    {qtyStr} · {formatCurrencyOrOptional(item.unitPrice ?? 0)} · GST{' '}
+                    {formatGstOrOptional(item.gstPercentage)} ·{' '}
+                    <span className="font-medium text-[#0F172A]">
+                      {formatCurrencyOrOptional(lineTotal)}
+                    </span>
                   </p>
                 </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-[13px] text-slate-500">Unit Price</p>
-                  <p className="text-[15px] text-slate-900">
-                    {formatCurrencyOrOptional(item.unitPrice ?? 0)}
-                  </p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-[13px] text-slate-500">GST %</p>
-                  <p className="text-[15px] text-slate-900">
-                    {formatGstOrOptional(item.gstPercentage)}
-                  </p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-[13px] text-slate-500">Total</p>
-                  <p className="text-[15px] font-semibold text-slate-900">
-                    {formatCurrencyOrOptional(
-                      item.amount +
-                        (item.gstAmount ??
-                          Math.round((item.amount * (item.gstPercentage ?? 0)) / 100))
-                    )}
-                  </p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -450,20 +409,17 @@ export function ApprovePOPage() {
         )}
 
         <div className="rounded-[10px] border border-slate-200 bg-white p-4">
-          <p className="text-[13px] text-slate-500">Justification</p>
-          <p className="mt-1 text-[15px] text-slate-900">
+          <p className="text-[13px] text-[#64748B]">Justification</p>
+          <p className="mt-1 text-[15px] text-[#0F172A]">
             {po.justification || '—'}
           </p>
         </div>
 
         {po.status === 'received' && (po.documents?.length ?? 0) > 0 && (
           <div className="rounded-[10px] border border-slate-200 bg-white p-4">
-            <h2 className="mb-1 text-[17px] font-semibold text-slate-900">
-              ATTACHED DOCUMENTS
+            <h2 className="mb-3 text-[17px] font-semibold text-[#0F172A]">
+              Documents
             </h2>
-            <p className="mb-3 text-[13px] text-slate-500">
-              Invoice and bills attached at receipt
-            </p>
             <div className="space-y-3">
               {po.documents!.map((doc, i) => (
                 <PODocumentCard
@@ -479,12 +435,12 @@ export function ApprovePOPage() {
 
         {isReadOnly && po.status === 'rejected' && (po.rejectionReason || po.adminComments) && (
           <div className="rounded-[10px] border border-slate-200 bg-white p-4">
-            <h2 className="mb-3 text-[17px] font-semibold text-slate-900">
-              REJECTION DETAILS
+            <h2 className="mb-3 text-[17px] font-semibold text-[#0F172A]">
+              Rejection
             </h2>
             {po.rejectionReason && (
               <div className="mb-2">
-                <p className="text-[13px] text-slate-500">Reason</p>
+                <p className="text-[13px] text-[#64748B]">Reason</p>
                 <p className="text-[15px] text-red-600">{po.rejectionReason}</p>
               </div>
             )}
