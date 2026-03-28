@@ -39,7 +39,7 @@ import {
   selectItemsLoadingMore,
 } from '../../store/selectors/inventorySelectors';
 import {
-  selectIsAdmin,
+  selectIsAdminOrSuperAdmin,
   selectIsStoreIncharge,
 } from '../../store/selectors/authSelectors';
 import { useInventoryError } from '../../hooks/useInventoryError';
@@ -125,7 +125,7 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   const hasMore = useAppSelector(selectItemsHasMore);
   const loadingMore = useAppSelector(selectItemsLoadingMore);
   const error = useInventoryError();
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
 
   // Client-side search: case-insensitive name, SKU, category, description (same as web)
@@ -687,7 +687,7 @@ export const CentralStoreInventoryScreen: React.FC = () => {
                 </Text>
                 
                 <View className="gap-2">
-                  {isAdmin && (
+                  {isAdminOrSuperAdmin && (
                     <TouchableOpacity
                       className="flex-row items-center px-4 py-3 rounded-xl bg-[#F8FAFC]"
                       onPress={() => {
@@ -701,7 +701,7 @@ export const CentralStoreInventoryScreen: React.FC = () => {
                     </TouchableOpacity>
                   )}
                   
-                  {(isAdmin || isStoreIncharge) && (
+                  {(isAdminOrSuperAdmin || isStoreIncharge) && (
                     <TouchableOpacity
                       className="flex-row items-center px-4 py-3 rounded-xl bg-[#F8FAFC]"
                       onPress={() => {

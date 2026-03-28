@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import {
-  selectIsAdmin,
+  selectIsAdminOrSuperAdmin,
   selectIsStoreIncharge,
   selectIsSiteManager,
   selectUserDisplayName,
@@ -11,6 +11,8 @@ import {
   selectIsActive,
   selectHasPermission,
   selectUserPermissions,
+  selectCanManageRequests,
+  selectCanViewRequestQueue,
 } from '../store/selectors/authSelectors';
 import { selectRequestsError } from '../store/selectors/requestSelectors';
 import { selectPurchaseOrderError } from '../store/selectors/purchaseOrderSelectors';
@@ -78,7 +80,9 @@ export function DashboardPage() {
   const dispatch = useAppDispatch();
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
+  const canManageRequests = useAppSelector(selectCanManageRequests);
+  const canViewRequestQueue = useAppSelector(selectCanViewRequestQueue);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const isSiteManager = useAppSelector(selectIsSiteManager);
   const displayName = useAppSelector(selectUserDisplayName) ?? '';
@@ -142,10 +146,10 @@ export function DashboardPage() {
     if (!userId || roleType === 'Unassigned') return;
     setDashboardLoading(true);
     try {
-      if (isAdmin || isStoreIncharge) {
+      if (isAdminOrSuperAdmin || isStoreIncharge) {
         const [posCount, reqs, allItems] = await Promise.all([
           getPendingPOCount(),
-          getRecentPendingRequests({}, 5),
+          canViewRequestQueue ? getRecentPendingRequests({}, 5) : Promise.resolve([]),
           listItems(),
         ]);
 
@@ -172,7 +176,16 @@ export function DashboardPage() {
     } finally {
       setDashboardLoading(false);
     }
-  }, [userId, roleType, isAdmin, isStoreIncharge, isSiteManager, assignedSiteId]);
+  }, [
+    userId,
+    roleType,
+    isAdminOrSuperAdmin,
+    canManageRequests,
+    canViewRequestQueue,
+    isStoreIncharge,
+    isSiteManager,
+    assignedSiteId,
+  ]);
 
   useEffect(() => {
     if (isVisible || isRefreshing) {
@@ -265,9 +278,9 @@ export function DashboardPage() {
         />
 
         {/* KPI Section - Full Width */}
-        {(isAdmin || (isStoreIncharge && statsForStore.length > 0)) && (
+        {(isAdminOrSuperAdmin || (isStoreIncharge && statsForStore.length > 0)) && (
           <QuickStatsRow
-            stats={isAdmin ? [
+            stats={isAdminOrSuperAdmin ? [
               { icon: 'cube', value: itemsCount, label: 'Items' },
               { icon: 'clock', value: pendingPOCount, label: 'Pending POs' },
               { icon: 'building-office-2', value: sites.length, label: 'Sites' },
@@ -282,7 +295,7 @@ export function DashboardPage() {
           {/* Main Content Area (2/3 width on desktop) */}
           <div className="lg:col-span-2 space-y-6">
             
-            {(isAdmin || isStoreIncharge) && (
+            {(isAdminOrSuperAdmin || isStoreIncharge) && (
               <>
                 {(lowStockItemsWidget.length > 0 || isInitialLoad || dashboardLoading) && (
                   <LowStockAlertWidget
@@ -306,15 +319,17 @@ export function DashboardPage() {
                 {(recentPendingRequests.length > 0 || isInitialLoad || dashboardLoading) && (
                   <PendingRequestsWidget
                     requests={recentPendingRequests}
-                    onViewAll={() => navigate(isAdmin || isStoreIncharge ? '/requests/queue' : '/requests/my-requests')}
-                    showApprove={isAdmin || isStoreIncharge}
+                    onViewAll={() =>
+                      navigate(canManageRequests ? '/requests/queue' : '/requests/my-requests')
+                    }
+                    showApprove={canManageRequests}
                     loading={isInitialLoad || dashboardLoading}
                   />
                 )}
               </>
             )}
 
-            {isSiteManager && !isAdmin && !isStoreIncharge && (
+            {isSiteManager && !isAdminOrSuperAdmin && !isStoreIncharge && (
               <>
                 <div className="bg-white rounded-[10px] p-4 lg:p-6 border border-slate-200 shadow-sm">
                   <h3 className="text-[17px] font-semibold text-slate-900 mb-3">
@@ -345,7 +360,7 @@ export function DashboardPage() {
               </>
             )}
 
-            {!isAdmin && !isStoreIncharge && !isSiteManager && roleType === 'Unassigned' && (
+            {!isAdminOrSuperAdmin && !isStoreIncharge && !isSiteManager && roleType === 'Unassigned' && (
               <div
                 className="bg-amber-600/15 rounded-[10px] p-4 lg:p-6 border border-amber-600/30 flex items-center gap-4"
                 role="alert"
@@ -360,7 +375,7 @@ export function DashboardPage() {
 
           {/* Side Content Area (1/3 width on desktop) */}
           <div className="lg:col-span-1 space-y-6">
-            {isAdmin && (
+            {isAdminOrSuperAdmin && (
               <Link
                 to="/activity"
                 className="bg-white rounded-[10px] p-4 lg:p-6 border border-slate-200 shadow-sm flex items-center justify-between hover:bg-slate-50 transition-colors group"

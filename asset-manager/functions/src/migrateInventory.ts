@@ -27,7 +27,8 @@
 
 import * as admin from 'firebase-admin';
 
-const PROJECT_ID = 'asset-management-system-622c2';
+const PROJECT_ID =
+  process.env.FIREBASE_MIGRATION_PROJECT_ID ?? 'asset-management-system-622c2';
 
 // Safety: default to dry run. Set DRY_RUN=false in env to actually write.
 const DRY_RUN = process.env.DRY_RUN !== 'false';

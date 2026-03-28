@@ -253,7 +253,7 @@ export function CreateSiteTransferPage() {
               className="h-5 w-5 text-slate-500 flex-shrink-0 mt-0.5"
             />
             <p className="text-[13px] text-slate-500">
-              This request will be reviewed by the Store Incharge or Admin. Once
+              This request will be reviewed by the Store Incharge or Super Admin. Once
               approved and confirmed, the item will be moved from {sourceSiteName}{' '}
               to {destinationSiteName}.
             </p>

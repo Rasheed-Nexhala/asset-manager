@@ -8,7 +8,7 @@ import {
   UsersScreen,
 } from '../screens';
 import { useAppSelector } from '../store/hooks';
-import { selectIsAdmin } from '../store/selectors/authSelectors';
+import { selectIsAdminOrSuperAdmin } from '../store/selectors/authSelectors';
 import type { DashboardStackParamList } from './DashboardStackParamList';
 
 const Stack = createStackNavigator<DashboardStackParamList>();
@@ -21,7 +21,7 @@ const Stack = createStackNavigator<DashboardStackParamList>();
  * - MyActivity: User's recent activity (all users)
  */
 export const DashboardStackNavigator: React.FC = () => {
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
 
   return (
     <Stack.Navigator
@@ -30,7 +30,7 @@ export const DashboardStackNavigator: React.FC = () => {
       }}
     >
       <Stack.Screen name="DashboardHome" component={DashboardScreen} />
-      {isAdmin && (
+      {isAdminOrSuperAdmin && (
         <Stack.Screen
           name="ActivityLog"
           component={ActivityLogScreen}
@@ -56,7 +56,7 @@ export const DashboardStackNavigator: React.FC = () => {
           gestureEnabled: true,
         }}
       />
-      {isAdmin && (
+      {isAdminOrSuperAdmin && (
         <Stack.Screen
           name="Users"
           component={UsersScreen}

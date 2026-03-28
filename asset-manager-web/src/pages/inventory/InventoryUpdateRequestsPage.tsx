@@ -14,7 +14,7 @@ import {
   selectInventoryUpdateRequestLoading,
   selectInventoryUpdateRequestError,
 } from '../../store/selectors/inventoryUpdateRequestSelectors';
-import { selectIsAdmin } from '../../store/selectors/authSelectors';
+import { selectIsAdminOrSuperAdmin } from '../../store/selectors/authSelectors';
 import { clearError } from '../../store/slices/inventoryUpdateRequestSlice';
 import type { InventoryUpdateRequest } from '../../types/inventoryUpdateRequest';
 import { useToast } from '../../contexts/ToastContext';
@@ -46,12 +46,12 @@ export function InventoryUpdateRequestsPage() {
   );
   const isLoading = useAppSelector(selectInventoryUpdateRequestLoading);
   const error = useAppSelector(selectInventoryUpdateRequestError);
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const toast = useToast();
 
   useEffect(() => {
-    if (isAdmin) dispatch(fetchPendingRequests());
-  }, [dispatch, isAdmin]);
+    if (isAdminOrSuperAdmin) dispatch(fetchPendingRequests());
+  }, [dispatch, isAdminOrSuperAdmin]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -130,7 +130,7 @@ export function InventoryUpdateRequestsPage() {
     };
   }, [dispatch]);
 
-  if (!isAdmin) {
+  if (!isAdminOrSuperAdmin) {
     return (
       <div className="flex flex-col min-h-0 flex-1">
         <header className="bg-white border-b border-slate-200 px-4 md:px-6 flex items-center min-h-[56px] shrink-0">

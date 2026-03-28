@@ -6,8 +6,7 @@ import { fetchItems } from '../../store/thunks/inventoryThunks';
 import {
   selectUserId,
   selectUserDisplayName,
-  selectIsAdmin,
-  selectIsStoreIncharge,
+  selectCanManageRequests,
 } from '../../store/selectors/authSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import { requestService } from '../../services/firebase/requestService';
@@ -32,8 +31,7 @@ export function ConfirmTransferPage() {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
-  const isAdmin = useAppSelector(selectIsAdmin);
-  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const canManageRequests = useAppSelector(selectCanManageRequests);
   const inventoryItems = useAppSelector(selectAllItems);
   const { viewMode } = useWeightViewPreference();
 
@@ -52,8 +50,10 @@ export function ConfirmTransferPage() {
 
   useEffect(() => {
     if (!requestId) return;
-    if (!isAdmin && !isStoreIncharge) {
-      toast.error('Only Admin and Store Incharge can confirm transfers.');
+    if (!canManageRequests) {
+      toast.error(
+        'Only Super Admin and Store Incharge can confirm transfers.'
+      );
       navigate(-1);
       setIsLoading(false);
       return;
@@ -82,7 +82,7 @@ export function ConfirmTransferPage() {
     return () => {
       cancelled = true;
     };
-  }, [requestId, navigate, isAdmin, isStoreIncharge, toast]);
+  }, [requestId, navigate, canManageRequests, toast]);
 
   const validateForm = (): boolean => {
     const newErrors: { receivedByName?: string } = {};

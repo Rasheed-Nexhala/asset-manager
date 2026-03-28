@@ -14,7 +14,7 @@ import { clearError, setError } from '../../store/slices/purchaseOrderSlice';
 import {
   selectUserId,
   selectUserDisplayName,
-  selectIsAdmin,
+  selectIsAdminOrSuperAdmin,
   selectIsSuperAdmin,
 } from '../../store/selectors/authSelectors';
 import { selectPurchaseOrderError } from '../../store/selectors/purchaseOrderSelectors';
@@ -43,7 +43,7 @@ export function ApprovePOPage() {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
   const reduxError = useAppSelector(selectPurchaseOrderError);
 
@@ -248,12 +248,12 @@ export function ApprovePOPage() {
     );
   }
 
-  const canApproveReject = isAdmin || isSuperAdmin;
+  const canApproveReject = isAdminOrSuperAdmin;
   const isAssignedAdmin =
     isSuperAdmin ||
     (po.assignedToAdminId != null && po.assignedToAdminId.trim() !== ''
       ? po.assignedToAdminId === userId
-      : isAdmin);
+      : isAdminOrSuperAdmin);
   const showApproveReject =
     po.status === 'pending_approval' && canApproveReject && isAssignedAdmin;
   const isOtherAdminViewing =

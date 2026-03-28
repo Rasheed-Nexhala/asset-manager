@@ -1,0 +1,1 @@
+Implement it step by step using N SUBAGENTS paralelly or sequentially based on the requirement or possibility.

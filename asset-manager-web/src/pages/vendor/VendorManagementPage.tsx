@@ -6,7 +6,7 @@ import { VendorForm } from '../../components/purchaseOrder/VendorForm';
 import { useAppSelector } from '../../store/hooks';
 import { useConfirm } from '../../hooks';
 import { useToast } from '../../contexts/ToastContext';
-import { selectIsAdmin } from '../../store/selectors/authSelectors';
+import { selectIsAdminOrSuperAdmin } from '../../store/selectors/authSelectors';
 import { subscribeToVendors } from '../../services/firebase/vendorService';
 import {
   createVendor,
@@ -31,7 +31,7 @@ const formatDate = (iso: string | null | undefined): string => {
 export function VendorManagementPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useAppDispatch();
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const vendors = useAppSelector(selectVendors);
   const vendorsLoading = useAppSelector(selectVendorsLoading);
 
@@ -184,7 +184,7 @@ export function VendorManagementPage() {
     [confirm, toast]
   );
 
-  if (!isAdmin) {
+  if (!isAdminOrSuperAdmin) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <Icon name="lock-closed" className="h-16 w-16 text-slate-400" />

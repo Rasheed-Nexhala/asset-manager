@@ -19,6 +19,8 @@ import {
   getUserPushTokens,
   getAdminAndStoreInchargeTokens,
   getAdminAndStoreInchargeUserIds,
+  getRequestAlertPushTokens,
+  getRequestQueueStaffInAppUserIds,
   getAdminOnlyTokens,
   getAdminOnlyUserIds,
   createInAppNotification,
@@ -159,18 +161,15 @@ export const onRequestCreated = onDocumentCreated(
     if (request.status === 'pending') {
       try {
         const requestedBy = request.requestedBy as string | undefined;
-        const tokens = await getAdminAndStoreInchargeTokens(
-          'requestUpdates',
-          requestedBy
-        );
+        const title = 'New Request';
+        const body = `${request.requestedByName ?? 'Someone'} submitted request ${request.requestNumber ?? requestId}`;
+        const pushData = { screen: 'RequestQueue', requestId };
+        const userIds = await getRequestQueueStaffInAppUserIds(requestedBy);
+        for (const uid of userIds) {
+          await createInAppNotification(uid, 'new_request', title, body, pushData);
+        }
+        const tokens = await getRequestAlertPushTokens('requestUpdates', requestedBy);
         if (tokens.length > 0) {
-          const title = 'New Request';
-          const body = `${request.requestedByName ?? 'Someone'} submitted request ${request.requestNumber ?? requestId}`;
-          const pushData = { screen: 'RequestQueue', requestId };
-          const userIds = await getAdminAndStoreInchargeUserIds(requestedBy);
-          for (const uid of userIds) {
-            await createInAppNotification(uid, 'new_request', title, body, pushData);
-          }
           await sendExpoPushNotification(tokens, title, body, pushData);
         }
       } catch (notifErr) {
@@ -289,21 +288,18 @@ export const onRequestUpdated = onDocumentUpdated(
           }
         } else if (after.status === 'returned' || after.status === 'partially_returned') {
           const processedBy = after.processedBy as string | undefined;
-          const tokens = await getAdminAndStoreInchargeTokens(
-            'requestUpdates',
-            processedBy
-          );
+          const userIds = await getRequestQueueStaffInAppUserIds(processedBy);
+          for (const uid of userIds) {
+            await createInAppNotification(
+              uid,
+              'items_returned',
+              'Items Returned',
+              `Items returned for request ${requestNumber}.`,
+              pushData
+            );
+          }
+          const tokens = await getRequestAlertPushTokens('requestUpdates', processedBy);
           if (tokens.length > 0) {
-            const userIds = await getAdminAndStoreInchargeUserIds(processedBy);
-            for (const uid of userIds) {
-              await createInAppNotification(
-                uid,
-                'items_returned',
-                'Items Returned',
-                `Items returned for request ${requestNumber}.`,
-                pushData
-              );
-            }
             await sendExpoPushNotification(tokens, 'Items Returned',
               `Items returned for request ${requestNumber}.`,
               pushData);

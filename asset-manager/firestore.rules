@@ -31,14 +31,14 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && getUserRole() == 'Admin';
     }
-    
-    /**
-     * Check if user is Super Admin (can manage all users including Admins, except themselves)
-     * Set manually in Firestore: isSuperadmin: true
-     */
+
+    /** Super admin — first-class role string only (no legacy boolean field). */
     function isSuperAdmin() {
-      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      return isAuthenticated() && exists(userPath) && get(userPath).data.isSuperadmin == true;
+      return isAuthenticated() && getUserRole() == 'SuperAdmin';
+    }
+
+    function isAdminOrSuperAdmin() {
+      return isAdmin() || isSuperAdmin();
     }
     
     /**
@@ -60,7 +60,7 @@ service cloud.firestore {
      * These roles have similar permissions for inventory management
      */
     function isAdminOrStoreIncharge() {
-      return isAdmin() || isStoreIncharge();
+      return isAdmin() || isStoreIncharge() || isSuperAdmin();
     }
     
     /**
@@ -133,26 +133,39 @@ service cloud.firestore {
      */
     match /users/{userId} {
       // Allow reading individual user documents
-      allow get: if isAuthenticated() && (isAdmin() || request.auth.uid == userId);
-      // Allow listing users: Admins (full) and Store Incharge (needed to assign admin when submitting PO for approval)
-      allow list: if isAuthenticated() && (isAdmin() || isStoreIncharge());
+      allow get: if isAuthenticated() && (isAdminOrSuperAdmin() || request.auth.uid == userId);
+      // Allow listing users: Admins/SuperAdmins (full) and Store Incharge (needed to assign admin when submitting PO for approval)
+      allow list: if isAuthenticated() && (isAdminOrSuperAdmin() || isStoreIncharge());
       // Allow Admins to create users; allow self-registration on signup (create own doc with Unassigned role)
       allow create: if isAuthenticated() && (
-        (isUserActive() && isAdmin()) ||
+        (isUserActive() && isAdminOrSuperAdmin()) ||
         isSelfRegistration(userId)
       );
       // Admins can delete any user; users can delete their own account (Guideline 5.1.1(v))
       allow delete: if isAuthenticated() && (
-        (isUserActive() && isAdmin()) ||
+        (isUserActive() && isAdminOrSuperAdmin()) ||
         request.auth.uid == userId
       );
-      // Allow update: Admins and Super Admins can update other users; users can update own token fields or soft-delete
-      // Super Admins can deactivate Admins; regular Admins cannot. Super Admins cannot update themselves.
+      // Allow update: SuperAdmin may manage any non-self user; Admin may manage only non-Admin non-SuperAdmin users.
+      // Super Admins can deactivate Admins and other SuperAdmins; regular Admins cannot. Super Admins cannot update themselves (except token/soft-delete branch).
       allow update: if isAuthenticated() && (
-        (isUserActive() && (isAdmin() || isSuperAdmin()) && request.auth.uid != userId) ||
+        (
+          isUserActive() &&
+          (
+            isSuperAdmin() ||
+            (
+              isAdmin() &&
+              resource.data.role != 'Admin' &&
+              resource.data.role != 'SuperAdmin'
+            )
+          ) &&
+          request.auth.uid != userId
+        ) ||
         (request.auth.uid == userId && (onlyUpdatingOwnTokenFields() || onlySoftDeleteFields()))
       ) && (
-        resource.data.role != 'Admin' || request.resource.data.isActive != false || isSuperAdmin()
+        (resource.data.role != 'Admin' && resource.data.role != 'SuperAdmin') ||
+        request.resource.data.isActive != false ||
+        isSuperAdmin()
       );
     }
     
@@ -175,9 +188,9 @@ service cloud.firestore {
      */
     match /sites/{siteId} {
       allow read: if isAuthenticated();
-      allow create, delete: if isAuthenticated() && isUserActive() && isAdmin();
+      allow create, delete: if isAuthenticated() && isUserActive() && isAdminOrSuperAdmin();
       allow update: if isAuthenticated() && (
-        (isUserActive() && isAdmin()) ||
+        (isUserActive() && isAdminOrSuperAdmin()) ||
         isRemovingSelfAsManager()
       );
     }
@@ -193,7 +206,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge();
       allow create: if isAuthenticated() && isUserActive() && (isStoreIncharge() || isSuperAdmin());
       // Draft submit (draft -> pending_approval): same as create — Store Incharge or super admin only.
-      // Approve/reject: Admin or super admin. Other updates: Admin or Store Incharge.
+      // Approve/reject: Admin or SuperAdmin. Other updates: Admin, Store Incharge, or SuperAdmin.
       allow update: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge() &&
         (
           (resource.data.status == 'draft' && request.resource.data.status == 'pending_approval')
@@ -203,7 +216,7 @@ service cloud.firestore {
                   request.resource.data.status != resource.data.status &&
                   request.resource.data.status in ['approved', 'rejected']
                 )
-                  ? (isAdmin() || isSuperAdmin())
+                  ? isAdminOrSuperAdmin()
                   : true
               )
         );
@@ -232,7 +245,7 @@ service cloud.firestore {
      * GRR Counters — atomic sequence for Goods Receipt Register numbers (PO-RCV-YYYY-NNNN)
      */
     match /grrCounters/{counterId} {
-      allow read, write: if isAuthenticated() && isUserActive() && (isAdmin() || isStoreIncharge());
+      allow read, write: if isAuthenticated() && isUserActive() && isAdminOrStoreIncharge();
     }
     
     // ============================================
@@ -401,8 +414,8 @@ service cloud.firestore {
      * tamper-proof audit trail. All writes occur server-side via Cloud Functions.
      */
     match /activityLogs/{logId} {
-      // Admin can read all logs for audit purposes
-      allow read: if isAuthenticated() && isUserActive() && isAdmin();
+      // Admin / SuperAdmin can read all logs for audit purposes
+      allow read: if isAuthenticated() && isUserActive() && isAdminOrSuperAdmin();
 
       // Users can read only their own logs (userId match)
       // Includes new signup users (Unassigned, isActive: true) for Dashboard My Recent Activity widget
@@ -418,10 +431,17 @@ service cloud.firestore {
     // ============================================
     
     /**
-     * Check if user can manage requests (Store Incharge or Admin)
+     * Request queue staff: Store Incharge or SuperAdmin (approve / reject / transfer).
      */
     function canManageRequests() {
-      return isAuthenticated() && isUserActive() && (isAdmin() || isStoreIncharge());
+      return isAuthenticated() && isUserActive() &&
+        (isStoreIncharge() || isSuperAdmin());
+    }
+
+    /** View full queue + request documents (includes plain Admin, read-only). */
+    function canViewRequestQueue() {
+      return canManageRequests() ||
+        (isAuthenticated() && isUserActive() && isAdmin());
     }
 
     /**
@@ -431,8 +451,10 @@ service cloud.firestore {
      * Site Managers need read/write to increment when creating requests.
      */
     match /requestCounters/{counterId} {
-      allow read, write: if isAuthenticated() && isUserActive() &&
-        (isAdmin() || isStoreIncharge() || isSiteManager());
+      allow read: if canViewRequestQueue() ||
+        (isAuthenticated() && isUserActive() && isSiteManager());
+      allow write: if canManageRequests() ||
+        (isAuthenticated() && isUserActive() && isSiteManager());
     }
     
     /**
@@ -442,16 +464,16 @@ service cloud.firestore {
      * 
      * Access Rules:
      * - Read:
-     *   - Admin and Store Incharge: can read all requests
+     *   - Admin (read-only), Store Incharge, SuperAdmin: can read all requests
      *   - Site Manager: can only read their own requests (where requestedBy == user.uid)
      * - Create:
      *   - Site Managers: can create requests for themselves (draft or pending status)
      * - Update:
      *   - Site Managers: can ONLY edit their own DRAFT requests (before submission)
-     *   - Store Incharge/Admin: can update for approval/rejection/transfer
+     *   - SuperAdmin: unrestricted staff updates; Store Incharge: approval/rejection/transfer fields only
      *     CRITICAL: Store Incharge CANNOT edit items/priority (enforced in service layer)
      * - Delete:
-     *   - Admin: can delete any request
+     *   - Admin or SuperAdmin: can delete any request
      *   - Site Manager: can delete own DRAFT requests only
      * 
      * Business Rules Enforced:
@@ -460,12 +482,10 @@ service cloud.firestore {
      * - Site Manager can only edit own draft requests (enforced here and in service)
      */
     match /requests/{requestId} {
-      // Read access
-      allow read: if isAuthenticated() && isUserActive() && (
-        isAdmin() ||
-        isStoreIncharge() ||
-        (isSiteManager() && resource.data.requestedBy == request.auth.uid)
-      );
+      // Read access: queue viewers (Admin read-only + staff) or own site-manager requests
+      allow read: if canViewRequestQueue() ||
+        (isAuthenticated() && isUserActive() &&
+          isSiteManager() && resource.data.requestedBy == request.auth.uid);
       
       // Create: Only Site Managers for their own requests
       allow create: if isAuthenticated() && 
@@ -475,10 +495,9 @@ service cloud.firestore {
         request.resource.data.status in ['draft', 'pending'];
       
       // Update: Site Managers (own drafts only OR returning items on transferred/partially_returned requests),
-      // Store Incharge/Admin (approve/reject/transfer only - NO edit)
-      // Store Incharge can update status, processedBy, rejectionReason etc. but NOT items/priority (enforced in service)
+      // SuperAdmin (full staff path) or Store Incharge (approve/reject/transfer field allow-list)
       allow update: if isAuthenticated() && isUserActive() && (
-        isAdmin() ||
+        isSuperAdmin() ||
         (isSiteManager() && 
          resource.data.requestedBy == request.auth.uid && (
            (resource.data.status == 'draft' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['priority', 'purpose', 'items', 'status', 'updatedAt'])) ||
@@ -495,7 +514,7 @@ service cloud.firestore {
       
       // Delete: Admin (any) or Site Manager (own draft only)
       allow delete: if isAuthenticated() && isUserActive() && (
-        isAdmin() ||
+        isAdminOrSuperAdmin() ||
         (isSiteManager() && resource.data.requestedBy == request.auth.uid && resource.data.status == 'draft')
       );
     }
@@ -524,11 +543,11 @@ service cloud.firestore {
      */
     match /inventoryUpdateRequests/{requestId} {
       allow read: if isAuthenticated() && isUserActive() && (
-        isAdmin() ||
+        isAdminOrSuperAdmin() ||
         (isStoreIncharge() && resource.data.requestedBy == request.auth.uid)
       );
       allow create: if isAuthenticated() && isUserActive() && isStoreIncharge();
-      allow update: if isAuthenticated() && isUserActive() && isAdmin();
+      allow update: if isAuthenticated() && isUserActive() && isAdminOrSuperAdmin();
       allow delete: if false;
     }
   }

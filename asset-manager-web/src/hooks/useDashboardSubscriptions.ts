@@ -64,7 +64,11 @@ export function useDashboardSubscriptions({
       if (receivedCount >= 1) setIsInitialLoad(false);
     };
 
-    if (role === 'Admin' || role === 'StoreIncharge') {
+    if (
+      role === 'Admin' ||
+      role === 'SuperAdmin' ||
+      role === 'StoreIncharge'
+    ) {
       const unsubSites = subscribeToSites((sites) => {
         dispatch(setSites(sites));
         markReceived();

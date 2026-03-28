@@ -35,6 +35,7 @@ import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
 import { fetchSites } from '../../store/slices/sitesSlice';
 import { navigateToProcessRequest } from '../../navigation/navigationUtils';
+import { selectCanManageRequests } from '../../store/selectors/authSelectors';
 import type { Request } from '../../types/request';
 import type { RequestStackParamList } from '../../navigation/RequestStackParamList';
 
@@ -59,6 +60,7 @@ export const RequestQueueScreen: React.FC = () => {
   const loadingMore = useAppSelector(selectRequestsLoadingMore);
   const sites = useAppSelector(selectAllSites);
   const allItems = useAppSelector(selectAllItems);
+  const canManageRequests = useAppSelector(selectCanManageRequests);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -154,7 +156,8 @@ export const RequestQueueScreen: React.FC = () => {
     ({ item }: { item: Request }) => {
       // Only show availability for pending/approved; hide once transferred, returned, etc.
       const showAvailability =
-        item.status === 'pending' || item.status === 'approved';
+        canManageRequests &&
+        (item.status === 'pending' || item.status === 'approved');
 
       // Site transfers use source-site inventory, not central store. We don't have
       // per-site inventory in the list, so show "View to check" instead of wrong status.
@@ -181,7 +184,7 @@ export const RequestQueueScreen: React.FC = () => {
         </View>
       );
     },
-    [handleRequestPress, allItems]
+    [handleRequestPress, allItems, canManageRequests]
   );
 
   const hasActiveFilters =

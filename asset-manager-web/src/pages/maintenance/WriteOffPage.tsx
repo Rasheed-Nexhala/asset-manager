@@ -16,7 +16,7 @@ import {
   writeOffItemThunk,
 } from '../../store/thunks/maintenanceThunks';
 import { selectMaintenanceById } from '../../store/selectors/maintenanceSelectors';
-import { selectUserId, selectUserDisplayName, selectIsAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
+import { selectUserId, selectUserDisplayName, selectIsAdminOrSuperAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
 import type { WriteOffData, WriteOffReason } from '../../types/maintenance';
 
 const WRITE_OFF_ACCESS_REASON_OPTIONS = [
@@ -32,15 +32,16 @@ export function WriteOffPage() {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const canWriteOffAccess = useAppSelector(selectCanStoreInchargeMaintenanceWriteOff);
   const maintenance = useAppSelector((state) =>
     maintenanceId ? selectMaintenanceById(maintenanceId)(state) : null
   );
 
-  const hasMaintenanceRole = isAdmin || isStoreIncharge;
-  const canPerformWriteOff = isAdmin || (isStoreIncharge && canWriteOffAccess);
+  const hasMaintenanceRole = isAdminOrSuperAdmin || isStoreIncharge;
+  const canPerformWriteOff =
+    isAdminOrSuperAdmin || (isStoreIncharge && canWriteOffAccess);
 
   const [writeOffQuantity, setWriteOffQuantity] = useState(1);
   const [reason, setReason] = useState<WriteOffReason | null>(null);

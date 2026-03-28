@@ -11,7 +11,7 @@ import {
 import { selectMaintenanceById, selectMaintenanceError } from '../../store/selectors/maintenanceSelectors';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
-  selectIsAdmin,
+  selectIsAdminOrSuperAdmin,
   selectIsStoreIncharge,
 } from '../../store/selectors/authSelectors';
 import { selectCanStoreInchargeMaintenanceWriteOff } from '../../store/selectors/inventoryUpdateRequestSelectors';
@@ -130,10 +130,11 @@ export function MaintenanceDetailPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
 
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const canWriteOffAccess = useAppSelector(selectCanStoreInchargeMaintenanceWriteOff);
-  const showWriteOffAction = isAdmin || (isStoreIncharge && canWriteOffAccess);
+  const showWriteOffAction =
+    isAdminOrSuperAdmin || (isStoreIncharge && canWriteOffAccess);
 
   const maintenance = useAppSelector((state) =>
     maintenanceId ? selectMaintenanceById(maintenanceId)(state) : null

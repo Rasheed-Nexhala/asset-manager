@@ -11,9 +11,10 @@ import {
   selectIsAuthenticated,
   selectRoleLoading,
   selectAuthInitialized,
-  selectIsAdmin,
+  selectIsAdminOrSuperAdmin,
   selectIsStoreIncharge,
-  selectIsSuperAdmin,
+  selectCanManageRequests,
+  selectCanViewRequestQueue,
 } from '../store/selectors/authSelectors';
 import { AuthFlowScreen } from '../screens/Authentication/AuthFlowScreen';
 import { AuthCheckingScreen } from '../screens/Authentication/AuthCheckingScreen';
@@ -40,20 +41,17 @@ type NotificationData = {
 function handleNotificationNavigation(
   data: NotificationData | undefined,
   canNavigateToMain: boolean,
-  isAdmin: boolean,
-  isStoreIncharge: boolean,
-  isSuperAdmin: boolean
+  canManageRequests: boolean,
+  canViewRequestQueue: boolean,
+  canManagePo: boolean,
+  canReviewPo: boolean
 ): void {
   if (!data || !canNavigateToMain || !navigationRef.isReady()) return;
 
-  const canManageRequests = isAdmin || isStoreIncharge;
-  const canManagePo = isAdmin || isStoreIncharge;
-  const canReviewPo = isAdmin || isSuperAdmin;
-
-  if (data.screen === 'ProcessRequest' && data.requestId && canManageRequests) {
+  if (data.screen === 'ProcessRequest' && data.requestId && canViewRequestQueue) {
     const { navigateToProcessRequest } = require('./navigationUtils');
     navigateToProcessRequest(data.requestId);
-  } else if (data.screen === 'RequestQueue' && canManageRequests) {
+  } else if (data.screen === 'RequestQueue' && canViewRequestQueue) {
     navigationRef.navigate('Main', {
       screen: 'Tabs',
       params: {
@@ -138,7 +136,7 @@ function handleNotificationNavigation(
         },
       },
     });
-  } else if (data.screen === 'InventoryUpdateRequests' && isAdmin) {
+  } else if (data.screen === 'InventoryUpdateRequests' && canReviewPo) {
     navigationRef.navigate('Main', {
       screen: 'Tabs',
       params: {
@@ -200,9 +198,10 @@ const MainStackNavigator: React.FC = () => {
 function useNotificationResponseHandler(
   isAuthenticated: boolean,
   isRoleLoading: boolean,
-  isAdmin: boolean,
-  isStoreIncharge: boolean,
-  isSuperAdmin: boolean
+  canManageRequests: boolean,
+  canViewRequestQueue: boolean,
+  canManagePo: boolean,
+  canReviewPo: boolean
 ): void {
   const [coldStartData, setColdStartData] = useState<NotificationData | null>(null);
   const canNavigateToMain = isAuthenticated && !isRoleLoading;
@@ -222,13 +221,14 @@ function useNotificationResponseHandler(
       handleNotificationNavigation(
         data,
         canNavigateToMain,
-        isAdmin,
-        isStoreIncharge,
-        isSuperAdmin
+        canManageRequests,
+        canViewRequestQueue,
+        canManagePo,
+        canReviewPo
       );
     });
     return () => sub.remove();
-  }, [canNavigateToMain, isAdmin, isStoreIncharge, isSuperAdmin]);
+  }, [canNavigateToMain, canManageRequests, canViewRequestQueue, canManagePo, canReviewPo]);
 
   // Process cold start when auth, role loaded, and nav are ready (may lag behind initial mount)
   useEffect(() => {
@@ -240,9 +240,10 @@ function useNotificationResponseHandler(
         handleNotificationNavigation(
           coldStartData,
           canNavigateToMain,
-          isAdmin,
-          isStoreIncharge,
-          isSuperAdmin
+          canManageRequests,
+          canViewRequestQueue,
+          canManagePo,
+          canReviewPo
         );
         Notifications.clearLastNotificationResponseAsync();
         setColdStartData(null);
@@ -252,23 +253,34 @@ function useNotificationResponseHandler(
     };
 
     tryNavigate();
-  }, [canNavigateToMain, coldStartData, isAdmin, isStoreIncharge, isSuperAdmin]);
+  }, [
+    canNavigateToMain,
+    coldStartData,
+    canManageRequests,
+    canViewRequestQueue,
+    canManagePo,
+    canReviewPo,
+  ]);
 }
 
 export const RootNavigator: React.FC = () => {
   const authInitialized = useAppSelector(selectAuthInitialized);
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const isRoleLoading = useAppSelector(selectRoleLoading);
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
-  const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
+  const canManageRequests = useAppSelector(selectCanManageRequests);
+  const canViewRequestQueue = useAppSelector(selectCanViewRequestQueue);
+  const canManagePo = isAdminOrSuperAdmin || isStoreIncharge;
+  const canReviewPo = isAdminOrSuperAdmin;
 
   useNotificationResponseHandler(
     isAuthenticated,
     isRoleLoading,
-    isAdmin,
-    isStoreIncharge,
-    isSuperAdmin
+    canManageRequests,
+    canViewRequestQueue,
+    canManagePo,
+    canReviewPo
   );
 
   return (

@@ -6,7 +6,7 @@ import { POStatusBadge, PODocumentCard } from '../../components/purchaseOrder';
 import { useAppSelector } from '../../store/hooks';
 import { selectPOById } from '../../store/selectors/purchaseOrderSelectors';
 import {
-  selectIsAdmin,
+  selectIsAdminOrSuperAdmin,
   selectIsStoreIncharge,
   selectIsSuperAdmin,
   selectUserId,
@@ -36,7 +36,7 @@ export function PurchaseOrderDetailPage() {
     poId ? selectPOById(poId)(state) : null
   );
   const userId = useAppSelector(selectUserId);
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
 
@@ -117,12 +117,11 @@ export function PurchaseOrderDetailPage() {
   const assignedId = po.assignedToAdminId?.trim() ?? '';
   const canApprove =
     po.status === 'pending_approval' &&
-    (isSuperAdmin ||
-      (isAdmin &&
-        (!assignedId || assignedId === userId)));
+    isAdminOrSuperAdmin &&
+    (isSuperAdmin || !assignedId || assignedId === userId);
   const canReceive =
     (po.status === 'approved' || po.status === 'ordered' || po.status === 'partially_received') &&
-    (isAdmin || isStoreIncharge);
+    (isAdminOrSuperAdmin || isStoreIncharge);
 
   return (
     <div className="space-y-6">

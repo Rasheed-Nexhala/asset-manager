@@ -1,7 +1,12 @@
 /**
  * User Roles in the system
  */
-export type UserRole = 'Admin' | 'StoreIncharge' | 'SiteManager' | 'Unassigned';
+export type UserRole =
+  | 'SuperAdmin'
+  | 'Admin'
+  | 'StoreIncharge'
+  | 'SiteManager'
+  | 'Unassigned';
 
 /**
  * Available permissions
@@ -22,8 +27,6 @@ export interface UserRoleData {
   role: UserRole;
   isActive: boolean;
   permissions: Permission[];
-  /** Super admin can change roles and deactivate any user including Admins, except themselves. Set manually in Firestore. */
-  isSuperadmin?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -40,6 +43,4 @@ export interface UserListItem {
   permissions: Permission[];
   /** True when user has deleted their account (soft delete) */
   isDeleted?: boolean;
-  /** Super admin can manage all users including Admins. Set manually in Firestore. */
-  isSuperadmin?: boolean;
 }

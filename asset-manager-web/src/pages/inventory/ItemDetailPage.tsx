@@ -9,7 +9,7 @@ import {
   selectItemsError,
 } from '../../store/selectors/inventorySelectors';
 import {
-  selectIsAdmin,
+  selectIsAdminOrSuperAdmin,
   selectIsStoreIncharge,
   selectRoleLoading,
   selectIsRoleLoaded,
@@ -105,10 +105,10 @@ export function ItemDetailPage() {
   const item = useAppSelector((s) => (itemId ? selectItemById(itemId)(s) : null));
   const isLoading = useAppSelector(selectItemsLoading);
   const error = useAppSelector(selectItemsError);
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const isRoleLoaded = useAppSelector(selectIsRoleLoaded);
-  const canEditItem = isAdmin || isStoreIncharge;
+  const canEditItem = isAdminOrSuperAdmin || isStoreIncharge;
   const canStoreInchargeAdjustBase = useAppSelector(selectCanStoreInchargeAdjustInventory);
   const canStoreInchargeAdjust = canStoreInchargeAdjustBase || item?.type === 'fuel';
   const isAdjustmentReady = isRoleLoaded;
@@ -369,7 +369,7 @@ export function ItemDetailPage() {
                 <p className="text-[15px] text-slate-900">{item.description}</p>
               </div>
             )}
-            {(isAdmin || isStoreIncharge) && (
+            {(isAdminOrSuperAdmin || isStoreIncharge) && (
               <>
                 <InfoRow
                   label="Standard Unit Price"
@@ -501,7 +501,7 @@ export function ItemDetailPage() {
           </div>
         )}
 
-        {isAdjustmentReady && (isAdmin || (isStoreIncharge && canStoreInchargeAdjust)) && (
+        {isAdjustmentReady && (isAdminOrSuperAdmin || (isStoreIncharge && canStoreInchargeAdjust)) && (
           <div className="mb-3 bg-white rounded-[10px] p-4 border border-slate-200">
             <h3 className="text-[17px] font-semibold text-slate-900 mb-3">Stock Actions</h3>
             {myAccessGrantedUntil && (

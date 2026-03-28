@@ -3,21 +3,18 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAppSelector } from '../../store/hooks';
 import {
   selectIsAuthenticated,
-  selectIsAdminOrSuperAdmin,
+  selectCanViewRequestQueue,
   selectRoleLoading,
 } from '../../store/selectors/authSelectors';
 import { LoadingSpinner } from '../shared/LoadingSpinner';
 
 /**
- * Protects admin-only routes.
- * - If not authenticated: redirects to /login
- * - If authenticated but not admin: redirects to /dashboard
- * - If role still loading: shows full-screen spinner
- * - Otherwise: renders child routes via <Outlet />
+ * Routes for viewing the site request queue (list + read-only detail from queue).
+ * Admin: view only. Store Incharge / SuperAdmin: view + staff actions on other routes.
  */
-export function AdminGuard(): ReactNode {
+export function RequestQueueViewGuard(): ReactNode {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
+  const canViewRequestQueue = useAppSelector(selectCanViewRequestQueue);
   const isRoleLoading = useAppSelector(selectRoleLoading);
 
   if (!isAuthenticated) {
@@ -32,7 +29,7 @@ export function AdminGuard(): ReactNode {
     );
   }
 
-  if (!isAdminOrSuperAdmin) {
+  if (!canViewRequestQueue) {
     return <Navigate to="/dashboard" replace />;
   }
 

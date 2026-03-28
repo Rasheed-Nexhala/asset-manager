@@ -8,6 +8,8 @@ vi.mock('../../../config/firebase', () => ({
   auth: {},
   db: {},
   storage: {},
+  functions: {},
+  analytics: null,
 }));
 
 vi.mock('../../../services/firebase/categoryService', () => ({

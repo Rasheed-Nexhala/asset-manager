@@ -27,7 +27,8 @@ service firebase.storage {
      * Role values are stored as PascalCase: 'Admin', 'StoreIncharge', 'SiteManager'
      */
     function isAdmin() {
-      return isAuthenticated() && getUserRole() == 'Admin';
+      return isAuthenticated() &&
+        (getUserRole() == 'Admin' || getUserRole() == 'SuperAdmin');
     }
     
     /**

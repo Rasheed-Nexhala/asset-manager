@@ -40,7 +40,7 @@ import {
   selectInventoryUpdateRequestLoading,
   selectInventoryUpdateRequestError,
 } from '../../store/selectors/inventoryUpdateRequestSelectors';
-import { selectIsAdmin } from '../../store/selectors/authSelectors';
+import { selectIsAdminOrSuperAdmin } from '../../store/selectors/authSelectors';
 import { clearError } from '../../store/slices/inventoryUpdateRequestSlice';
 import type { InventoryUpdateRequest } from '../../types/inventoryUpdateRequest';
 import type { InventoryStackParamList } from '../../navigation/InventoryStackNavigator';
@@ -73,14 +73,14 @@ export const InventoryUpdateRequestsScreen: React.FC = () => {
   );
   const isLoading = useAppSelector(selectInventoryUpdateRequestLoading);
   const error = useAppSelector(selectInventoryUpdateRequestError);
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
 
   useFocusEffect(
     useCallback(() => {
-      if (isAdmin) {
+      if (isAdminOrSuperAdmin) {
         dispatch(fetchPendingRequests());
       }
-    }, [dispatch, isAdmin])
+    }, [dispatch, isAdminOrSuperAdmin])
   );
 
   const handleRefresh = useCallback(() => {
@@ -168,7 +168,7 @@ export const InventoryUpdateRequestsScreen: React.FC = () => {
     };
   }, [dispatch]);
 
-  if (!isAdmin) {
+  if (!isAdminOrSuperAdmin) {
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader

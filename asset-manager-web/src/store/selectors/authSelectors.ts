@@ -80,8 +80,14 @@ export const selectIsAdmin = createSelector(
 );
 
 export const selectIsSuperAdmin = createSelector(
-  [selectAuthState],
-  (auth) => auth.userRole?.isSuperadmin === true
+  [selectUserRoleType],
+  (role) => role === 'SuperAdmin'
+);
+
+/** Admin or SuperAdmin — org admin capabilities (sites, activity, users list, PO approve, etc.). */
+export const selectIsAdminOrSuperAdmin = createSelector(
+  [selectUserRoleType],
+  (role) => role === 'Admin' || role === 'SuperAdmin'
 );
 
 export const selectIsStoreIncharge = createSelector(
@@ -89,7 +95,20 @@ export const selectIsStoreIncharge = createSelector(
   (role) => role === 'StoreIncharge'
 );
 
-/** Store Incharge or super admin may create new POs (not regular Admin). */
+/** Request queue / approve / transfer — Store Incharge or SuperAdmin only (not plain Admin). */
+export const selectCanManageRequests = createSelector(
+  [selectUserRoleType],
+  (role) => role === 'StoreIncharge' || role === 'SuperAdmin'
+);
+
+/** Request queue list + read-only detail (Admin may view; actions use selectCanManageRequests). */
+export const selectCanViewRequestQueue = createSelector(
+  [selectIsAdminOrSuperAdmin, selectIsStoreIncharge],
+  (isAdminOrSuperAdmin, isStoreIncharge) =>
+    isAdminOrSuperAdmin || isStoreIncharge
+);
+
+/** Store Incharge or SuperAdmin may create new POs (not regular Admin). */
 export const selectCanCreatePurchaseOrder = createSelector(
   [selectIsStoreIncharge, selectIsSuperAdmin],
   (isStoreIncharge, isSuperAdmin) => isStoreIncharge || isSuperAdmin

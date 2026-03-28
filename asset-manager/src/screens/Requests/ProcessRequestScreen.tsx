@@ -28,8 +28,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   selectUserId,
   selectUserDisplayName,
-  selectIsStoreIncharge,
-  selectIsAdmin,
+  selectCanManageRequests,
 } from '../../store/selectors/authSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
@@ -44,7 +43,7 @@ import {
 type RouteParams = RouteProp<RequestStackParamList, 'ProcessRequest'>;
 type NavigationProp = StackNavigationProp<RequestStackParamList, 'ProcessRequest'>;
 
-/** Human-readable labels for return condition (visible to Store Incharge / Admin) */
+/** Human-readable labels for return condition (visible to request queue staff) */
 const CONDITION_LABELS: Record<ItemCondition, string> = {
   good: 'Good',
   needs_maintenance: 'Needs maintenance',
@@ -84,8 +83,7 @@ export const ProcessRequestScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
-  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const canManageRequests = useAppSelector(selectCanManageRequests);
   const inventoryItems = useAppSelector(selectAllItems);
   const requestFromStore = useAppSelector(selectRequestById(requestId));
 
@@ -179,7 +177,7 @@ export const ProcessRequestScreen: React.FC = () => {
     }));
   }, [request]);
 
-  const canProcess = isStoreIncharge || isAdmin;
+  const canProcess = canManageRequests;
   const allSufficient = availability.length > 0 && availability.every((a) => {
     const requested = approvedQuantities[a.itemId] ?? a.requested;
     return a.available >= requested;
@@ -192,7 +190,7 @@ export const ProcessRequestScreen: React.FC = () => {
       return;
     }
 
-    // Only check availability if user can manage requests (Store Incharge or Admin)
+    // Only check availability if user can manage requests (Store Incharge or Super Admin)
     if (!canProcess) {
       setIsCheckingAvailability(false);
       setAvailability([]);
@@ -442,9 +440,14 @@ export const ProcessRequestScreen: React.FC = () => {
     priorityConfig[request.priority as keyof typeof priorityConfig] ??
     priorityConfig.medium;
 
+  const requestScreenTitle =
+    request.status === 'rejected' || request.status === 'transferred'
+      ? 'View Request'
+      : 'Process Request';
+
   return (
     <ScreenLayout edges={['top']}>
-      <ScreenHeader title="Process Request" showBack onBackPress={handleBack} />
+      <ScreenHeader title={requestScreenTitle} showBack onBackPress={handleBack} />
 
       <ScrollView className="flex-1 px-4">
         <View className="gap-4 py-4">
@@ -826,7 +829,7 @@ export const ProcessRequestScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Confirm Transfer - for Store Incharge/Admin when request is approved */}
+      {/* Confirm Transfer - queue staff when request is approved */}
       {showConfirmTransfer && (
         <View className="bg-white border-t border-[#E2E8F0] px-4 py-3">
           <TouchableOpacity

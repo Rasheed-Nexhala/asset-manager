@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { subscribeToSiteManagers } from '../services/firebase/userRoleService';
 import { cleanupManagerAssignments } from '../store/thunks/managerValidationThunks';
-import { selectIsAuthenticated, selectIsAdmin, selectIsRoleLoaded } from '../store/selectors/authSelectors';
+import { selectIsAuthenticated, selectIsAdminOrSuperAdmin, selectIsRoleLoaded } from '../store/selectors/authSelectors';
 import type { UserListItem } from '../types/roles';
 
 /**
@@ -30,9 +30,9 @@ export const useManagerValidationSync = (): void => {
 
   // Only run for authenticated admin users
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isRoleLoaded = useAppSelector(selectIsRoleLoaded);
-  const shouldRun = isAuthenticated && isRoleLoaded && isAdmin;
+  const shouldRun = isAuthenticated && isRoleLoaded && isAdminOrSuperAdmin;
 
   /**
    * Check if a user change invalidates their manager assignment

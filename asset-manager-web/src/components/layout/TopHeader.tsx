@@ -4,11 +4,12 @@ import { companyConfig } from '../../config/company';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { signOutUser } from '../../store/slices/authSlice';
 import {
-  selectIsAdmin,
+  selectIsAdminOrSuperAdmin,
   selectIsStoreIncharge,
   selectIsSiteManager,
   selectUserId,
   selectUserRoleType,
+  selectCanViewRequestQueue,
 } from '../../store/selectors/authSelectors';
 import { selectUserDisplayName } from '../../store/selectors/authSelectors';
 import { useUnreadNotificationCount } from '../../hooks/useUnreadNotificationCount';
@@ -31,7 +32,8 @@ export function TopHeader() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
+  const canViewRequestQueue = useAppSelector(selectCanViewRequestQueue);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const isSiteManager = useAppSelector(selectIsSiteManager);
   const displayName = useAppSelector(selectUserDisplayName);
@@ -40,23 +42,28 @@ export function TopHeader() {
   const unreadCount = useUnreadNotificationCount(userId);
   const showNotifications = roleType !== 'Unassigned';
 
-  const showInventory = isAdmin || isStoreIncharge || isSiteManager;
-  const showRequests = isAdmin || isStoreIncharge || isSiteManager;
-  const showPurchaseOrders = isAdmin || isStoreIncharge;
-  const showMaintenance = isAdmin || isStoreIncharge;
+  const showInventory = isAdminOrSuperAdmin || isStoreIncharge || isSiteManager;
+  const showRequests = canViewRequestQueue || isSiteManager;
+  const showPurchaseOrders = isAdminOrSuperAdmin || isStoreIncharge;
+  const showMaintenance = isAdminOrSuperAdmin || isStoreIncharge;
 
-  const requestsTo = isAdmin || isStoreIncharge ? '/requests/queue' : '/requests/my-requests';
+  const requestsTo =
+    isSiteManager && !canViewRequestQueue
+      ? '/requests/my-requests'
+      : canViewRequestQueue
+        ? '/requests/queue'
+        : '/requests/my-requests';
 
   const navItems: NavItem[] = [
     { to: '/dashboard', label: 'Dashboard', icon: 'squares-2x2', show: true },
-    { to: '/activity', label: 'Activity Log', icon: 'document-text', show: isAdmin },
+    { to: '/activity', label: 'Activity Log', icon: 'document-text', show: isAdminOrSuperAdmin },
     { to: '/inventory', label: 'Inventory', icon: 'cube', show: showInventory },
     { to: requestsTo, label: 'Requests', icon: 'inbox', show: showRequests },
     { to: '/purchase-orders', label: 'Purchase Orders', icon: 'document-text', show: showPurchaseOrders },
     { to: '/maintenance', label: 'Maintenance', icon: 'wrench-screwdriver', show: showMaintenance },
-    { to: '/vendors', label: 'Vendors', icon: 'building-storefront', show: isAdmin },
-    { to: '/sites', label: 'Sites', icon: 'building-office-2', show: isAdmin },
-    { to: '/admin/users', label: 'Users', icon: 'users', show: isAdmin },
+    { to: '/vendors', label: 'Vendors', icon: 'building-storefront', show: isAdminOrSuperAdmin },
+    { to: '/sites', label: 'Sites', icon: 'building-office-2', show: isAdminOrSuperAdmin },
+    { to: '/admin/users', label: 'Users', icon: 'users', show: isAdminOrSuperAdmin },
     { to: '/profile', label: 'Profile', icon: 'user-circle', show: true },
   ];
 

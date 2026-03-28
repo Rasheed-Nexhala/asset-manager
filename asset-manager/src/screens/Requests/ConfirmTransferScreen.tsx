@@ -26,8 +26,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   selectUserId,
   selectUserDisplayName,
-  selectIsAdmin,
-  selectIsStoreIncharge,
+  selectCanManageRequests,
 } from '../../store/selectors/authSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
@@ -52,8 +51,7 @@ export const ConfirmTransferScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
-  const isAdmin = useAppSelector(selectIsAdmin);
-  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const canManageRequests = useAppSelector(selectCanManageRequests);
   const inventoryItems = useAppSelector(selectAllItems);
   const { viewMode } = useWeightViewPreference();
 
@@ -72,10 +70,12 @@ export const ConfirmTransferScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!isAdmin && !isStoreIncharge) {
-      Alert.alert('Access denied', 'Only Admin and Store Incharge can confirm transfers.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+    if (!canManageRequests) {
+      Alert.alert(
+        'Access denied',
+        'Only Super Admin and Store Incharge can confirm transfers.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
       setIsLoading(false);
       return;
     }
@@ -108,7 +108,7 @@ export const ConfirmTransferScreen: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [requestId, navigation, isAdmin, isStoreIncharge]);
+  }, [requestId, navigation, canManageRequests]);
 
   const validateForm = (): boolean => {
     const newErrors: { receivedByName?: string } = {};

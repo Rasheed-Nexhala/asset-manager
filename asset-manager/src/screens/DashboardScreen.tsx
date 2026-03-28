@@ -25,7 +25,9 @@ import {
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import type { RootState } from '../store';
 import {
-  selectIsAdmin,
+  selectIsAdminOrSuperAdmin,
+  selectCanManageRequests,
+  selectCanViewRequestQueue,
   selectIsStoreIncharge,
   selectIsSiteManager,
   selectUserDisplayName,
@@ -103,7 +105,9 @@ export const DashboardScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
+  const canManageRequests = useAppSelector(selectCanManageRequests);
+  const canViewRequestQueue = useAppSelector(selectCanViewRequestQueue);
   const isStoreIncharge = useAppSelector(selectIsStoreInchargeSafe);
   const isSiteManager = useAppSelector(selectIsSiteManager);
   const displayName = useAppSelector(selectUserDisplayName) ?? '';
@@ -164,13 +168,19 @@ export const DashboardScreen: React.FC = () => {
     if (!userId || roleType === 'Unassigned') return;
     setDashboardLoading(true);
     try {
-      if (isAdmin || isStoreIncharge) {
+      if (isAdminOrSuperAdmin || isStoreIncharge) {
         const poCountUrl = getPendingPOCount();
-        const pendingReqUrl = getRecentPendingRequests({}, 5);
+        const pendingReqUrl = canViewRequestQueue
+          ? getRecentPendingRequests({}, 5)
+          : Promise.resolve([]);
         // Using getDocs one-time fetch to avoid onSnapshot memory leaks
         const allItemsUrl = listItems();
 
-        const [posCount, reqs, allItems] = await Promise.all([poCountUrl, pendingReqUrl, allItemsUrl]);
+        const [posCount, reqs, allItems] = await Promise.all([
+          poCountUrl,
+          pendingReqUrl,
+          allItemsUrl,
+        ]);
 
         setPendingPOCount(posCount);
         setRecentPendingRequests(reqs.map(toPendingRequest));
@@ -192,7 +202,16 @@ export const DashboardScreen: React.FC = () => {
     } finally {
       setDashboardLoading(false);
     }
-  }, [userId, roleType, isAdmin, isStoreIncharge, isSiteManager, assignedSiteId]);
+  }, [
+    userId,
+    roleType,
+    isAdminOrSuperAdmin,
+    canManageRequests,
+    canViewRequestQueue,
+    isStoreIncharge,
+    isSiteManager,
+    assignedSiteId,
+  ]);
 
   useEffect(() => {
     if (isFocused || isRefreshing) {
@@ -292,7 +311,7 @@ export const DashboardScreen: React.FC = () => {
             accessibilityLabel: 'Notifications',
             badge: unreadCount > 0 ? unreadCount : undefined,
           },
-          ...(isAdmin
+          ...(isAdminOrSuperAdmin
             ? [
                 {
                   icon: 'people-outline' as const,
@@ -349,7 +368,7 @@ export const DashboardScreen: React.FC = () => {
             siteName={siteName ?? undefined}
           />
 
-          {isAdmin && (
+          {isAdminOrSuperAdmin && (
             <>
               <QuickStatsRow
                 stats={[
@@ -394,15 +413,20 @@ export const DashboardScreen: React.FC = () => {
                   loading={isInitialLoad || dashboardLoading}
                 />
               )}
-              {(recentPendingRequests.length > 0 || isInitialLoad || dashboardLoading) && (
-                <PendingRequestsWidget
-                  requests={recentPendingRequests}
-                  onViewAll={() => tabNav?.navigate('Requests', { screen: 'RequestQueue' })}
-                  onViewRequest={(id) => navigateToProcessRequest(id)}
-                  onApprove={(id) => navigateToProcessRequest(id)}
-                  loading={isInitialLoad || dashboardLoading}
-                />
-              )}
+              {canViewRequestQueue &&
+                (recentPendingRequests.length > 0 || isInitialLoad || dashboardLoading) && (
+                  <PendingRequestsWidget
+                    requests={recentPendingRequests}
+                    onViewAll={() => tabNav?.navigate('Requests', { screen: 'RequestQueue' })}
+                    onViewRequest={(id) => navigateToProcessRequest(id)}
+                    onApprove={
+                      canManageRequests
+                        ? (id) => navigateToProcessRequest(id)
+                        : undefined
+                    }
+                    loading={isInitialLoad || dashboardLoading}
+                  />
+                )}
               <MyRecentActivityWidget onViewAll={() => navigation.navigate('MyActivity')} />
             </>
           )}
@@ -483,7 +507,7 @@ export const DashboardScreen: React.FC = () => {
             </>
           )}
 
-          {!isAdmin && !isStoreIncharge && !isSiteManager && (
+          {!isAdminOrSuperAdmin && !isStoreIncharge && !isSiteManager && (
             <>
               {!isActive && roleType === 'Unassigned' && (
                 <View

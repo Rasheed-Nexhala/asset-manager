@@ -6,8 +6,7 @@ import { fetchItems } from '../../store/thunks/inventoryThunks';
 import {
   selectUserId,
   selectUserDisplayName,
-  selectIsAdmin,
-  selectIsStoreIncharge,
+  selectCanManageRequests,
 } from '../../store/selectors/authSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import { requestService } from '../../services/firebase/requestService';
@@ -67,8 +66,7 @@ export function ReturnItemsPage() {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
-  const isAdmin = useAppSelector(selectIsAdmin);
-  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const canManageRequests = useAppSelector(selectCanManageRequests);
   const inventoryItems = useAppSelector(selectAllItems);
   const { viewMode, toggleViewMode } = useWeightViewPreference();
 
@@ -363,7 +361,7 @@ export function ReturnItemsPage() {
                           </span>
                         </div>
                       )}
-                      {isDamaged && (isAdmin || isStoreIncharge) && (
+                      {isDamaged && canManageRequests && (
                         <div className="mt-2">
                           <QuickMoveToMaintenanceButton
                             itemId={returnedItem.itemId}

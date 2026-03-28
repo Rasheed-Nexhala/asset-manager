@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "asset-management-system-622c2"
+    "default": "asset-management-system-622c2",
+    "demo": "asset-manager-demo"
   }
 }

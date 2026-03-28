@@ -48,6 +48,8 @@ import { UpdatePasswordPage } from './pages/UpdatePasswordPage';
 import { DeleteAccountPage } from './pages/DeleteAccountPage';
 import { AdminGuard } from './components/auth/AdminGuard';
 import { AdminOrStoreInchargeGuard } from './components/auth/AdminOrStoreInchargeGuard';
+import { RequestQueueViewGuard } from './components/auth/RequestQueueViewGuard';
+import { RequestQueueStaffGuard } from './components/auth/RequestQueueStaffGuard';
 
 export const router = createBrowserRouter([
   {
@@ -111,9 +113,22 @@ export const router = createBrowserRouter([
               { path: 'purchase-orders/:poId', element: <PurchaseOrderDetailPage /> },
               { path: 'purchase-orders/:poId/approve', element: <ApprovePOPage /> },
               { path: 'purchase-orders/:poId/receive', element: <ReceivePOPage /> },
-              { path: 'requests/queue', element: <RequestQueuePage /> },
-              { path: 'requests/:requestId/reject', element: <RejectRequestPage /> },
-              { path: 'requests/:requestId/confirm-transfer', element: <ConfirmTransferPage /> },
+              {
+                element: <RequestQueueViewGuard />,
+                children: [
+                  { path: 'requests/queue', element: <RequestQueuePage /> },
+                  {
+                    element: <RequestQueueStaffGuard />,
+                    children: [
+                      { path: 'requests/:requestId/reject', element: <RejectRequestPage /> },
+                      {
+                        path: 'requests/:requestId/confirm-transfer',
+                        element: <ConfirmTransferPage />,
+                      },
+                    ],
+                  },
+                ],
+              },
               { path: 'maintenance', element: <MaintenancePage /> },
               { path: 'maintenance/add', element: <AddToMaintenancePage /> },
               { path: 'maintenance/written-off', element: <MaintenancePage /> },

@@ -21,7 +21,7 @@ import {
   selectItemsLoadingMore,
   selectFilteredAndSearchedItems,
 } from '../../store/selectors/inventorySelectors';
-import { selectIsAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
+import { selectIsAdminOrSuperAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
 import { useInventoryError } from '../../hooks/useInventoryError';
 import { subscribeCategories } from '../../services/firebase/categoryService';
 import { countLowStockItems } from '../../services/firebase/inventoryService';
@@ -72,7 +72,7 @@ export function CentralStoreInventoryPage() {
   const hasMore = useAppSelector(selectItemsHasMore);
   const loadingMore = useAppSelector(selectItemsLoadingMore);
   const error = useInventoryError();
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
 
   useEffect(() => {
@@ -282,7 +282,7 @@ export function CentralStoreInventoryPage() {
             {showMoreMenu && (
               <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-lg border border-slate-200 bg-white py-2 shadow-lg hidden md:block">
                 <MoreOptionsMenuItems
-                  isAdmin={isAdmin}
+                  isAdminOrSuperAdmin={isAdminOrSuperAdmin}
                   isStoreIncharge={isStoreIncharge}
                   onClose={() => setShowMoreMenu(false)}
                   onInventoryUpdateRequests={handleInventoryUpdateRequests}
@@ -547,7 +547,7 @@ export function CentralStoreInventoryPage() {
             <div className="w-10 h-1 bg-slate-300 rounded-full self-center mb-4 md:hidden" />
             <h2 className="text-[22px] font-semibold text-slate-900 mb-4 px-2">More Options</h2>
             <MoreOptionsMenuItems
-              isAdmin={isAdmin}
+              isAdminOrSuperAdmin={isAdminOrSuperAdmin}
               isStoreIncharge={isStoreIncharge}
               onClose={() => setShowMoreMenu(false)}
               onInventoryUpdateRequests={handleInventoryUpdateRequests}
@@ -565,7 +565,7 @@ export function CentralStoreInventoryPage() {
 }
 
 function MoreOptionsMenuItems({
-  isAdmin,
+  isAdminOrSuperAdmin,
   isStoreIncharge,
   onClose,
   onInventoryUpdateRequests,
@@ -574,7 +574,7 @@ function MoreOptionsMenuItems({
   onCategoryManagement,
   variant = 'full',
 }: {
-  isAdmin: boolean;
+  isAdminOrSuperAdmin: boolean;
   isStoreIncharge: boolean;
   onClose: () => void;
   onInventoryUpdateRequests: () => void;
@@ -591,7 +591,7 @@ function MoreOptionsMenuItems({
 
   return (
     <div className={variant === 'compact' ? 'flex flex-col' : 'flex flex-col gap-2'}>
-      {isAdmin && (
+      {isAdminOrSuperAdmin && (
         <button
           type="button"
           onClick={() => {
@@ -604,7 +604,7 @@ function MoreOptionsMenuItems({
           <span className="text-[15px] font-medium text-slate-900">Inventory Update Requests</span>
         </button>
       )}
-      {(isAdmin || isStoreIncharge) && (
+      {(isAdminOrSuperAdmin || isStoreIncharge) && (
         <button
           type="button"
           onClick={() => {

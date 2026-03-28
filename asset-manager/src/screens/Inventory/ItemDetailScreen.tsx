@@ -20,7 +20,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchItemById, adjustQuantity, deleteItem } from '../../store/thunks/inventoryThunks';
 import { createInventoryUpdateRequest } from '../../store/thunks/inventoryUpdateRequestThunks';
 import { selectItemById, selectItemsLoading, selectItemsError } from '../../store/selectors/inventorySelectors';
-import { selectIsAdmin, selectIsStoreIncharge, selectRoleLoading, selectIsRoleLoaded } from '../../store/selectors/authSelectors';
+import { selectIsAdminOrSuperAdmin, selectIsStoreIncharge, selectRoleLoading, selectIsRoleLoaded } from '../../store/selectors/authSelectors';
 import { selectCanStoreInchargeAdjustInventory, selectMyAccessGrantedUntil } from '../../store/selectors/inventoryUpdateRequestSelectors';
 import { updateItemInState, clearError } from '../../store/slices/inventorySlice';
 import { subscribeItemById, subscribeInventoryByItemId } from '../../services/firebase/inventoryService';
@@ -130,11 +130,11 @@ export const ItemDetailScreen: React.FC = () => {
   const item = useAppSelector((state) => selectItemById(itemId)(state));
   const isLoading = useAppSelector(selectItemsLoading);
   const error = useAppSelector(selectItemsError);
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const isRoleLoading = useAppSelector(selectRoleLoading);
   const isRoleLoaded = useAppSelector(selectIsRoleLoaded);
-  const canEditItem = isAdmin || isStoreIncharge;
+  const canEditItem = isAdminOrSuperAdmin || isStoreIncharge;
   const canStoreInchargeAdjustBase = useAppSelector(selectCanStoreInchargeAdjustInventory);
   const canStoreInchargeAdjust = canStoreInchargeAdjustBase || item?.type === 'fuel';
   const isAdjustmentSectionReady = isRoleLoaded && !isRoleLoading;
@@ -444,7 +444,7 @@ export const ItemDetailScreen: React.FC = () => {
             )}
 
             {/* Standard Price & GST - visible only to Admin and Store Incharge */}
-            {(isAdmin || isStoreIncharge) && (
+            {(isAdminOrSuperAdmin || isStoreIncharge) && (
               <>
                 <View className="flex-row justify-between items-center">
                   <Text className="text-[13px] text-[#64748B]">Standard Unit Price</Text>
@@ -669,7 +669,7 @@ export const ItemDetailScreen: React.FC = () => {
             <Text className="text-[13px] text-[#64748B] mt-2">Loading permissions…</Text>
           </View>
         )}
-        {isAdjustmentSectionReady && (isAdmin || (isStoreIncharge && canStoreInchargeAdjust)) && (
+        {isAdjustmentSectionReady && (isAdminOrSuperAdmin || (isStoreIncharge && canStoreInchargeAdjust)) && (
           <View className="mb-3 bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
             <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">Stock Actions</Text>
             {myAccessGrantedUntil && (
@@ -732,7 +732,7 @@ export const ItemDetailScreen: React.FC = () => {
         )}
 
         {/* Edit Item only when can edit but no stock adjustment access (e.g. Store Incharge without approval) */}
-        {isAdjustmentSectionReady && canEditItem && !(isAdmin || (isStoreIncharge && canStoreInchargeAdjust)) && (
+        {isAdjustmentSectionReady && canEditItem && !(isAdminOrSuperAdmin || (isStoreIncharge && canStoreInchargeAdjust)) && (
           <View className="mb-6 bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
             <TouchableOpacity
               className="border-[1.5px] border-[#1E40AF] rounded-[10px] min-h-[50px] items-center justify-center flex-row gap-2"

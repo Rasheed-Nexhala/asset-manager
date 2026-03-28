@@ -258,7 +258,7 @@ export const CreateSiteTransferRequestScreen: React.FC = () => {
             <View className="flex-row items-start gap-2">
               <Ionicons name="information-circle-outline" size={18} color="#64748B" />
               <Text className="text-[13px] text-[#64748B] flex-1 leading-5">
-                This request will be reviewed by the Store Incharge or Admin. Once approved and confirmed, the item will be moved from {sourceSiteName} to {destinationSiteName}.
+                This request will be reviewed by the Store Incharge or Super Admin. Once approved and confirmed, the item will be moved from {sourceSiteName} to {destinationSiteName}.
               </Text>
             </View>
           </View>

@@ -28,6 +28,17 @@ export function UsersPage() {
   const currentUserId = useAppSelector(selectUserId);
   const isCurrentUserSuperAdmin = useAppSelector(selectIsSuperAdmin);
 
+  const assignableRoleOptions = useMemo(
+    () =>
+      isCurrentUserSuperAdmin
+        ? [
+            ...ROLE_OPTIONS,
+            { value: 'SuperAdmin' as UserRole, label: 'Super Admin' },
+          ]
+        : ROLE_OPTIONS,
+    [isCurrentUserSuperAdmin]
+  );
+
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +101,8 @@ export function UsersPage() {
   const isUserReadOnly = useCallback(
     (user: UserListItem) =>
       user.isDeleted === true ||
-      (user.role === 'Admin' && !isCurrentUserSuperAdmin) ||
+      ((user.role === 'Admin' || user.role === 'SuperAdmin') &&
+        !isCurrentUserSuperAdmin) ||
       (user.id === currentUserId && isCurrentUserSuperAdmin),
     [isCurrentUserSuperAdmin, currentUserId]
   );
@@ -513,7 +525,7 @@ export function UsersPage() {
               Select Role
             </h2>
             <div className="space-y-2">
-              {ROLE_OPTIONS.map((option) => (
+              {assignableRoleOptions.map((option) => (
                 <button
                   key={option.value}
                   type="button"

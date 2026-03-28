@@ -262,10 +262,9 @@ const superAdminPreloadedState: Partial<RootState> = {
   auth: {
     ...defaultPreloadedState.auth!,
     userRole: {
-      role: 'Admin',
+      role: 'SuperAdmin',
       isActive: true,
       permissions: [],
-      isSuperadmin: true,
     },
   },
 };

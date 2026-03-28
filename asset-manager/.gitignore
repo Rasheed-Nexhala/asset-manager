@@ -33,7 +33,8 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files (use `.env.example`; set EXPO_PUBLIC_FIREBASE_ENV there)
+.env
 .env*.local
 
 # typescript

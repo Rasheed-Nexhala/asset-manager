@@ -6,8 +6,7 @@ import { fetchItems } from '../../store/thunks/inventoryThunks';
 import {
   selectUserId,
   selectUserDisplayName,
-  selectIsStoreIncharge,
-  selectIsAdmin,
+  selectCanManageRequests,
 } from '../../store/selectors/authSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import { selectRequestById } from '../../store/selectors/requestSelectors';
@@ -68,8 +67,7 @@ export function ProcessRequestPage() {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
-  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const canManageRequests = useAppSelector(selectCanManageRequests);
   const inventoryItems = useAppSelector(selectAllItems);
   const requestFromStore = useAppSelector(
     selectRequestById(requestId ?? '')
@@ -93,7 +91,7 @@ export function ProcessRequestPage() {
   const [retryKey, setRetryKey] = useState(0);
   const [slipPrinting, setSlipPrinting] = useState(false);
 
-  const canProcess = isStoreIncharge || isAdmin;
+  const canProcess = canManageRequests;
   const allSufficient =
     availability.length > 0 &&
     availability.every((a) => {
@@ -411,6 +409,11 @@ export function ProcessRequestPage() {
     priorityConfig[request.priority as keyof typeof priorityConfig] ??
     priorityConfig.medium;
 
+  const requestScreenTitle =
+    request.status === 'rejected' || request.status === 'transferred'
+      ? 'View Request'
+      : 'Process Request';
+
   return (
     <div className="flex flex-col h-full">
       <header className="flex items-center gap-4 pb-4">
@@ -423,7 +426,7 @@ export function ProcessRequestPage() {
           <Icon name="arrow-left" className="h-6 w-6" />
         </button>
         <h1 className="text-[22px] font-semibold text-slate-900">
-          Process Request
+          {requestScreenTitle}
         </h1>
       </header>
 

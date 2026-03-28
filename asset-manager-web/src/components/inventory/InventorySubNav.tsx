@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAppSelector } from '../../store/hooks';
-import { selectIsAdmin, selectIsStoreIncharge, selectIsSiteManager } from '../../store/selectors/authSelectors';
+import { selectIsAdminOrSuperAdmin, selectIsStoreIncharge, selectIsSiteManager } from '../../store/selectors/authSelectors';
 import { Icon } from '../shared/Icon';
 import { clsx } from 'clsx';
 
@@ -12,11 +12,17 @@ const allTabs = [
 ];
 
 export function InventorySubNav() {
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const isSiteManager = useAppSelector(selectIsSiteManager);
 
-  const role = isAdmin ? 'Admin' : isStoreIncharge ? 'StoreIncharge' : isSiteManager ? 'SiteManager' : null;
+  const role = isSiteManager
+    ? 'SiteManager'
+    : isStoreIncharge
+      ? 'StoreIncharge'
+      : isAdminOrSuperAdmin
+        ? 'Admin'
+        : null;
   const tabs = role
     ? allTabs.filter((tab) => (tab.roles as readonly string[]).includes(role))
     : allTabs.filter((t) => (t.roles as readonly string[]).includes('SiteManager'));

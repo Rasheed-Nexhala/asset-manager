@@ -15,7 +15,7 @@ export interface PendingRequest {
 export interface PendingRequestsWidgetProps {
   requests: PendingRequest[];
   onViewAll: () => void;
-  /** When true, shows the Approve button (Admin/StoreIncharge). When false, only View is shown (SiteManager). */
+  /** When true, shows the Approve button (queue staff: Store Incharge / Super Admin). */
   showApprove?: boolean;
   loading?: boolean;
 }

@@ -9,10 +9,11 @@ import { RequestStackNavigator } from './RequestStackNavigator';
 import { PurchaseOrderStackNavigator } from './PurchaseOrderStackNavigator';
 import { useAppSelector } from '../store/hooks';
 import {
-  selectIsAdmin,
+  selectIsAdminOrSuperAdmin,
   selectIsStoreIncharge,
   selectIsSiteManager,
-  selectIsSuperAdmin,
+  selectCanManageRequests,
+  selectCanViewRequestQueue,
 } from '../store/selectors/authSelectors';
 import { selectPendingRequestsCount } from '../store/selectors/requestSelectors';
 import { selectPendingApprovalCount } from '../store/selectors/purchaseOrderSelectors';
@@ -36,28 +37,34 @@ const TAB_BAR_MIN_BOTTOM_PADDING = 12;
 export const BottomTabNavigator: React.FC = () => {
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, TAB_BAR_MIN_BOTTOM_PADDING);
-  const isAdmin = useAppSelector(selectIsAdmin);
-  const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
+  const canManageRequests = useAppSelector(selectCanManageRequests);
+  const canViewRequestQueue = useAppSelector(selectCanViewRequestQueue);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const isSiteManager = useAppSelector(selectIsSiteManager);
   const pendingRequestsCount = useAppSelector(selectPendingRequestsCount);
   const pendingApprovalCount = useAppSelector(selectPendingApprovalCount);
 
-  // Purchase Orders tab is visible to Admin and StoreIncharge only
-  const showPurchaseOrdersTab = isAdmin || isStoreIncharge;
+  // Purchase Orders tab is visible to Admin, SuperAdmin, and StoreIncharge
+  const showPurchaseOrdersTab = isAdminOrSuperAdmin || isStoreIncharge;
 
-  // Inventory tab is visible to Admin, StoreIncharge, and SiteManager
-  const showInventoryTab = isAdmin || isStoreIncharge || isSiteManager;
+  // Inventory tab is visible to Admin, SuperAdmin, StoreIncharge, and SiteManager
+  const showInventoryTab = isAdminOrSuperAdmin || isStoreIncharge || isSiteManager;
 
-  // Requests tab is visible to Admin, StoreIncharge, and SiteManager
-  const showRequestsTab = isAdmin || isStoreIncharge || isSiteManager;
+  // Requests tab: queue viewers (incl. read-only Admin) and Site Managers
+  const showRequestsTab = canViewRequestQueue || isSiteManager;
 
   // Initial screen for Requests stack (role-based)
-  const requestsInitialScreen = isAdmin || isStoreIncharge ? 'RequestQueue' : 'MyRequests';
+  const requestsInitialScreen =
+    isSiteManager && !canViewRequestQueue
+      ? 'MyRequests'
+      : canViewRequestQueue
+        ? 'RequestQueue'
+        : 'MyRequests';
 
   // Initial screen for Inventory stack (role-based)
   const inventoryInitialScreen =
-    isAdmin || isStoreIncharge ? 'CentralStoreInventory' : 'MySiteInventory';
+    isAdminOrSuperAdmin || isStoreIncharge ? 'CentralStoreInventory' : 'MySiteInventory';
 
   // When Requests tab is pressed, pop to initial screen so user always sees RequestQueue/MyRequests
   const requestsTabListeners = useCallback(
@@ -190,14 +197,14 @@ export const BottomTabNavigator: React.FC = () => {
             ),
             tabBarLabel: 'Purchase',
             tabBarBadge:
-              (isAdmin || isSuperAdmin) && pendingApprovalCount > 0
+              isAdminOrSuperAdmin && pendingApprovalCount > 0
                 ? pendingApprovalCount
                 : undefined,
           }}
           listeners={purchaseOrdersTabListeners}
         />
       )}
-      {isAdmin && (
+      {isAdminOrSuperAdmin && (
         <Tab.Screen
           name="Sites"
           component={SiteStackNavigator}

@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAppSelector } from '../../store/hooks';
-import { selectIsAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
+import { selectIsAdminOrSuperAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
 import { MySiteInventoryPage } from './MySiteInventoryPage';
 
 /**
@@ -10,10 +10,10 @@ import { MySiteInventoryPage } from './MySiteInventoryPage';
  */
 export function InventoryLandingPage() {
   const location = useLocation();
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
 
-  if (isAdmin || isStoreIncharge) {
+  if (isAdminOrSuperAdmin || isStoreIncharge) {
     const search = location.search || '';
     return <Navigate to={`/inventory/central${search}`} replace />;
   }

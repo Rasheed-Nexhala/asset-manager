@@ -2,7 +2,7 @@ import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useAppSelector } from '../store/hooks';
 import {
-  selectIsAdmin,
+  selectIsAdminOrSuperAdmin,
   selectIsStoreIncharge,
   selectIsSiteManager,
 } from '../store/selectors/authSelectors';
@@ -58,13 +58,13 @@ const Stack = createStackNavigator<InventoryStackParamList>();
  * - SiteManager → MySiteInventory
  */
 export const InventoryStackNavigator: React.FC = () => {
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const isSiteManager = useAppSelector(selectIsSiteManager);
 
   // Determine initial route based on role
   const initialRouteName: keyof InventoryStackParamList = 
-    isAdmin || isStoreIncharge 
+    isAdminOrSuperAdmin || isStoreIncharge 
       ? 'CentralStoreInventory' 
       : isSiteManager 
         ? 'MySiteInventory' 
@@ -78,7 +78,7 @@ export const InventoryStackNavigator: React.FC = () => {
       }}
     >
       {/* Central Store screens - visible to Admin and StoreIncharge */}
-      {(isAdmin || isStoreIncharge) && (
+      {(isAdminOrSuperAdmin || isStoreIncharge) && (
         <>
           <Stack.Screen 
             name="CentralStoreInventory" 

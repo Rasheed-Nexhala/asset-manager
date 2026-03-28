@@ -119,7 +119,7 @@ const fetchPoUserFlags = async (
   const data = userSnap.data();
   return {
     role: data?.role as string | undefined,
-    isSuperAdmin: data?.isSuperadmin === true,
+    isSuperAdmin: data?.role === 'SuperAdmin',
   };
 };
 
@@ -153,8 +153,8 @@ const ensureCanReceive = async (userId: string): Promise<void> => {
     throw new Error('User not found');
   }
   const role = userSnap.data()?.role;
-  if (role !== 'Admin' && role !== 'StoreIncharge') {
-    throw new Error('Only Admin or Store Incharge can receive POs');
+  if (role !== 'Admin' && role !== 'StoreIncharge' && role !== 'SuperAdmin') {
+    throw new Error('Only Admin, Super Admin, or Store Incharge can receive POs');
   }
 };
 

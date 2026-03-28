@@ -1,6 +1,9 @@
 import {
   selectUserId,
   selectIsAdmin,
+  selectIsSuperAdmin,
+  selectIsAdminOrSuperAdmin,
+  selectCanManageRequests,
   selectIsStoreIncharge,
   selectIsSiteManager,
   selectUserDisplayName,
@@ -110,14 +113,72 @@ describe('authSelectors', () => {
     expect(selectCanCreatePurchaseOrder(state)).toBe(true);
   });
 
-  it('selectCanCreatePurchaseOrder is true for super admin', () => {
+  it('selectIsSuperAdmin is true for SuperAdmin role', () => {
     const state = createMockState({
-      userRole: {
-        role: 'Admin',
-        isActive: true,
-        permissions: [],
-        isSuperadmin: true,
-      },
+      userRole: { role: 'SuperAdmin', isActive: true, permissions: [] },
+    });
+    expect(selectIsSuperAdmin(state)).toBe(true);
+    expect(selectIsAdmin(state)).toBe(false);
+  });
+
+  it('selectIsAdminOrSuperAdmin is true for Admin and SuperAdmin', () => {
+    expect(
+      selectIsAdminOrSuperAdmin(
+        createMockState({
+          userRole: { role: 'Admin', isActive: true, permissions: [] },
+        })
+      )
+    ).toBe(true);
+    expect(
+      selectIsAdminOrSuperAdmin(
+        createMockState({
+          userRole: { role: 'SuperAdmin', isActive: true, permissions: [] },
+        })
+      )
+    ).toBe(true);
+    expect(
+      selectIsAdminOrSuperAdmin(
+        createMockState({
+          userRole: { role: 'StoreIncharge', isActive: true, permissions: [] },
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('selectCanManageRequests is true for StoreIncharge and SuperAdmin only', () => {
+    expect(
+      selectCanManageRequests(
+        createMockState({
+          userRole: { role: 'Admin', isActive: true, permissions: [] },
+        })
+      )
+    ).toBe(false);
+    expect(
+      selectCanManageRequests(
+        createMockState({
+          userRole: { role: 'StoreIncharge', isActive: true, permissions: [] },
+        })
+      )
+    ).toBe(true);
+    expect(
+      selectCanManageRequests(
+        createMockState({
+          userRole: { role: 'SuperAdmin', isActive: true, permissions: [] },
+        })
+      )
+    ).toBe(true);
+    expect(
+      selectCanManageRequests(
+        createMockState({
+          userRole: { role: 'SiteManager', isActive: true, permissions: [] },
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('selectCanCreatePurchaseOrder is true for SuperAdmin role', () => {
+    const state = createMockState({
+      userRole: { role: 'SuperAdmin', isActive: true, permissions: [] },
     });
     expect(selectCanCreatePurchaseOrder(state)).toBe(true);
   });

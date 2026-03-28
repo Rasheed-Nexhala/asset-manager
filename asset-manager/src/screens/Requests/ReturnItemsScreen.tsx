@@ -24,8 +24,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   selectUserId,
   selectUserDisplayName,
-  selectIsAdmin,
-  selectIsStoreIncharge,
+  selectCanManageRequests,
 } from '../../store/selectors/authSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
@@ -67,8 +66,7 @@ export const ReturnItemsScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
-  const isAdmin = useAppSelector(selectIsAdmin);
-  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const canManageRequests = useAppSelector(selectCanManageRequests);
   const inventoryItems = useAppSelector(selectAllItems);
   const { viewMode, toggleViewMode } = useWeightViewPreference();
 
@@ -344,7 +342,7 @@ export const ReturnItemsScreen: React.FC = () => {
                             </Text>
                           </View>
                         )}
-                        {isDamaged && (isAdmin || isStoreIncharge) && (
+                        {isDamaged && canManageRequests && (
                           <View className="mt-2">
                             <QuickMoveToMaintenanceButton
                               itemId={returnedItem.itemId}

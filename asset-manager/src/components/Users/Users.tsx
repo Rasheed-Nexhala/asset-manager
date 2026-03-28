@@ -62,6 +62,17 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
   const onLoadingChangeRef = useRef(onLoadingChange);
   onLoadingChangeRef.current = onLoadingChange;
 
+  const assignableRoleOptions = useMemo(
+    () =>
+      isCurrentUserSuperAdmin
+        ? [
+            ...ROLE_OPTIONS,
+            { value: 'SuperAdmin' as UserRole, label: 'Super Admin' },
+          ]
+        : ROLE_OPTIONS,
+    [isCurrentUserSuperAdmin]
+  );
+
   /**
    * Set up real-time listener for all users
    */
@@ -145,10 +156,11 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
   );
 
   /**
-   * Check if the target user is an Admin (regular admins cannot update other admins; super admins can)
+   * Admin or SuperAdmin row — only a SuperAdmin may edit these users.
    */
   const isTargetUserAdmin = useCallback(
-    (user: UserListItem) => user.role === 'Admin',
+    (user: UserListItem) =>
+      user.role === 'Admin' || user.role === 'SuperAdmin',
     []
   );
 
@@ -458,7 +470,7 @@ export const Users: React.FC<UsersProps> = ({ onLoadingChange }) => {
 
           {/* Role Options */}
           <View className="gap-2">
-            {ROLE_OPTIONS.map((option) => (
+            {assignableRoleOptions.map((option) => (
               <TouchableOpacity
                 key={option.value}
                 className={`border border-[#E2E8F0] rounded-lg h-12 px-4 flex-row items-center justify-between ${

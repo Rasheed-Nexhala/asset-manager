@@ -28,7 +28,7 @@ import { selectMaintenanceById } from '../../store/selectors/maintenanceSelector
 import {
   selectUserId,
   selectUserDisplayName,
-  selectIsAdmin,
+  selectIsAdminOrSuperAdmin,
   selectIsStoreIncharge,
 } from '../../store/selectors/authSelectors';
 import { selectCanStoreInchargeMaintenanceWriteOff } from '../../store/selectors/inventoryUpdateRequestSelectors';
@@ -59,12 +59,13 @@ export const WriteOffScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const canWriteOffAccess = useAppSelector(selectCanStoreInchargeMaintenanceWriteOff);
   const maintenance = useAppSelector((state) => selectMaintenanceById(maintenanceId)(state));
 
-  const canPerformWriteOff = isAdmin || (isStoreIncharge && canWriteOffAccess);
+  const canPerformWriteOff =
+    isAdminOrSuperAdmin || (isStoreIncharge && canWriteOffAccess);
 
   const [writeOffQuantity, setWriteOffQuantity] = useState<number>(1);
   const [reason, setReason] = useState<WriteOffReason | null>(null);

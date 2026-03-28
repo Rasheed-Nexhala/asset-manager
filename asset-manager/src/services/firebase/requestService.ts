@@ -1103,7 +1103,7 @@ const buildRequestQueryConstraints = (filters?: RequestListFilters): QueryConstr
   if (filters?.userId) {
     constraints.push(where('requestedBy', '==', filters.userId));
   } else {
-    // Queue: exclude drafts (Store Incharge/Admin never see drafts)
+    // Queue: exclude drafts (queue staff never see drafts)
     if (filters?.status && filters.status !== 'all') {
       constraints.push(where('status', '==', filters.status));
     } else {
@@ -1282,7 +1282,7 @@ export const subscribeToRequests = (
 
         // Drafts: only visible to the site manager who created them.
         // When userId is provided (My Requests), show all including drafts.
-        // When userId is NOT provided (Request Queue for Store Incharge/Admin), exclude drafts.
+        // When userId is NOT provided (Request Queue for Store Incharge / Super Admin), exclude drafts.
         if (!filters.userId) {
           requests = requests.filter((r) => r.status !== 'draft');
         }

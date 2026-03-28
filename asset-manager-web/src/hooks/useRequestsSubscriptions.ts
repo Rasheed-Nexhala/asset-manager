@@ -15,7 +15,7 @@ import { selectRequestsFilters } from '../store/selectors/requestSelectors';
 import { selectUserId } from '../store/selectors/authSelectors';
 
 /**
- * Subscribe to requests for Request Queue (Admin/StoreIncharge).
+ * Subscribe to requests for Request Queue (Store Incharge / Super Admin).
  */
 export function useRequestQueueSubscription() {
   const dispatch = useAppDispatch();

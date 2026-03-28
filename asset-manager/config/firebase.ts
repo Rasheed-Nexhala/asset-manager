@@ -16,21 +16,32 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * This config uses the Firebase Web SDK (not @react-native-firebase).
  * Works in Expo Go, web builds, and native builds.
  *
+ * Override via Expo public env: `EXPO_PUBLIC_FIREBASE_*` (see `.env.example`).
+ * Copy `.env.demo` to `.env` to use the demo Firebase project.
+ *
  * Auth persistence:
  * - React Native (iOS/Android): AsyncStorage — user stays logged in until sign out
  * - Web: browserLocalPersistence — session persists in browser storage
- *
- * Values are extracted from google-services.json and GoogleService-Info.plist.
- * For production, consider using environment variables for sensitive data.
  */
 const firebaseConfig = {
-  apiKey: "AIzaSyCSd424s9bpQQSK0FFcBP7VQ6wRYVZ8GeE",
-  authDomain: "asset-management-system-622c2.firebaseapp.com",
-  projectId: "asset-management-system-622c2",
-  storageBucket: "asset-management-system-622c2.firebasestorage.app",
-  messagingSenderId: "145560718311",
-  appId: "1:145560718311:web:cc34b1747f5bffe5bb0b42",
-  measurementId: "G-RY22WQBVXZ"
+  apiKey:
+    process.env.EXPO_PUBLIC_FIREBASE_API_KEY ??
+    'AIzaSyCSd424s9bpQQSK0FFcBP7VQ6wRYVZ8GeE',
+  authDomain:
+    process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ??
+    'asset-management-system-622c2.firebaseapp.com',
+  projectId:
+    process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? 'asset-management-system-622c2',
+  storageBucket:
+    process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ??
+    'asset-management-system-622c2.firebasestorage.app',
+  messagingSenderId:
+    process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? '145560718311',
+  appId:
+    process.env.EXPO_PUBLIC_FIREBASE_APP_ID ??
+    '1:145560718311:web:cc34b1747f5bffe5bb0b42',
+  measurementId:
+    process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID ?? 'G-RY22WQBVXZ',
 };
 
 // Initialize Firebase
@@ -49,7 +60,11 @@ export const auth = initializeAuth(app, {
 });
 export const db = getFirestore(app);
 export const storage = getStorage(app);
-export const functions = getFunctions(app);
+
+const functionsRegion = process.env.EXPO_PUBLIC_FIREBASE_FUNCTIONS_REGION?.trim();
+export const functions = functionsRegion
+  ? getFunctions(app, functionsRegion)
+  : getFunctions(app);
 
 // if (__DEV__) {
 //   const host = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';

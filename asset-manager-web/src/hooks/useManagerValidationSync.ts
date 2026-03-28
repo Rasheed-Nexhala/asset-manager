@@ -4,7 +4,7 @@ import { subscribeToSiteManagers } from '../services/firebase/userRoleService';
 import { cleanupManagerAssignments } from '../store/thunks/managerValidationThunks';
 import {
   selectIsAuthenticated,
-  selectIsAdmin,
+  selectIsAdminOrSuperAdmin,
   selectIsRoleLoaded,
 } from '../store/selectors/authSelectors';
 import type { UserListItem } from '../types/roles';
@@ -20,9 +20,9 @@ export const useManagerValidationSync = (): void => {
   const pendingCleanupsRef = useRef<Set<string>>(new Set());
 
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isRoleLoaded = useAppSelector(selectIsRoleLoaded);
-  const shouldRun = isAuthenticated && isRoleLoaded && isAdmin;
+  const shouldRun = isAuthenticated && isRoleLoaded && isAdminOrSuperAdmin;
 
   const checkManagerInvalidation = useCallback(
     (prevUser: UserListItem | undefined, currentUser: UserListItem | undefined): boolean => {

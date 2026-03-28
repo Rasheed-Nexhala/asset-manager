@@ -3,27 +3,23 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAppSelector } from '../../store/hooks';
 import {
   selectIsAuthenticated,
-  selectIsAdmin,
+  selectIsAdminOrSuperAdmin,
   selectIsStoreIncharge,
   selectRoleLoading,
 } from '../../store/selectors/authSelectors';
 import { LoadingSpinner } from '../shared/LoadingSpinner';
 
 /**
- * Protects routes that require Admin or StoreIncharge role.
- * Used for: Maintenance, Vendors (via PO stack), Purchase Orders, Request Queue, etc.
- * - If not authenticated: redirects to /login
- * - If authenticated but not Admin/StoreIncharge: redirects to /dashboard
- * - If role still loading: shows full-screen spinner
- * - Otherwise: renders child routes via <Outlet />
+ * Central-ops routes: Admin, SuperAdmin, or Store Incharge (inventory central, vendors, PO list, maintenance).
+ * Request queue / approval uses {@link RequestQueueStaffGuard} instead (Store Incharge + SuperAdmin only).
  */
 export function AdminOrStoreInchargeGuard(): ReactNode {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const isRoleLoading = useAppSelector(selectRoleLoading);
 
-  const hasAccess = isAdmin || isStoreIncharge;
+  const hasAccess = isAdminOrSuperAdmin || isStoreIncharge;
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;

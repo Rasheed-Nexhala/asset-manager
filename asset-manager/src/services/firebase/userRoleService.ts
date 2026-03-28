@@ -34,7 +34,6 @@ export const getUserRole = async (userId: string): Promise<UserRoleData | null> 
       role: data.role as UserRole,
       isActive: data.isActive ?? false,
       permissions: Array.isArray(data.permissions) ? data.permissions : [],
-      isSuperadmin: data.isSuperadmin ?? false,
     };
   } catch (error) {
     console.error('Error getting user role:', error);
@@ -77,7 +76,6 @@ export const createDefaultUserDocument = async (
     role: 'Unassigned', // Default role for new users
     isActive: true, // New signups can use the app immediately; admins can deactivate if needed
     permissions: [],
-    isSuperadmin: false, // Set manually in Firestore for designated super admins
   };
   
   try {
@@ -202,7 +200,6 @@ export const getAllUsers = async (): Promise<UserListItem[]> => {
         isActive: data.isActive ?? false,
         permissions: Array.isArray(data.permissions) ? data.permissions : [],
         isDeleted: data.isDeleted ?? false,
-        isSuperadmin: data.isSuperadmin ?? false,
       });
     });
     
@@ -219,7 +216,10 @@ export const getAllUsers = async (): Promise<UserListItem[]> => {
 export const getAdminUsers = async (): Promise<UserListItem[]> => {
   const users = await getAllUsers();
   return users.filter(
-    (u) => u.role === 'Admin' && u.isActive && !u.isDeleted
+    (u) =>
+      (u.role === 'Admin' || u.role === 'SuperAdmin') &&
+      u.isActive &&
+      !u.isDeleted
   );
 };
 
@@ -250,7 +250,6 @@ export const subscribeToUserRole = (
         role: data.role as UserRole,
         isActive: data.isActive ?? false,
         permissions: Array.isArray(data.permissions) ? data.permissions : [],
-        isSuperadmin: data.isSuperadmin ?? false,
       });
     },
     (error) => {
@@ -287,7 +286,6 @@ export const subscribeToAllUsers = (
           isActive: data.isActive ?? false,
           permissions: Array.isArray(data.permissions) ? data.permissions : [],
           isDeleted: data.isDeleted ?? false,
-          isSuperadmin: data.isSuperadmin ?? false,
         });
       });
 
@@ -326,7 +324,6 @@ export const subscribeToSiteManagers = (
           isActive: data.isActive ?? false,
           permissions: Array.isArray(data.permissions) ? data.permissions : [],
           isDeleted: data.isDeleted ?? false,
-          isSuperadmin: data.isSuperadmin ?? false,
         });
       });
 

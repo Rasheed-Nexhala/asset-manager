@@ -96,7 +96,11 @@ export async function getAdminAndStoreInchargeTokens(
   for (const doc of snapshot.docs) {
     if (excludeUserId && doc.id === excludeUserId) continue;
     const role = doc.data()?.role as string | undefined;
-    if (role === 'Admin' || role === 'StoreIncharge') {
+    if (
+      role === 'Admin' ||
+      role === 'SuperAdmin' ||
+      role === 'StoreIncharge'
+    ) {
       const tokens = await getUserPushTokens(doc.id, type);
       all.push(...tokens);
     }
@@ -120,7 +124,11 @@ export async function getAdminAndStoreInchargeUserIds(
   for (const doc of snapshot.docs) {
     if (excludeUserId && doc.id === excludeUserId) continue;
     const role = doc.data()?.role as string | undefined;
-    if (role === 'Admin' || role === 'StoreIncharge') {
+    if (
+      role === 'Admin' ||
+      role === 'SuperAdmin' ||
+      role === 'StoreIncharge'
+    ) {
       ids.push(doc.id);
     }
   }
@@ -128,8 +136,55 @@ export async function getAdminAndStoreInchargeUserIds(
 }
 
 /**
- * Returns deduplicated Expo push tokens for all active Admin users only.
- * Use when Store Incharge creates something that only Admin should be notified about
+ * Expo push tokens for operational request-queue alerts (new request, items returned).
+ * Store Incharge only — not Admin or SuperAdmin (SuperAdmin still gets in-app via getRequestQueueStaffInAppUserIds).
+ */
+export async function getRequestAlertPushTokens(
+  type: NotificationPrefType,
+  excludeUserId?: string
+): Promise<string[]> {
+  const snapshot = await db
+    .collection('users')
+    .where('isActive', '==', true)
+    .get();
+
+  const all: string[] = [];
+  for (const doc of snapshot.docs) {
+    if (excludeUserId && doc.id === excludeUserId) continue;
+    const role = doc.data()?.role as string | undefined;
+    if (role === 'StoreIncharge') {
+      const tokens = await getUserPushTokens(doc.id, type);
+      all.push(...tokens);
+    }
+  }
+  return [...new Set(all)];
+}
+
+/**
+ * In-app recipients for new_request / items_returned: Store Incharge + SuperAdmin only (not plain Admin).
+ */
+export async function getRequestQueueStaffInAppUserIds(
+  excludeUserId?: string
+): Promise<string[]> {
+  const snapshot = await db
+    .collection('users')
+    .where('isActive', '==', true)
+    .get();
+
+  const ids: string[] = [];
+  for (const doc of snapshot.docs) {
+    if (excludeUserId && doc.id === excludeUserId) continue;
+    const role = doc.data()?.role as string | undefined;
+    if (role === 'SuperAdmin' || role === 'StoreIncharge') {
+      ids.push(doc.id);
+    }
+  }
+  return ids;
+}
+
+/**
+ * Returns deduplicated Expo push tokens for all active Admin and SuperAdmin users.
+ * Use when Store Incharge creates something that only org admins should be notified about
  * (e.g. inventory update requests).
  * @param excludeUserId - Optional user ID to exclude (e.g. the actor who triggered the event)
  */
@@ -146,7 +201,7 @@ export async function getAdminOnlyTokens(
   for (const doc of snapshot.docs) {
     if (excludeUserId && doc.id === excludeUserId) continue;
     const role = doc.data()?.role as string | undefined;
-    if (role === 'Admin') {
+    if (role === 'Admin' || role === 'SuperAdmin') {
       const tokens = await getUserPushTokens(doc.id, type);
       all.push(...tokens);
     }
@@ -155,7 +210,7 @@ export async function getAdminOnlyTokens(
 }
 
 /**
- * Returns user IDs of active Admin users only (for in-app notifications).
+ * Returns user IDs of active Admin and SuperAdmin users (for in-app notifications).
  * @param excludeUserId - Optional user ID to exclude (e.g. the actor who triggered the event)
  */
 export async function getAdminOnlyUserIds(
@@ -170,7 +225,7 @@ export async function getAdminOnlyUserIds(
   for (const doc of snapshot.docs) {
     if (excludeUserId && doc.id === excludeUserId) continue;
     const role = doc.data()?.role as string | undefined;
-    if (role === 'Admin') {
+    if (role === 'Admin' || role === 'SuperAdmin') {
       ids.push(doc.id);
     }
   }

@@ -18,10 +18,12 @@ import { RequestCard, RequestStatusBadge, RequestTypeBadge } from '../../compone
 import { Icon } from '../../components/shared/Icon';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import type { Request } from '../../types/request';
+import { selectCanManageRequests } from '../../store/selectors/authSelectors';
 
 export function RequestQueuePage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const canManageRequests = useAppSelector(selectCanManageRequests);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -331,6 +333,11 @@ export function RequestQueuePage() {
                       request.requestType === 'site_transfer' && request.sourceSiteName
                         ? `${request.sourceSiteName} → ${request.siteName}`
                         : request.siteName ?? '—';
+                    const queueRowIsViewOnly =
+                      request.status === 'rejected' ||
+                      request.status === 'transferred';
+                    const showProcessButton =
+                      canManageRequests && !queueRowIsViewOnly;
                     return (
                       <tr
                         key={request.id}
@@ -361,13 +368,23 @@ export function RequestQueuePage() {
                           {createdStr}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleRequestPress(request)}
-                            className="rounded-[10px] bg-blue-800 px-4 py-2 text-[13px] font-semibold text-white hover:bg-blue-900 transition-colors"
-                          >
-                            Process
-                          </button>
+                          {showProcessButton ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRequestPress(request)}
+                              className="rounded-[10px] bg-blue-800 px-4 py-2 text-[13px] font-semibold text-white hover:bg-blue-900 transition-colors"
+                            >
+                              Process
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleRequestPress(request)}
+                              className="rounded-[10px] border border-slate-200 bg-white px-4 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                            >
+                              View
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
@@ -380,7 +397,8 @@ export function RequestQueuePage() {
           <div className="space-y-3 overflow-y-auto flex-1 md:hidden">
             {requests.map((request) => {
               const showAvailability =
-                request.status === 'pending' || request.status === 'approved';
+                canManageRequests &&
+                (request.status === 'pending' || request.status === 'approved');
               const isSiteTransfer = request.requestType === 'site_transfer';
               const availabilityUnknown = isSiteTransfer;
               const isAllSufficient = availabilityUnknown

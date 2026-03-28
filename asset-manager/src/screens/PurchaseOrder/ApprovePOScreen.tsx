@@ -24,7 +24,7 @@ import {
 import {
   selectUserId,
   selectUserDisplayName,
-  selectIsAdmin,
+  selectIsAdminOrSuperAdmin,
   selectIsSuperAdmin,
 } from '../../store/selectors/authSelectors';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -92,7 +92,7 @@ export const ApprovePOScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
-  const isAdmin = useAppSelector(selectIsAdmin);
+  const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
   const reduxError = useAppSelector(selectPurchaseOrderError);
 
@@ -299,12 +299,12 @@ export const ApprovePOScreen: React.FC = () => {
     );
   }
 
-  const canApproveReject = isAdmin || isSuperAdmin;
+  const canApproveReject = isAdminOrSuperAdmin;
   const isAssignedAdmin =
     isSuperAdmin ||
     (po.assignedToAdminId != null && po.assignedToAdminId.trim() !== ''
       ? po.assignedToAdminId === userId
-      : isAdmin);
+      : isAdminOrSuperAdmin);
   const showApproveReject =
     po.status === 'pending_approval' && canApproveReject && isAssignedAdmin;
   const isOtherAdminViewing =
