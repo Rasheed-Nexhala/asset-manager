@@ -38,6 +38,7 @@ export interface RequestItem {
   quantityRequested: number;
   quantityApproved: number;
   quantityReturned: number;
+  supervisorOutstandingQty?: number;
   status: 'pending' | 'approved' | 'transferred' | 'partially_returned' | 'returned';
   weightPerMeter?: number;
   lengthPerPiece?: number;
@@ -119,6 +120,10 @@ export interface Request {
   // Audit
   createdAt: Timestamp;
   updatedAt: Timestamp;
+
+  /** Site Manager split / return — who last updated supervisor custody on this request */
+  lastSupervisorCustodyUpdateBy?: string;
+  lastSupervisorCustodyUpdateByName?: string;
 }
 
 /**

@@ -1312,6 +1312,7 @@ export const subscribeToRequests = (
       },
       (error) => {
         console.error('Error in requests subscription:', error);
+        callback([]);
       }
     );
     

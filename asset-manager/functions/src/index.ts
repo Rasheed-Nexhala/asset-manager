@@ -26,6 +26,10 @@ import {
   getAdminOnlyUserIds,
   createInAppNotification,
 } from './notifications';
+import {
+  analyzeSupervisorCustodyItemsChange,
+  findSupervisorCustodyDeltas,
+} from './supervisorCustodyActivity';
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -904,12 +908,75 @@ export const onRequestUpdated = onDocumentUpdated(
       return;
     }
 
+    const custodyAnalysis = analyzeSupervisorCustodyItemsChange(before.items, after.items);
+    const hasNonCustodyFieldsChanged =
+      before.priority !== after.priority || before.storeNotes !== after.storeNotes;
+
+    if (
+      custodyAnalysis.isSupervisorOnly &&
+      custodyAnalysis.deltas.length > 0 &&
+      !hasNonCustodyFieldsChanged
+    ) {
+      const requestNumber = String(after.requestNumber ?? requestId);
+      const actorId = String(
+        after.lastSupervisorCustodyUpdateBy ?? after.requestedBy ?? 'unknown'
+      );
+      const actorName = String(
+        after.lastSupervisorCustodyUpdateByName ?? after.requestedByName ?? 'Unknown'
+      );
+      const deltas = custodyAnalysis.deltas;
+      const summaryLines = deltas.map((d) => {
+        const delta = d.newSup - d.oldSup;
+        const abs = Math.abs(delta);
+        if (delta > 0) {
+          return `Assigned ${abs} unit(s) of ${d.itemName} to supervisor custody (total with supervisors: ${d.oldSup} → ${d.newSup})`;
+        }
+        return `Recorded ${abs} unit(s) of ${d.itemName} returned from supervisor custody (total with supervisors: ${d.oldSup} → ${d.newSup})`;
+      });
+      const summary =
+        deltas.length === 1
+          ? `${requestNumber}: ${summaryLines[0]}`
+          : `${requestNumber}: Supervisor custody updated (${deltas.length} line items)`;
+      const details = summaryLines.join('\n');
+
+      const changesCustody = deltas.map((d) => ({
+        field: `items[${d.itemId}].supervisorOutstandingQty`,
+        fieldLabel: `Supervisor custody — ${d.itemName}`,
+        oldValue: d.oldSup,
+        newValue: d.newSup,
+      }));
+
+      await createActivityLog({
+        userId: actorId,
+        userName: actorName,
+        userRole: 'SiteManager',
+        actionType: 'supervisor_custody_updated',
+        actionCategory: 'requests',
+        targetType: 'request',
+        targetId: requestId,
+        targetDisplay: requestNumber,
+        summary,
+        details,
+        changes: changesCustody,
+      });
+      return;
+    }
+
     // Log draft edits (status unchanged but items, priority, etc. changed)
     const changes: Array<{ field: string; fieldLabel: string; oldValue: unknown; newValue: unknown }> = [];
+    const supDeltas = findSupervisorCustodyDeltas(before.items, after.items);
     if (JSON.stringify(before.items) !== JSON.stringify(after.items)) {
+      for (const d of supDeltas) {
+        changes.push({
+          field: `items[${d.itemId}].supervisorOutstandingQty`,
+          fieldLabel: `Supervisor custody — ${d.itemName}`,
+          oldValue: d.oldSup,
+          newValue: d.newSup,
+        });
+      }
       changes.push({
         field: 'items',
-        fieldLabel: 'Items',
+        fieldLabel: 'Items (line count)',
         oldValue: Array.isArray(before.items) ? before.items.length : 0,
         newValue: Array.isArray(after.items) ? after.items.length : 0,
       });
@@ -932,6 +999,27 @@ export const onRequestUpdated = onDocumentUpdated(
     }
 
     if (changes.length > 0) {
+      const requestNumber = String(after.requestNumber ?? requestId);
+      const detailsParts: string[] = [];
+      if (after.storeNotes) detailsParts.push(String(after.storeNotes));
+      if (supDeltas.length > 0) {
+        const custodyLines = supDeltas.map((d) => {
+          const delta = d.newSup - d.oldSup;
+          const abs = Math.abs(delta);
+          if (delta > 0) {
+            return `Supervisor custody +${abs} on ${d.itemName} (${d.oldSup} → ${d.newSup})`;
+          }
+          return `Supervisor custody −${abs} on ${d.itemName} (${d.oldSup} → ${d.newSup})`;
+        });
+        detailsParts.push(custodyLines.join('\n'));
+      }
+      const details = detailsParts.filter(Boolean).join('\n\n');
+
+      const summary =
+        supDeltas.length > 0
+          ? `${requestNumber}: Request updated (includes supervisor custody on ${supDeltas.length} line item(s))`
+          : `Edited request: ${requestNumber}`;
+
       await createActivityLog({
         userId: after.requestedBy ?? 'unknown',
         userName: after.requestedByName ?? 'Unknown',
@@ -940,9 +1028,9 @@ export const onRequestUpdated = onDocumentUpdated(
         actionCategory: 'requests',
         targetType: 'request',
         targetId: requestId,
-        targetDisplay: after.requestNumber ?? requestId,
-        summary: `Edited request: ${after.requestNumber ?? requestId}`,
-        details: after.storeNotes ?? '',
+        targetDisplay: requestNumber,
+        summary,
+        details,
         changes,
       });
 

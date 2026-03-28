@@ -361,6 +361,7 @@ describe('ItemDetailScreen', () => {
 
     expect(screen.queryByRole('button', { name: 'Edit item' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Add stock' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'View item activity history' })).toBeNull();
     expect(screen.queryByText('Stock Level & Status')).toBeNull();
     expect(screen.getByText('Steel Bar 12mm')).toBeTruthy();
   });

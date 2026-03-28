@@ -29,6 +29,8 @@ import {
   selectUserId,
   selectUserDisplayName,
   selectCanManageRequests,
+  selectIsSiteManager,
+  selectCanReturnItemsToCentralStore,
 } from '../../store/selectors/authSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
@@ -39,6 +41,7 @@ import {
   printTransferSlip,
   canPrintTransferSlip,
 } from '../../utils/transferSlipPdfUtils';
+import { SupervisorAllocationsSection } from '../../components/Requests/SupervisorAllocationsSection';
 
 type RouteParams = RouteProp<RequestStackParamList, 'ProcessRequest'>;
 type NavigationProp = StackNavigationProp<RequestStackParamList, 'ProcessRequest'>;
@@ -84,6 +87,8 @@ export const ProcessRequestScreen: React.FC = () => {
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
   const canManageRequests = useAppSelector(selectCanManageRequests);
+  const isSiteManager = useAppSelector(selectIsSiteManager);
+  const canReturnToCentralStore = useAppSelector(selectCanReturnItemsToCentralStore);
   const inventoryItems = useAppSelector(selectAllItems);
   const requestFromStore = useAppSelector(selectRequestById(requestId));
 
@@ -382,9 +387,10 @@ export const ProcessRequestScreen: React.FC = () => {
   );
   const showReturnItems =
     (isTransferred || isPartiallyReturned) &&
-    isRequestOwner &&
-    !canProcess &&
+    canReturnToCentralStore &&
     hasItemsToReturn;
+  const tabNavigation =
+    typeof navigation.getParent === 'function' ? navigation.getParent() : null;
   const showTransferSlipPrint = request ? canPrintTransferSlip(request) : false;
 
   const handlePrintTransferSlip = useCallback(async () => {
@@ -540,6 +546,17 @@ export const ProcessRequestScreen: React.FC = () => {
               />
             ))}
           </View>
+
+          {isSiteManager &&
+            isRequestOwner &&
+            (isTransferred || isPartiallyReturned) &&
+            tabNavigation != null && (
+              <SupervisorAllocationsSection
+                siteId={request.siteId}
+                requestId={request.id}
+                tabNavigation={tabNavigation}
+              />
+            )}
 
           {/* Return history – shown when status is returned or partially_returned */}
           {((request.returnHistory && request.returnHistory.length > 0) ||
@@ -876,7 +893,7 @@ export const ProcessRequestScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Return Items - for Site Managers viewing their own transferred request */}
+      {/* Return to central store — Store Incharge only */}
       {showReturnItems && (
         <View className="bg-white border-t border-[#E2E8F0] px-4 py-3">
           <TouchableOpacity
@@ -887,9 +904,12 @@ export const ProcessRequestScreen: React.FC = () => {
           >
             <Ionicons name="arrow-undo" size={20} color="#FFFFFF" />
             <Text className="text-[15px] font-semibold text-white">
-              Return Items
+              Return to central store
             </Text>
           </TouchableOpacity>
+          <Text className="text-[13px] text-[#64748B] mt-2 text-center">
+            Only Store Incharge executes physical returns to the central store.
+          </Text>
         </View>
       )}
     </ScreenLayout>

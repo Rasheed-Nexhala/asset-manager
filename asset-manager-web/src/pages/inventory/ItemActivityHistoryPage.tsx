@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { DocumentSnapshot } from 'firebase/firestore';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchItemById } from '../../store/thunks/inventoryThunks';
 import { selectItemById } from '../../store/selectors/inventorySelectors';
+import { selectIsSiteManager, selectIsRoleLoaded } from '../../store/selectors/authSelectors';
 import {
   listActivityLogs,
   getActivityLogsCount,
@@ -35,6 +36,8 @@ export function ItemActivityHistoryPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const item = useAppSelector((s) => (itemId ? selectItemById(itemId)(s) : undefined));
+  const isSiteManager = useAppSelector(selectIsSiteManager);
+  const isRoleLoaded = useAppSelector(selectIsRoleLoaded);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [logs, setLogs] = useState<ActivityLog[]>([]);
@@ -49,9 +52,9 @@ export function ItemActivityHistoryPage() {
   const [detailOpen, setDetailOpen] = useState(false);
 
   useEffect(() => {
-    if (!itemId) return;
+    if (!itemId || !isRoleLoaded || isSiteManager) return;
     dispatch(fetchItemById(itemId));
-  }, [dispatch, itemId]);
+  }, [dispatch, itemId, isRoleLoaded, isSiteManager]);
 
   useEffect(() => {
     setSearchQuery('');
@@ -87,8 +90,9 @@ export function ItemActivityHistoryPage() {
   }, [itemId]);
 
   useEffect(() => {
+    if (!isRoleLoaded || isSiteManager) return;
     fetchLogs();
-  }, [fetchLogs]);
+  }, [fetchLogs, isRoleLoaded, isSiteManager]);
 
   const filteredLogs = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -161,6 +165,18 @@ export function ItemActivityHistoryPage() {
         <p className="text-[15px] text-slate-600">Invalid link.</p>
       </div>
     );
+  }
+
+  if (!isRoleLoaded) {
+    return (
+      <div className="flex justify-center py-12 px-4">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  if (isSiteManager) {
+    return <Navigate to={`/inventory/${itemId}`} replace />;
   }
 
   const isInitialOrRefetching =

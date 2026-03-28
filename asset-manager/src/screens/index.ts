@@ -13,6 +13,8 @@ export { ItemActivityHistoryScreen } from './Inventory/ItemActivityHistoryScreen
 export { SteelMasterScreen } from './Inventory/SteelMasterScreen';
 export { AddEditCustomItemScreen } from './Inventory/AddEditCustomItemScreen';
 export { MySiteInventoryScreen } from './Inventory/MySiteInventoryScreen';
+export { SiteSupervisorsScreen } from './Inventory/SiteSupervisorsScreen';
+export { AllocateItemsToSupervisorsScreen } from './Inventory/AllocateItemsToSupervisorsScreen';
 export { OtherSiteInventoryScreen } from './Inventory/OtherSiteInventoryScreen';
 export { InventoryUpdateRequestsScreen } from './Inventory/InventoryUpdateRequestsScreen';
 export { CategorySelectScreen } from './Inventory/CategorySelectScreen';

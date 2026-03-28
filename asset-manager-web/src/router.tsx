@@ -11,6 +11,8 @@ import { InventoryLandingPage } from './pages/inventory/InventoryLandingPage';
 import { CentralStoreInventoryPage } from './pages/inventory/CentralStoreInventoryPage';
 import { OtherSitesListPage } from './pages/inventory/OtherSitesListPage';
 import { OtherSiteInventoryPage } from './pages/inventory/OtherSiteInventoryPage';
+import { SiteSupervisorsPage } from './pages/inventory/SiteSupervisorsPage';
+import { AllocateItemsToSupervisorsPage } from './pages/inventory/AllocateItemsToSupervisorsPage';
 import { SteelMasterPage } from './pages/inventory/SteelMasterPage';
 import { ItemDetailPage } from './pages/inventory/ItemDetailPage';
 import { ItemActivityHistoryPage } from './pages/inventory/ItemActivityHistoryPage';
@@ -97,6 +99,14 @@ export const router = createBrowserRouter([
           {
             path: 'inventory/other-sites/:siteId',
             element: <OtherSiteInventoryPage />,
+          },
+          {
+            path: 'inventory/site-supervisors',
+            element: <SiteSupervisorsPage />,
+          },
+          {
+            path: 'inventory/divide-to-supervisors',
+            element: <AllocateItemsToSupervisorsPage />,
           },
           {
             element: <AdminOrStoreInchargeGuard />,

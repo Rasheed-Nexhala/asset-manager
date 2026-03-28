@@ -193,6 +193,26 @@ service cloud.firestore {
         (isUserActive() && isAdminOrSuperAdmin()) ||
         isRemovingSelfAsManager()
       );
+
+      /** Site supervisors — names only; Site Manager for this site or Admin. */
+      match /siteSupervisors/{supervisorId} {
+        allow read: if isAuthenticated() && isUserActive() && (
+          isAdminOrSuperAdmin() || isAssignedSite(siteId) || isStoreIncharge()
+        );
+        allow create, update, delete: if isAuthenticated() && isUserActive() && (
+          isAdminOrSuperAdmin() || isAssignedSite(siteId)
+        );
+      }
+
+      /** Item allocations to supervisors (custody); SM updates request + allocation together in app. */
+      match /supervisorAllocations/{allocId} {
+        allow read: if isAuthenticated() && isUserActive() && (
+          isAdminOrSuperAdmin() || isAssignedSite(siteId) || isStoreIncharge()
+        );
+        allow create, update, delete: if isAuthenticated() && isUserActive() && (
+          isAdminOrSuperAdmin() || isAssignedSite(siteId)
+        );
+      }
     }
     
     /**
@@ -510,21 +530,21 @@ service cloud.firestore {
         request.resource.data.requestedBy == request.auth.uid &&
         request.resource.data.status in ['draft', 'pending'];
       
-      // Update: Site Managers (own drafts only OR returning items on transferred/partially_returned requests),
-      // SuperAdmin (full staff path) or Store Incharge (approve/reject/transfer field allow-list)
+      // Update: Site Managers (own drafts only OR supervisor split on transferred requests — items only),
+      // SuperAdmin (full staff path) or Store Incharge (approve/reject/transfer/return-to-store)
       allow update: if isAuthenticated() && isUserActive() && (
         isSuperAdmin() ||
         (isSiteManager() && 
          resource.data.requestedBy == request.auth.uid && (
            (resource.data.status == 'draft' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['priority', 'purpose', 'items', 'status', 'updatedAt'])) ||
            (resource.data.status == 'pending' && request.resource.data.status == 'cancelled' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
-           (resource.data.status in ['transferred', 'partially_returned'] && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['items', 'status', 'returnHistory', 'updatedAt']))
+           (resource.data.status in ['transferred', 'partially_returned'] && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['items', 'updatedAt', 'lastSupervisorCustodyUpdateBy', 'lastSupervisorCustodyUpdateByName']))
          )
         ) ||
         (isStoreIncharge() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'status', 'processedBy', 'processedByName', 'processedAt', 'storeNotes', 
           'rejectionReason', 'rejectionComments', 'items', 'transferredAt', 'transferredBy', 
-          'transferredByName', 'receivedBy', 'receivedByName', 'updatedAt'
+          'transferredByName', 'receivedBy', 'receivedByName', 'updatedAt', 'returnHistory'
         ]))
       );
       

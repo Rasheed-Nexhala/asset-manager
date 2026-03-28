@@ -58,6 +58,8 @@ export type ActionType =
   | 'request_transferred'
   | 'items_returned'
   | 'request_cancelled'
+  /** Site Manager: split stock to supervisors or record return (supervisorOutstandingQty on request lines) */
+  | 'supervisor_custody_updated'
   // Purchase Orders
   | 'po_created'
   | 'po_submitted'

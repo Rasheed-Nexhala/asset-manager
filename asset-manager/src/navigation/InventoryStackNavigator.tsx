@@ -14,6 +14,8 @@ import {
   ItemActivityHistoryScreen,
   MySiteInventoryScreen,
   OtherSiteInventoryScreen,
+  SiteSupervisorsScreen,
+  AllocateItemsToSupervisorsScreen,
   SteelMasterScreen,
   InventoryUpdateRequestsScreen,
   CategorySelectScreen,
@@ -44,6 +46,9 @@ export type InventoryStackParamList = {
   // Site Manager screens
   MySiteInventory: undefined;
   OtherSiteInventory: { siteId: string };
+  SiteSupervisors: undefined;
+  /** returnTo: where to navigate after a successful split (defaults to inventory). */
+  AllocateItemsToSupervisors: { returnTo?: 'inventory' | 'requests' } | undefined;
 };
 
 const Stack = createStackNavigator<InventoryStackParamList>();
@@ -177,16 +182,24 @@ export const InventoryStackNavigator: React.FC = () => {
             }}
           />
           <Stack.Screen
-            name="ItemDetail"
-            component={ItemDetailScreen}
+            name="SiteSupervisors"
+            component={SiteSupervisorsScreen}
             options={{
               presentation: 'card',
               gestureEnabled: true,
             }}
           />
           <Stack.Screen
-            name="ItemActivityHistory"
-            component={ItemActivityHistoryScreen}
+            name="AllocateItemsToSupervisors"
+            component={AllocateItemsToSupervisorsScreen}
+            options={{
+              presentation: 'card',
+              gestureEnabled: true,
+            }}
+          />
+          <Stack.Screen
+            name="ItemDetail"
+            component={ItemDetailScreen}
             options={{
               presentation: 'card',
               gestureEnabled: true,

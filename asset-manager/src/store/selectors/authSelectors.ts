@@ -119,6 +119,12 @@ export const selectIsSiteManager = createSelector(
   (role) => role === 'SiteManager'
 );
 
+/** Return from site to central store — Store Incharge only (not Site Manager / Admin). */
+export const selectCanReturnItemsToCentralStore = createSelector(
+  [selectIsStoreIncharge],
+  (isStoreIncharge) => isStoreIncharge === true
+);
+
 export const selectHasPermission = (permission: Permission) =>
   createSelector(
     [selectUserPermissions],

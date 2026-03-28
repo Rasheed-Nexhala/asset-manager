@@ -6,7 +6,7 @@ import { fetchItems } from '../../store/thunks/inventoryThunks';
 import {
   selectUserId,
   selectUserDisplayName,
-  selectCanManageRequests,
+  selectCanReturnItemsToCentralStore,
 } from '../../store/selectors/authSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import { requestService } from '../../services/firebase/requestService';
@@ -66,7 +66,7 @@ export function ReturnItemsPage() {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
-  const canManageRequests = useAppSelector(selectCanManageRequests);
+  const canReturnToCentralStore = useAppSelector(selectCanReturnItemsToCentralStore);
   const inventoryItems = useAppSelector(selectAllItems);
   const { viewMode, toggleViewMode } = useWeightViewPreference();
 
@@ -192,6 +192,31 @@ export function ReturnItemsPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (!canReturnToCentralStore) {
+    return (
+      <div className="flex flex-col h-full">
+        <header className="flex items-center gap-4 pb-4">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="flex h-12 w-12 items-center justify-center rounded-full hover:bg-slate-100"
+            aria-label="Go back"
+          >
+            <Icon name="arrow-left" className="h-6 w-6" />
+          </button>
+          <h1 className="text-[22px] font-semibold text-slate-900">Return to central store</h1>
+        </header>
+        <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
+          <Icon name="lock-closed" className="h-16 w-16 text-slate-400" />
+          <h2 className="text-[22px] font-semibold text-slate-900 mt-4 mb-2">Store Incharge only</h2>
+          <p className="text-[15px] text-slate-500">
+            Returning items to the central store is done by the Store Incharge after receiving materials from the site.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -361,7 +386,7 @@ export function ReturnItemsPage() {
                           </span>
                         </div>
                       )}
-                      {isDamaged && canManageRequests && (
+                      {isDamaged && canReturnToCentralStore && (
                         <div className="mt-2">
                           <QuickMoveToMaintenanceButton
                             itemId={returnedItem.itemId}

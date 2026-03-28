@@ -16,7 +16,7 @@ isProject: false
 | **One manager may manage several sites** | **This is what we add** by removing the app logic that previously **unassigned** that manager from other sites when assigning them to a new site.                                                                                     |
 
 
-**Summary:** Cardinality is **many sites → one manager each** (unchanged field shape), and we allow **one manager → many sites** (remove exclusivity on the manager side only).
+**Summary:** Cardinality is **many sites → one manager each** (unchangedfield shape), and we allow **one manager → many sites** (remove exclusivity on the manager side only).
 
 ## What changes in implementation
 

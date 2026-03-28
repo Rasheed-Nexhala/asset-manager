@@ -24,7 +24,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   selectUserId,
   selectUserDisplayName,
-  selectCanManageRequests,
+  selectCanReturnItemsToCentralStore,
 } from '../../store/selectors/authSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import { fetchItems } from '../../store/thunks/inventoryThunks';
@@ -66,7 +66,7 @@ export const ReturnItemsScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
-  const canManageRequests = useAppSelector(selectCanManageRequests);
+  const canReturnToCentralStore = useAppSelector(selectCanReturnItemsToCentralStore);
   const inventoryItems = useAppSelector(selectAllItems);
   const { viewMode, toggleViewMode } = useWeightViewPreference();
 
@@ -214,6 +214,23 @@ export const ReturnItemsScreen: React.FC = () => {
     }
   };
 
+  if (!canReturnToCentralStore) {
+    return (
+      <ScreenLayout edges={['top']}>
+        <ScreenHeader title="Return to central store" showBack onBackPress={handleBack} />
+        <View className="flex-1 items-center justify-center px-4">
+          <Ionicons name="lock-closed-outline" size={64} color="#64748B" />
+          <Text className="text-[22px] font-semibold text-[#0F172A] text-center mb-2 mt-4">
+            Store Incharge only
+          </Text>
+          <Text className="text-[15px] text-[#64748B] text-center">
+            Returning items to the central store is done by the Store Incharge after receiving materials from the site.
+          </Text>
+        </View>
+      </ScreenLayout>
+    );
+  }
+
   if (isLoading) {
     return (
       <ScreenLayout edges={['top']}>
@@ -342,7 +359,7 @@ export const ReturnItemsScreen: React.FC = () => {
                             </Text>
                           </View>
                         )}
-                        {isDamaged && canManageRequests && (
+                        {isDamaged && canReturnToCentralStore && (
                           <View className="mt-2">
                             <QuickMoveToMaintenanceButton
                               itemId={returnedItem.itemId}

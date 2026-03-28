@@ -178,6 +178,11 @@ export const ACTION_TYPE_CONFIG: Record<
     icon: 'ban-outline',
     category: 'requests',
   },
+  supervisor_custody_updated: {
+    label: 'Supervisor Custody Updated',
+    icon: 'people-outline',
+    category: 'requests',
+  },
 
   // Purchase Orders
   po_created: {

@@ -7,6 +7,8 @@ import {
   selectUserId,
   selectUserDisplayName,
   selectCanManageRequests,
+  selectIsSiteManager,
+  selectCanReturnItemsToCentralStore,
 } from '../../store/selectors/authSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
 import { selectRequestById } from '../../store/selectors/requestSelectors';
@@ -30,6 +32,7 @@ import {
   printTransferSlip,
   canPrintTransferSlip,
 } from '../../utils/transferSlipPdfUtils';
+import { SupervisorAllocationsSection } from '../../components/requests/SupervisorAllocationsSection';
 
 const CONDITION_LABELS: Record<ItemCondition, string> = {
   good: 'Good',
@@ -68,6 +71,8 @@ export function ProcessRequestPage() {
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
   const canManageRequests = useAppSelector(selectCanManageRequests);
+  const isSiteManager = useAppSelector(selectIsSiteManager);
+  const canReturnToCentralStore = useAppSelector(selectCanReturnItemsToCentralStore);
   const inventoryItems = useAppSelector(selectAllItems);
   const requestFromStore = useAppSelector(
     selectRequestById(requestId ?? '')
@@ -338,8 +343,7 @@ export function ProcessRequestPage() {
   );
   const showReturnItems =
     (isTransferred || isPartiallyReturned) &&
-    isRequestOwner &&
-    !canProcess &&
+    canReturnToCentralStore &&
     hasItemsToReturn;
   const showTransferSlipPrint = request ? canPrintTransferSlip(request) : false;
 
@@ -529,6 +533,12 @@ export function ProcessRequestPage() {
           </div>
         </div>
 
+        {isSiteManager &&
+          isRequestOwner &&
+          (isTransferred || isPartiallyReturned) && (
+            <SupervisorAllocationsSection siteId={request.siteId} requestId={request.id} />
+          )}
+
         {/* Insufficient Stock Banner */}
         {canProcess &&
           isPending &&
@@ -673,8 +683,11 @@ export function ProcessRequestPage() {
             className="w-full bg-blue-800 rounded-[10px] h-[50px] flex items-center justify-center gap-2 text-[15px] font-semibold text-white hover:bg-blue-900"
           >
             <Icon name="arrow-path" className="h-5 w-5" />
-            Return Items
+            Return to central store
           </button>
+          <p className="text-[13px] text-slate-500 mt-2 text-center">
+            Only Store Incharge executes physical returns to the central store.
+          </p>
         </div>
       )}
     </div>

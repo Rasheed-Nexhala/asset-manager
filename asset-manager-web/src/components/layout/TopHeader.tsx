@@ -225,6 +225,53 @@ export function TopHeader() {
                       <Icon name={item.icon} className="h-5 w-5" />
                       {item.label}
                     </NavLink>
+                    {item.to === '/inventory' && isSiteManager && (
+                      <ul
+                        className="mt-1 space-y-0.5 border-l border-slate-200 py-1 pl-3 ml-4"
+                        role="group"
+                        aria-label="Site team"
+                      >
+                        <li className="px-3 pb-1 pt-0.5">
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                            Site team
+                          </span>
+                        </li>
+                        <li>
+                          <NavLink
+                            to="/inventory/divide-to-supervisors"
+                            onClick={closeDrawer}
+                            className={({ isActive }) =>
+                              clsx(
+                                'flex items-center gap-2 rounded-lg px-3 py-2 text-[15px] font-medium transition-colors',
+                                isActive
+                                  ? 'bg-blue-50 text-blue-800'
+                                  : 'text-slate-700 hover:bg-slate-50'
+                              )
+                            }
+                          >
+                            <Icon name="arrows-right-left" className="h-4 w-4 shrink-0" />
+                            Split stock
+                          </NavLink>
+                        </li>
+                        <li>
+                          <NavLink
+                            to="/inventory/site-supervisors"
+                            onClick={closeDrawer}
+                            className={({ isActive }) =>
+                              clsx(
+                                'flex items-center gap-2 rounded-lg px-3 py-2 text-[15px] font-medium transition-colors',
+                                isActive
+                                  ? 'bg-blue-50 text-blue-800'
+                                  : 'text-slate-700 hover:bg-slate-50'
+                              )
+                            }
+                          >
+                            <Icon name="users" className="h-4 w-4 shrink-0" />
+                            Team list
+                          </NavLink>
+                        </li>
+                      </ul>
+                    )}
                   </li>
                 ))}
               </ul>

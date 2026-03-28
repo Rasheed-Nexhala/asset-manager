@@ -277,6 +277,30 @@ export const MySiteInventoryScreen: React.FC = () => {
           />
         </View>
 
+        {/* Site team — compact bar (web uses sidebar); keeps inventory list above the fold */}
+        <View className="px-4 pt-3">
+          <View className="flex-row rounded-[10px] border border-[#E2E8F0] bg-white overflow-hidden">
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate('AllocateItemsToSupervisors', { returnTo: 'inventory' })
+              }
+              className="flex-1 min-h-[48px] justify-center items-center border-r border-[#E2E8F0] px-2 py-2 active:bg-[#F8FAFC]"
+              accessibilityRole="button"
+              accessibilityLabel="Split transferred stock to supervisors"
+            >
+              <Text className="text-[14px] font-semibold text-[#1E40AF] text-center">Split stock</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('SiteSupervisors')}
+              className="flex-1 min-h-[48px] justify-center items-center px-2 py-2 active:bg-[#F8FAFC]"
+              accessibilityRole="button"
+              accessibilityLabel="Manage site supervisors team list"
+            >
+              <Text className="text-[14px] font-semibold text-[#B45309] text-center">Team list</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Search Bar */}
         <View className="px-4 pt-4 pb-3">
           <View className="bg-[#F1F5F9] rounded-full h-12 px-4 flex-row items-center">
@@ -334,7 +358,11 @@ export const MySiteInventoryScreen: React.FC = () => {
         {/* Inventory List */}
         <View className="px-4">
           {isLoading ? (
-            <View className="py-8 items-center">
+            <View
+              className="py-8 items-center justify-center min-h-[120px]"
+              accessibilityLabel="Loading site inventory"
+              accessibilityState={{ busy: true }}
+            >
               <ActivityIndicator size="large" color="#1E40AF" />
               <Text className="text-[15px] text-[#64748B] mt-4">Loading inventory...</Text>
             </View>

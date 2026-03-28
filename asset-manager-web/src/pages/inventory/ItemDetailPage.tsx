@@ -11,6 +11,7 @@ import {
 import {
   selectIsAdminOrSuperAdmin,
   selectIsStoreIncharge,
+  selectIsSiteManager,
   selectRoleLoading,
   selectIsRoleLoaded,
 } from '../../store/selectors/authSelectors';
@@ -107,6 +108,7 @@ export function ItemDetailPage() {
   const error = useAppSelector(selectItemsError);
   const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const isSiteManager = useAppSelector(selectIsSiteManager);
   const isRoleLoaded = useAppSelector(selectIsRoleLoaded);
   const canEditItem = isAdminOrSuperAdmin || isStoreIncharge;
   const canStoreInchargeAdjustBase = useAppSelector(selectCanStoreInchargeAdjustInventory);
@@ -392,15 +394,17 @@ export function ItemDetailPage() {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => navigate(`/inventory/${itemId}/history`)}
-          className="w-full bg-white rounded-[10px] p-4 border border-slate-200 mb-3 flex items-center justify-between min-h-[48px] text-left hover:bg-slate-50 transition-colors"
-          aria-label="View item activity history"
-        >
-          <span className="text-[17px] font-semibold text-slate-900">Item activity history</span>
-          <Icon name="chevron-right" className="w-5 h-5 text-slate-500 flex-shrink-0" />
-        </button>
+        {!isSiteManager && (
+          <button
+            type="button"
+            onClick={() => navigate(`/inventory/${itemId}/history`)}
+            className="w-full bg-white rounded-[10px] p-4 border border-slate-200 mb-3 flex items-center justify-between min-h-[48px] text-left hover:bg-slate-50 transition-colors"
+            aria-label="View item activity history"
+          >
+            <span className="text-[17px] font-semibold text-slate-900">Item activity history</span>
+            <Icon name="chevron-right" className="w-5 h-5 text-slate-500 flex-shrink-0" />
+          </button>
+        )}
 
         {item.type !== 'fuel' && (
           <div className="mb-3">

@@ -119,6 +119,11 @@ export const selectIsSiteManager = createSelector(
   (role) => role === 'SiteManager'
 );
 
+export const selectCanReturnItemsToCentralStore = createSelector(
+  [selectIsStoreIncharge],
+  (isStoreIncharge) => isStoreIncharge === true
+);
+
 export const selectHasPermission = (permission: Permission) =>
   createSelector(
     [selectUserPermissions],

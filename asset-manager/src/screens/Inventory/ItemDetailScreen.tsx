@@ -20,7 +20,13 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchItemById, adjustQuantity, deleteItem } from '../../store/thunks/inventoryThunks';
 import { createInventoryUpdateRequest } from '../../store/thunks/inventoryUpdateRequestThunks';
 import { selectItemById, selectItemsLoading, selectItemsError } from '../../store/selectors/inventorySelectors';
-import { selectIsAdminOrSuperAdmin, selectIsStoreIncharge, selectRoleLoading, selectIsRoleLoaded } from '../../store/selectors/authSelectors';
+import {
+  selectIsAdminOrSuperAdmin,
+  selectIsStoreIncharge,
+  selectIsSiteManager,
+  selectRoleLoading,
+  selectIsRoleLoaded,
+} from '../../store/selectors/authSelectors';
 import { selectCanStoreInchargeAdjustInventory, selectMyAccessGrantedUntil } from '../../store/selectors/inventoryUpdateRequestSelectors';
 import { updateItemInState, clearError } from '../../store/slices/inventorySlice';
 import { subscribeItemById, subscribeInventoryByItemId } from '../../services/firebase/inventoryService';
@@ -132,6 +138,7 @@ export const ItemDetailScreen: React.FC = () => {
   const error = useAppSelector(selectItemsError);
   const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const isSiteManager = useAppSelector(selectIsSiteManager);
   const isRoleLoading = useAppSelector(selectRoleLoading);
   const isRoleLoaded = useAppSelector(selectIsRoleLoaded);
   const canEditItem = isAdminOrSuperAdmin || isStoreIncharge;
@@ -467,23 +474,25 @@ export const ItemDetailScreen: React.FC = () => {
           </View>
         </View>
 
-        <TouchableOpacity
-          className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-3 flex-row items-center justify-between min-h-[48px]"
-          onPress={() =>
-            navigation.navigate('ItemActivityHistory', {
-              itemId,
-              itemName: item.name,
-            })
-          }
-          activeOpacity={0.7}
-          accessibilityLabel="View item activity history"
-          accessibilityRole="button"
-        >
-          <Text className="text-[17px] font-semibold text-[#0F172A]">
-            Item activity history
-          </Text>
-          <Ionicons name="chevron-forward" size={20} color="#64748B" />
-        </TouchableOpacity>
+        {!isSiteManager && (
+          <TouchableOpacity
+            className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-3 flex-row items-center justify-between min-h-[48px]"
+            onPress={() =>
+              navigation.navigate('ItemActivityHistory', {
+                itemId,
+                itemName: item.name,
+              })
+            }
+            activeOpacity={0.7}
+            accessibilityLabel="View item activity history"
+            accessibilityRole="button"
+          >
+            <Text className="text-[17px] font-semibold text-[#0F172A]">
+              Item activity history
+            </Text>
+            <Ionicons name="chevron-forward" size={20} color="#64748B" />
+          </TouchableOpacity>
+        )}
 
         {/* Stock Distribution Section - hidden for Fuel; By Location remains for all */}
         <View className="mb-3">
