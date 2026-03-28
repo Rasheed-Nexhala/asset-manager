@@ -182,7 +182,7 @@ describe('VendorManagementScreen', () => {
     });
 
     expect(screen.getByText('Saved Vendors')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Add' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Add vendor' })).toBeTruthy();
   });
 
   it('renders vendor list when vendors in store (preload)', () => {
@@ -264,7 +264,7 @@ describe('VendorManagementScreen', () => {
       purchaseOrders: defaultPurchaseOrderState,
     });
 
-    fireEvent.press(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Add vendor' }));
     expect(mockNavigate).toHaveBeenCalledWith('AddVendor', {});
   });
 
@@ -279,8 +279,25 @@ describe('VendorManagementScreen', () => {
       },
     });
 
-    fireEvent.press(screen.getByRole('button', { name: 'Vendor Steel Suppliers Ltd' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Edit vendor Steel Suppliers Ltd' }));
     expect(mockNavigate).toHaveBeenCalledWith('AddVendor', { vendorId: 'v1' });
+  });
+
+  it('Vendor ledger button navigates to VendorLedger', () => {
+    mockVendorsToReturn = null;
+    const vendor = createMockVendor({ id: 'v1', name: 'Steel Suppliers Ltd' });
+
+    renderWithStore(<VendorManagementScreen />, {
+      purchaseOrders: {
+        ...defaultPurchaseOrderState,
+        vendors: [vendor],
+      },
+    });
+
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Vendor ledger for Steel Suppliers Ltd' })
+    );
+    expect(mockNavigate).toHaveBeenCalledWith('VendorLedger', { vendorId: 'v1' });
   });
 
   it('Back button calls goBack', () => {

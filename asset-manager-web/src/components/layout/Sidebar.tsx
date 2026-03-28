@@ -46,7 +46,12 @@ export function Sidebar() {
     { to: requestsTo, label: 'Requests', icon: 'inbox', show: showRequests },
     { to: '/purchase-orders', label: 'Purchase Orders', icon: 'document-text', show: showPurchaseOrders },
     { to: '/maintenance', label: 'Maintenance', icon: 'wrench-screwdriver', show: showMaintenance },
-    { to: '/vendors', label: 'Vendors', icon: 'building-storefront', show: isAdminOrSuperAdmin },
+    {
+      to: '/vendors',
+      label: 'Vendors',
+      icon: 'building-storefront',
+      show: isAdminOrSuperAdmin || isStoreIncharge,
+    },
     { to: '/sites', label: 'Sites', icon: 'building-office-2', show: isAdminOrSuperAdmin },
     { to: '/admin/users', label: 'Users', icon: 'users', show: isAdminOrSuperAdmin },
     { to: '/profile', label: 'Profile', icon: 'user-circle', show: true },

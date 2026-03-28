@@ -34,6 +34,8 @@ import type {
   RejectPOData,
 } from '../../types/purchaseOrder';
 import { firestorePOToPO } from '../../types/purchaseOrder';
+import type { VendorLedgerDateRange } from '../../utils/vendorLedgerUtils';
+export type { VendorLedgerDateRange } from '../../utils/vendorLedgerUtils';
 import { incrementVendorPoCountInTransaction } from './vendorService';
 
 const PURCHASE_ORDERS_COLLECTION = 'purchaseOrders';
@@ -1247,4 +1249,97 @@ export const subscribeToPurchaseOrders = (
   );
 
   return () => unsub();
+};
+
+/**
+ * Default batch size for each vendor-ledger page fetch (not a cap on total POs).
+ * Callers can pass a different `pageSize` per request; repeat with `lastDoc` until `hasMore` is false.
+ */
+export const DEFAULT_VENDOR_LEDGER_PAGE_SIZE = 25;
+
+/** Maps inclusive calendar range to Firestore `createdAt` boundaries (start of day → end of day). */
+const vendorLedgerCreatedAtBoundaries = (
+  range: VendorLedgerDateRange
+): { start: Timestamp; end: Timestamp } => {
+  const a = new Date(range.dateFrom);
+  const b = new Date(range.dateTo);
+  a.setHours(0, 0, 0, 0);
+  b.setHours(0, 0, 0, 0);
+  const minMs = Math.min(a.getTime(), b.getTime());
+  const maxMs = Math.max(a.getTime(), b.getTime());
+  const start = new Date(minMs);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(maxMs);
+  end.setHours(23, 59, 59, 999);
+  return { start: Timestamp.fromDate(start), end: Timestamp.fromDate(end) };
+};
+
+/**
+ * Cursor-based pagination for one vendor's POs (newest first), filtered by PO `createdAt`.
+ * There is no maximum on how many POs can be loaded overall — repeat with `lastDoc` until `hasMore` is false.
+ * Requires composite index: vendorId + createdAt.
+ */
+export const listPurchaseOrdersByVendorPaginated = async (
+  vendorId: string,
+  pageSize: number,
+  dateRange: VendorLedgerDateRange,
+  lastDoc?: DocumentSnapshot
+): Promise<{
+  orders: PurchaseOrder[];
+  lastDoc: DocumentSnapshot | null;
+  hasMore: boolean;
+}> => {
+  if (!vendorId.trim()) {
+    return { orders: [], lastDoc: null, hasMore: false };
+  }
+
+  const { start, end } = vendorLedgerCreatedAtBoundaries(dateRange);
+
+  const constraints: QueryConstraint[] = [
+    where('vendorId', '==', vendorId.trim()),
+    where('createdAt', '>=', start),
+    where('createdAt', '<=', end),
+    orderBy('createdAt', 'desc'),
+  ];
+  if (lastDoc) constraints.push(startAfter(lastDoc));
+  constraints.push(limit(pageSize));
+
+  const q = query(collection(db, PURCHASE_ORDERS_COLLECTION), ...constraints);
+  const snapshot = await getDocsFromServer(q);
+
+  const orders: PurchaseOrder[] = [];
+  snapshot.forEach((docSnap) => {
+    try {
+      const data = docSnap.data();
+      const firestorePO = mapFirestoreDocToPOFirestore(docSnap.id, data);
+      orders.push(firestorePOToPO(firestorePO));
+    } catch (err) {
+      console.warn('Skipping malformed PO document:', docSnap.id, err);
+    }
+  });
+
+  const newLastDoc =
+    snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
+  const hasMore = snapshot.docs.length === pageSize;
+
+  return { orders, lastDoc: newLastDoc, hasMore };
+};
+
+/**
+ * PO count for a vendor in the given `createdAt` range (same filter as the paginated list).
+ */
+export const getPurchaseOrdersCountByVendor = async (
+  vendorId: string,
+  dateRange: VendorLedgerDateRange
+): Promise<number> => {
+  if (!vendorId.trim()) return 0;
+  const { start, end } = vendorLedgerCreatedAtBoundaries(dateRange);
+  const q = query(
+    collection(db, PURCHASE_ORDERS_COLLECTION),
+    where('vendorId', '==', vendorId.trim()),
+    where('createdAt', '>=', start),
+    where('createdAt', '<=', end)
+  );
+  const snapshot = await getCountFromServer(q);
+  return snapshot.data().count;
 };

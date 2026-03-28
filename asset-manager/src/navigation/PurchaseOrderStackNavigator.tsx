@@ -5,6 +5,7 @@ import {
   PurchaseOrderListScreen,
   CreatePOScreen,
   VendorManagementScreen,
+  VendorLedgerScreen,
   AddVendorScreen,
   ApprovePOScreen,
   ReceivePOScreen,
@@ -30,6 +31,7 @@ export const PurchaseOrderStackNavigator: React.FC = () => {
       <Stack.Screen name="PurchaseOrderList" component={PurchaseOrderListScreen} />
       <Stack.Screen name="CreatePO" component={CreatePOScreen} />
       <Stack.Screen name="VendorManagement" component={VendorManagementScreen} />
+      <Stack.Screen name="VendorLedger" component={VendorLedgerScreen} />
       <Stack.Screen name="AddVendor" component={AddVendorScreen} />
       <Stack.Screen name="ApprovePO" component={ApprovePOScreen} />
       <Stack.Screen name="ReceivePO" component={ReceivePOScreen} />

@@ -152,6 +152,10 @@ jest.mock('../../../store/thunks/purchaseOrderThunks', () => {
       'purchaseOrders/loadMorePurchaseOrders',
       async () => ({ orders: [], lastDoc: null, pageSize: 15 })
     ),
+    exportPurchaseOrdersThunk: createAsyncThunk(
+      'purchaseOrders/export',
+      async () => null
+    ),
   };
 });
 
@@ -373,6 +377,22 @@ describe('PurchaseOrderListScreen', () => {
 
     fireEvent.press(screen.getByText('PO-2025-0001'));
     expect(mockNavigate).toHaveBeenCalledWith('CreatePO', { poId: 'po-1' });
+  });
+
+  it('navigates to VendorManagement when Vendors shortcut is pressed', async () => {
+    renderWithStore(<PurchaseOrderListScreen />, {
+      purchaseOrders: defaultPOState,
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Vendors — suppliers and purchase history' })
+      ).toBeTruthy();
+    });
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Vendors — suppliers and purchase history' })
+    );
+    expect(mockNavigate).toHaveBeenCalledWith('VendorManagement');
   });
 
   it('shows error when fetch fails', async () => {

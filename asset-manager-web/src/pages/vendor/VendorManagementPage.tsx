@@ -6,7 +6,7 @@ import { VendorForm } from '../../components/purchaseOrder/VendorForm';
 import { useAppSelector } from '../../store/hooks';
 import { useConfirm } from '../../hooks';
 import { useToast } from '../../contexts/ToastContext';
-import { selectIsAdminOrSuperAdmin } from '../../store/selectors/authSelectors';
+import { selectIsAdminOrSuperAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
 import { subscribeToVendors } from '../../services/firebase/vendorService';
 import {
   createVendor,
@@ -32,6 +32,8 @@ export function VendorManagementPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useAppDispatch();
   const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
+  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const canAccessVendors = isAdminOrSuperAdmin || isStoreIncharge;
   const vendors = useAppSelector(selectVendors);
   const vendorsLoading = useAppSelector(selectVendorsLoading);
 
@@ -184,15 +186,15 @@ export function VendorManagementPage() {
     [confirm, toast]
   );
 
-  if (!isAdminOrSuperAdmin) {
+  if (!canAccessVendors) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <Icon name="lock-closed" className="h-16 w-16 text-slate-400" />
         <h2 className="mt-4 text-[17px] font-semibold text-slate-900">
-          Admin Only
+          Access restricted
         </h2>
         <p className="mt-2 text-[15px] text-slate-500">
-          Vendor management is restricted to administrators.
+          Vendor management is available to administrators and store incharge.
         </p>
       </div>
     );
@@ -340,6 +342,14 @@ export function VendorManagementPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end items-center gap-1">
+                        <Link
+                          to={`/vendors/${vendor.id}/ledger`}
+                          className="p-2 text-slate-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Vendor ledger"
+                          aria-label={`Vendor ledger for ${vendor.name}`}
+                        >
+                          <Icon name="book-open" className="h-5 w-5" />
+                        </Link>
                         <button
                           type="button"
                           onClick={() => handleOpenEdit(vendor)}
@@ -388,6 +398,13 @@ export function VendorManagementPage() {
                   </p>
                 </button>
                 <div className="flex items-center gap-2">
+                  <Link
+                    to={`/vendors/${vendor.id}/ledger`}
+                    className="rounded-lg p-2 text-slate-500 hover:bg-blue-50 hover:text-blue-800"
+                    aria-label={`Vendor ledger for ${vendor.name}`}
+                  >
+                    <Icon name="book-open" className="h-5 w-5" />
+                  </Link>
                   <button
                     type="button"
                     onClick={() => handleOpenEdit(vendor)}

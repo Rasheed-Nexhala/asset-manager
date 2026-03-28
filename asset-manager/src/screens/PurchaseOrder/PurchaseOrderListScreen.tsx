@@ -157,15 +157,10 @@ export const PurchaseOrderListScreen: React.FC = () => {
     [handlePOPress]
   );
 
+  /** Single primary action in header (CIAMS: one primary per screen). Vendors + Export live in the row below search. */
   const listHeaderActions = React.useMemo(
-    () => [
-      {
-        icon: 'download-outline' as const,
-        onPress: handleExport,
-        loading: isExporting,
-        accessibilityLabel: 'Export purchase orders',
-      },
-      ...(canCreatePO
+    () =>
+      canCreatePO
         ? [
             {
               icon: 'add' as const,
@@ -173,9 +168,8 @@ export const PurchaseOrderListScreen: React.FC = () => {
               label: 'New',
             },
           ]
-        : []),
-    ],
-    [handleExport, isExporting, canCreatePO, navigation]
+        : [],
+    [canCreatePO, navigation]
   );
 
   const isInitialOrRefetching =
@@ -243,6 +237,48 @@ export const PurchaseOrderListScreen: React.FC = () => {
               <Ionicons name="close-circle" size={20} color="#94A3B8" />
             </TouchableOpacity>
           )}
+        </View>
+      </View>
+
+      {/* Secondary: vendors + export — avoids crowding the header on narrow phones */}
+      <View className="bg-white border-b border-[#E2E8F0] px-4 py-2.5">
+        <View className="flex-row gap-2">
+          <TouchableOpacity
+            className="flex-1 min-h-[48px] flex-row items-center justify-center gap-1.5 border-[1.5px] border-[#1E40AF] rounded-[10px] px-2 bg-white active:opacity-90"
+            onPress={() => navigation.navigate('VendorManagement')}
+            accessibilityRole="button"
+            accessibilityLabel="Vendors — suppliers and purchase history"
+          >
+            <Ionicons name="people-outline" size={20} color="#1E40AF" />
+            <Text
+              className="text-[14px] font-semibold text-[#1E40AF] shrink"
+              numberOfLines={1}
+            >
+              Vendors
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            className="flex-1 min-h-[48px] flex-row items-center justify-center gap-1.5 border-[1.5px] border-[#1E40AF] rounded-[10px] px-2 bg-white active:opacity-90"
+            onPress={handleExport}
+            disabled={isExporting}
+            accessibilityRole="button"
+            accessibilityLabel="Export purchase orders"
+            accessibilityState={{ disabled: isExporting, busy: isExporting }}
+          >
+            {isExporting ? (
+              <ActivityIndicator size="small" color="#1E40AF" />
+            ) : (
+              <>
+                <Ionicons name="download-outline" size={20} color="#1E40AF" />
+                <Text
+                  className="text-[14px] font-semibold text-[#1E40AF] shrink"
+                  numberOfLines={1}
+                >
+                  Export
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 

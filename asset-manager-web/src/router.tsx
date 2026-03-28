@@ -24,6 +24,7 @@ import { CreatePOPage } from './pages/purchaseOrder/CreatePOPage';
 import { ApprovePOPage } from './pages/purchaseOrder/ApprovePOPage';
 import { ReceivePOPage } from './pages/purchaseOrder/ReceivePOPage';
 import { VendorManagementPage } from './pages/vendor/VendorManagementPage';
+import { VendorLedgerPage } from './pages/vendor/VendorLedgerPage';
 import {
   RequestQueuePage,
   CreateRequestPage,
@@ -108,6 +109,7 @@ export const router = createBrowserRouter([
               { path: 'inventory/custom/add', element: <AddEditCustomItemPage /> },
               { path: 'inventory/custom/:customItemId/edit', element: <AddEditCustomItemPage /> },
               { path: 'inventory/:itemId/edit', element: <AddEditItemPage /> },
+              { path: 'vendors/:vendorId/ledger', element: <VendorLedgerPage /> },
               { path: 'vendors', element: <VendorManagementPage /> },
               { path: 'purchase-orders', element: <PurchaseOrderListPage /> },
               { path: 'purchase-orders/new', element: <CreatePOPage /> },

@@ -7,6 +7,8 @@ export type PurchaseOrderStackParamList = {
   PurchaseOrderList: undefined;
   CreatePO: { poId?: string; selectedItems?: Item[]; initialQuantities?: Record<string, number> };
   VendorManagement: undefined;
+  /** PO history, items purchased, and links to each PO for this vendor */
+  VendorLedger: { vendorId: string };
   AddVendor: { vendorId?: string };
   ApprovePO: { poId: string };
   ReceivePO: { poId: string };

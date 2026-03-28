@@ -22,7 +22,7 @@ import type { PurchaseOrderStackParamList } from '../../navigation/PurchaseOrder
 
 type NavigationProp = StackNavigationProp<
   PurchaseOrderStackParamList,
-  'VendorManagement'
+  'VendorManagement' | 'VendorLedger'
 >;
 
 export const VendorManagementScreen: React.FC = () => {
@@ -64,13 +64,24 @@ export const VendorManagementScreen: React.FC = () => {
     navigation.navigate('AddVendor', {});
   }, [navigation]);
 
+  const handleLedgerPress = useCallback(
+    (vendor: Vendor) => {
+      navigation.navigate('VendorLedger', { vendorId: vendor.id });
+    },
+    [navigation]
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: Vendor }) => (
       <View className="px-4 pb-3">
-        <VendorCard vendor={item} onPress={() => handleVendorPress(item)} />
+        <VendorCard
+          vendor={item}
+          onPress={() => handleVendorPress(item)}
+          onLedgerPress={() => handleLedgerPress(item)}
+        />
       </View>
     ),
-    [handleVendorPress]
+    [handleVendorPress, handleLedgerPress]
   );
 
   return (
@@ -82,7 +93,7 @@ export const VendorManagementScreen: React.FC = () => {
         rightAction={{
           icon: 'add',
           onPress: handleAddVendor,
-          label: 'Add',
+          accessibilityLabel: 'Add vendor',
         }}
       />
 
