@@ -108,7 +108,7 @@ export function AllocateItemsToSupervisorsPage() {
   );
 
   const handleSubmit = useCallback(async () => {
-    if (!siteId || !selectedRequest || !selectedLine || !selectedSupervisor) {
+    if (!siteId || !userId || !selectedRequest || !selectedLine || !selectedSupervisor) {
       toast.info('Choose request, item, supervisor, and quantity.');
       return;
     }

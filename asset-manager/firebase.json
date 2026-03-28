@@ -1,6 +1,7 @@
 {
   "hosting": {
-    "public": "../asset-manager-web/dist",
+    "predeploy": ["bash scripts/sync-web-hosting-dist.sh"],
+    "public": "hosting-dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [{ "source": "**", "destination": "/index.html" }]
   },
