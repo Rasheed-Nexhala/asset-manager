@@ -20,6 +20,9 @@ export { InventoryUpdateRequestsScreen } from './Inventory/InventoryUpdateReques
 export { CategorySelectScreen } from './Inventory/CategorySelectScreen';
 export { SelectItemsScreen } from './SelectItems';
 export { CategoryManagementScreen } from './Inventory/CategoryManagementScreen';
+export { VehiclesListScreen } from './Inventory/VehiclesListScreen';
+export { VehicleDetailScreen } from './Inventory/VehicleDetailScreen';
+export { AddEditVehicleScreen } from './Inventory/AddEditVehicleScreen';
 export { SiteManagementScreen } from './Sites/SiteManagementScreen';
 export { AddSiteScreen } from './Sites/AddSiteScreen';
 export { EditSiteScreen } from './Sites/EditSiteScreen';

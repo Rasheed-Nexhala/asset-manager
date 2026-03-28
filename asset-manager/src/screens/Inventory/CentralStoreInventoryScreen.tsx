@@ -223,6 +223,10 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     navigation.navigate('CategoryManagement');
   }, [navigation]);
 
+  const handleVehicles = useCallback(() => {
+    navigation.navigate('VehiclesList');
+  }, [navigation]);
+
   const handleMaintenance = useCallback(() => {
     navigation.navigate('Maintenance');
   }, [navigation]);
@@ -742,6 +746,23 @@ export const CentralStoreInventoryScreen: React.FC = () => {
                     <Ionicons name="pricetags-outline" size={24} color="#1E40AF" />
                     <Text className="text-[15px] font-medium text-[#0F172A] ml-3">Manage Categories</Text>
                   </TouchableOpacity>
+
+                  {(isAdminOrSuperAdmin || isStoreIncharge) && (
+                    <TouchableOpacity
+                      className="flex-row items-center px-4 py-3 rounded-xl bg-[#F8FAFC]"
+                      onPress={() => {
+                        handleCloseMoreMenu();
+                        handleVehicles();
+                      }}
+                      activeOpacity={0.7}
+                      accessibilityLabel="Vehicles and fuel"
+                    >
+                      <Ionicons name="car-outline" size={24} color="#1E40AF" />
+                      <Text className="text-[15px] font-medium text-[#0F172A] ml-3">
+                        Vehicles & fuel
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             </TouchableWithoutFeedback>

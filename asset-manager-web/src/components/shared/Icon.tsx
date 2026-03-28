@@ -51,6 +51,7 @@ import {
   CameraIcon,
   XCircleIcon,
   BookOpenIcon,
+  TruckIcon,
 } from '@heroicons/react/24/outline';
 import type { SVGProps } from 'react';
 import { clsx } from 'clsx';
@@ -108,7 +109,8 @@ export type IconName =
   | 'photo'
   | 'camera'
   | 'x-circle'
-  | 'book-open';
+  | 'book-open'
+  | 'truck';
 
 const iconMap = {
   'squares-2x2': Squares2X2Icon,
@@ -163,6 +165,7 @@ const iconMap = {
   camera: CameraIcon,
   'x-circle': XCircleIcon,
   'book-open': BookOpenIcon,
+  truck: TruckIcon,
 } as const;
 
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {

@@ -20,6 +20,9 @@ import {
   InventoryUpdateRequestsScreen,
   CategorySelectScreen,
   CategoryManagementScreen,
+  VehiclesListScreen,
+  VehicleDetailScreen,
+  AddEditVehicleScreen,
 } from '../screens';
 import { MaintenanceStackNavigator } from './MaintenanceStackNavigator';
 
@@ -42,6 +45,9 @@ export type InventoryStackParamList = {
     initialCategoryId?: string | null;
   };
   CategoryManagement: undefined;
+  VehiclesList: undefined;
+  VehicleDetail: { vehicleId: string };
+  AddEditVehicle: { vehicleId?: string } | undefined;
 
   // Site Manager screens
   MySiteInventory: undefined;
@@ -162,6 +168,21 @@ export const InventoryStackNavigator: React.FC = () => {
               presentation: 'card',
               gestureEnabled: true,
             }}
+          />
+          <Stack.Screen
+            name="VehiclesList"
+            component={VehiclesListScreen}
+            options={{ presentation: 'card', gestureEnabled: true }}
+          />
+          <Stack.Screen
+            name="VehicleDetail"
+            component={VehicleDetailScreen}
+            options={{ presentation: 'card', gestureEnabled: true }}
+          />
+          <Stack.Screen
+            name="AddEditVehicle"
+            component={AddEditVehicleScreen}
+            options={{ presentation: 'card', gestureEnabled: true }}
           />
         </>
       )}

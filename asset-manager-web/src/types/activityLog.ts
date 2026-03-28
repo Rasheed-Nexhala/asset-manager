@@ -39,6 +39,7 @@ export type ActionType =
   | 'item_created'
   | 'item_updated'
   | 'quantity_adjusted'
+  | 'vehicle_fuel_assigned'
   | 'item_transferred'
   | 'item_deleted'
   | 'steel_master_created'

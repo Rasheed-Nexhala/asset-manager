@@ -91,6 +91,11 @@ export const ACTION_TYPE_CONFIG: Record<
     icon: 'swap-vertical-outline',
     category: 'inventory',
   },
+  vehicle_fuel_assigned: {
+    label: 'Fuel Assigned to Vehicle',
+    icon: 'car',
+    category: 'inventory',
+  },
   item_transferred: {
     label: 'Item Transferred',
     icon: 'arrow-forward-outline',

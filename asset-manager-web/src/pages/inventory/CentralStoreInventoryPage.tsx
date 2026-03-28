@@ -185,6 +185,7 @@ export function CentralStoreInventoryPage() {
     () => navigate('/inventory/update-requests'),
     [navigate]
   );
+  const handleVehicles = useCallback(() => navigate('/inventory/vehicles'), [navigate]);
   const handleExport = useCallback(async () => {
     setIsExporting(true);
     await dispatch(exportInventoryThunk());
@@ -289,6 +290,7 @@ export function CentralStoreInventoryPage() {
                   onMaintenance={handleMaintenance}
                   onSteelMaster={handleSteelMaster}
                   onCategoryManagement={handleCategoryManagement}
+                  onVehicles={handleVehicles}
                   variant="compact"
                 />
               </div>
@@ -554,6 +556,7 @@ export function CentralStoreInventoryPage() {
               onMaintenance={handleMaintenance}
               onSteelMaster={handleSteelMaster}
               onCategoryManagement={handleCategoryManagement}
+              onVehicles={handleVehicles}
               variant="full"
             />
           </div>
@@ -572,6 +575,7 @@ function MoreOptionsMenuItems({
   onMaintenance,
   onSteelMaster,
   onCategoryManagement,
+  onVehicles,
   variant = 'full',
 }: {
   isAdminOrSuperAdmin: boolean;
@@ -581,6 +585,7 @@ function MoreOptionsMenuItems({
   onMaintenance: () => void;
   onSteelMaster: () => void;
   onCategoryManagement: () => void;
+  onVehicles: () => void;
   variant?: 'full' | 'compact';
 }) {
   const itemClass =
@@ -639,6 +644,19 @@ function MoreOptionsMenuItems({
         <Icon name="swatch" className={iconClass} />
         <span className="text-[15px] font-medium text-slate-900">Manage Categories</span>
       </button>
+      {(isAdminOrSuperAdmin || isStoreIncharge) && (
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            onVehicles();
+          }}
+          className={itemClass}
+        >
+          <Icon name="truck" className={iconClass} />
+          <span className="text-[15px] font-medium text-slate-900">Vehicles & fuel</span>
+        </button>
+      )}
     </div>
   );
 }

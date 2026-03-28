@@ -522,3 +522,57 @@ export async function logInventoryUpdateRequestToCloud(
     console.error('Failed to log inventory update request:', error);
   }
 }
+
+export interface LogVehicleFuelAssignedPayload {
+  itemId: string;
+  itemName: string;
+  itemSku: string;
+  vehicleId: string;
+  vehicleNumber: string;
+  quantityLiters: number;
+  oldCentralQuantity: number;
+  newCentralQuantity: number;
+  referenceSiteId?: string | null;
+  referenceSiteName?: string | null;
+  reason?: string;
+  notes?: string;
+  assignmentId: string;
+  userName?: string;
+  userRole?: string;
+}
+
+export async function logVehicleFuelAssignedToCloud(
+  payload: LogVehicleFuelAssignedPayload
+): Promise<void> {
+  try {
+    const fn = httpsCallable<
+      LogVehicleFuelAssignedPayload,
+      { success: boolean }
+    >(functions, 'logVehicleFuelAssigned');
+    await fn(payload);
+  } catch (error: unknown) {
+    const code = (error as { code?: string })?.code ?? '';
+    const message = (error as { message?: string })?.message ?? String(error);
+    if (
+      code === 'functions/not-found' ||
+      code === 'functions/unavailable' ||
+      message.includes('not-found')
+    ) {
+      if (import.meta.env?.DEV) {
+        console.info(
+          'Activity log (logVehicleFuelAssigned) unavailable. Deploy Cloud Functions to enable logging.'
+        );
+      }
+      return;
+    }
+    if (code === 'unauthenticated' || message.includes('unauthenticated')) {
+      if (import.meta.env?.DEV) {
+        console.info(
+          'Activity log (logVehicleFuelAssigned): unauthenticated; event not logged.'
+        );
+      }
+      return;
+    }
+    console.warn('Failed to log vehicle fuel assignment:', error);
+  }
+}

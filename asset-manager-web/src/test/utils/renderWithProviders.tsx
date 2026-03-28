@@ -1,6 +1,7 @@
+import React, { type ReactElement, type ReactNode } from 'react';
 import { render } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { configureStore } from '@reduxjs/toolkit';
+import { combineReducers, configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../store/slices/authSlice';
 import sitesReducer from '../../store/slices/sitesSlice';
 import inventoryReducer from '../../store/slices/inventorySlice';
@@ -10,10 +11,9 @@ import maintenanceReducer from '../../store/slices/maintenanceSlice';
 import activityLogReducer from '../../store/slices/activityLogSlice';
 import purchaseOrderReducer from '../../store/slices/purchaseOrderSlice';
 import inventoryUpdateRequestReducer from '../../store/slices/inventoryUpdateRequestSlice';
-import type { PreloadedState } from '@reduxjs/toolkit';
 import type { RootState } from '../../store';
 
-const rootReducer = {
+const rootReducer = combineReducers({
   auth: authReducer,
   sites: sitesReducer,
   inventory: inventoryReducer,
@@ -23,17 +23,17 @@ const rootReducer = {
   activityLog: activityLogReducer,
   purchaseOrders: purchaseOrderReducer,
   inventoryUpdateRequest: inventoryUpdateRequestReducer,
-};
+});
 
 export function renderWithProviders(
-  ui: React.ReactElement,
-  { preloadedState = {} }: { preloadedState?: PreloadedState<RootState> } = {}
+  ui: ReactElement,
+  { preloadedState = {} }: { preloadedState?: Partial<RootState> } = {}
 ) {
   const store = configureStore({
     reducer: rootReducer,
     preloadedState,
   });
-  function Wrapper({ children }: { children: React.ReactNode }) {
+  function Wrapper({ children }: { children: ReactNode }) {
     return <Provider store={store}>{children}</Provider>;
   }
   return { store, ...render(ui, { wrapper: Wrapper }) };

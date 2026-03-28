@@ -2815,5 +2815,131 @@ export const logInventoryUpdateRequest = onCall(async (request) => {
   return { success: true };
 });
 
+/**
+ * Callable: log vehicle fuel assignment (central store consumption to a vehicle).
+ * Single audit entry for item history; stock was already updated via client adjustQuantity.
+ */
+export const logVehicleFuelAssigned = onCall(async (request) => {
+  try {
+    if (!request.auth) {
+      throw new HttpsError(
+        'unauthenticated',
+        'User must be authenticated to log vehicle fuel assignment'
+      );
+    }
+
+    const data = request.data ?? {};
+    const {
+      itemId,
+      itemName,
+      itemSku,
+      vehicleId,
+      vehicleNumber,
+      quantityLiters,
+      oldCentralQuantity,
+      newCentralQuantity,
+      referenceSiteId,
+      referenceSiteName,
+      reason,
+      notes,
+      assignmentId,
+      userName,
+      userRole,
+    } = data;
+
+    if (
+      !itemId ||
+      itemName == null ||
+      itemSku == null ||
+      !vehicleId ||
+      vehicleNumber == null ||
+      quantityLiters == null ||
+      oldCentralQuantity == null ||
+      newCentralQuantity == null
+    ) {
+      throw new HttpsError(
+        'invalid-argument',
+        'Missing required fields for vehicle fuel log'
+      );
+    }
+
+    const safeQty = sanitizeNumberForFirestore(quantityLiters);
+    const safeOld = sanitizeNumberForFirestore(oldCentralQuantity);
+    const safeNew = sanitizeNumberForFirestore(newCentralQuantity);
+
+    const displayName =
+      request.auth.token.name ??
+      request.auth.token.email ??
+      'Unknown';
+
+    const siteLine =
+      referenceSiteId && referenceSiteName
+        ? ` Reference site: ${referenceSiteName}.`
+        : '';
+    const summary = `Fuel to vehicle ${String(vehicleNumber)}: ${safeQty} L (central ${safeOld}→${safeNew})`;
+    const detailsParts = [
+      `Assignment: ${assignmentId ? String(assignmentId) : 'n/a'}`,
+      reason ? `Reason: ${String(reason)}` : '',
+      notes ? `Notes: ${String(notes)}` : '',
+      siteLine.trim(),
+    ].filter(Boolean);
+    const details = detailsParts.join('. ');
+
+    const baseChanges: ActivityChangeEntry[] = [
+      {
+        field: 'locationName',
+        fieldLabel: 'Location',
+        oldValue: 'Central Store',
+        newValue: 'Central Store',
+      },
+      {
+        field: 'quantity',
+        fieldLabel: 'Quantity at central store',
+        oldValue: safeOld,
+        newValue: safeNew,
+      },
+      {
+        field: 'vehicleNumber',
+        fieldLabel: 'Vehicle',
+        oldValue: '',
+        newValue: String(vehicleNumber),
+      },
+      {
+        field: 'quantityLiters',
+        fieldLabel: 'Liters assigned',
+        oldValue: 0,
+        newValue: safeQty,
+      },
+    ];
+
+    const changes = await ensureCentralStoreContextInChanges(
+      baseChanges,
+      String(itemId)
+    );
+
+    await createActivityLog({
+      userId: request.auth.uid,
+      userName: (userName as string) ?? displayName,
+      userRole: (userRole as string) ?? 'Unassigned',
+      actionType: 'vehicle_fuel_assigned',
+      actionCategory: 'inventory',
+      targetType: 'item',
+      targetId: String(itemId),
+      targetDisplay: `${String(itemName)} (${String(itemSku)})`,
+      summary,
+      details,
+      changes,
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    logger.error('logVehicleFuelAssigned failed', { error });
+    return { success: true };
+  }
+});
+
 /** Scheduled Firestore backup — exports daily to GCS. See docs/FIREBASE_BACKUP_IMPLEMENTATION.md */
 export { scheduledFirestoreBackup } from './scheduledBackup';

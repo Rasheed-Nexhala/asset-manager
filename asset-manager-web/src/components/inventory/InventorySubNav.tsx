@@ -7,6 +7,7 @@ import { clsx } from 'clsx';
 const allTabs = [
   { to: '/inventory', end: true, label: 'My Site', icon: 'map-pin' as const, roles: ['SiteManager'] as const },
   { to: '/inventory/central', end: false, label: 'Central Store', icon: 'building-storefront' as const, roles: ['Admin', 'StoreIncharge'] as const },
+  { to: '/inventory/vehicles', end: false, label: 'Vehicles', icon: 'truck' as const, roles: ['Admin', 'StoreIncharge'] as const },
   { to: '/inventory/other-sites', end: false, label: 'Other Sites', icon: 'building-office-2' as const, roles: ['SiteManager'] as const },
   { to: '/inventory/steel-master', end: false, label: 'Custom Items', icon: 'chart-bar-square' as const, roles: ['Admin', 'StoreIncharge'] as const },
 ];
@@ -27,11 +28,8 @@ export function InventorySubNav() {
     ? allTabs.filter((tab) => (tab.roles as readonly string[]).includes(role))
     : allTabs.filter((t) => (t.roles as readonly string[]).includes('SiteManager'));
   return (
-    <nav
-      className="border-b border-slate-200 bg-white px-4 md:px-6"
-      aria-label="Inventory sections"
-    >
-      <div className="flex gap-1 overflow-x-auto -mb-px scrollbar-hide">
+    <nav className="border-b border-slate-200 bg-white" aria-label="Inventory sections">
+      <div className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 -mb-px scrollbar-hide md:px-6 lg:px-8">
         {tabs.map((tab) => (
           <NavLink
             key={tab.to}

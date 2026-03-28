@@ -1,0 +1,1 @@
+Using your Ask Question tool message-question until you are clear about this feature and give a summary of how this feature would work and where it would be in the UI and only when I ask to go ahead with the implementation do it for me.

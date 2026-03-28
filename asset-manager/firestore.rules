@@ -47,6 +47,15 @@ service cloud.firestore {
     function isStoreIncharge() {
       return isAuthenticated() && getUserRole() == 'StoreIncharge';
     }
+
+    /** Vehicles & fuel assignments: Admin/SuperAdmin overview; Store Incharge manages. */
+    function canViewVehiclesModule() {
+      return isAdminOrSuperAdmin() || isStoreIncharge();
+    }
+
+    function canManageVehiclesModule() {
+      return isStoreIncharge();
+    }
     
     /**
      * Check if user is Site Manager
@@ -360,6 +369,23 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isUserActive() &&
         (hasInventoryAccess() || isSiteManager());
       allow create, update, delete: if hasInventoryAccess();
+    }
+
+    /**
+     * Vehicles — fleet registry for fuel assignment (Store Incharge writes; Admin/SuperAdmin read).
+     */
+    match /vehicles/{vehicleId} {
+      allow read: if isAuthenticated() && isUserActive() && canViewVehiclesModule();
+      allow create, update, delete: if isAuthenticated() && isUserActive() && canManageVehiclesModule();
+    }
+
+    /**
+     * Vehicle fuel assignments — consumption from central store to a vehicle (immutable rows).
+     */
+    match /vehicleFuelAssignments/{assignmentId} {
+      allow read: if isAuthenticated() && isUserActive() && canViewVehiclesModule();
+      allow create: if isAuthenticated() && isUserActive() && canManageVehiclesModule();
+      allow update, delete: if false;
     }
 
     /**

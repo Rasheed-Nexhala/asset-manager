@@ -19,6 +19,9 @@ import { ItemActivityHistoryPage } from './pages/inventory/ItemActivityHistoryPa
 import { AddEditItemPage } from './pages/inventory/AddEditItemPage';
 import { AddEditCustomItemPage } from './pages/inventory/AddEditCustomItemPage';
 import { CategoryManagementPage } from './pages/inventory/CategoryManagementPage';
+import { VehiclesPage } from './pages/inventory/VehiclesPage';
+import { VehicleDetailPage } from './pages/inventory/VehicleDetailPage';
+import { AddEditVehiclePage } from './pages/inventory/AddEditVehiclePage';
 import { InventoryUpdateRequestsPage } from './pages/inventory/InventoryUpdateRequestsPage';
 import { PurchaseOrderListPage } from './pages/purchaseOrder/PurchaseOrderListPage';
 import { PurchaseOrderDetailPage } from './pages/purchaseOrder/PurchaseOrderDetailPage';
@@ -112,6 +115,10 @@ export const router = createBrowserRouter([
             element: <AdminOrStoreInchargeGuard />,
             children: [
               { path: 'inventory/central', element: <CentralStoreInventoryPage /> },
+              { path: 'inventory/vehicles/new', element: <AddEditVehiclePage /> },
+              { path: 'inventory/vehicles/:vehicleId/edit', element: <AddEditVehiclePage /> },
+              { path: 'inventory/vehicles/:vehicleId', element: <VehicleDetailPage /> },
+              { path: 'inventory/vehicles', element: <VehiclesPage /> },
               { path: 'inventory/steel-master', element: <SteelMasterPage /> },
               { path: 'inventory/categories', element: <CategoryManagementPage /> },
               { path: 'inventory/update-requests', element: <InventoryUpdateRequestsPage /> },
