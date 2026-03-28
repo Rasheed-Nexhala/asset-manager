@@ -25,6 +25,7 @@ import type { DocumentSnapshot, QueryConstraint } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type {
   Request,
+  RequestStatus,
   CreateRequestData,
   EditRequestData,
   RejectRequestData,
@@ -34,6 +35,17 @@ import type {
 } from '../../types/request';
 
 const REQUESTS_COLLECTION = 'requests';
+
+/** Queue list: all lifecycle states except drafts (avoids `!=` + orderBy quirks; max 10 for `in`). */
+export const REQUEST_QUEUE_NON_DRAFT_STATUSES: RequestStatus[] = [
+  'pending',
+  'approved',
+  'rejected',
+  'transferred',
+  'partially_returned',
+  'returned',
+  'cancelled',
+];
 const REQUEST_COUNTERS_COLLECTION = 'requestCounters';
 const INVENTORY_COLLECTION = 'inventory';
 const ITEMS_COLLECTION = 'items';
@@ -1097,7 +1109,9 @@ export const REQUESTS_PAGE_SIZE = 10;
  * - Queue (no userId): excludes drafts via status filter; optional status/siteId
  * - My Requests (userId): includes drafts; filters by requestedBy
  */
-const buildRequestQueryConstraints = (filters?: RequestListFilters): QueryConstraint[] => {
+export const buildRequestQueryConstraints = (
+  filters?: RequestListFilters
+): QueryConstraint[] => {
   const constraints: QueryConstraint[] = [];
 
   if (filters?.userId) {
@@ -1107,7 +1121,7 @@ const buildRequestQueryConstraints = (filters?: RequestListFilters): QueryConstr
     if (filters?.status && filters.status !== 'all') {
       constraints.push(where('status', '==', filters.status));
     } else {
-      constraints.push(where('status', '!=', 'draft'));
+      constraints.push(where('status', 'in', REQUEST_QUEUE_NON_DRAFT_STATUSES));
     }
     if (filters?.siteId && filters.siteId !== 'all') {
       constraints.push(where('siteId', '==', filters.siteId));

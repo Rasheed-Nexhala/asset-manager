@@ -73,6 +73,7 @@ export const VendorLedgerScreen: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [vendorLoadError, setVendorLoadError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [tab, setTab] = useState<'pos' | 'items'>('pos');
 
@@ -84,12 +85,20 @@ export const VendorLedgerScreen: React.FC = () => {
   const titleName = vendor?.name ?? vendorFromStore?.name ?? 'Vendor';
 
   const loadVendor = useCallback(async () => {
-    if (vendorFromStore) {
-      setVendor(vendorFromStore);
-      return;
+    setVendorLoadError(null);
+    try {
+      if (vendorFromStore) {
+        setVendor(vendorFromStore);
+        return;
+      }
+      const v = await getVendorById(vendorId);
+      setVendor(v);
+      if (!v) setVendorLoadError('Vendor not found');
+    } catch (e) {
+      setVendorLoadError(
+        e instanceof Error ? e.message : 'Could not load vendor'
+      );
     }
-    const v = await getVendorById(vendorId);
-    setVendor(v);
   }, [vendorFromStore, vendorId]);
 
   const loadInitial = useCallback(
@@ -282,6 +291,11 @@ export const VendorLedgerScreen: React.FC = () => {
       >
         <View className="px-4 pt-4">
           <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">{titleName}</Text>
+          {vendorLoadError ? (
+            <View className="mb-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200">
+              <Text className="text-[14px] text-red-800">{vendorLoadError}</Text>
+            </View>
+          ) : null}
         </View>
 
         <View className="px-4 mb-3">

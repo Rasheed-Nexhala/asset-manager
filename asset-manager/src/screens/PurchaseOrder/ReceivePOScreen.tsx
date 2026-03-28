@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -52,6 +52,7 @@ export const ReceivePOScreen: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryTrigger, setRetryTrigger] = useState(0);
   const [saving, setSaving] = useState(false);
+  const receiveInFlightRef = useRef(false);
   const [invoiceFiles, setInvoiceFiles] = useState<
     Array<{ fileName: string; fileUrl: string }>
   >([]);
@@ -164,6 +165,7 @@ export const ReceivePOScreen: React.FC = () => {
 
   const handleConfirm = useCallback(async () => {
     if (!po || !userId || !userName) return;
+    if (receiveInFlightRef.current) return;
 
     // Validate all quantities are non-negative integers
     for (const item of po.items) {
@@ -184,6 +186,7 @@ export const ReceivePOScreen: React.FC = () => {
       return;
     }
 
+    receiveInFlightRef.current = true;
     setSaving(true);
     try {
       const { grrNumber, updatedPO } = await dispatch(
@@ -217,6 +220,7 @@ export const ReceivePOScreen: React.FC = () => {
       const msg = err instanceof Error ? err.message : 'Failed to receive PO';
       Alert.alert('Error', msg);
     } finally {
+      receiveInFlightRef.current = false;
       setSaving(false);
     }
   }, [

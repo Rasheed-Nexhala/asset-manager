@@ -126,7 +126,7 @@ export const AllocateItemsToSupervisorsScreen: React.FC = () => {
   }, [navigation, returnTo, requestsListScreen]);
 
   const handleSubmit = useCallback(async () => {
-    if (!siteId || !selectedRequest || !selectedLine || !selectedSupervisor) {
+    if (!siteId || !userId || !selectedRequest || !selectedLine || !selectedSupervisor) {
       Alert.alert('Incomplete', 'Choose request, item, supervisor, and quantity.');
       return;
     }

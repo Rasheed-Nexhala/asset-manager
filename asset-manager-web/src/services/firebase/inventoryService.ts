@@ -23,6 +23,7 @@ import {
   DocumentSnapshot,
   deleteField,
 } from 'firebase/firestore';
+import type { Transaction } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { auth } from '../../config/firebase';
 import { deleteItemImageByUrl } from './storageService';
@@ -1050,6 +1051,120 @@ export const deleteItem = async (id: string): Promise<void> => {
  */
 const MAX_TRANSACTION_RETRIES = 3;
 
+/**
+ * Apply inventory + item total updates inside an existing Firestore transaction.
+ * Performs all reads first, then writes. Callers may add more writes after this resolves.
+ */
+export async function applyInventoryAdjustmentInTransaction(
+  transaction: Transaction,
+  adjustmentData: AdjustmentData
+): Promise<{ oldQuantity: number; newQuantity: number }> {
+  const inventoryDocRef = doc(
+    db,
+    INVENTORY_COLLECTION,
+    getInventoryDocId(adjustmentData.itemId, adjustmentData.locationId)
+  );
+
+  const itemRef = doc(db, ITEMS_COLLECTION, adjustmentData.itemId);
+
+  const inventoryDoc = await transaction.get(inventoryDocRef);
+  const invData = inventoryDoc.exists() ? inventoryDoc.data() : null;
+  const currentQty = invData?.quantity ?? 0;
+
+  const itemDoc = await transaction.get(itemRef);
+  if (!itemDoc.exists()) {
+    throw new Error(`Item ${adjustmentData.itemId} not found`);
+  }
+  const itemData = itemDoc.data() ?? {};
+
+  let quantityChange: number;
+  let newQuantity: number;
+
+  if (adjustmentData.type === 'set') {
+    newQuantity = adjustmentData.quantity;
+    quantityChange = newQuantity - currentQty;
+    if (newQuantity < 0) {
+      throw new Error(
+        `Target quantity cannot be negative. Requested: ${adjustmentData.quantity}`
+      );
+    }
+  } else {
+    quantityChange =
+      adjustmentData.type === 'add'
+        ? adjustmentData.quantity
+        : -adjustmentData.quantity;
+    newQuantity = currentQty + quantityChange;
+  }
+
+  if (newQuantity < 0) {
+    throw new Error(
+      `Cannot reduce stock below zero. Current quantity: ${currentQty}, Attempted change: ${quantityChange}`
+    );
+  }
+
+  const inventoryUpdateData: Record<string, unknown> = {
+    itemId: adjustmentData.itemId,
+    itemName: itemData.name,
+    itemSku: itemData.sku,
+    locationId: adjustmentData.locationId,
+    locationType: adjustmentData.locationType,
+    locationName: adjustmentData.locationName,
+    quantity: newQuantity,
+    updatedAt: serverTimestamp(),
+  };
+  if (adjustmentData.lengthPerPiece != null) {
+    inventoryUpdateData.lengthPerPiece = adjustmentData.lengthPerPiece;
+  }
+
+  if (newQuantity === 0 && adjustmentData.locationType === 'site') {
+    if (inventoryDoc.exists()) {
+      transaction.delete(inventoryDocRef);
+    }
+  } else if (!inventoryDoc.exists()) {
+    transaction.set(inventoryDocRef, inventoryUpdateData);
+  } else {
+    transaction.update(inventoryDocRef, inventoryUpdateData);
+  }
+
+  const currentTotals = {
+    totalQuantity: itemData.totalQuantity || 0,
+    centralStoreQuantity: itemData.centralStoreQuantity || 0,
+    atSitesQuantity: itemData.atSitesQuantity || 0,
+    inMaintenanceQuantity: itemData.inMaintenanceQuantity || 0,
+  };
+
+  const updatedTotals: Record<string, unknown> = {};
+  if (adjustmentData.locationType === 'store') {
+    updatedTotals.centralStoreQuantity =
+      currentTotals.centralStoreQuantity + quantityChange;
+  } else if (adjustmentData.locationType === 'site') {
+    updatedTotals.atSitesQuantity =
+      currentTotals.atSitesQuantity + quantityChange;
+  } else if (adjustmentData.locationType === 'maintenance') {
+    updatedTotals.inMaintenanceQuantity =
+      currentTotals.inMaintenanceQuantity + quantityChange;
+  }
+
+  updatedTotals.totalQuantity = currentTotals.totalQuantity + quantityChange;
+  updatedTotals.updatedAt = serverTimestamp();
+
+  if (typeof updatedTotals.totalQuantity === 'number' && updatedTotals.totalQuantity < 0) {
+    throw new Error('Total quantity cannot drop below zero.');
+  }
+  if (typeof updatedTotals.centralStoreQuantity === 'number' && updatedTotals.centralStoreQuantity < 0) {
+    throw new Error('Central store quantity cannot drop below zero.');
+  }
+  if (typeof updatedTotals.atSitesQuantity === 'number' && updatedTotals.atSitesQuantity < 0) {
+    throw new Error('Site quantity cannot drop below zero.');
+  }
+  if (typeof updatedTotals.inMaintenanceQuantity === 'number' && updatedTotals.inMaintenanceQuantity < 0) {
+    throw new Error('Maintenance quantity cannot drop below zero.');
+  }
+
+  transaction.update(itemRef, updatedTotals);
+  return { oldQuantity: currentQty, newQuantity };
+}
+
 export const adjustQuantity = async (
   adjustmentData: AdjustmentData
 ): Promise<{ oldQuantity: number; newQuantity: number }> => {
@@ -1065,121 +1180,11 @@ export const adjustQuantity = async (
     throw new Error('Location ID is required to adjust quantity');
   }
 
-  const inventoryDocRef = doc(
-    db,
-    INVENTORY_COLLECTION,
-    getInventoryDocId(adjustmentData.itemId, adjustmentData.locationId)
-  );
-
-  const itemRef = doc(db, ITEMS_COLLECTION, adjustmentData.itemId);
-
   let lastError: unknown;
   for (let attempt = 1; attempt <= MAX_TRANSACTION_RETRIES; attempt++) {
     try {
       const result = await runTransaction(db, async (transaction) => {
-      // Read inventory doc within transaction (transaction.get accepts DocumentReference only)
-      const inventoryDoc = await transaction.get(inventoryDocRef);
-      const invData = inventoryDoc.exists() ? inventoryDoc.data() : null;
-      const currentQty = invData?.quantity ?? 0;
-
-      // Read item within transaction
-      const itemDoc = await transaction.get(itemRef);
-      if (!itemDoc.exists()) {
-        throw new Error(`Item ${adjustmentData.itemId} not found`);
-      }
-      const itemData = itemDoc.data() ?? {};
-
-      // Calculate new quantity
-      let quantityChange: number;
-      let newQuantity: number;
-
-      if (adjustmentData.type === 'set') {
-        newQuantity = adjustmentData.quantity;
-        quantityChange = newQuantity - currentQty;
-        if (newQuantity < 0) {
-          throw new Error(
-            `Target quantity cannot be negative. Requested: ${adjustmentData.quantity}`
-          );
-        }
-      } else {
-        quantityChange =
-          adjustmentData.type === 'add'
-            ? adjustmentData.quantity
-            : -adjustmentData.quantity;
-        newQuantity = currentQty + quantityChange;
-      }
-
-      // Prevent negative stock (atomic check)
-      if (newQuantity < 0) {
-        throw new Error(
-          `Cannot reduce stock below zero. Current quantity: ${currentQty}, Attempted change: ${quantityChange}`
-        );
-      }
-
-      // Update or create inventory entry
-      const inventoryUpdateData: Record<string, unknown> = {
-        itemId: adjustmentData.itemId,
-        itemName: itemData.name,
-        itemSku: itemData.sku,
-        locationId: adjustmentData.locationId,
-        locationType: adjustmentData.locationType,
-        locationName: adjustmentData.locationName,
-        quantity: newQuantity,
-        updatedAt: serverTimestamp(),
-      };
-      if (adjustmentData.lengthPerPiece != null) {
-        inventoryUpdateData.lengthPerPiece = adjustmentData.lengthPerPiece;
-      }
-
-      if (newQuantity === 0 && adjustmentData.locationType === 'site') {
-        if (inventoryDoc.exists()) {
-          transaction.delete(inventoryDocRef);
-        }
-      } else if (!inventoryDoc.exists()) {
-        transaction.set(inventoryDocRef, inventoryUpdateData);
-      } else {
-        transaction.update(inventoryDocRef, inventoryUpdateData);
-      }
-
-      // Update item's denormalized stock totals
-      const currentTotals = {
-        totalQuantity: itemData.totalQuantity || 0,
-        centralStoreQuantity: itemData.centralStoreQuantity || 0,
-        atSitesQuantity: itemData.atSitesQuantity || 0,
-        inMaintenanceQuantity: itemData.inMaintenanceQuantity || 0,
-      };
-
-      const updatedTotals: Record<string, unknown> = {};
-      if (adjustmentData.locationType === 'store') {
-        updatedTotals.centralStoreQuantity =
-          currentTotals.centralStoreQuantity + quantityChange;
-      } else if (adjustmentData.locationType === 'site') {
-        updatedTotals.atSitesQuantity =
-          currentTotals.atSitesQuantity + quantityChange;
-      } else if (adjustmentData.locationType === 'maintenance') {
-        updatedTotals.inMaintenanceQuantity =
-          currentTotals.inMaintenanceQuantity + quantityChange;
-      }
-
-      updatedTotals.totalQuantity = currentTotals.totalQuantity + quantityChange;
-      updatedTotals.updatedAt = serverTimestamp();
-
-      // Defensive checks to prevent any denormalized stock from dropping below zero
-      if (typeof updatedTotals.totalQuantity === 'number' && updatedTotals.totalQuantity < 0) {
-        throw new Error('Total quantity cannot drop below zero.');
-      }
-      if (typeof updatedTotals.centralStoreQuantity === 'number' && updatedTotals.centralStoreQuantity < 0) {
-        throw new Error('Central store quantity cannot drop below zero.');
-      }
-      if (typeof updatedTotals.atSitesQuantity === 'number' && updatedTotals.atSitesQuantity < 0) {
-        throw new Error('Site quantity cannot drop below zero.');
-      }
-      if (typeof updatedTotals.inMaintenanceQuantity === 'number' && updatedTotals.inMaintenanceQuantity < 0) {
-        throw new Error('Maintenance quantity cannot drop below zero.');
-      }
-
-      transaction.update(itemRef, updatedTotals);
-        return { oldQuantity: currentQty, newQuantity };
+        return applyInventoryAdjustmentInTransaction(transaction, adjustmentData);
       });
       return result;
     } catch (error) {

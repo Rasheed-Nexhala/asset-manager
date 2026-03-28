@@ -23,6 +23,7 @@ export function ReceivePOPage() {
   const dispatch = useAppDispatch();
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const receiveInFlightRef = useRef(false);
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
@@ -137,6 +138,7 @@ export function ReceivePOPage() {
 
   const handleConfirm = useCallback(async () => {
     if (!po || !userId || !userName || !poId) return;
+    if (receiveInFlightRef.current) return;
 
     for (const item of po.items) {
       const raw = receivedQtys[item.itemId] ?? '';
@@ -160,6 +162,7 @@ export function ReceivePOPage() {
       return;
     }
 
+    receiveInFlightRef.current = true;
     setSaving(true);
     try {
       const { grrNumber, updatedPO } = await dispatch(
@@ -195,6 +198,7 @@ export function ReceivePOPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to receive PO');
     } finally {
+      receiveInFlightRef.current = false;
       setSaving(false);
     }
   }, [
