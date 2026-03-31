@@ -13,6 +13,8 @@ export interface SiteFormProps {
   isLoading?: boolean;
   submitButtonLabel?: string;
   siteId?: string;
+  /** When editing, only SuperAdmin should pass true so the site name field is editable. */
+  canEditSiteName?: boolean;
 }
 
 interface FormErrors {
@@ -34,7 +36,9 @@ export function SiteForm({
   isLoading = false,
   submitButtonLabel = 'Save',
   siteId,
+  canEditSiteName = false,
 }: SiteFormProps) {
+  const nameFieldLocked = Boolean(siteId) && !canEditSiteName;
   const [formData, setFormData] = useState<SiteFormData>({
     name: initialData?.name || '',
     description: initialData?.description || '',
@@ -165,13 +169,13 @@ export function SiteForm({
       <div className="rounded-[10px] border border-slate-200 bg-white p-4">
         <div className="space-y-4">
           <FormField
-            label={siteId ? 'Site Name (cannot be changed)' : 'Site Name'}
+            label={nameFieldLocked ? 'Site Name (cannot be changed)' : 'Site Name'}
             required
             value={formData.name}
             onChange={(text) => handleFieldChange('name', text)}
             placeholder="e.g. Site A"
             error={errors.name}
-            disabled={!!siteId}
+            disabled={nameFieldLocked}
           />
           <FormField
             label="Project Description (Optional)"

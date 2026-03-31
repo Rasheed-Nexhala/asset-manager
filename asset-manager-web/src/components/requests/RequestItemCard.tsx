@@ -173,7 +173,7 @@ export function RequestItemCard({
         )}
 
         <div className="flex-1 min-w-0">
-          <p className="text-[15px] font-semibold text-slate-900 mb-1">
+          <p className="text-[15px] font-semibold text-slate-900 mb-1 line-clamp-2 break-words">
             {item.itemName}
           </p>
           <div className="flex items-center gap-2 mb-2">
@@ -205,7 +205,7 @@ export function RequestItemCard({
                 </div>
               )}
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col gap-2">
                 <span className="text-[13px] text-slate-500">
                   {hasFullWeightConfig
                     ? entryMode === 'pieces'
@@ -215,46 +215,50 @@ export function RequestItemCard({
                         : 'Weight (Ton):'
                     : `Quantity (${displayUnit}):`}
                 </span>
-                <div className="flex items-center gap-2">
-                  {(!hasFullWeightConfig || entryMode === 'pieces') && (
+                <div className="flex items-stretch gap-2 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {(!hasFullWeightConfig || entryMode === 'pieces') && (
+                      <button
+                        type="button"
+                        onClick={handleDecrement}
+                        aria-label="Decrease quantity"
+                        className="h-12 w-12 shrink-0 border border-slate-200 rounded-full flex items-center justify-center text-blue-800 hover:bg-slate-50"
+                      >
+                        <Icon name="minus" className="h-5 w-5" />
+                      </button>
+                    )}
+
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={amountStr}
+                      onChange={(e) => handleAmountChange(e.target.value)}
+                      className="border border-slate-200 rounded-lg px-2 py-2 text-center text-[15px] font-bold text-slate-900 bg-white min-w-[56px] max-w-[120px] w-full min-h-12"
+                    />
+
+                    {(!hasFullWeightConfig || entryMode === 'pieces') && (
+                      <button
+                        type="button"
+                        onClick={handleIncrement}
+                        aria-label="Increase quantity"
+                        className="h-12 w-12 shrink-0 border border-blue-800 rounded-full flex items-center justify-center bg-blue-800 text-white hover:bg-blue-900"
+                      >
+                        <Icon name="plus" className="h-5 w-5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {onRemove && (
                     <button
                       type="button"
-                      onClick={handleDecrement}
-                      className="w-8 h-8 border border-slate-200 rounded-full flex items-center justify-center text-blue-800 hover:bg-slate-50"
+                      onClick={() => onRemove(item.itemId)}
+                      className="h-12 w-12 shrink-0 flex items-center justify-center text-red-600 hover:bg-red-50 rounded-[10px] border border-transparent hover:border-red-200"
+                      aria-label="Remove item from request"
                     >
-                      <Icon name="minus" className="h-4 w-4" />
-                    </button>
-                  )}
-
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={amountStr}
-                    onChange={(e) => handleAmountChange(e.target.value)}
-                    className="border border-slate-200 rounded-lg px-2 py-2 text-center text-[15px] font-bold text-slate-900 bg-white w-16"
-                  />
-
-                  {(!hasFullWeightConfig || entryMode === 'pieces') && (
-                    <button
-                      type="button"
-                      onClick={handleIncrement}
-                      className="w-8 h-8 border border-blue-800 rounded-full flex items-center justify-center bg-blue-800 text-white hover:bg-blue-900"
-                    >
-                      <Icon name="plus" className="h-4 w-4" />
+                      <Icon name="trash" className="h-6 w-6" />
                     </button>
                   )}
                 </div>
-
-                {onRemove && (
-                  <button
-                    type="button"
-                    onClick={() => onRemove(item.itemId)}
-                    className="ml-auto w-9 h-9 flex items-center justify-center text-red-600 hover:bg-red-50 rounded"
-                    aria-label="Remove item"
-                  >
-                    <Icon name="trash" className="h-5 w-5" />
-                  </button>
-                )}
               </div>
 
               {hasFullWeightConfig &&

@@ -143,8 +143,11 @@ export const RequestItemCard: React.FC<RequestItemCardProps> = ({
           </View>
         )}
 
-        <View className="flex-1">
-          <Text className="text-[15px] font-semibold text-[#0F172A] mb-1">
+        <View className="flex-1 min-w-0">
+          <Text
+            className="text-[15px] font-semibold text-[#0F172A] mb-1"
+            numberOfLines={2}
+          >
             {item.itemName}
           </Text>
 
@@ -182,48 +185,58 @@ export const RequestItemCard: React.FC<RequestItemCardProps> = ({
                 </View>
               )}
 
-              <View className="flex-row items-center gap-3">
+              <View className="gap-2">
                 <Text className="text-[13px] text-[#64748B]">
                   {hasFullWeightConfig
-                    ? entryMode === 'pieces' ? 'Quantity (Pcs):' : entryMode === 'kg' ? 'Weight (Kg):' : 'Weight (Ton):'
+                    ? entryMode === 'pieces'
+                      ? 'Quantity (Pcs):'
+                      : entryMode === 'kg'
+                        ? 'Weight (Kg):'
+                        : 'Weight (Ton):'
                     : `Quantity (${displayUnit}):`}
                 </Text>
                 <View className="flex-row items-center gap-2">
-                  {(!hasFullWeightConfig || entryMode === 'pieces') && (
-                    <TouchableOpacity
-                      onPress={handleDecrement}
-                      className="w-8 h-8 border border-[#E2E8F0] rounded-full items-center justify-center"
-                    >
-                      <Text className="text-[#1E40AF] text-lg">−</Text>
-                    </TouchableOpacity>
-                  )}
+                  <View className="flex-row items-center gap-2 flex-1 min-w-0">
+                    {(!hasFullWeightConfig || entryMode === 'pieces') && (
+                      <TouchableOpacity
+                        onPress={handleDecrement}
+                        accessibilityLabel="Decrease quantity"
+                        className="h-12 w-12 shrink-0 border border-[#E2E8F0] rounded-full items-center justify-center"
+                      >
+                        <Text className="text-[#1E40AF] text-lg">−</Text>
+                      </TouchableOpacity>
+                    )}
 
-                  <TextInput
-                    value={amountStr}
-                    onChangeText={handleAmountChange}
-                    keyboardType="decimal-pad"
-                    className="border border-[#E2E8F0] rounded-lg px-2 text-center text-[15px] font-bold text-[#0F172A] bg-white"
-                    style={{ minWidth: 64, minHeight: 40, paddingVertical: 8 }}
-                  />
+                    <TextInput
+                      value={amountStr}
+                      onChangeText={handleAmountChange}
+                      keyboardType="decimal-pad"
+                      className="border border-[#E2E8F0] rounded-lg px-2 text-center text-[15px] font-bold text-[#0F172A] bg-white flex-1 min-w-[56px] max-w-[120px]"
+                      style={{ minHeight: 48, paddingVertical: 8 }}
+                    />
 
-                  {(!hasFullWeightConfig || entryMode === 'pieces') && (
+                    {(!hasFullWeightConfig || entryMode === 'pieces') && (
+                      <TouchableOpacity
+                        onPress={handleIncrement}
+                        accessibilityLabel="Increase quantity"
+                        className="h-12 w-12 shrink-0 border border-[#1E40AF] rounded-full items-center justify-center bg-[#1E40AF]"
+                      >
+                        <Text className="text-white text-lg">+</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {onRemove && (
                     <TouchableOpacity
-                      onPress={handleIncrement}
-                      className="w-8 h-8 border border-[#1E40AF] rounded-full items-center justify-center bg-[#1E40AF]"
+                      onPress={() => onRemove(item.itemId)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Remove item from request"
+                      className="h-12 w-12 shrink-0 items-center justify-center rounded-[10px] active:bg-red-600/10"
                     >
-                      <Text className="text-white text-lg">+</Text>
+                      <Ionicons name="trash-outline" size={22} color="#DC2626" />
                     </TouchableOpacity>
                   )}
                 </View>
-
-                {onRemove && (
-                  <TouchableOpacity
-                    onPress={() => onRemove(item.itemId)}
-                    className="ml-auto w-9 h-9 items-center justify-center"
-                  >
-                    <Ionicons name="trash-outline" size={20} color="#DC2626" />
-                  </TouchableOpacity>
-                )}
               </View>
               
               {hasFullWeightConfig && !errorMsg && quantity > 0 && entryMode !== 'pieces' && (

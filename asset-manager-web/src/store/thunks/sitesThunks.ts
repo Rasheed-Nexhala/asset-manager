@@ -93,7 +93,8 @@ export const updateSite = createAsyncThunk(
     { getState, rejectWithValue }
   ) => {
     try {
-      // Site name cannot be changed when editing — no name uniqueness check needed
+      const stateBefore = getState() as RootState;
+      const isSuperAdmin = stateBefore.auth.userRole?.role === 'SuperAdmin';
 
       // Handle manager assignment (same manager may manage multiple sites)
       let managerName: string | null = null;
@@ -105,7 +106,7 @@ export const updateSite = createAsyncThunk(
         }
       }
 
-      const state = getState() as RootState;
+      const state = stateBefore;
       const { user, userRole } = state.auth;
       const userId = user?.uid ?? null;
       const userName = user?.displayName ?? user?.email ?? 'Unknown';
@@ -114,6 +115,7 @@ export const updateSite = createAsyncThunk(
       const desc = (formData.description ?? '').trim();
       const contact = (formData.contactNumber ?? '').trim();
       const isInactive = formData.status === 'inactive';
+      const trimmedName = formData.name.trim();
       const updateData: UpdateSiteData = {
         address: formData.address.trim(),
         managerId: isInactive ? null : (formData.managerId || null),
@@ -123,7 +125,24 @@ export const updateSite = createAsyncThunk(
         ...(contact && { contactNumber: contact }),
         ...(userId && { updatedBy: userId, updatedByName: userName, updatedByRole: userRoleType }),
       };
-      // Note: name is intentionally omitted — site name cannot be changed when editing
+
+      if (isSuperAdmin) {
+        let previousName =
+          state.sites.sites.find((s) => s.id === siteId)?.name?.trim() ?? '';
+        if (previousName === '') {
+          const doc = await getSite(siteId);
+          previousName = doc?.name?.trim() ?? '';
+        }
+        if (trimmedName !== previousName) {
+          const nameTaken = await checkSiteNameExists(trimmedName, siteId);
+          if (nameTaken) {
+            return rejectWithValue(
+              'Site name already exists. Please choose a different name.'
+            );
+          }
+        }
+        updateData.name = trimmedName;
+      }
       // Note: when status is inactive, manager is always removed (inactive sites cannot have a manager)
 
       await updateSiteService(siteId, updateData);

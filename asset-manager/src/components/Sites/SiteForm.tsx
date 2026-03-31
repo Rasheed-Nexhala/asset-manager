@@ -13,6 +13,8 @@ export interface SiteFormProps {
   isLoading?: boolean;
   submitButtonLabel?: string;
   siteId?: string;
+  /** When editing, only SuperAdmin should pass true so the site name field is editable. */
+  canEditSiteName?: boolean;
 }
 
 interface FormErrors {
@@ -33,7 +35,9 @@ export const SiteForm: React.FC<SiteFormProps> = ({
   isLoading = false,
   submitButtonLabel = 'Save',
   siteId,
+  canEditSiteName = false,
 }) => {
+  const nameFieldLocked = Boolean(siteId) && !canEditSiteName;
   const [formData, setFormData] = useState<SiteFormData>({
     name: initialData?.name || '',
     description: initialData?.description || '',
@@ -176,14 +180,14 @@ export const SiteForm: React.FC<SiteFormProps> = ({
     <ScrollView className="flex-1 bg-[#F8FAFC]" contentContainerStyle={{ padding: 16 }}>
       <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] gap-4">
         <FormField
-          label={siteId ? 'Site Name (cannot be changed)' : 'Site Name'}
+          label={nameFieldLocked ? 'Site Name (cannot be changed)' : 'Site Name'}
           required
           value={formData.name}
           onChangeText={(text) => handleFieldChange('name', text)}
           placeholder="e.g. Site A"
           error={errors.name}
           accessibilityLabel="Site name"
-          editable={!siteId}
+          editable={!nameFieldLocked}
         />
 
         <FormField

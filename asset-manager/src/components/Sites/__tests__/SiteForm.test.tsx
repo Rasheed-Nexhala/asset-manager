@@ -115,6 +115,21 @@ describe('SiteForm', () => {
     expect(nameInput.props.editable).toBe(false);
   });
 
+  it('enables site name when siteId is provided and canEditSiteName (SuperAdmin)', () => {
+    render(
+      <SiteForm
+        onSubmit={mockOnSubmit}
+        siteId="s1"
+        canEditSiteName
+        initialData={{ name: 'Site Alpha', address: '123 Main St', status: 'active' }}
+      />
+    );
+
+    expect(screen.getByText('Site Name')).toBeTruthy();
+    const nameInput = screen.getByPlaceholderText('e.g. Site A');
+    expect(nameInput.props.editable).not.toBe(false);
+  });
+
   it('switches to active status when Active button pressed', () => {
     render(
       <SiteForm

@@ -17,6 +17,7 @@ import {
   selectSitesError,
   selectSearchQuery,
 } from '../store/selectors/sitesSelectors';
+import { selectIsSuperAdmin } from '../store/selectors/authSelectors';
 import { subscribeToSites } from '../services/firebase/siteService';
 import type { Site } from '../types/sites';
 import type { SiteFormData } from '../types/sites';
@@ -36,6 +37,7 @@ export function SitesPage() {
   const isLoading = useAppSelector(selectSitesLoading);
   const error = useAppSelector(selectSitesError);
   const searchQuery = useAppSelector(selectSearchQuery);
+  const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
 
   useEffect(() => {
     dispatch(fetchSites());
@@ -373,6 +375,7 @@ export function SitesPage() {
               isLoading={saving}
               submitButtonLabel={editingSite ? 'Save' : 'Add Site'}
               siteId={editingSite?.id}
+              canEditSiteName={isSuperAdmin}
             />
           </div>
         </div>

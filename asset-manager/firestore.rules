@@ -188,6 +188,11 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['managerId', 'managerName', 'updatedAt']);
     }
+
+    /** Renaming a site is restricted to SuperAdmin (Admin may update other fields). */
+    function siteNameUnchanged() {
+      return request.resource.data.name == resource.data.name;
+    }
     
     /**
      * Sites collection
@@ -199,8 +204,8 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, delete: if isAuthenticated() && isUserActive() && isAdminOrSuperAdmin();
       allow update: if isAuthenticated() && (
-        (isUserActive() && isAdminOrSuperAdmin()) ||
-        isRemovingSelfAsManager()
+        isRemovingSelfAsManager() ||
+        (isUserActive() && isAdminOrSuperAdmin() && (siteNameUnchanged() || isSuperAdmin()))
       );
 
       /** Site supervisors — names only; Site Manager for this site or Admin. */

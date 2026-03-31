@@ -7,6 +7,7 @@ import { ScreenHeader, ScreenLayout, SiteForm } from '../../components';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { updateSite, fetchSites, clearError } from '../../store/slices/sitesSlice';
 import { selectSiteById, selectSitesLoading, selectSitesError } from '../../store/selectors/sitesSelectors';
+import { selectIsSuperAdmin } from '../../store/selectors/authSelectors';
 import { getSite } from '../../services/firebase/siteService';
 import type { SiteFormData, Site } from '../../types/sites';
 
@@ -25,6 +26,7 @@ export const EditSiteScreen: React.FC = () => {
 
   const isLoading = useAppSelector(selectSitesLoading);
   const error = useAppSelector(selectSitesError);
+  const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
 
   // Memoize initial data to prevent unnecessary re-renders
   const initialData: Partial<SiteFormData> = useMemo(
@@ -182,6 +184,7 @@ export const EditSiteScreen: React.FC = () => {
         isLoading={isLoading}
         submitButtonLabel="Save"
         siteId={siteId}
+        canEditSiteName={isSuperAdmin}
       />
     </ScreenLayout>
   );
