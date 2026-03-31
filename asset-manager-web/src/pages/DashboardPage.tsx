@@ -40,13 +40,10 @@ import {
 } from '../store/slices/maintenanceSlice';
 import { useDashboardSubscriptions } from '../hooks/useDashboardSubscriptions';
 import { useAutoClearError } from '../hooks/useAutoClearError';
-import { getUnreadCount } from '../services/firebase/notificationService';
+import { getItemsCount, getDashboardLowStockPreview } from '../services/firebase/inventoryService';
 import { getLocationId } from '../utils/locationUtils';
-import { runNonCriticalTask } from '../utils/nonCriticalTask';
-import { listItems } from '../services/firebase/inventoryService';
 import { getRecentPendingRequests } from '../services/firebase/requestService';
 import { getPendingPOCount } from '../services/firebase/purchaseOrderService';
-import { isLowStock } from '../utils/inventoryUtils';
 import type { Request } from '../types/request';
 import {
   DashboardGreeting,
@@ -85,7 +82,6 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
-  const [unreadCount, setUnreadCount] = useState(0);
 
   const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const canManageRequests = useAppSelector(selectCanManageRequests);
@@ -165,17 +161,18 @@ export function DashboardPage() {
     setDashboardLoading(true);
     try {
       if (isAdminOrSuperAdmin || isStoreIncharge) {
-        const [posCount, reqs, allItems] = await Promise.all([
+        const [posCount, reqs, itemsTotal, lowStockItems] = await Promise.all([
           getPendingPOCount(),
           canViewRequestQueue ? getRecentPendingRequests({}, 5) : Promise.resolve([]),
-          listItems(),
+          getItemsCount({ status: 'active' }),
+          getDashboardLowStockPreview(DASHBOARD_LOW_STOCK_PREVIEW_LIMIT, 50)
         ]);
 
         setPendingPOCount(posCount);
         setRecentPendingRequests(reqs.map(toPendingRequest));
-        setItemsCount(allItems.length);
+        setItemsCount(itemsTotal);
 
-        const lowStock = allItems.filter(isLowStock).map((i) => ({
+        const lowStock = lowStockItems.map((i) => ({
           id: i.id,
           name: i.name ?? i.id,
           currentQty: i.centralStoreQuantity ?? i.totalQuantity ?? 0,
@@ -221,24 +218,7 @@ export function DashboardPage() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [triggerRefresh]);
 
-  const refreshUnreadCount = useCallback(() => {
-    if (!userId) return;
-    runNonCriticalTask('dashboard_unread_count', () => getUnreadCount(userId), {
-      feature: 'notifications',
-      tags: { screen: 'dashboard' },
-    })
-      .then((count) => {
-        if (typeof count === 'number') setUnreadCount(count);
-      })
-      .catch(() => {});
-  }, [userId]);
 
-  useEffect(() => {
-    if (!userId) return;
-    refreshUnreadCount();
-    const interval = setInterval(refreshUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, [userId, refreshUnreadCount]);
 
   const dashboardDataError = requestsError || purchaseOrderError || maintenanceError;
   const clearDashboardError = useCallback(() => {

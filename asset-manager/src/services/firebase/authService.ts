@@ -16,6 +16,7 @@ import {
 import { httpsCallable } from 'firebase/functions';
 import { auth, functions } from '../../../config/firebase';
 import { getUserRole } from './userRoleService';
+import { unregisterPushToken } from './notificationService';
 
 export interface ProfileUpdateData {
   displayName?: string;
@@ -248,6 +249,10 @@ export const signIn = async (
  * Used when blocking inactive users - they were never "properly" logged in.
  */
 export const signOutOnly = async (): Promise<void> => {
+  const user = auth.currentUser;
+  if (user) {
+    await unregisterPushToken(user.uid);
+  }
   await signOut(auth);
 };
 
@@ -256,6 +261,7 @@ export const logout = async (): Promise<void> => {
     // Log logout event BEFORE signOut (user must be authenticated for Cloud Function)
     const user = auth.currentUser;
     if (user) {
+      await unregisterPushToken(user.uid);
       // Ensure we have a fresh token so the callable request is authenticated
       await user.getIdToken(true);
       const userRole = await getUserRole(user.uid);

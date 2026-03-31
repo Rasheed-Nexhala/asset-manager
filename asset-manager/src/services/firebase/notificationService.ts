@@ -5,6 +5,7 @@ import {
   doc,
   updateDoc,
   arrayUnion,
+  arrayRemove,
   getDoc,
   serverTimestamp,
   collection,
@@ -158,6 +159,31 @@ export async function registerPushToken(userId: string): Promise<void> {
       toErrorText(error),
       error
     );
+  }
+}
+
+/**
+ * Removes this device's Expo push token from the user's Firestore doc (sign-out / account switch).
+ * Never throws — logout must always be able to complete.
+ */
+export async function unregisterPushToken(userId: string): Promise<void> {
+  if (!Device.isDevice) return;
+  let token: string | null = null;
+  try {
+    token = await getExpoPushToken();
+  } catch (error) {
+    console.warn('unregisterPushToken: could not get Expo token', toErrorText(error));
+    return;
+  }
+  if (!token) return;
+  try {
+    const userRef = doc(db, USERS_COLLECTION, userId);
+    await updateDoc(userRef, {
+      expoPushTokens: arrayRemove(token),
+      tokensUpdatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.warn('unregisterPushToken: Firestore update failed', toErrorText(error));
   }
 }
 

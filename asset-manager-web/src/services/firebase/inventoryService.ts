@@ -168,6 +168,34 @@ export const listItems = async (filters?: ItemFilters): Promise<Item[]> => {
 };
 
 /**
+ * Quick preview query for low-stock dashboard widgets.
+ * Uses a bounded query sorted by centralStoreQuantity ASC to loosely approximate low-stock priority 
+ * without fetching all N items in the database. Filters client-side for true \`isLowStock\`, then caps out.
+ */
+export const getDashboardLowStockPreview = async (
+  requestedLimit: number = 5,
+  maxFetchPool: number = 50
+): Promise<Item[]> => {
+  try {
+    const q = query(
+      collection(db, ITEMS_COLLECTION),
+      where('status', '==', 'active'),
+      orderBy('centralStoreQuantity', 'asc'),
+      limit(maxFetchPool)
+    );
+    const snap = await getDocs(q);
+    const items: Item[] = [];
+    snap.forEach((docSnap) => {
+      items.push(firestoreItemToItem({ id: docSnap.id, ...docSnap.data() } as FirestoreItem));
+    });
+    return items.filter(isLowStock).slice(0, requestedLimit);
+  } catch (error) {
+    console.error('Error fetching dashboard low stock preview:', error);
+    return [];
+  }
+};
+
+/**
  * Count items in low stock across the catalog (not paginated). Uses full listItems + isLowStock.
  * Optional category/type/status scope matches listItems filters.
  */

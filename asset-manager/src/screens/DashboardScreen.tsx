@@ -64,16 +64,13 @@ import {
 } from '../store/slices/maintenanceSlice';
 import { useDashboardSubscriptions } from '../hooks/useDashboardSubscriptions';
 import { useAutoClearError } from '../hooks/useAutoClearError';
-import { getUnreadCount } from '../services/firebase/notificationService';
 import { getLocationId } from '../utils/locationUtils';
-import { runNonCriticalTask } from '../utils/nonCriticalTask';
 import type { DashboardStackParamList } from '../navigation/DashboardStackParamList';
 import { navigateToProcessRequest } from '../navigation/navigationUtils';
 import type { Request } from '../types/request';
 import { getRecentPendingRequests } from '../services/firebase/requestService';
 import { getPendingPOCount } from '../services/firebase/purchaseOrderService';
-import { listItems } from '../services/firebase/inventoryService';
-import { isLowStock } from '../utils/inventoryUtils';
+import { getItemsCount, getDashboardLowStockPreview } from '../services/firebase/inventoryService';
 
 /** Fallback when authSelectors fails to load (e.g. circular deps, hot reload) */
 const selectIsStoreInchargeSafe = selectIsStoreIncharge ?? ((_state: RootState) => false);
@@ -110,7 +107,6 @@ export const DashboardScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const isFocused = useIsFocused();
   const [refreshing, setRefreshing] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
 
   const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const canManageRequests = useAppSelector(selectCanManageRequests);
@@ -192,19 +188,18 @@ export const DashboardScreen: React.FC = () => {
           ? getRecentPendingRequests({}, 5)
           : Promise.resolve([]);
         // Using getDocs one-time fetch to avoid onSnapshot memory leaks
-        const allItemsUrl = listItems();
-
-        const [posCount, reqs, allItems] = await Promise.all([
+        const [posCount, reqs, itemsTotal, lowStockItems] = await Promise.all([
           poCountUrl,
           pendingReqUrl,
-          allItemsUrl,
+          getItemsCount({ status: 'active' }),
+          getDashboardLowStockPreview(DASHBOARD_LOW_STOCK_PREVIEW_LIMIT, 50)
         ]);
 
         setPendingPOCount(posCount);
         setRecentPendingRequests(reqs.map(toPendingRequest));
-        setItemsCount(allItems.length);
+        setItemsCount(itemsTotal);
 
-        const lowStock = allItems.filter(isLowStock).map(i => ({
+        const lowStock = lowStockItems.map(i => ({
           id: i.id,
           name: i.name ?? i.id,
           currentQty: i.centralStoreQuantity ?? i.totalQuantity ?? 0,
@@ -246,38 +241,7 @@ export const DashboardScreen: React.FC = () => {
     return () => sub.remove();
   }, [triggerRefresh]);
 
-  const refreshUnreadCount = useCallback(() => {
-    if (!userId) return;
-    runNonCriticalTask(
-      'dashboard_unread_count',
-      () => getUnreadCount(userId),
-      {
-        feature: 'notifications',
-        tags: {
-          screen: 'dashboard',
-        },
-      }
-    )
-      .then((count) => {
-        if (typeof count === 'number') {
-          setUnreadCount(count);
-        }
-      })
-      .catch(() => {
-        // runNonCriticalTask handles capture internally; this guard prevents unhandled rejections.
-      });
-  }, [userId]);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!userId) return;
-      refreshUnreadCount();
-      const interval = setInterval(() => {
-        refreshUnreadCount();
-      }, 30000);
-      return () => clearInterval(interval);
-    }, [userId, refreshUnreadCount])
-  );
 
   const navToNotificationCenter = useCallback(() => {
     const parent = navigation.getParent();
@@ -327,7 +291,6 @@ export const DashboardScreen: React.FC = () => {
             icon: 'notifications-outline',
             onPress: navToNotificationCenter,
             accessibilityLabel: 'Notifications',
-            badge: unreadCount > 0 ? unreadCount : undefined,
           },
           ...(isAdminOrSuperAdmin
             ? [

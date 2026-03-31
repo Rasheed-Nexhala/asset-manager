@@ -71,6 +71,8 @@ export async function getUserPushTokens(
 ): Promise<string[]> {
   const doc = await db.collection('users').doc(userId).get();
   const data = doc.data();
+  if (data?.isActive === false) return [];
+
   const tokens = (data?.expoPushTokens ?? []) as string[];
   const prefs = (data?.notificationPrefs ?? {}) as Record<string, boolean>;
 

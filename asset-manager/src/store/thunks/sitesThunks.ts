@@ -6,7 +6,8 @@ import {
   checkSiteNameExists,
   getSite,
 } from '../../services/firebase/siteService';
-import { getAllUsers } from '../../services/firebase/userRoleService';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../../config/firebase';
 import type { CreateSiteData, UpdateSiteData, Site } from '../../types/sites';
 import type { SiteFormData } from '../../types/sites';
 import type { RootState } from '../index';
@@ -42,10 +43,10 @@ export const createSite = createAsyncThunk(
       // Handle manager assignment (same manager may manage multiple sites)
       let managerName: string | null = null;
       if (formData.managerId) {
-        const users = await getAllUsers();
-        const manager = users.find((user) => user.id === formData.managerId);
-        if (manager) {
-          managerName = manager.displayName || manager.email || null;
+        const managerDoc = await getDoc(doc(db, 'users', formData.managerId));
+        if (managerDoc.exists()) {
+          const data = managerDoc.data();
+          managerName = data.displayName || data.email || null;
         }
       }
 
@@ -99,10 +100,10 @@ export const updateSite = createAsyncThunk(
       // Handle manager assignment (same manager may manage multiple sites)
       let managerName: string | null = null;
       if (formData.managerId) {
-        const users = await getAllUsers();
-        const manager = users.find((user) => user.id === formData.managerId);
-        if (manager) {
-          managerName = manager.displayName || manager.email || null;
+        const managerDoc = await getDoc(doc(db, 'users', formData.managerId));
+        if (managerDoc.exists()) {
+          const data = managerDoc.data();
+          managerName = data.displayName || data.email || null;
         }
       }
 

@@ -1240,6 +1240,18 @@ export const onUserUpdated = onDocumentUpdated(
       }
     }
 
+    if (isDeactivated || isDeleted) {
+      try {
+        await db.collection('users').doc(userId).update({
+          expoPushTokens: [],
+          tokensUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        logger.info(`Cleared expo push tokens for user ${userId}`);
+      } catch (error) {
+        logger.error('Failed to clear push tokens for user', { error, userId });
+      }
+    }
+
     if (isDeleted) {
       try {
         await admin.auth().deleteUser(userId);
