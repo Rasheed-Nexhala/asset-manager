@@ -388,7 +388,6 @@ export const DashboardScreen: React.FC = () => {
               {(lowStockItemsWidget.length > 0 || isInitialLoad || dashboardLoading) && (
                 <LowStockAlertWidget
                   items={lowStockItemsWidget.slice(0, DASHBOARD_LOW_STOCK_PREVIEW_LIMIT)}
-                  totalAlertCount={lowStockItemsWidget.length}
                   onViewAll={() =>
                     tabNav?.navigate('Inventory', {
                       screen: 'CentralStoreInventory',
@@ -436,7 +435,6 @@ export const DashboardScreen: React.FC = () => {
               {showInventory && (lowStockItemsWidget.length > 0 || isInitialLoad || dashboardLoading) && (
                 <LowStockAlertWidget
                   items={lowStockItemsWidget.slice(0, DASHBOARD_LOW_STOCK_PREVIEW_LIMIT)}
-                  totalAlertCount={lowStockItemsWidget.length}
                   onViewAll={() =>
                     tabNav?.navigate('Inventory', {
                       screen: 'CentralStoreInventory',
