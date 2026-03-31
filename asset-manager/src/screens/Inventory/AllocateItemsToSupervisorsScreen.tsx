@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
@@ -41,8 +41,6 @@ function StepBadge({ n, label }: { n: number; label: string }) {
 
 export const AllocateItemsToSupervisorsScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
-  const route = useRoute<RouteProp<InventoryStackParamList, 'AllocateItemsToSupervisors'>>();
-  const returnTo = route.params?.returnTo ?? 'inventory';
   const canViewRequestQueue = useAppSelector(selectCanViewRequestQueue);
   const requestsListScreen = canViewRequestQueue ? 'RequestQueue' : 'MyRequests';
 
@@ -59,6 +57,14 @@ export const AllocateItemsToSupervisorsScreen: React.FC = () => {
   const [selectedSupervisorId, setSelectedSupervisorId] = useState<string | null>(null);
   const [qty, setQty] = useState('1');
   const [submitting, setSubmitting] = useState(false);
+  const [allocationSuccess, setAllocationSuccess] = useState<{
+    requestNumber: string;
+    itemName: string;
+    quantity: number;
+    supervisorName: string;
+  } | null>(null);
+
+  const clearAllocationSuccess = useCallback(() => setAllocationSuccess(null), []);
 
   useEffect(() => {
     if (!siteId || !userId) {
@@ -89,7 +95,9 @@ export const AllocateItemsToSupervisorsScreen: React.FC = () => {
 
   const allocatableLines = useMemo(() => {
     if (!selectedRequest) return [];
-    return (selectedRequest.items ?? []).filter((i) => i.itemType === 'non_consumable');
+    return (selectedRequest.items ?? []).filter(
+      (i) => i.itemType === 'consumable' || i.itemType === 'non_consumable'
+    );
   }, [selectedRequest]);
 
   const selectedLine = useMemo(
@@ -110,20 +118,25 @@ export const AllocateItemsToSupervisorsScreen: React.FC = () => {
     [supervisors, selectedSupervisorId]
   );
 
-  const navigateAfterSave = useCallback(() => {
-    // Screen → Inventory stack → bottom tab (same pattern as cross-tab navigation from nested stacks)
+  const navigateToInventoryHome = useCallback(() => {
     const stackNav = navigation.getParent();
     const tabNav = stackNav?.getParent();
     if (!tabNav) {
       navigation.goBack();
       return;
     }
-    if (returnTo === 'requests') {
-      tabNav.navigate('Requests', { screen: requestsListScreen });
-    } else {
-      tabNav.navigate('Inventory', { screen: 'MySiteInventory' });
+    tabNav.navigate('Inventory', { screen: 'MySiteInventory' });
+  }, [navigation]);
+
+  const navigateToRequestsList = useCallback(() => {
+    const stackNav = navigation.getParent();
+    const tabNav = stackNav?.getParent();
+    if (!tabNav) {
+      navigation.goBack();
+      return;
     }
-  }, [navigation, returnTo, requestsListScreen]);
+    tabNav.navigate('Requests', { screen: requestsListScreen });
+  }, [navigation, requestsListScreen]);
 
   const handleSubmit = useCallback(async () => {
     if (!siteId || !userId || !selectedRequest || !selectedLine || !selectedSupervisor) {
@@ -152,8 +165,14 @@ export const AllocateItemsToSupervisorsScreen: React.FC = () => {
         selectedSupervisor.name,
         { userId, userName: userDisplayName?.trim() || 'Site manager' }
       );
+      setAllocationSuccess({
+        requestNumber: selectedRequest.requestNumber,
+        itemName: selectedLine.itemName,
+        quantity: q,
+        supervisorName: selectedSupervisor.name,
+      });
       setQty('1');
-      navigateAfterSave();
+      setSelectedSupervisorId(null);
     } catch (e: unknown) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Could not allocate');
     } finally {
@@ -168,7 +187,6 @@ export const AllocateItemsToSupervisorsScreen: React.FC = () => {
     selectedSupervisor,
     qty,
     availableForLine,
-    navigateAfterSave,
   ]);
 
   if (!siteId) {
@@ -210,9 +228,49 @@ export const AllocateItemsToSupervisorsScreen: React.FC = () => {
           <View className="flex-row gap-2 mb-4 bg-[#F8FAFC] rounded-lg p-3 border border-[#E2E8F0]">
             <Ionicons name="information-circle-outline" size={22} color="#475569" style={{ marginTop: 1 }} />
             <Text className="text-[13px] text-[#64748B] flex-1 leading-5">
-              Non-consumables only. Physical stock stays on site; this tracks who holds what until they return it to you.
+              Consumable and non-consumable lines. Physical stock stays on site; this tracks who holds what until they
+              return it to you.
             </Text>
           </View>
+
+          {allocationSuccess && (
+            <View
+              accessibilityRole="text"
+              accessibilityLabel="Allocation saved"
+              accessibilityLiveRegion="polite"
+              className="mb-4 rounded-[10px] border border-[#16A34A]/30 bg-[#16A34A]/15 p-4"
+            >
+              <View className="flex-row items-start justify-between gap-2">
+                <View className="flex-1 flex-row items-start gap-2">
+                  <Ionicons name="checkmark-circle" size={22} color="#16A34A" style={{ marginTop: 2 }} />
+                  <View className="flex-1 pr-2">
+                    <Text className="text-[15px] font-semibold text-[#0F172A]">Allocation saved</Text>
+                    <Text className="mt-1 text-[13px] leading-5 text-[#64748B]">
+                      <Text className="font-medium text-[#0F172A]">{allocationSuccess.requestNumber}</Text>
+                      {' · '}
+                      {allocationSuccess.itemName}
+                    </Text>
+                    <Text className="mt-1 text-[15px] text-[#0F172A]">
+                      <Text className="font-semibold">{allocationSuccess.quantity}</Text> unit
+                      {allocationSuccess.quantity === 1 ? '' : 's'} →{' '}
+                      <Text className="font-semibold">{allocationSuccess.supervisorName}</Text>
+                    </Text>
+                    <Text className="mt-2 text-[13px] text-[#64748B]">
+                      Choose another supervisor or line to continue, or tap Done below when finished.
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={clearAllocationSuccess}
+                  className="min-h-[48px] min-w-[48px] items-center justify-center rounded-lg px-2"
+                  accessibilityLabel="Dismiss success message"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-[13px] font-semibold text-[#16A34A]">Dismiss</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           <StepBadge n={1} label="Transferred request" />
           {requests.length === 0 ? (
@@ -230,6 +288,7 @@ export const AllocateItemsToSupervisorsScreen: React.FC = () => {
                   onPress={() => {
                     setSelectedRequestId(r.id);
                     setSelectedItemId(null);
+                    clearAllocationSuccess();
                   }}
                   className={`rounded-[10px] p-4 border flex-row items-center justify-between ${
                     selectedRequestId === r.id
@@ -258,7 +317,7 @@ export const AllocateItemsToSupervisorsScreen: React.FC = () => {
               <View className="gap-2 mb-8">
                 {allocatableLines.length === 0 ? (
                   <Text className="text-[15px] text-[#64748B] text-center py-4">
-                    No non-consumable lines on this request.
+                    No lines available to split on this request.
                   </Text>
                 ) : (
                   allocatableLines.map((line) => {
@@ -268,7 +327,10 @@ export const AllocateItemsToSupervisorsScreen: React.FC = () => {
                     return (
                       <TouchableOpacity
                         key={line.itemId}
-                        onPress={() => setSelectedItemId(line.itemId)}
+                        onPress={() => {
+                          setSelectedItemId(line.itemId);
+                          clearAllocationSuccess();
+                        }}
                         className={`rounded-[10px] p-4 border ${
                           selectedItemId === line.itemId
                             ? 'border-[#1E40AF] bg-[#EFF6FF]'
@@ -383,6 +445,28 @@ export const AllocateItemsToSupervisorsScreen: React.FC = () => {
               <Text className="text-[15px] font-semibold text-white">Save allocation</Text>
             )}
           </TouchableOpacity>
+
+          <View className="mt-6 rounded-[10px] border border-[#E2E8F0] bg-white p-4">
+            <Text className="mb-3 text-[13px] font-medium text-[#64748B]">Done splitting?</Text>
+            <View className="gap-3">
+              <TouchableOpacity
+                onPress={navigateToInventoryHome}
+                className="min-h-[48px] items-center justify-center rounded-[10px] border-[1.5px] border-[#1E40AF] px-4"
+                accessibilityRole="button"
+                accessibilityLabel="Back to inventory"
+              >
+                <Text className="text-[15px] font-semibold text-[#1E40AF]">Back to inventory</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={navigateToRequestsList}
+                className="min-h-[48px] items-center justify-center rounded-[10px] border-[1.5px] border-[#1E40AF] px-4"
+                accessibilityRole="button"
+                accessibilityLabel="Back to requests"
+              >
+                <Text className="text-[15px] font-semibold text-[#1E40AF]">Back to requests</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </ScrollView>
       )}
     </ScreenLayout>

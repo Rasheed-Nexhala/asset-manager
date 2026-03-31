@@ -119,7 +119,7 @@ export function SupervisorAllocationsSection({ siteId, requestId }: Props) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate('/inventory/divide-to-supervisors?returnTo=requests')}
+                  onClick={() => navigate('/inventory/divide-to-supervisors')}
                   className="min-h-[48px] flex-1 rounded-[10px] border-2 border-[#1E40AF] px-2 text-[15px] font-semibold text-[#1E40AF] hover:bg-[#EFF6FF]"
                 >
                   Split stock
@@ -188,7 +188,7 @@ export function SupervisorAllocationsSection({ siteId, requestId }: Props) {
               </button>
               <button
                 type="button"
-                onClick={() => navigate('/inventory/divide-to-supervisors?returnTo=requests')}
+                onClick={() => navigate('/inventory/divide-to-supervisors')}
                 className="min-h-[48px] flex-1 rounded-[10px] border-2 border-[#1E40AF] px-2 text-[15px] font-semibold text-[#1E40AF] hover:bg-[#EFF6FF]"
               >
                 Split stock

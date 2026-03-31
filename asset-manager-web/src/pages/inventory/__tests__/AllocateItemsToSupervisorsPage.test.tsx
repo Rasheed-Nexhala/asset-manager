@@ -1,5 +1,5 @@
 /**
- * Split stock: filters transferred requests, validation toasts, post-save navigation with actor.
+ * Split stock: filters transferred requests, validation toasts, success state and explicit Done navigation.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -11,6 +11,7 @@ import { ToastProvider } from '../../../contexts/ToastContext';
 import { siteSupervisorService } from '../../../services/firebase/siteSupervisorService';
 import { requestService } from '../../../services/firebase/requestService';
 import { createSiteManagerPreloadedState, SITE_MANAGER_TEST_IDS } from '../../../test/fixtures/siteManagerStore';
+import type { RootState } from '../../../store';
 import type { Request, RequestItem } from '../../../types/request';
 import type { SiteSupervisor } from '../../../types/siteSupervisor';
 
@@ -86,7 +87,15 @@ function mkTransferredRequest(): Request {
   };
 }
 
-function renderAt(search: string) {
+function mkTransferredRequest2(): Request {
+  return {
+    ...mkTransferredRequest(),
+    id: 'req-2',
+    requestNumber: 'REQ-2026-0002',
+  };
+}
+
+function renderAt(search: string, preloadedState: Partial<RootState> = createSiteManagerPreloadedState()) {
   return renderWithProviders(
     <ToastProvider>
       <MemoryRouter initialEntries={[`/inventory/divide-to-supervisors${search}`]}>
@@ -98,8 +107,31 @@ function renderAt(search: string) {
         </Routes>
       </MemoryRouter>
     </ToastProvider>,
-    { preloadedState: createSiteManagerPreloadedState() }
+    { preloadedState }
   );
+}
+
+function preloadedStoreInchargeCanViewQueue(): Partial<RootState> {
+  const base = createSiteManagerPreloadedState();
+  return {
+    ...base,
+    auth: {
+      ...base.auth!,
+      userRole: {
+        role: 'StoreIncharge',
+        isActive: true,
+        permissions: ['canManageInventory'],
+      },
+    },
+  };
+}
+
+async function completeAllocationFlow(user: ReturnType<typeof userEvent.setup>) {
+  await waitFor(() => screen.findByText('REQ-2026-0001'));
+  await user.click(screen.getByText('REQ-2026-0001'));
+  await user.click(screen.getByText('Ladder'));
+  await user.click(screen.getByText('Lead One'));
+  await user.click(screen.getByRole('button', { name: /save allocation/i }));
 }
 
 describe('AllocateItemsToSupervisorsPage', () => {
@@ -152,7 +184,7 @@ describe('AllocateItemsToSupervisorsPage', () => {
     });
   });
 
-  it('navigates to inventory after save when returnTo is not requests', async () => {
+  it('stays on page and shows success summary after save; does not auto-navigate', async () => {
     const user = userEvent.setup();
     renderAt('');
 
@@ -177,22 +209,195 @@ describe('AllocateItemsToSupervisorsPage', () => {
       );
     });
 
+    expect(mockNavigate).not.toHaveBeenCalled();
+    const successRegion = screen.getByRole('status', { name: /allocation saved/i });
+    expect(successRegion).toHaveTextContent('REQ-2026-0001');
+    expect(successRegion).toHaveTextContent('Ladder');
+    expect(successRegion).toHaveTextContent('Lead One');
+  });
+
+  it('navigates to inventory when Back to inventory is pressed', async () => {
+    const user = userEvent.setup();
+    renderAt('');
+
+    await waitFor(() => screen.findByRole('button', { name: /back to inventory/i }));
+    await user.click(screen.getByRole('button', { name: /back to inventory/i }));
+
     expect(mockNavigate).toHaveBeenCalledWith('/inventory');
   });
 
-  it('navigates to my-requests after save when returnTo=requests and user cannot view queue', async () => {
+  it('navigates to my-requests when Back to requests is pressed', async () => {
     const user = userEvent.setup();
-    renderAt('?returnTo=requests');
+    renderAt('');
+
+    await waitFor(() => screen.findByRole('button', { name: /back to requests/i }));
+    await user.click(screen.getByRole('button', { name: /back to requests/i }));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/requests/my-requests');
+  });
+
+  it('subscribes to requests with site and user filters', async () => {
+    renderAt('');
+    await waitFor(() => {
+      expect(requestService.subscribeToRequests).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: SITE_MANAGER_TEST_IDS.userId,
+          siteId: SITE_MANAGER_TEST_IDS.siteId,
+        }),
+        expect.any(Function),
+        expect.any(Function)
+      );
+    });
+  });
+
+  it('dismisses the success banner when Dismiss is pressed', async () => {
+    const user = userEvent.setup();
+    renderAt('');
+
+    await completeAllocationFlow(user);
+
+    await waitFor(() => {
+      expect(screen.getByRole('status', { name: /allocation saved/i })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /dismiss success message/i }));
+
+    expect(screen.queryByRole('status', { name: /allocation saved/i })).not.toBeInTheDocument();
+  });
+
+  it('clears the success banner when selecting a different request', async () => {
+    const user = userEvent.setup();
+    vi.mocked(requestService.subscribeToRequests).mockImplementation((_filters, cb) => {
+      cb([mkTransferredRequest(), mkTransferredRequest2()]);
+      return vi.fn();
+    });
+
+    renderAt('');
+
+    await completeAllocationFlow(user);
+
+    await waitFor(() => {
+      expect(screen.getByRole('status', { name: /allocation saved/i })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('REQ-2026-0002'));
+
+    expect(screen.queryByRole('status', { name: /allocation saved/i })).not.toBeInTheDocument();
+  });
+
+  it('clears the success banner when selecting a different line item', async () => {
+    const user = userEvent.setup();
+    const twoLineRequest: Request = {
+      ...mkTransferredRequest(),
+      items: [
+        mkItem({ itemId: 'item-a', itemName: 'Ladder' }),
+        mkItem({
+          itemId: 'item-b',
+          itemName: 'Cable',
+          quantityApproved: 4,
+          quantityRequested: 4,
+        }),
+      ],
+    };
+    vi.mocked(requestService.subscribeToRequests).mockImplementation((_filters, cb) => {
+      cb([twoLineRequest]);
+      return vi.fn();
+    });
+
+    renderAt('');
 
     await waitFor(() => screen.findByText('REQ-2026-0001'));
     await user.click(screen.getByText('REQ-2026-0001'));
     await user.click(screen.getByText('Ladder'));
     await user.click(screen.getByText('Lead One'));
-
     await user.click(screen.getByRole('button', { name: /save allocation/i }));
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/requests/my-requests');
+      expect(screen.getByRole('status', { name: /allocation saved/i })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Cable'));
+
+    expect(screen.queryByRole('status', { name: /allocation saved/i })).not.toBeInTheDocument();
+  });
+
+  it('shows error toast when allocation fails', async () => {
+    const user = userEvent.setup();
+    createSupervisorAllocation.mockRejectedValueOnce(new Error('Firestore transaction failed'));
+
+    renderAt('');
+
+    await completeAllocationFlow(user);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Firestore transaction failed/i)).toBeInTheDocument();
+    });
+  });
+
+  it('saves allocation for a consumable line', async () => {
+    const user = userEvent.setup();
+    const consumableRequest: Request = {
+      ...mkTransferredRequest(),
+      items: [mkItem({ itemType: 'consumable', itemName: 'Cement bags' })],
+    };
+    vi.mocked(requestService.subscribeToRequests).mockImplementation((_filters, cb) => {
+      cb([consumableRequest]);
+      return vi.fn();
+    });
+
+    renderAt('');
+
+    await waitFor(() => screen.findByText('REQ-2026-0001'));
+    await user.click(screen.getByText('REQ-2026-0001'));
+    await user.click(screen.getByText('Cement bags'));
+    await user.click(screen.getByText('Lead One'));
+    await user.click(screen.getByRole('button', { name: /save allocation/i }));
+
+    await waitFor(() => {
+      expect(createSupervisorAllocation).toHaveBeenCalledWith(
+        SITE_MANAGER_TEST_IDS.siteId,
+        expect.objectContaining({
+          itemId: 'item-1',
+        }),
+        'Lead One',
+        expect.any(Object)
+      );
+    });
+    expect(screen.getByRole('status', { name: /allocation saved/i })).toHaveTextContent('Cement bags');
+  });
+
+  it('navigates to request queue when user can view queue and Back to requests is pressed', async () => {
+    const user = userEvent.setup();
+    renderAt('', preloadedStoreInchargeCanViewQueue());
+
+    await waitFor(() => screen.findByRole('button', { name: /back to requests/i }));
+    await user.click(screen.getByRole('button', { name: /back to requests/i }));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/requests/queue');
+  });
+
+  describe('request list filtering', () => {
+    beforeEach(() => {
+      vi.mocked(requestService.subscribeToRequests).mockImplementation((_filters, cb) => {
+        cb([
+          mkTransferredRequest(),
+          {
+            ...mkTransferredRequest(),
+            id: 'pending-only',
+            requestNumber: 'REQ-PENDING',
+            status: 'pending',
+          },
+        ]);
+        return vi.fn();
+      });
+    });
+
+    it('does not list requests that are not transferred or partially_returned', async () => {
+      renderAt('');
+      await waitFor(() => {
+        expect(screen.getByText('REQ-2026-0001')).toBeInTheDocument();
+      });
+      expect(screen.queryByText('REQ-PENDING')).not.toBeInTheDocument();
     });
   });
 });

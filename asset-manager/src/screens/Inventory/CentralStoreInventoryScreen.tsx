@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState, useMemo } from 'react';
+import React, { useEffect, useCallback, useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -97,6 +97,9 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   }, []);
 
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
+  /** Stable key for category/type/stock only — search is client-side, not part of ItemFilters here. */
+  const filtersKey = useMemo(() => JSON.stringify(filters), [filters]);
+  const prevFiltersKeyRef = useRef<string | null>(null);
 
   // Sync route.params.lowStockFilter to local state when it changes (e.g. "View All Alerts"
   // navigation). Handles both: (a) screen already mounted when params arrive, (b) params
@@ -168,9 +171,18 @@ export const CentralStoreInventoryScreen: React.FC = () => {
   }, [filters.categoryId, filters.type]);
 
   useEffect(() => {
-    // Do not pass searchTerm to Firestore — use selectFilteredAndSearchedItems (case-insensitive)
+    // Do not pass searchTerm to Firestore — use selectFilteredAndSearchedItems (case-insensitive).
+    // Only dispatch setFilters when category/type/stock change: setFilters clears items[], which
+    // would otherwise make allItems.length === 0 during fetchItems and show the full-screen loader
+    // on every debounced search keystroke.
     const itemFilters = toItemFilters(filters, undefined);
-    dispatch(setFilters(itemFilters));
+    const filtersChanged = prevFiltersKeyRef.current !== filtersKey;
+    prevFiltersKeyRef.current = filtersKey;
+
+    if (filtersChanged) {
+      dispatch(setFilters(itemFilters));
+    }
+
     const hasClientSearch = debouncedSearch.trim().length > 0;
     const needsFullItemList = hasClientSearch || filters.stock === 'low_stock';
     if (needsFullItemList) {
@@ -178,7 +190,7 @@ export const CentralStoreInventoryScreen: React.FC = () => {
     } else {
       dispatch(fetchItemsPaginated());
     }
-  }, [dispatch, filters, debouncedSearch]);
+  }, [dispatch, filters, debouncedSearch, filtersKey]);
 
   // Subscribe to categories for real-time updates
   useEffect(() => {

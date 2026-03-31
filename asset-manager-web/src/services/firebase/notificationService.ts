@@ -14,7 +14,7 @@ import {
   orderBy,
   limit,
   onSnapshot,
-  getDocs,
+  getCountFromServer,
   where,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
@@ -103,6 +103,6 @@ export async function markNotificationRead(
 
 export async function getUnreadCount(userId: string): Promise<number> {
   const ref = collection(db, NOTIFICATIONS_COLLECTION, userId, 'items');
-  const snap = await getDocs(query(ref, where('read', '==', false)));
-  return snap.size;
+  const snap = await getCountFromServer(query(ref, where('read', '==', false)));
+  return snap.data().count;
 }

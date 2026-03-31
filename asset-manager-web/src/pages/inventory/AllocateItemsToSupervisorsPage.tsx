@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../store/hooks';
 import {
   selectUserId,
@@ -15,6 +15,13 @@ import { Icon } from '../../components/shared/Icon';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { useToast } from '../../contexts/ToastContext';
 
+type AllocationSuccessSummary = {
+  requestNumber: string;
+  itemName: string;
+  quantity: number;
+  supervisorName: string;
+};
+
 function StepBadge({ n, label }: { n: number; label: string }) {
   return (
     <div className="mb-3 flex items-center gap-2">
@@ -29,8 +36,6 @@ function StepBadge({ n, label }: { n: number; label: string }) {
 export function AllocateItemsToSupervisorsPage() {
   const navigate = useNavigate();
   const toast = useToast();
-  const [searchParams] = useSearchParams();
-  const returnTo = searchParams.get('returnTo') === 'requests' ? 'requests' : 'inventory';
   const canViewRequestQueue = useAppSelector(selectCanViewRequestQueue);
 
   const userId = useAppSelector(selectUserId);
@@ -46,6 +51,9 @@ export function AllocateItemsToSupervisorsPage() {
   const [selectedSupervisorId, setSelectedSupervisorId] = useState<string | null>(null);
   const [qty, setQty] = useState('1');
   const [submitting, setSubmitting] = useState(false);
+  const [allocationSuccess, setAllocationSuccess] = useState<AllocationSuccessSummary | null>(null);
+
+  const clearAllocationSuccess = useCallback(() => setAllocationSuccess(null), []);
 
   const handleSubscriptionError = useCallback(
     (err: Error) => {
@@ -87,7 +95,9 @@ export function AllocateItemsToSupervisorsPage() {
 
   const allocatableLines = useMemo(() => {
     if (!selectedRequest) return [];
-    return (selectedRequest.items ?? []).filter((i) => i.itemType === 'non_consumable');
+    return (selectedRequest.items ?? []).filter(
+      (i) => i.itemType === 'consumable' || i.itemType === 'non_consumable'
+    );
   }, [selectedRequest]);
 
   const selectedLine = useMemo(
@@ -134,12 +144,17 @@ export function AllocateItemsToSupervisorsPage() {
         selectedSupervisor.name,
         { userId, userName: userDisplayName?.trim() || 'Site manager' }
       );
+      setAllocationSuccess({
+        requestNumber: selectedRequest.requestNumber,
+        itemName: selectedLine.itemName,
+        quantity: q,
+        supervisorName: selectedSupervisor.name,
+      });
+      toast.success(
+        `Assigned ${q} to ${selectedSupervisor.name}. You can split another line or leave when done.`
+      );
       setQty('1');
-      if (returnTo === 'requests') {
-        navigate(canViewRequestQueue ? '/requests/queue' : '/requests/my-requests');
-      } else {
-        navigate('/inventory');
-      }
+      setSelectedSupervisorId(null);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Could not allocate');
     } finally {
@@ -152,9 +167,6 @@ export function AllocateItemsToSupervisorsPage() {
     selectedSupervisor,
     qty,
     availableForLine,
-    returnTo,
-    canViewRequestQueue,
-    navigate,
     toast,
     userDisplayName,
     userId,
@@ -217,9 +229,49 @@ export function AllocateItemsToSupervisorsPage() {
           <div className="mb-4 flex gap-2 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3">
             <Icon name="exclamation-circle" className="mt-0.5 h-5 w-5 shrink-0 text-[#475569]" />
             <p className="text-[13px] leading-5 text-[#64748B]">
-              Non-consumables only. Physical stock stays on site; this tracks custody until Store Incharge returns to central store.
+              Consumable and non-consumable lines. Physical stock stays on site; this tracks custody until Store
+              Incharge returns to central store.
             </p>
           </div>
+
+          {allocationSuccess && (
+            <div
+              role="status"
+              aria-live="polite"
+              aria-label="Allocation saved"
+              className="mb-4 rounded-[10px] border border-[#16A34A]/30 bg-[#16A34A]/15 p-4"
+            >
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <div className="flex min-w-0 flex-1 items-start gap-2">
+                  <Icon name="check-circle" className="mt-0.5 h-5 w-5 shrink-0 text-[#16A34A]" />
+                  <div className="min-w-0">
+                    <p className="text-[15px] font-semibold text-[#0F172A]">Allocation saved</p>
+                    <p className="mt-1 text-[13px] leading-5 text-[#64748B]">
+                      <span className="font-medium text-[#0F172A]">{allocationSuccess.requestNumber}</span>
+                      {' · '}
+                      {allocationSuccess.itemName}
+                    </p>
+                    <p className="mt-1 text-[15px] text-[#0F172A]">
+                      <span className="font-semibold">{allocationSuccess.quantity}</span> unit
+                      {allocationSuccess.quantity === 1 ? '' : 's'} →{' '}
+                      <span className="font-semibold">{allocationSuccess.supervisorName}</span>
+                    </p>
+                    <p className="mt-2 text-[13px] text-[#64748B]">
+                      Choose another supervisor or line to continue, or use Done below when finished.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearAllocationSuccess}
+                  className="flex h-12 min-w-[48px] shrink-0 items-center justify-center rounded-lg px-3 text-[13px] font-semibold text-[#16A34A] hover:bg-[#16A34A]/10"
+                  aria-label="Dismiss success message"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
 
           <StepBadge n={1} label="Transferred request" />
           {requests.length === 0 ? (
@@ -238,6 +290,7 @@ export function AllocateItemsToSupervisorsPage() {
                     onClick={() => {
                       setSelectedRequestId(r.id);
                       setSelectedItemId(null);
+                      clearAllocationSuccess();
                     }}
                     className={`flex w-full items-center justify-between rounded-[10px] border p-4 text-left ${
                       selectedRequestId === r.id
@@ -264,7 +317,7 @@ export function AllocateItemsToSupervisorsPage() {
               <ul className="mb-8 space-y-2">
                 {allocatableLines.length === 0 ? (
                   <li className="py-4 text-center text-[15px] text-[#64748B]">
-                    No non-consumable lines on this request.
+                    No lines available to split on this request.
                   </li>
                 ) : (
                   allocatableLines.map((line) => {
@@ -275,7 +328,10 @@ export function AllocateItemsToSupervisorsPage() {
                       <li key={line.itemId}>
                         <button
                           type="button"
-                          onClick={() => setSelectedItemId(line.itemId)}
+                          onClick={() => {
+                            setSelectedItemId(line.itemId);
+                            clearAllocationSuccess();
+                          }}
                           className={`w-full rounded-[10px] border p-4 text-left ${
                             selectedItemId === line.itemId
                               ? 'border-[#1E40AF] bg-[#EFF6FF]'
@@ -388,6 +444,28 @@ export function AllocateItemsToSupervisorsPage() {
               'Save allocation'
             )}
           </button>
+
+          <div className="mt-6 rounded-[10px] border border-[#E2E8F0] bg-white p-4">
+            <p className="mb-3 text-[13px] font-medium text-[#64748B]">Done splitting?</p>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => navigate('/inventory')}
+                className="flex min-h-[48px] flex-1 items-center justify-center rounded-[10px] border-[1.5px] border-[#1E40AF] px-4 text-[15px] font-semibold text-[#1E40AF] hover:bg-[#1E40AF]/5"
+              >
+                Back to inventory
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(canViewRequestQueue ? '/requests/queue' : '/requests/my-requests')
+                }
+                className="flex min-h-[48px] flex-1 items-center justify-center rounded-[10px] border-[1.5px] border-[#1E40AF] px-4 text-[15px] font-semibold text-[#1E40AF] hover:bg-[#1E40AF]/5"
+              >
+                Back to requests
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

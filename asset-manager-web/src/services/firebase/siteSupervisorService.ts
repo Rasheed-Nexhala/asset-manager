@@ -240,9 +240,6 @@ export async function createSupervisorAllocation(
 
     const line = requestData.items?.find((i) => i.itemId === itemId);
     if (!line) throw new Error('Item not found on this request');
-    if (line.itemType === 'consumable') {
-      throw new Error('Consumable items are not divided to supervisors');
-    }
 
     const qtyApproved = Number(line.quantityApproved ?? 0);
     const qtyReturnedCentral = Number(line.quantityReturned ?? 0);
