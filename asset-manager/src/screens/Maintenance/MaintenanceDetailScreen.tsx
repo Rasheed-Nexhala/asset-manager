@@ -166,6 +166,8 @@ export const MaintenanceDetailScreen: React.FC = () => {
   const canWriteOffAccess = useAppSelector(selectCanStoreInchargeMaintenanceWriteOff);
   const showWriteOffAction =
     isAdminOrSuperAdmin || (isStoreIncharge && canWriteOffAccess);
+  /** Store Incharge without time-boxed write-off grant: surface path to request Admin approval (same destination as Write Off). */
+  const showRequestWriteOffAccessAction = isStoreIncharge && !canWriteOffAccess;
   const maintenance = useAppSelector((state) => selectMaintenanceById(maintenanceId)(state));
   const error = useAppSelector(selectMaintenanceError);
 
@@ -242,9 +244,28 @@ export const MaintenanceDetailScreen: React.FC = () => {
             <Text className="text-[15px] font-semibold text-white">Write Off</Text>
           </TouchableOpacity>
         )}
+        {showRequestWriteOffAccessAction && (
+          <TouchableOpacity
+            className="border-[1.5px] border-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2 bg-white"
+            onPress={handleWriteOff}
+            activeOpacity={0.7}
+            accessibilityLabel="Request write-off access"
+            accessibilityHint="Opens write-off where you can request Admin approval"
+            accessibilityRole="button"
+          >
+            <Ionicons name="shield-checkmark-outline" size={20} color="#1E40AF" />
+            <Text className="text-[15px] font-semibold text-[#1E40AF]">Request write-off access</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
-  }, [maintenance, handleReturnToInventory, handleWriteOff, showWriteOffAction]);
+  }, [
+    maintenance,
+    handleReturnToInventory,
+    handleWriteOff,
+    showWriteOffAction,
+    showRequestWriteOffAccessAction,
+  ]);
 
   // Loading state (waiting for snapshot or initial load)
   if (maintenanceId && !maintenance && !error) {

@@ -296,6 +296,36 @@ describe('MaintenanceDetailScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('WriteOff', { maintenanceId: 'm1' });
   });
 
+  it('Request write-off access button navigates to WriteOff when Store Incharge has no grant', () => {
+    const mockMaintenance = createMockMaintenance({ status: 'pending' });
+
+    renderWithStore(<MaintenanceDetailScreen />, {
+      ...defaultPreloadedState,
+      inventoryUpdateRequest: {
+        myAccessGrantedUntil: null,
+        myWriteOffAccessGrantedUntil: null,
+        pendingRequests: [],
+        activeApprovedRequests: [],
+        loading: false,
+        error: null,
+      },
+      maintenance: {
+        maintenanceRecords: [mockMaintenance],
+        selectedMaintenance: null,
+        loading: false,
+        error: null,
+        errorTimestamp: null,
+        filters: { status: 'all' },
+      },
+    });
+
+    const requestButton = screen.getByRole('button', { name: 'Request write-off access' });
+    fireEvent.press(requestButton);
+
+    expect(mockNavigate).toHaveBeenCalledWith('WriteOff', { maintenanceId: 'm1' });
+    expect(screen.queryByRole('button', { name: 'Write off item' })).toBeNull();
+  });
+
   it('Back button calls goBack', () => {
     const mockMaintenance = createMockMaintenance();
 

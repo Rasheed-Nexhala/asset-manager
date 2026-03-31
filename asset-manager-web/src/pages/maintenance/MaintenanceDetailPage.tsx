@@ -135,6 +135,8 @@ export function MaintenanceDetailPage() {
   const canWriteOffAccess = useAppSelector(selectCanStoreInchargeMaintenanceWriteOff);
   const showWriteOffAction =
     isAdminOrSuperAdmin || (isStoreIncharge && canWriteOffAccess);
+  /** Store Incharge without grant: navigate to write-off route where they can submit an inventory update request. */
+  const showRequestWriteOffAccessAction = isStoreIncharge && !canWriteOffAccess;
 
   const maintenance = useAppSelector((state) =>
     maintenanceId ? selectMaintenanceById(maintenanceId)(state) : null
@@ -186,15 +188,26 @@ export function MaintenanceDetailPage() {
           <button
             type="button"
             onClick={handleWriteOff}
-            className="flex h-[50px] items-center justify-center gap-2 rounded-[10px] bg-red-600 text-[15px] font-semibold text-white hover:bg-red-700"
+            className="flex h-[50px] min-h-[48px] items-center justify-center gap-2 rounded-[10px] bg-red-600 text-[15px] font-semibold text-white hover:bg-red-700"
           >
             <Icon name="trash" className="h-5 w-5" />
             Write Off
           </button>
         )}
+        {showRequestWriteOffAccessAction && (
+          <button
+            type="button"
+            onClick={handleWriteOff}
+            className="flex h-[50px] min-h-[48px] items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-blue-800 bg-white text-[15px] font-semibold text-blue-800 hover:bg-slate-50"
+            aria-label="Request write-off access"
+          >
+            <Icon name="lock-closed" className="h-5 w-5 shrink-0" />
+            Request write-off access
+          </button>
+        )}
       </div>
     );
-  }, [maintenance, handleReturn, handleWriteOff, showWriteOffAction]);
+  }, [maintenance, handleReturn, handleWriteOff, showWriteOffAction, showRequestWriteOffAccessAction]);
 
   if (maintenanceId && !maintenance && !error) {
     return (
