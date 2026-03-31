@@ -1,0 +1,13 @@
+{
+  "name": "nexhala-scripts",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "One-off admin scripts for Nexhala. Run from this directory.",
+  "scripts": {
+    "backfill-is-low-stock": "node backfill-is-low-stock.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.7.0"
+  }
+}

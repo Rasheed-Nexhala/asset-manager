@@ -197,6 +197,7 @@ export async function addToMaintenance(
       transaction.update(itemRef, {
         inMaintenanceQuantity: currentInMaintenance + data.quantity,
         centralStoreQuantity: (itemData.centralStoreQuantity || 0) - data.quantity,
+        isLowStock: (itemData.centralStoreQuantity || 0) - data.quantity <= (itemData.minStockLevel || 0),
         updatedAt: Timestamp.now(),
       });
       
@@ -317,6 +318,7 @@ export async function returnFromMaintenance(
       transaction.update(itemRef, {
         inMaintenanceQuantity: Math.max(0, currentInMaintenance - returnData.returnQuantity),
         centralStoreQuantity: (itemData.centralStoreQuantity || 0) + returnData.returnQuantity,
+        isLowStock: (itemData.centralStoreQuantity || 0) + returnData.returnQuantity <= (itemData.minStockLevel || 0),
         updatedAt: Timestamp.now(),
       });
       

@@ -644,6 +644,7 @@ export const transferRequest = async (
           transaction.update(itemRef, {
             centralStoreQuantity: (itemData.centralStoreQuantity || 0) - quantity,
             atSitesQuantity: (itemData.atSitesQuantity || 0) + quantity,
+            isLowStock: (itemData.centralStoreQuantity || 0) - quantity <= (itemData.minStockLevel || 0),
             updatedAt: serverTimestamp(),
           });
         }
@@ -944,6 +945,7 @@ const returnItemsBatch = async (
           transaction.update(itemRef, {
             centralStoreQuantity: (itemData.centralStoreQuantity || 0) + qty,
             atSitesQuantity: (itemData.atSitesQuantity || 0) - qty,
+            isLowStock: (itemData.centralStoreQuantity || 0) + qty <= (itemData.minStockLevel || 0),
             updatedAt: now,
           });
         }

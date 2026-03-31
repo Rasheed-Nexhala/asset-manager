@@ -196,14 +196,35 @@ export const getDashboardLowStockPreview = async (
 };
 
 /**
- * Count items in low stock across the catalog (not paginated). Uses full listItems + isLowStock.
- * Optional category/type/status scope matches listItems filters.
+ * Returns true when an item's central store quantity is at or below the minimum stock level.
+ * This mirrors the isLowStock logic in inventoryUtils so we can write it denormalized to Firestore.
+ */
+function computeIsLowStock(centralStoreQuantity: number, minStockLevel: number): boolean {
+  return centralStoreQuantity <= minStockLevel;
+}
+
+/**
+ * Count items in low stock across the catalog using server-side count (no document fetches).
+ * Optional category/type/status scope matches the existing item filters.
  */
 export const countLowStockItems = async (
   scope?: Pick<ItemFilters, 'categoryId' | 'type' | 'status'>
 ): Promise<number> => {
-  const items = await listItems({ ...scope, lowStockOnly: true });
-  return items.length;
+  const constraints: QueryConstraint[] = [where('isLowStock', '==', true)];
+
+  if (scope?.categoryId !== undefined) {
+    if (scope.categoryId === null || scope.categoryId === 'uncategorized' || scope.categoryId === '') {
+      constraints.push(where('categoryId', '==', null));
+    } else {
+      constraints.push(where('categoryId', '==', scope.categoryId));
+    }
+  }
+  if (scope?.type) constraints.push(where('type', '==', scope.type));
+  if (scope?.status) constraints.push(where('status', '==', scope.status));
+
+  const q = query(collection(db, ITEMS_COLLECTION), ...constraints);
+  const snap = await getCountFromServer(q);
+  return snap.data().count;
 };
 
 /**
@@ -821,6 +842,7 @@ export const createItem = async (
         status: 'active' as const,
         totalQuantity: itemData.initialQuantity,
         centralStoreQuantity: itemData.initialQuantity,
+        isLowStock: computeIsLowStock(itemData.initialQuantity, itemData.minStockLevel),
         atSitesQuantity: 0,
         inMaintenanceQuantity: 0,
         createdAt: now,
@@ -975,6 +997,13 @@ export const updateItem = async (
       const mergedSku =
         updates.sku !== undefined ? updates.sku : ((itemData.sku as string) ?? '');
       Object.assign(rawData, itemSearchIndexFields(mergedName, mergedSku));
+
+      // Recompute isLowStock if minStockLevel or centralStoreQuantity-affecting fields changed
+      const newMinStockLevel = updates.minStockLevel !== undefined
+        ? updates.minStockLevel
+        : (itemData.minStockLevel as number ?? 0);
+      const currentCentralQty = itemData.centralStoreQuantity as number ?? 0;
+      rawData.isLowStock = computeIsLowStock(currentCentralQty, newMinStockLevel);
 
       const updateData = Object.fromEntries(
         Object.entries(rawData).filter(([, v]) => v !== undefined)
@@ -1187,6 +1216,12 @@ export async function applyInventoryAdjustmentInTransaction(
   }
   if (typeof updatedTotals.inMaintenanceQuantity === 'number' && updatedTotals.inMaintenanceQuantity < 0) {
     throw new Error('Maintenance quantity cannot drop below zero.');
+  }
+
+  if (typeof updatedTotals.centralStoreQuantity === 'number') {
+    const newCentralQty = updatedTotals.centralStoreQuantity;
+    const minStock = (itemData.minStockLevel as number) ?? 0;
+    updatedTotals.isLowStock = computeIsLowStock(newCentralQty, minStock);
   }
 
   transaction.update(itemRef, updatedTotals);

@@ -1044,6 +1044,7 @@ export const receivePO = async (
       transaction.update(itemRef, {
         centralStoreQuantity: (itemData.centralStoreQuantity || 0) + receivedQty,
         totalQuantity: (itemData.totalQuantity || 0) + receivedQty,
+        isLowStock: (itemData.centralStoreQuantity || 0) + receivedQty <= (itemData.minStockLevel || 0),
         updatedAt: now,
       });
     }
