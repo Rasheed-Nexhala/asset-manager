@@ -9,6 +9,8 @@ import {
   Platform,
   Modal,
   FlatList,
+  Pressable,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -1247,21 +1249,24 @@ export const CreatePOScreen: React.FC = () => {
             animationType="slide"
             onRequestClose={() => setSitePickerVisible(false)}
           >
-            <TouchableOpacity
-              activeOpacity={1}
-              onPress={() => setSitePickerVisible(false)}
-              className="flex-1 bg-black/50 justify-end"
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              className="flex-1 justify-end"
             >
-              <TouchableOpacity
-                activeOpacity={1}
-                onPress={(e) => e.stopPropagation()}
-                className="bg-white rounded-t-[20px] max-h-[70%]"
-              >
-                <View className="p-4 border-b border-[#E2E8F0]">
-                  <Text className="text-[17px] font-semibold text-[#0F172A]">
+              <View className="absolute inset-0 bg-black/50" />
+              <Pressable
+                className="absolute inset-0"
+                onPress={() => setSitePickerVisible(false)}
+                accessibilityLabel="Close site picker"
+                accessibilityRole="button"
+              />
+              <View className="bg-white rounded-t-2xl max-h-[70%]">
+                <View className="w-10 h-1 bg-gray-300 rounded-full self-center mt-4 mb-2" />
+                <View className="px-4 pb-4 border-b border-[#E2E8F0]">
+                  <Text className="text-[22px] font-semibold text-[#0F172A]">
                     PO issue site
                   </Text>
-                  <Text className="text-[13px] text-[#64748B] mt-1">
+                  <Text className="text-[15px] text-[#64748B] mt-1">
                     Optional. Pick an active site or leave unset.
                   </Text>
                 </View>
@@ -1313,9 +1318,10 @@ export const CreatePOScreen: React.FC = () => {
                       </View>
                     ) : null
                   }
+                  contentContainerStyle={{ paddingBottom: 24 }}
                 />
-              </TouchableOpacity>
-            </TouchableOpacity>
+              </View>
+            </KeyboardAvoidingView>
           </Modal>
 
           <Modal
@@ -1324,21 +1330,24 @@ export const CreatePOScreen: React.FC = () => {
             animationType="slide"
             onRequestClose={() => setAdminSelectorVisible(false)}
           >
-            <TouchableOpacity
-              activeOpacity={1}
-              onPress={() => setAdminSelectorVisible(false)}
-              className="flex-1 bg-black/50 justify-end"
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              className="flex-1 justify-end"
             >
-              <TouchableOpacity
-                activeOpacity={1}
-                onPress={(e) => e.stopPropagation()}
-                className="bg-white rounded-t-[20px] max-h-[70%]"
-              >
-                <View className="p-4 border-b border-[#E2E8F0]">
-                  <Text className="text-[17px] font-semibold text-[#0F172A]">
+              <View className="absolute inset-0 bg-black/50" />
+              <Pressable
+                className="absolute inset-0"
+                onPress={() => setAdminSelectorVisible(false)}
+                accessibilityLabel="Close admin selector"
+                accessibilityRole="button"
+              />
+              <View className="bg-white rounded-t-2xl max-h-[70%]">
+                <View className="w-10 h-1 bg-gray-300 rounded-full self-center mt-4 mb-2" />
+                <View className="px-4 pb-4 border-b border-[#E2E8F0]">
+                  <Text className="text-[22px] font-semibold text-[#0F172A]">
                     Select Admin
                   </Text>
-                  <Text className="text-[13px] text-[#64748B] mt-1">
+                  <Text className="text-[15px] text-[#64748B] mt-1">
                     Only the selected admin can approve this PO.
                   </Text>
                 </View>
@@ -1378,9 +1387,10 @@ export const CreatePOScreen: React.FC = () => {
                       </View>
                     ) : null
                   }
+                  contentContainerStyle={{ paddingBottom: 24 }}
                 />
-              </TouchableOpacity>
-            </TouchableOpacity>
+              </View>
+            </KeyboardAvoidingView>
           </Modal>
 
           {/* Buttons */}

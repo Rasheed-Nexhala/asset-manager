@@ -198,21 +198,21 @@ export function generatePOHtml(
 
   const items = po.items ?? [];
   let totalQtySum = 0;
-  const itemRows = items
+  let itemRows = items
     .map((item, index) => {
       totalQtySum += qtyNumericForTotal(item);
       const sl = index + 1;
       const lineTot = itemLineTotal(item);
       const gstPct = item.gstPercentage ?? DEFAULT_GST_PERCENTAGE;
       return `<tr>
-        <td style="border:1px solid #000;padding:8px 10px;font-size:11px;text-align:center;vertical-align:middle;">${sl}</td>
-        <td style="border:1px solid #000;padding:8px 10px;font-size:11px;vertical-align:middle;">${escapeHtml(item.itemSku || '—')}</td>
-        <td style="border:1px solid #000;padding:8px 10px;font-size:11px;vertical-align:middle;">${escapeHtml(item.itemName)}</td>
-        <td style="border:1px solid #000;padding:8px 10px;font-size:11px;text-align:center;vertical-align:middle;">${escapeHtml(itemUnitColumn(item))}</td>
-        <td style="border:1px solid #000;padding:8px 10px;font-size:11px;text-align:right;vertical-align:middle;">${nowrapNumCellHtml(item.unitPrice ?? 0)}</td>
-        <td style="border:1px solid #000;padding:8px 10px;font-size:11px;text-align:right;vertical-align:middle;">${escapeHtml(formatQtyDisplay(item))}</td>
-        <td style="border:1px solid #000;padding:8px 10px;font-size:11px;text-align:center;vertical-align:middle;">${gstPct > 0 ? `${gstPct}%` : '—'}</td>
-        <td style="border:1px solid #000;padding:8px 10px;font-size:11px;text-align:right;vertical-align:middle;">${inrAmountCellHtml(lineTot)}</td>
+        <td style="border:1px solid #000;padding:4px 6px;font-size:11px;text-align:center;vertical-align:middle;">${sl}</td>
+        <td style="border:1px solid #000;padding:4px 6px;font-size:11px;vertical-align:middle;">${escapeHtml(item.itemSku || '—')}</td>
+        <td style="border:1px solid #000;padding:4px 6px;font-size:11px;vertical-align:middle;">${escapeHtml(item.itemName)}</td>
+        <td style="border:1px solid #000;padding:4px 6px;font-size:11px;text-align:center;vertical-align:middle;">${escapeHtml(itemUnitColumn(item))}</td>
+        <td style="border:1px solid #000;padding:4px 6px;font-size:11px;text-align:right;vertical-align:middle;">${nowrapNumCellHtml(item.unitPrice ?? 0)}</td>
+        <td style="border:1px solid #000;padding:4px 6px;font-size:11px;text-align:right;vertical-align:middle;">${escapeHtml(formatQtyDisplay(item))}</td>
+        <td style="border:1px solid #000;padding:4px 6px;font-size:11px;text-align:center;vertical-align:middle;">${gstPct > 0 ? `${gstPct}%` : '—'}</td>
+        <td style="border:1px solid #000;padding:4px 6px;font-size:11px;text-align:right;vertical-align:middle;">${inrAmountCellHtml(lineTot)}</td>
       </tr>`;
     })
     .join('');
@@ -266,29 +266,29 @@ export function generatePOHtml(
       : '';
 
   const logoImg = logoDataUrl
-    ? `<img src="${logoDataUrl}" alt="${escapeHtml(companyConfig.logoAlt)}" style="height:96px;max-width:100%;width:auto;display:block;object-fit:contain;" />`
+    ? `<img src="${logoDataUrl}" alt="${escapeHtml(companyConfig.logoAlt)}" style="height:72px;max-width:100%;width:auto;display:block;object-fit:contain;" />`
     : typeof window !== 'undefined'
-      ? `<img src="${window.location.origin}${companyConfig.logoPath}" alt="${escapeHtml(companyConfig.logoAlt)}" style="height:96px;max-width:100%;width:auto;display:block;object-fit:contain;" />`
+      ? `<img src="${window.location.origin}${companyConfig.logoPath}" alt="${escapeHtml(companyConfig.logoAlt)}" style="height:72px;max-width:100%;width:auto;display:block;object-fit:contain;" />`
       : '';
 
   const totalsFooterRow = `<tr>
-    <td colspan="5" style="border:1px solid #000;padding:10px 12px;background:#fff;"></td>
-    <td style="border:1px solid #000;padding:10px 12px;font-size:11px;text-align:right;font-weight:bold;vertical-align:middle;">${totalQtySum.toLocaleString('en-IN')}</td>
-    <td style="border:1px solid #000;padding:10px 12px;font-size:10px;text-align:center;vertical-align:middle;">&nbsp;</td>
-    <td style="border:1px solid #000;padding:6px;vertical-align:middle;min-width:128px;width:26%;">
+    <td colspan="5" style="border:1px solid #000;padding:6px 8px;background:#fff;"></td>
+    <td style="border:1px solid #000;padding:6px 8px;font-size:11px;text-align:right;font-weight:bold;vertical-align:middle;">${totalQtySum.toLocaleString('en-IN')}</td>
+    <td style="border:1px solid #000;padding:6px 8px;font-size:10px;text-align:center;vertical-align:middle;">&nbsp;</td>
+    <td style="border:1px solid #000;padding:4px;vertical-align:middle;min-width:128px;width:26%;">
       <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:11px;">
         <colgroup><col style="width:46%" /><col style="width:54%" /></colgroup>
         <tr>
-          <td style="padding:8px 10px;font-weight:bold;text-align:right;border-bottom:1px solid #000;vertical-align:middle;"><span style="white-space:nowrap">Sub\u00A0Total</span></td>
-          <td style="padding:8px 10px;text-align:right;border-bottom:1px solid #000;vertical-align:middle;">${inrAmountCellHtml(po.subtotal ?? 0)}</td>
+          <td style="padding:4px 6px;font-weight:bold;text-align:right;border-bottom:1px solid #000;vertical-align:middle;"><span style="white-space:nowrap">Sub\u00A0Total</span></td>
+          <td style="padding:4px 6px;text-align:right;border-bottom:1px solid #000;vertical-align:middle;">${inrAmountCellHtml(po.subtotal ?? 0)}</td>
         </tr>
         <tr>
-          <td style="padding:8px 10px;font-weight:bold;text-align:right;border-bottom:1px solid #000;vertical-align:middle;"><span style="white-space:nowrap">TAX</span></td>
-          <td style="padding:8px 10px;text-align:right;border-bottom:1px solid #000;vertical-align:middle;">${inrAmountCellHtml(po.gstAmount ?? 0)}</td>
+          <td style="padding:4px 6px;font-weight:bold;text-align:right;border-bottom:1px solid #000;vertical-align:middle;"><span style="white-space:nowrap">TAX</span></td>
+          <td style="padding:4px 6px;text-align:right;border-bottom:1px solid #000;vertical-align:middle;">${inrAmountCellHtml(po.gstAmount ?? 0)}</td>
         </tr>
         <tr>
-          <td style="padding:10px 10px;font-weight:bold;text-align:right;vertical-align:middle;"><span style="white-space:nowrap">Final\u00A0Total</span></td>
-          <td style="padding:10px 10px;font-weight:bold;text-align:right;vertical-align:middle;">${inrAmountCellHtml(po.totalAmount ?? 0)}</td>
+          <td style="padding:6px 6px;font-weight:bold;text-align:right;vertical-align:middle;"><span style="white-space:nowrap">Final\u00A0Total</span></td>
+          <td style="padding:6px 6px;font-weight:bold;text-align:right;vertical-align:middle;">${inrAmountCellHtml(po.totalAmount ?? 0)}</td>
         </tr>
       </table>
     </td>
@@ -315,68 +315,68 @@ export function generatePOHtml(
     <tr>
       <td style="width: 42%; vertical-align: top; border: none; padding: 0 12px 0 0;">
         ${logoImg}
-        ${isoLine ? `<div style="font-size:9px;margin-top:8px;font-weight:bold;color:${IBF_RED};">${escapeHtml(isoLine)}</div>` : ''}
+        ${isoLine ? `<div style="font-size:9px;margin-top:4px;font-weight:bold;color:${IBF_RED};">${escapeHtml(isoLine)}</div>` : ''}
       </td>
       <td style="vertical-align: top; text-align: right; border: none; padding: 0;">
         <div style="font-size:15px;font-weight:bold;color:${IBF_BLUE};line-height:1.2;">${escapeHtml(displayName)}</div>
-        <div style="margin-top:8px;">${companyAddressLinesHtml()}</div>
-        ${phones ? `<div style="font-size:10px;margin-top:8px;color:#000;">Ph: <strong>${escapeHtml(phones)}</strong></div>` : ''}
-        <div style="font-size:10px;margin-top:4px;color:#000;">Email: <strong>${escapeHtml(companyConfig.email)}</strong></div>
-        ${website ? `<div style="font-size:10px;margin-top:4px;color:#000;">Website: <strong>${escapeHtml(website)}</strong></div>` : ''}
-        ${cin ? `<div style="font-size:10px;margin-top:4px;color:#000;">CIN No.: <strong>${escapeHtml(cin)}</strong></div>` : ''}
-        <div style="font-size:10px;margin-top:4px;color:#000;">GST No.: <strong>${escapeHtml(companyConfig.gstin)}</strong></div>
+        <div style="margin-top:6px;">${companyAddressLinesHtml()}</div>
+        ${phones ? `<div style="font-size:10px;margin-top:6px;color:#000;">Ph: <strong>${escapeHtml(phones)}</strong></div>` : ''}
+        <div style="font-size:10px;margin-top:2px;color:#000;">Email: <strong>${escapeHtml(companyConfig.email)}</strong></div>
+        ${website ? `<div style="font-size:10px;margin-top:2px;color:#000;">Website: <strong>${escapeHtml(website)}</strong></div>` : ''}
+        ${cin ? `<div style="font-size:10px;margin-top:2px;color:#000;">CIN No.: <strong>${escapeHtml(cin)}</strong></div>` : ''}
+        <div style="font-size:10px;margin-top:2px;color:#000;">GST No.: <strong>${escapeHtml(companyConfig.gstin)}</strong></div>
       </td>
     </tr>
   </table>
 
-  <div style="border-top:3px solid #000;margin:14px 0 0 0;height:0;line-height:0;font-size:0;"></div>
+  <div style="border-top:3px solid #000;margin:10px 0 0 0;height:0;line-height:0;font-size:0;"></div>
 
-  <table class="po-grid" style="margin-top:10px;border:2px solid #000;">
+  <table class="po-grid" style="margin-top:8px;border:2px solid #000;">
     <tr>
-      <td colspan="4" style="padding:12px 16px;font-size:13px;font-weight:bold;text-align:center;border:none;border-bottom:1px solid #000;vertical-align:middle;letter-spacing:0.4px;">${escapeHtml(docTitle)}</td>
+      <td colspan="4" style="padding:8px 12px;font-size:13px;font-weight:bold;text-align:center;border:none;border-bottom:1px solid #000;vertical-align:middle;letter-spacing:0.4px;">${escapeHtml(docTitle)}</td>
     </tr>
     <tr>
-      <td colspan="2" style="vertical-align:top;padding:14px 14px;border:none;border-right:1px solid #000;">
+      <td colspan="2" style="vertical-align:top;padding:10px 12px;border:none;border-right:1px solid #000;">
         <div style="font-size:12px;font-weight:bold;text-transform:uppercase;margin-bottom:6px;color:#000;">${escapeHtml(po.vendorName ?? '—')}</div>
         ${vendorAddressLinesHtml(po) || `<div style="font-size:10px;">—</div>`}
-        <div style="margin-top:10px;font-size:10px;"><strong>GST No.:</strong> ${escapeHtml(po.vendorGstin?.trim() || '—')}</div>
-        <div style="margin-top:6px;font-size:10px;"><strong>Contact Person:</strong> ${escapeHtml(vendorContactPersonLine(po))}</div>
-        <div style="margin-top:4px;font-size:10px;"><strong>Contact No:</strong> ${escapeHtml(vendorPhoneEmailLine(po))}</div>
+        <div style="margin-top:8px;font-size:10px;"><strong>GST No.:</strong> ${escapeHtml(po.vendorGstin?.trim() || '—')}</div>
+        <div style="margin-top:4px;font-size:10px;"><strong>Contact Person:</strong> ${escapeHtml(vendorContactPersonLine(po))}</div>
+        <div style="margin-top:2px;font-size:10px;"><strong>Contact No:</strong> ${escapeHtml(vendorPhoneEmailLine(po))}</div>
       </td>
-      <td colspan="2" style="vertical-align:top;padding:14px 14px;border:none;">
+      <td colspan="2" style="vertical-align:top;padding:10px 12px;border:none;">
         <table style="width:100%;border-collapse:collapse;font-size:10px;">
-          <tr><td style="padding:8px 12px;font-weight:bold;vertical-align:middle;">Purchase Order No.</td><td style="padding:8px 12px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(po.poNumber ?? '—')}</td></tr>
-          <tr><td style="padding:8px 12px;font-weight:bold;vertical-align:middle;">JOB No.</td><td style="padding:8px 12px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(po.jobNo?.trim() || '—')}</td></tr>
-          <tr><td style="padding:8px 12px;font-weight:bold;vertical-align:middle;">Issue Date</td><td style="padding:8px 12px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(formatDdMmYyyy(po.createdAt))}</td></tr>
-          <tr><td style="padding:8px 12px;font-weight:bold;vertical-align:middle;">Delivery Date</td><td style="padding:8px 12px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(deliveryDateLabel(po))}</td></tr>
-          <tr><td style="padding:8px 12px;font-weight:bold;vertical-align:middle;">PO Issue Site</td><td style="padding:8px 12px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(poIssueSiteDisplay(po))}</td></tr>
-          <tr><td style="padding:8px 12px;font-weight:bold;vertical-align:middle;">Contact person</td><td style="padding:8px 12px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(buyerContactLine(po))}</td></tr>
-          <tr><td style="padding:8px 12px;font-weight:bold;vertical-align:middle;">Deliver Location</td><td style="padding:8px 12px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(deliverLocationDisplay(po))}</td></tr>
-          <tr><td style="padding:8px 12px;font-weight:bold;vertical-align:middle;">Approved by</td><td style="padding:8px 12px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(approvedByDisplay)}</td></tr>
+          <tr><td style="padding:6px 10px;font-weight:bold;vertical-align:middle;">Purchase Order No.</td><td style="padding:6px 10px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(po.poNumber ?? '—')}</td></tr>
+          <tr><td style="padding:6px 10px;font-weight:bold;vertical-align:middle;">JOB No.</td><td style="padding:6px 10px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(po.jobNo?.trim() || '—')}</td></tr>
+          <tr><td style="padding:6px 10px;font-weight:bold;vertical-align:middle;">Issue Date</td><td style="padding:6px 10px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(formatDdMmYyyy(po.createdAt))}</td></tr>
+          <tr><td style="padding:6px 10px;font-weight:bold;vertical-align:middle;">Delivery Date</td><td style="padding:6px 10px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(deliveryDateLabel(po))}</td></tr>
+          <tr><td style="padding:6px 10px;font-weight:bold;vertical-align:middle;">PO Issue Site</td><td style="padding:6px 10px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(poIssueSiteDisplay(po))}</td></tr>
+          <tr><td style="padding:6px 10px;font-weight:bold;vertical-align:middle;">Contact person</td><td style="padding:6px 10px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(buyerContactLine(po))}</td></tr>
+          <tr><td style="padding:6px 10px;font-weight:bold;vertical-align:middle;">Deliver Location</td><td style="padding:6px 10px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(deliverLocationDisplay(po))}</td></tr>
+          <tr><td style="padding:6px 10px;font-weight:bold;vertical-align:middle;">Approved by</td><td style="padding:6px 10px;text-align:right;font-weight:bold;vertical-align:middle;">${escapeHtml(approvedByDisplay)}</td></tr>
         </table>
       </td>
     </tr>
   </table>
 
-  <div style="border:2px solid #000;border-top:none;padding:14px 14px;">
-    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#000;">Deliver To:</div>
+  <div style="border:2px solid #000;border-top:none;padding:10px 12px;">
+    <div style="font-size:11px;font-weight:bold;margin-bottom:4px;color:#000;">Deliver To:</div>
     <div style="font-size:11px;font-weight:bold;color:${IBF_BLUE};">${escapeHtml(deliverTo)}</div>
-    <div style="margin-top:8px;font-size:10px;line-height:1.45;"><strong>Delivery Address:</strong> ${escapeHtml(deliverAddr || '—')}</div>
-    <div style="margin-top:4px;font-size:10px;line-height:1.45;"><strong>Delivery Contact / Email:</strong> ${escapeHtml(deliverContacts || '—')}</div>
-    ${deliverWeb ? `<div style="margin-top:4px;font-size:10px;"><strong>Website:</strong> ${escapeHtml(deliverWeb)}</div>` : ''}
+    <div style="margin-top:6px;font-size:10px;line-height:1.45;"><strong>Delivery Address:</strong> ${escapeHtml(deliverAddr || '—')}</div>
+    <div style="margin-top:2px;font-size:10px;line-height:1.45;"><strong>Delivery Contact / Email:</strong> ${escapeHtml(deliverContacts || '—')}</div>
+    ${deliverWeb ? `<div style="margin-top:2px;font-size:10px;"><strong>Website:</strong> ${escapeHtml(deliverWeb)}</div>` : ''}
   </div>
 
   <table class="po-grid" style="margin-top:0;border:2px solid #000;border-top:none;">
     <thead>
       <tr style="background:#f0f0f0;">
-        <th style="padding:10px 10px;font-size:10px;width:32px;">Sr.<br/>No.</th>
-        <th style="padding:10px 10px;font-size:10px;width:64px;">SKU</th>
-        <th style="padding:10px 10px;font-size:10px;">Description</th>
-        <th style="padding:10px 10px;font-size:10px;width:40px;">Unit</th>
-        <th style="padding:10px 10px;font-size:10px;width:62px;">U/Price</th>
-        <th style="padding:10px 10px;font-size:10px;width:52px;">Q'ty</th>
-        <th style="padding:10px 10px;font-size:10px;width:36px;">GST</th>
-        <th style="padding:10px 10px;font-size:10px;min-width:108px;width:108px;">Total</th>
+        <th style="padding:6px 8px;font-size:10px;width:32px;">Sr.<br/>No.</th>
+        <th style="padding:6px 8px;font-size:10px;width:64px;">SKU</th>
+        <th style="padding:6px 8px;font-size:10px;">Description</th>
+        <th style="padding:6px 8px;font-size:10px;width:40px;">Unit</th>
+        <th style="padding:6px 8px;font-size:10px;width:62px;">U/Price</th>
+        <th style="padding:6px 8px;font-size:10px;width:52px;">Q'ty</th>
+        <th style="padding:6px 8px;font-size:10px;width:36px;">GST</th>
+        <th style="padding:6px 8px;font-size:10px;min-width:108px;width:108px;">Total</th>
       </tr>
     </thead>
     <tbody>${itemRows}${totalsFooterRow}</tbody>
@@ -384,29 +384,29 @@ export function generatePOHtml(
 
   ${grrSectionHtml}
 
-  <div style="margin-top:14px;border:1px solid #000;padding:14px 14px;background:#fff;">
+  <div style="margin-top:10px;border:1px solid #000;padding:10px 12px;background:#fff;">
     <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:${IBF_BLUE};">Remarks/Justifications</div>
     ${justificationBodyHtml}
-    <div style="font-size:11px;font-weight:bold;margin-top:14px;margin-bottom:6px;color:${IBF_BLUE};">Terms &amp; Conditions</div>
+    <div style="font-size:11px;font-weight:bold;margin-top:10px;margin-bottom:6px;color:${IBF_BLUE};">Terms &amp; Conditions</div>
     ${termsHtml}
   </div>
 
-  <table class="po-signatures" style="width:100%;border-collapse:collapse;margin-top:18px;">
+  <table class="po-signatures" style="width:100%;border-collapse:collapse;margin-top:14px;">
     <tr>
-      <td style="border:1px solid #000;width:33%;padding:32px 12px 14px;vertical-align:bottom;">
+      <td style="border:1px solid #000;width:33%;padding:24px 12px 10px;vertical-align:bottom;">
         <div style="border-bottom:1px solid #000;height:22px;margin-bottom:6px;"></div>
         <div style="font-size:10px;font-weight:bold;">Authorized signature of Seller</div>
-        <div style="font-size:10px;margin-top:8px;">Date: _______________</div>
+        <div style="font-size:10px;margin-top:6px;">Date: _______________</div>
       </td>
-      <td style="border:1px solid #000;border-left:none;width:33%;padding:32px 12px 14px;vertical-align:bottom;">
+      <td style="border:1px solid #000;border-left:none;width:33%;padding:24px 12px 10px;vertical-align:bottom;">
         <div style="border-bottom:1px solid #000;height:22px;margin-bottom:6px;"></div>
         <div style="font-size:10px;font-weight:bold;">Verified by</div>
-        <div style="font-size:10px;margin-top:8px;">Date: _______________</div>
+        <div style="font-size:10px;margin-top:6px;">Date: _______________</div>
       </td>
-      <td style="border:1px solid #000;border-left:none;width:34%;padding:32px 12px 14px;vertical-align:bottom;">
+      <td style="border:1px solid #000;border-left:none;width:34%;padding:24px 12px 10px;vertical-align:bottom;">
         <div style="border-bottom:1px solid #000;height:22px;margin-bottom:6px;"></div>
         <div style="font-size:10px;font-weight:bold;color:${IBF_BLUE};">IBF Authorized Signature</div>
-        <div style="font-size:10px;margin-top:8px;">Date: _______________</div>
+        <div style="font-size:10px;margin-top:6px;">Date: _______________</div>
       </td>
     </tr>
   </table>
