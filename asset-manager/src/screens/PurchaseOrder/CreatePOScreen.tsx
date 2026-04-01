@@ -37,8 +37,6 @@ import { getPOById } from '../../services/firebase/purchaseOrderService';
 import { getSites } from '../../services/firebase/siteService';
 import type { Site } from '../../types/sites';
 import { getItemById } from '../../services/firebase/inventoryService';
-import { getAdminUsers } from '../../services/firebase/userRoleService';
-import type { UserListItem } from '../../types/roles';
 
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { setVendors, clearError, setError } from '../../store/slices/purchaseOrderSlice';
@@ -64,7 +62,7 @@ import type { PurchaseOrderStackParamList } from '../../navigation/PurchaseOrder
 type RouteParams = RouteProp<PurchaseOrderStackParamList, 'CreatePO'>;
 type NavigationProp = StackNavigationProp<
   PurchaseOrderStackParamList,
-  'CreatePO' | 'ApprovePO'
+  'CreatePO' | 'ApprovePO' | 'SelectApprovalAdmin'
 >;
 
 const DEFAULT_GST_PERCENTAGE = 18;
@@ -128,9 +126,6 @@ export const CreatePOScreen: React.FC = () => {
   const [inventoryItemsMap, setInventoryItemsMap] = useState<Record<string, any>>({});
   const [assignedToAdminId, setAssignedToAdminId] = useState<string | null>(null);
   const [assignedToAdminName, setAssignedToAdminName] = useState<string | null>(null);
-  const [adminUsers, setAdminUsers] = useState<UserListItem[]>([]);
-  const [adminUsersLoading, setAdminUsersLoading] = useState(false);
-  const [adminSelectorVisible, setAdminSelectorVisible] = useState(false);
   const assignedAdminRef = useRef<{
     assignedToAdminId: string | null;
     assignedToAdminName: string | null;
@@ -150,17 +145,6 @@ export const CreatePOScreen: React.FC = () => {
         setSites([]);
       })
       .finally(() => setSitesLoading(false));
-  }, []);
-
-  useEffect(() => {
-    setAdminUsersLoading(true);
-    getAdminUsers()
-      .then(setAdminUsers)
-      .catch((err) => {
-        console.error('Failed to load admins:', err);
-        setAdminUsers([]);
-      })
-      .finally(() => setAdminUsersLoading(false));
   }, []);
 
   useEffect(() => {
@@ -474,6 +458,21 @@ export const CreatePOScreen: React.FC = () => {
         navigation.setParams({ selectedItems: undefined } as Record<string, unknown>);
       }
     }, [route.params?.selectedItems, navigation])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const sel = route.params?.approvalAdminSelection;
+      if (sel?.id?.trim() && sel?.name?.trim()) {
+        setAssignedToAdminId(sel.id.trim());
+        setAssignedToAdminName(sel.name.trim());
+        assignedAdminRef.current = {
+          assignedToAdminId: sel.id.trim(),
+          assignedToAdminName: sel.name.trim(),
+        };
+        navigation.setParams({ approvalAdminSelection: undefined } as Record<string, unknown>);
+      }
+    }, [route.params?.approvalAdminSelection, navigation])
   );
 
   const handleAddItemsPress = useCallback(() => {
@@ -1224,13 +1223,21 @@ export const CreatePOScreen: React.FC = () => {
               Select the admin who will approve this PO when submitting for approval.
             </Text>
             <TouchableOpacity
-              onPress={() => setAdminSelectorVisible(true)}
-              disabled={adminUsersLoading}
+              onPress={() =>
+                navigation.navigate('SelectApprovalAdmin', {
+                  returnParams: { poId },
+                  selectedAdminId: assignedToAdminId,
+                })
+              }
               className="border-[1.5px] border-[#E2E8F0] rounded-[10px] h-[50px] px-4 flex-row items-center justify-between bg-white"
+              accessibilityRole="button"
+              accessibilityLabel={
+                assignedToAdminId && assignedToAdminName
+                  ? `Assigned approver ${assignedToAdminName}, tap to change`
+                  : 'Select admin for approval'
+              }
             >
-              {adminUsersLoading ? (
-                <ActivityIndicator size="small" color="#1E40AF" />
-              ) : assignedToAdminId && assignedToAdminName ? (
+              {assignedToAdminId && assignedToAdminName ? (
                 <Text className="text-[15px] text-[#0F172A]">
                   {assignedToAdminName}
                 </Text>
@@ -1239,7 +1246,7 @@ export const CreatePOScreen: React.FC = () => {
                   Select admin
                 </Text>
               )}
-              <Ionicons name="chevron-down" size={20} color="#64748B" />
+              <Ionicons name="chevron-forward" size={20} color="#64748B" />
             </TouchableOpacity>
           </View>
 
@@ -1314,75 +1321,6 @@ export const CreatePOScreen: React.FC = () => {
                       <View className="p-4">
                         <Text className="text-[15px] text-[#64748B]">
                           No active sites. Add sites under Site Management.
-                        </Text>
-                      </View>
-                    ) : null
-                  }
-                  contentContainerStyle={{ paddingBottom: 24 }}
-                />
-              </View>
-            </KeyboardAvoidingView>
-          </Modal>
-
-          <Modal
-            visible={adminSelectorVisible}
-            transparent
-            animationType="slide"
-            onRequestClose={() => setAdminSelectorVisible(false)}
-          >
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              className="flex-1 justify-end"
-            >
-              <View className="absolute inset-0 bg-black/50" />
-              <Pressable
-                className="absolute inset-0"
-                onPress={() => setAdminSelectorVisible(false)}
-                accessibilityLabel="Close admin selector"
-                accessibilityRole="button"
-              />
-              <View className="bg-white rounded-t-2xl max-h-[70%]">
-                <View className="w-10 h-1 bg-gray-300 rounded-full self-center mt-4 mb-2" />
-                <View className="px-4 pb-4 border-b border-[#E2E8F0]">
-                  <Text className="text-[22px] font-semibold text-[#0F172A]">
-                    Select Admin
-                  </Text>
-                  <Text className="text-[15px] text-[#64748B] mt-1">
-                    Only the selected admin can approve this PO.
-                  </Text>
-                </View>
-                <FlatList
-                  data={adminUsers}
-                  keyExtractor={(item) => item.id}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      onPress={() => {
-                        const name = item.displayName || item.email || 'Unknown';
-                        setAssignedToAdminId(item.id);
-                        setAssignedToAdminName(name);
-                        assignedAdminRef.current = {
-                          assignedToAdminId: item.id,
-                          assignedToAdminName: name,
-                        };
-                        setAdminSelectorVisible(false);
-                      }}
-                      className="px-4 py-4 border-b border-[#E2E8F0]"
-                    >
-                      <Text className="text-[15px] font-medium text-[#0F172A]">
-                        {item.displayName || item.email || 'Unknown'}
-                      </Text>
-                      {item.email && (
-                        <Text className="text-[13px] text-[#64748B] mt-0.5">
-                          {item.email}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  )}
-                  ListEmptyComponent={
-                    !adminUsersLoading ? (
-                      <View className="p-4">
-                        <Text className="text-[15px] text-[#64748B]">
-                          No admins found.
                         </Text>
                       </View>
                     ) : null

@@ -5,3 +5,4 @@ export { VendorLedgerScreen } from './VendorLedgerScreen';
 export { AddVendorScreen } from './AddVendorScreen';
 export { ApprovePOScreen } from './ApprovePOScreen';
 export { ReceivePOScreen } from './ReceivePOScreen';
+export { SelectApprovalAdminScreen } from './SelectApprovalAdminScreen';
