@@ -72,6 +72,7 @@ vi.mock('../../../services/firebase/inventoryService', () => ({
 
 vi.mock('../../../services/firebase/purchaseOrderService', () => ({
   getPOById: vi.fn(),
+  getNextIbfPoNumberPreview: vi.fn().mockResolvedValue('IBF/PO/2026-27/001'),
 }));
 
 const rootReducer = {
