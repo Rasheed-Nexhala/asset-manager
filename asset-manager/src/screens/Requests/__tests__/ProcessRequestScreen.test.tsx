@@ -50,7 +50,7 @@ let mockSubscribeOnError: ((error: Error) => void) | null = null;
 
 jest.mock('../../../services/firebase/requestService', () => ({
   requestService: {
-    getRequestById: jest.fn(),
+    getRequestById: jest.fn().mockResolvedValue(null),
     subscribeToRequest: jest.fn(
       (requestId: string, callback: (request: Request | null) => void, onError?: (error: Error) => void) => {
         mockSubscribeCallback = callback;
@@ -62,6 +62,7 @@ jest.mock('../../../services/firebase/requestService', () => ({
       }
     ),
     subscribeToRequests: jest.fn(() => () => {}),
+    partialApproveAndSplitCallable: jest.fn(),
     checkItemsAvailability: jest.fn().mockResolvedValue([
       { itemId: 'item1', itemName: 'Steel Bar', requested: 5, available: 10, sufficient: true },
     ]),
@@ -128,6 +129,14 @@ jest.mock('../../../store/thunks/requestThunks', () => {
           mockApproveRequestResolve = resolve;
           mockApproveRequestReject = reject;
         })
+    ),
+    partialApproveAndSplit: createAsyncThunk(
+      'requests/partialApproveAndSplit',
+      async () => ({
+        parentRequestId: 'req1',
+        remainderRequestId: null,
+        remainderRequestNumber: null,
+      })
     ),
     returnItems: createAsyncThunk('requests/returnItems', async () => null),
   };
@@ -345,12 +354,11 @@ describe('ProcessRequestScreen', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Approve request' })).toBeTruthy();
+      const btn = screen.getByRole('button', { name: 'Approve request' });
+      expect(btn.props.accessibilityState?.disabled).toBeFalsy();
     });
 
-    const approveButton = screen.getByRole('button', { name: 'Approve request' });
-    expect(approveButton).toBeTruthy();
-    fireEvent.press(approveButton);
+    fireEvent.press(screen.getByRole('button', { name: 'Approve request' }));
 
     await waitFor(() => {
       expect(mockApproveRequestResolve).toBeDefined();

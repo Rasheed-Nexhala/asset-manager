@@ -8,3 +8,4 @@ export { VendorForm } from './VendorForm';
 export { POItemSelectorModal } from './POItemSelectorModal';
 export { InvoiceUploadField } from './InvoiceUploadField';
 export { POReceiptSummary } from './POReceiptSummary';
+export { POItemsScrollTable } from './POItemsScrollTable';

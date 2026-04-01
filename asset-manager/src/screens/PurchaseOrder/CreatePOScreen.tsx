@@ -11,6 +11,7 @@ import {
   FlatList,
   Pressable,
   KeyboardAvoidingView,
+  TextInput,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -33,7 +34,14 @@ import {
   createVendor,
   deleteVendor,
 } from '../../services/firebase/vendorService';
-import { getPOById } from '../../services/firebase/purchaseOrderService';
+import {
+  getPOById,
+  getNextIbfPoNumberPreview,
+} from '../../services/firebase/purchaseOrderService';
+import {
+  formatIbfPoNumber,
+  getIndianFinancialYearLabel,
+} from '../../utils/poNumberFormat';
 import { getSites } from '../../services/firebase/siteService';
 import type { Site } from '../../types/sites';
 import { getItemById } from '../../services/firebase/inventoryService';
@@ -44,6 +52,7 @@ import {
   selectUserId,
   selectUserDisplayName,
   selectCanCreatePurchaseOrder,
+  selectIsSuperAdmin,
 } from '../../store/selectors/authSelectors';
 import {
   selectVendors,
@@ -82,6 +91,7 @@ export const CreatePOScreen: React.FC = () => {
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
   const canCreatePO = useAppSelector(selectCanCreatePurchaseOrder);
+  const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
   const vendors = useAppSelector(selectVendors);
 
   const poFromStore = useAppSelector((state) =>
@@ -102,6 +112,7 @@ export const CreatePOScreen: React.FC = () => {
   const [buyerContactName, setBuyerContactName] = useState('');
   const [buyerContactPhone, setBuyerContactPhone] = useState('');
   const [poNumber, setPoNumber] = useState('');
+  const [poNumberLoading, setPoNumberLoading] = useState(false);
   const [items, setItems] = useState<PurchaseOrderItem[]>([]);
   const [justification, setJustification] = useState('');
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState<Date | null>(
@@ -314,9 +325,13 @@ export const CreatePOScreen: React.FC = () => {
     userId,
   ]);
 
+  /** Baseline for new PO (includes preview P.O. No.) so Save Draft stays disabled until real edits. */
   useEffect(() => {
-    if (!poId && initialStateHash === null) {
-      setInitialStateHash(JSON.stringify({
+    if (poId) return;
+    let cancelled = false;
+    setPoNumberLoading(true);
+    const buildNewPoInitialHash = (pn: string) =>
+      JSON.stringify({
         selectedVendorId: null,
         vendorName: '',
         vendorContact: '',
@@ -329,16 +344,33 @@ export const CreatePOScreen: React.FC = () => {
         buyerContactPhone: '',
         location: '',
         jobNo: '',
-        poNumber: '',
+        poNumber: pn.trim(),
         items: [],
         justification: '',
         expectedDeliveryDate: null,
         deliveryDateText: '',
         orderSiteId: null,
         orderSiteName: '',
-      }));
-    }
-  }, [poId, initialStateHash]);
+      });
+    getNextIbfPoNumberPreview()
+      .then((n) => {
+        if (cancelled) return;
+        setPoNumber(n);
+        setInitialStateHash(buildNewPoInitialHash(n));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const fallback = formatIbfPoNumber(getIndianFinancialYearLabel(new Date()), 1);
+        setPoNumber(fallback);
+        setInitialStateHash(buildNewPoInitialHash(fallback));
+      })
+      .finally(() => {
+        if (!cancelled) setPoNumberLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [poId]);
 
   const currentHash = JSON.stringify({
     selectedVendorId,
@@ -409,13 +441,12 @@ export const CreatePOScreen: React.FC = () => {
     const e: Record<string, string> = {};
     const vName = vendorName.trim();
     const vContact = vendorContact.trim();
-    if (!poNumber.trim()) e.poNumber = 'P.O. No. is required';
     if (!vName) e.vendorName = 'Vendor name is required';
     if (!vContact) e.vendorContact = 'Contact number is required';
     if (items.length === 0) e.items = 'At least one item is required';
     setErrors(e);
     return Object.keys(e).length === 0;
-  }, [poNumber, vendorName, vendorContact, items.length]);
+  }, [vendorName, vendorContact, items.length]);
 
   // Handle selectedItems when returning from SelectItemsScreen or ProcessRequestScreen
   useFocusEffect(
@@ -587,7 +618,7 @@ export const CreatePOScreen: React.FC = () => {
         }
 
         const data: CreatePurchaseOrderData = {
-          poNumber: poNumber.trim(),
+          poNumber: isSuperAdmin ? poNumber.trim() : '',
           vendorId,
           vendorName: vName,
           vendorContact: vContact,
@@ -718,6 +749,7 @@ export const CreatePOScreen: React.FC = () => {
       editingPOStatus,
       dispatch,
       navigation,
+      isSuperAdmin,
     ]
   );
 
@@ -759,10 +791,6 @@ export const CreatePOScreen: React.FC = () => {
   }, [poId, editingPOStatus, userId, dispatch, navigation]);
 
   const handlePrintDraft = useCallback(async () => {
-    if (!poNumber.trim()) {
-      Alert.alert('Error', 'P.O. No. is required to print.');
-      return;
-    }
     if (!vendorName.trim() || !vendorContact.trim()) {
       Alert.alert('Error', 'Vendor name and contact are required to print.');
       return;
@@ -794,7 +822,7 @@ export const CreatePOScreen: React.FC = () => {
           expectedDeliveryDate,
           userName: userName ?? '—',
         },
-        poNumber.trim()
+        poNumber.trim() || 'DRAFT'
       );
       await printPurchaseOrder(draftPO);
     } catch (err) {
@@ -905,16 +933,37 @@ export const CreatePOScreen: React.FC = () => {
         keyboardShouldPersistTaps="handled"
       >
         <View className="px-4 py-4 gap-6">
-          {/* PO Number — manual entry, optional (auto-generated if blank) */}
+          {/* P.O. No. — preview from counter; SuperAdmin editable; server assigns on save for others */}
           <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0]">
-            <FormField
-              label="P.O. No."
-              value={poNumber}
-              onChangeText={setPoNumber}
-              placeholder="e.g. PO-2025-0001"
-              error={errors.poNumber}
-              required
-            />
+            {poNumberLoading && !poId ? (
+              <View className="flex-row items-center gap-2 py-2">
+                <ActivityIndicator size="small" color="#1E40AF" />
+                <Text className="text-[15px] text-[#64748B]">Loading P.O. number…</Text>
+              </View>
+            ) : isSuperAdmin ? (
+              <FormField
+                label="P.O. No."
+                value={poNumber}
+                onChangeText={setPoNumber}
+                placeholder="Optional — edit or clear to auto-assign on save"
+                error={errors.poNumber}
+              />
+            ) : (
+              <View className="gap-1.5">
+                <Text className="text-[15px] text-[#0F172A]">P.O. No.</Text>
+                <Text className="text-[13px] text-[#64748B] mb-1">
+                  Preview of the next number (read-only). The value saved may differ if others create
+                  POs before you save.
+                </Text>
+                <TextInput
+                  className="border border-[#E2E8F0] rounded-lg h-12 px-4 bg-[#F8FAFC] text-[15px] text-[#0F172A]"
+                  value={poNumber}
+                  editable={false}
+                  selectTextOnFocus={true}
+                  accessibilityLabel="Purchase order number preview"
+                />
+              </View>
+            )}
           </View>
 
           {/* Vendor — CIAMS card layout */}

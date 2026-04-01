@@ -203,6 +203,48 @@ export const approveRequest = createAsyncThunk(
 );
 
 /**
+ * Partial approve: selected lines on parent + optional remainder request (Cloud Function).
+ */
+export const partialApproveAndSplit = createAsyncThunk(
+  'requests/partialApproveAndSplit',
+  async (
+    params: {
+      parentRequestId: string;
+      approvedLineItems: Array<{ itemId: string; quantityApproved: number }>;
+      storeNotes?: string;
+    },
+    { dispatch, rejectWithValue }
+  ) => {
+    try {
+      dispatch(setLoading(true));
+      dispatch(clearError());
+
+      const result = await requestService.partialApproveAndSplitCallable(params);
+
+      const parent = await requestService.getRequestById(result.parentRequestId);
+      if (parent) {
+        dispatch(updateRequestInState(parent));
+      }
+      if (result.remainderRequestId) {
+        const remainder = await requestService.getRequestById(result.remainderRequestId);
+        if (remainder) {
+          dispatch(addRequest(remainder));
+        }
+      }
+
+      dispatch(setLoading(false));
+      return result;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to approve request';
+      dispatch(setError(errorMessage));
+      dispatch(setLoading(false));
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
  * Reject a request
  */
 export const rejectRequest = createAsyncThunk(

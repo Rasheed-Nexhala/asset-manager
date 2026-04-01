@@ -148,7 +148,7 @@ export function RequestItemCard({
 
   const handleDecrement = () => {
     if (entryMode !== 'pieces' && hasFullWeightConfig) return;
-    if (quantity > 1) {
+    if (quantity > 0) {
       const newQty = quantity - 1;
       setAmountStr(String(newQty));
       setQuantity(newQty);

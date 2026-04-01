@@ -374,7 +374,7 @@ export const ReceivePOScreen: React.FC = () => {
                 {/* Item name + status badge */}
                 <View className="flex-row items-start justify-between mb-3">
                   <View className="flex-1 min-w-0 pr-2">
-                    <Text className="text-[15px] font-medium text-[#0F172A]" numberOfLines={2}>
+                    <Text className="text-[15px] font-medium text-[#0F172A] leading-5">
                       {item.itemName}
                     </Text>
                     <Text className="text-[13px] text-[#64748B] mt-0.5">

@@ -72,6 +72,21 @@ export function RequestCard({
         </div>
       </div>
 
+      {(request.splitFromRequestNumber || request.splitRemainderRequestNumber) && (
+        <div className="mb-3 text-[12px] text-slate-600">
+          {request.splitFromRequestNumber && (
+            <p className="font-medium text-slate-700">
+              Continued from {request.splitFromRequestNumber}
+            </p>
+          )}
+          {request.splitRemainderRequestNumber && (
+            <p className="font-medium text-slate-700">
+              Pending remainder {request.splitRemainderRequestNumber}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="flex gap-4 mb-3">
         <div className="flex-1 min-w-0">
           <p className="text-[13px] text-slate-500">

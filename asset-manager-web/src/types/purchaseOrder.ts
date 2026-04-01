@@ -252,7 +252,10 @@ export const firestorePOToPO = (doc: PurchaseOrderFirestore): PurchaseOrder => (
  * Data for creating a new PO
  */
 export interface CreatePurchaseOrderData {
-  /** Required PO number (manual entry). */
+  /**
+   * PO number. Empty string means allocate automatically (IBF/PO/FY/seq) on save.
+   * SuperAdmin may set a custom value; others rely on server assignment.
+   */
   poNumber: string;
   vendorId: string;
   vendorName: string;

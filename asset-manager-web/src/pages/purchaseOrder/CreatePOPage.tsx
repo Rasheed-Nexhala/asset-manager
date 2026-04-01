@@ -19,7 +19,14 @@ import {
   createVendor,
   deleteVendor,
 } from '../../services/firebase/vendorService';
-import { getPOById } from '../../services/firebase/purchaseOrderService';
+import {
+  getPOById,
+  getNextIbfPoNumberPreview,
+} from '../../services/firebase/purchaseOrderService';
+import {
+  formatIbfPoNumber,
+  getIndianFinancialYearLabel,
+} from '../../utils/poNumberFormat';
 import { getSites } from '../../services/firebase/siteService';
 import type { Site } from '../../types/sites';
 import { getItemById } from '../../services/firebase/inventoryService';
@@ -99,6 +106,8 @@ export function CreatePOPage() {
   const [buyerContactName, setBuyerContactName] = useState('');
   const [buyerContactPhone, setBuyerContactPhone] = useState('');
   const [poNumber, setPoNumber] = useState('');
+  const [poNumberLoading, setPoNumberLoading] = useState(false);
+  const [newPoInitialHash, setNewPoInitialHash] = useState<string | null>(null);
   const [items, setItems] = useState<PurchaseOrderItem[]>([]);
   const [justification, setJustification] = useState('');
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState<Date | null>(null);
@@ -347,15 +356,60 @@ export function CreatePOPage() {
     toast,
   ]);
 
+  useEffect(() => {
+    if (poId) return;
+    let cancelled = false;
+    setPoNumberLoading(true);
+    const buildNewPoHash = (pn: string) =>
+      JSON.stringify({
+        selectedVendorId: null,
+        vendorName: '',
+        vendorContact: '',
+        vendorEmail: '',
+        vendorAddress: '',
+        vendorGstin: '',
+        vendorContactPerson: '',
+        location: '',
+        jobNo: '',
+        deliveryLocation: '',
+        buyerContactName: '',
+        buyerContactPhone: '',
+        orderSiteId: null,
+        orderSiteName: '',
+        deliveryDateText: '',
+        poNumber: pn.trim(),
+        items: [],
+        justification: '',
+        expectedDeliveryDate: null,
+      });
+    getNextIbfPoNumberPreview()
+      .then((n) => {
+        if (cancelled) return;
+        setPoNumber(n);
+        setNewPoInitialHash(buildNewPoHash(n));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const fallback = formatIbfPoNumber(getIndianFinancialYearLabel(new Date()), 1);
+        setPoNumber(fallback);
+        setNewPoInitialHash(buildNewPoHash(fallback));
+      })
+      .finally(() => {
+        if (!cancelled) setPoNumberLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [poId]);
+
   const validate = useCallback((): boolean => {
     const e: Record<string, string> = {};
-    if (!poNumber.trim()) e.poNumber = 'P.O. No. is required';
     if (!vendorName.trim()) e.vendorName = 'Vendor name is required';
     if (!vendorContact.trim()) e.vendorContact = 'Contact number is required';
     if (items.length === 0) e.items = 'At least one item is required';
     setErrors(e);
     return Object.keys(e).length === 0;
-  }, [poNumber, vendorName, vendorContact, items.length]);
+  }, [vendorName, vendorContact, items.length]);
 
   const handleItemSelect = useCallback((selected: Item[]) => {
     const newItems: PurchaseOrderItem[] = selected.map((item) => {
@@ -532,7 +586,7 @@ export function CreatePOPage() {
         }
 
         const data: CreatePurchaseOrderData = {
-          poNumber: poNumber.trim(),
+          poNumber: isSuperAdmin ? poNumber.trim() : '',
           vendorId,
           vendorName: vName,
           vendorContact: vContact,
@@ -656,6 +710,7 @@ export function CreatePOPage() {
       navigate,
       toast,
       confirm,
+      isSuperAdmin,
     ]
   );
 
@@ -725,10 +780,6 @@ export function CreatePOPage() {
   }, [addVendorFormData, handleCloseAddVendorModal, toast]);
 
   const handlePrintDraft = useCallback(async () => {
-    if (!poNumber.trim()) {
-      toast.error('P.O. No. is required to print.');
-      return;
-    }
     if (!vendorName.trim() || !vendorContact.trim()) {
       toast.error('Vendor name and contact are required to print.');
       return;
@@ -760,7 +811,7 @@ export function CreatePOPage() {
           expectedDeliveryDate,
           userName: userName ?? '—',
         },
-        poNumber.trim()
+        poNumber.trim() || 'DRAFT'
       );
       await printPurchaseOrder(draftPO);
     } catch (err) {
@@ -856,19 +907,9 @@ export function CreatePOPage() {
   const isDirty =
     poId && editingPOStatus === 'draft'
       ? initialStateHash !== null && currentHash !== initialStateHash
-      : items.length > 0 ||
-        vendorName.trim() ||
-        vendorContact.trim() ||
-        poNumber.trim() ||
-        vendorContactPerson.trim() ||
-        location.trim() ||
-        jobNo.trim() ||
-        deliveryLocation.trim() ||
-        buyerContactName.trim() ||
-        buyerContactPhone.trim() ||
-        orderSiteId ||
-        orderSiteName.trim() ||
-        deliveryDateText.trim();
+      : !poId && newPoInitialHash !== null
+        ? currentHash !== newPoInitialHash
+        : false;
 
   if (poId && (isLoadingPO || loadPOError)) {
     return (
@@ -946,14 +987,35 @@ export function CreatePOPage() {
 
       <div className="space-y-6">
         <div className="rounded-[10px] border border-slate-200 bg-white p-4 lg:p-6">
-          <FormField
-            label="P.O. No."
-            value={poNumber}
-            onChange={setPoNumber}
-            placeholder="e.g. PO-2025-0001"
-            error={errors.poNumber}
-            required
-          />
+          {poNumberLoading && !poId ? (
+            <div className="flex items-center gap-2 py-2">
+              <LoadingSpinner className="h-5 w-5 text-blue-800" />
+              <span className="text-[15px] text-slate-500">Loading P.O. number…</span>
+            </div>
+          ) : isSuperAdmin ? (
+            <FormField
+              label="P.O. No."
+              value={poNumber}
+              onChange={setPoNumber}
+              placeholder="Optional — edit or clear to auto-assign on save"
+              error={errors.poNumber}
+            />
+          ) : (
+            <div className="space-y-1.5">
+              <label className="block text-[15px] text-slate-900">P.O. No.</label>
+              <p className="text-[13px] text-slate-500">
+                Preview of the next number (read-only). The value saved may differ if others create
+                POs before you save.
+              </p>
+              <input
+                type="text"
+                readOnly
+                value={poNumber}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-[15px] text-slate-900"
+                aria-label="Purchase order number preview"
+              />
+            </div>
+          )}
         </div>
 
         <div className="rounded-[10px] border border-slate-200 bg-white p-4 lg:p-6">

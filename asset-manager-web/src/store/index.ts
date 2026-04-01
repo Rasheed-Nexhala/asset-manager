@@ -59,6 +59,7 @@ export const store = configureStore({
           'requests/editRequest/fulfilled',
           'requests/submitDraftRequest/fulfilled',
           'requests/approveRequest/fulfilled',
+          'requests/partialApproveAndSplit/fulfilled',
           'requests/rejectRequest/fulfilled',
           'requests/transferRequest/fulfilled',
           'requests/returnItems/fulfilled',

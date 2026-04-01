@@ -22,7 +22,8 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import type { DocumentSnapshot, QueryConstraint } from 'firebase/firestore';
-import { db } from '../../../config/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../../../config/firebase';
 import type {
   Request,
   RequestStatus,
@@ -306,6 +307,26 @@ export const submitDraftRequest = async (
 /**
  * Approve a request (reserves items)
  */
+export type PartialApproveSplitResult = {
+  parentRequestId: string;
+  remainderRequestId: string | null;
+  remainderRequestNumber: string | null;
+};
+
+export const partialApproveAndSplitCallable = async (params: {
+  parentRequestId: string;
+  approvedLineItems: Array<{ itemId: string; quantityApproved: number }>;
+  storeNotes?: string;
+}): Promise<PartialApproveSplitResult> => {
+  const fn = httpsCallable(functions, 'partialApproveAndSplit');
+  const result = await fn({
+    parentRequestId: params.parentRequestId,
+    approvedLineItems: params.approvedLineItems,
+    storeNotes: params.storeNotes,
+  });
+  return result.data as PartialApproveSplitResult;
+};
+
 export const approveRequest = async (
   requestId: string,
   processedBy: string,
@@ -1381,6 +1402,7 @@ export const requestService = {
   checkItemsAvailability,
   editRequest,
   submitDraftRequest,
+  partialApproveAndSplitCallable,
   approveRequest,
   rejectRequest,
   transferRequest,

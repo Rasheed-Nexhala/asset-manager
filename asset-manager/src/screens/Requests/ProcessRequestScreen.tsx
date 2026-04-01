@@ -23,6 +23,7 @@ import { isWeightBasedItem } from '../../utils/weightConversionUtils';
 import { requestService } from '../../services/firebase/requestService';
 import {
   approveRequest,
+  partialApproveAndSplit,
 } from '../../store/thunks/requestThunks';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
@@ -173,8 +174,7 @@ export const ProcessRequestScreen: React.FC = () => {
       : null;
     const maxQty = originalItem?.quantityRequested ?? Infinity;
     
-    // Clamp between 1 and maxQty
-    const clampedQty = Math.max(1, Math.min(qty, maxQty));
+    const clampedQty = Math.max(0, Math.min(qty, maxQty));
     
     setApprovedQuantities(prev => ({
       ...prev,
@@ -183,11 +183,39 @@ export const ProcessRequestScreen: React.FC = () => {
   }, [request]);
 
   const canProcess = canManageRequests;
-  const allSufficient = availability.length > 0 && availability.every((a) => {
-    const requested = approvedQuantities[a.itemId] ?? a.requested;
-    return a.available >= requested;
-  });
   const isPending = request?.status === 'pending';
+  const selectedLinesSufficient =
+    availability.length > 0 &&
+    availability.every((a) => {
+      const qty = approvedQuantities[a.itemId] ?? a.requested;
+      if (qty <= 0) return true;
+      return a.available >= qty;
+    });
+  const hasAtLeastOneApprovedLine =
+    request?.items?.some((it) => {
+      const q = approvedQuantities[it.itemId] ?? it.quantityRequested;
+      return q > 0;
+    }) ?? false;
+  const fullQuantityApproval =
+    request?.items?.every((it) => {
+      const q = approvedQuantities[it.itemId] ?? it.quantityRequested;
+      return q === it.quantityRequested;
+    }) ?? false;
+  const allOriginalLinesSufficient =
+    availability.length > 0 &&
+    availability.every((a) => a.available >= a.requested);
+  const hasBlockingShortfall =
+    availability.some((a) => {
+      const qty = approvedQuantities[a.itemId] ?? a.requested;
+      return qty > 0 && a.available < qty;
+    }) ?? false;
+  const canApprovePending =
+    canProcess &&
+    !!isPending &&
+    !isCheckingAvailability &&
+    selectedLinesSufficient &&
+    hasAtLeastOneApprovedLine &&
+    !hasBlockingShortfall;
 
   useEffect(() => {
     if (!request || !isPending) {
@@ -233,6 +261,9 @@ export const ProcessRequestScreen: React.FC = () => {
       const a = availability.find((av) => av.itemId === itemId);
       if (!a) return undefined;
       const requested = approvedQuantities[itemId] ?? a.requested;
+      if (requested <= 0) {
+        return { available: a.available, sufficient: true };
+      }
       return { available: a.available, sufficient: a.available >= requested };
     },
     [availability, approvedQuantities]
@@ -267,13 +298,15 @@ export const ProcessRequestScreen: React.FC = () => {
     if (
       request?.requestType === 'site_transfer' ||
       availability.length === 0 ||
-      !allSufficient
+      !selectedLinesSufficient ||
+      !fullQuantityApproval
     ) {
       return [];
     }
     const items: Array<{ itemId: string; itemName: string; qtyToReplenish: number }> = [];
     availability.forEach((a) => {
       const requested = approvedQuantities[a.itemId] ?? a.requested;
+      if (requested <= 0) return;
       const remainingAfterFulfillment = a.available - requested;
       const invItem = inventoryItems.find((i) => i.id === a.itemId);
       const minStockLevel = invItem?.minStockLevel ?? 0;
@@ -287,7 +320,14 @@ export const ProcessRequestScreen: React.FC = () => {
       }
     });
     return items;
-  }, [request?.requestType, availability, allSufficient, approvedQuantities, inventoryItems]);
+  }, [
+    request?.requestType,
+    availability,
+    selectedLinesSufficient,
+    fullQuantityApproval,
+    approvedQuantities,
+    inventoryItems,
+  ]);
 
   const handleCreatePOForReplenishment = useCallback(() => {
     if (replenishmentItems.length === 0) return;
@@ -310,50 +350,93 @@ export const ProcessRequestScreen: React.FC = () => {
   useAutoClearError(subscriptionError, () => setSubscriptionError(null));
 
   const handleApprove = useCallback(async () => {
-    if (!request || !userId || !userName || !allSufficient) return;
+    if (!request || !userId || !userName || !canApprovePending) return;
 
     setIsLoading(true);
     try {
-      // Final re-check availability before approving (use source site for site_transfer)
-      const itemsToCheck = Array.isArray(request.items) ? request.items.map((item) => ({
-        itemId: item.itemId,
-        itemName: item.itemName,
-        quantityRequested: approvedQuantities[item.itemId] ?? item.quantityRequested,
-      })) : [];
       const approveSourceLocationId =
         request.requestType === 'site_transfer' && request.sourceSiteId
           ? `site_${request.sourceSiteId}`
           : 'store';
-      
-      const currentAvailability = await requestService.checkItemsAvailability(itemsToCheck, approveSourceLocationId);
-      const isStillSufficient = currentAvailability.length > 0 && currentAvailability.every((a) => {
-        const qty = approvedQuantities[a.itemId] ?? a.requested;
-        return a.available >= qty;
-      });
-      
+
+      const itemsToCheck = (Array.isArray(request.items) ? request.items : [])
+        .map((item) => ({
+          itemId: item.itemId,
+          itemName: item.itemName,
+          quantityRequested:
+            approvedQuantities[item.itemId] ?? item.quantityRequested,
+        }))
+        .filter((row) => row.quantityRequested > 0);
+
+      const currentAvailability = await requestService.checkItemsAvailability(
+        itemsToCheck,
+        approveSourceLocationId
+      );
+      const isStillSufficient =
+        currentAvailability.length > 0 &&
+        currentAvailability.every((a) => {
+          const qty =
+            approvedQuantities[a.itemId] ??
+            request.items?.find((i) => i.itemId === a.itemId)?.quantityRequested ??
+            a.requested;
+          if (qty <= 0) return true;
+          return a.available >= qty;
+        });
+
       if (!isStillSufficient) {
-        setAvailability(currentAvailability);
+        const fullCheck = await requestService.checkItemsAvailability(
+          (request.items ?? []).map((item) => ({
+            itemId: item.itemId,
+            itemName: item.itemName,
+            quantityRequested: item.quantityRequested,
+          })),
+          approveSourceLocationId
+        );
+        setAvailability(fullCheck);
         Alert.alert(
-          'Error', 
+          'Error',
           'Insufficient stock. Another transaction may have reduced the available quantity.'
         );
         return;
       }
 
-      await dispatch(
-        approveRequest({
-          requestId: request.id,
-          processedBy: userId,
-          processedByName: userName,
-          storeNotes: storeNotes.trim() || undefined,
-          updatedItems: Object.entries(approvedQuantities).map(([itemId, quantityApproved]) => ({
-            itemId,
-            quantityApproved,
-          })),
-        })
-      ).unwrap();
+      if (fullQuantityApproval) {
+        await dispatch(
+          approveRequest({
+            requestId: request.id,
+            processedBy: userId,
+            processedByName: userName,
+            storeNotes: storeNotes.trim() || undefined,
+            updatedItems: Object.entries(approvedQuantities).map(([itemId, quantityApproved]) => ({
+              itemId,
+              quantityApproved,
+            })),
+          })
+        ).unwrap();
+      } else {
+        const approvedLineItems = (request.items ?? [])
+          .map((item) => ({
+            itemId: item.itemId,
+            quantityApproved:
+              approvedQuantities[item.itemId] ?? item.quantityRequested,
+          }))
+          .filter((row) => row.quantityApproved > 0);
 
-      // No modal: UI updates via subscription (Confirm Transfer button appears)
+        const result = await dispatch(
+          partialApproveAndSplit({
+            parentRequestId: request.id,
+            approvedLineItems,
+            storeNotes: storeNotes.trim() || undefined,
+          })
+        ).unwrap();
+
+        if (result.remainderRequestNumber) {
+          Alert.alert(
+            'Approved',
+            `Selected lines approved. Remainder: ${result.remainderRequestNumber}`
+          );
+        }
+      }
     } catch (error: unknown) {
       Alert.alert(
         'Error',
@@ -362,7 +445,16 @@ export const ProcessRequestScreen: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [request, userId, userName, storeNotes, allSufficient, approvedQuantities, dispatch, navigation]);
+  }, [
+    request,
+    userId,
+    userName,
+    storeNotes,
+    canApprovePending,
+    fullQuantityApproval,
+    approvedQuantities,
+    dispatch,
+  ]);
 
   const handleReject = useCallback(() => {
     navigation.navigate('RejectRequest', { requestId });
@@ -514,6 +606,39 @@ export const ProcessRequestScreen: React.FC = () => {
               <Text className="text-[13px] text-[#64748B] mb-1">Purpose</Text>
               <Text className="text-[15px] text-[#0F172A]">{request.purpose}</Text>
             </View>
+
+            {(request.splitFromRequestId || request.splitRemainderRequestId) && (
+              <View className="mt-3 pt-3 border-t border-[#E2E8F0] gap-2">
+                {request.splitFromRequestId && (
+                  <TouchableOpacity
+                    onPress={() =>
+                      navigation.navigate('ProcessRequest', {
+                        requestId: request.splitFromRequestId!,
+                      })
+                    }
+                    accessibilityRole="button"
+                  >
+                    <Text className="text-[13px] font-medium text-[#1E40AF]">
+                      Continued from {request.splitFromRequestNumber ?? 'previous request'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {request.splitRemainderRequestId && (
+                  <TouchableOpacity
+                    onPress={() =>
+                      navigation.navigate('ProcessRequest', {
+                        requestId: request.splitRemainderRequestId!,
+                      })
+                    }
+                    accessibilityRole="button"
+                  >
+                    <Text className="text-[13px] font-medium text-[#1E40AF]">
+                      Open remainder {request.splitRemainderRequestNumber ?? ''}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </View>
 
           {/* Items List */}
@@ -723,11 +848,10 @@ export const ProcessRequestScreen: React.FC = () => {
               </View>
             )}
 
-          {/* Insufficient Stock Banner - CRITICAL: No Edit button, only wait or reject */}
           {canProcess &&
             isPending &&
             !isCheckingAvailability &&
-            !allSufficient &&
+            hasBlockingShortfall &&
             availability.length > 0 && (
               <View className="bg-[#DC2626]/15 rounded-[10px] p-4 border border-[#DC2626]/30">
                 <View className="flex-row items-center gap-2 mb-2">
@@ -737,10 +861,44 @@ export const ProcessRequestScreen: React.FC = () => {
                   </Text>
                 </View>
                 <Text className="text-[13px] text-[#64748B] mb-3">
-                  {request.requestType === 'site_transfer'
-                    ? `Some items do not have sufficient quantity at ${request.sourceSiteName ?? 'the source site'}. You can wait or reject this request.`
-                    : 'Some items do not have sufficient quantity in the central store. You can wait for stock to arrive or reject this request.'}
-                  {' '}Approval is disabled until all items are available.
+                  Reduce the approved quantity or set a line to 0 to exclude it. You can approve
+                  available lines now; excluded lines become a new pending request.
+                </Text>
+                {request.requestType !== 'site_transfer' && (
+                  <TouchableOpacity
+                    onPress={handleCreatePOForShortfall}
+                    className="bg-[#DC2626] rounded-[10px] h-[50px] items-center justify-center flex-row gap-2 mt-1"
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Create PO for Shortfall"
+                  >
+                    <Ionicons name="cart-outline" size={20} color="#FFFFFF" />
+                    <Text className="text-[15px] font-semibold text-white">
+                      Create PO for Shortfall
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+          {canProcess &&
+            isPending &&
+            !isCheckingAvailability &&
+            !allOriginalLinesSufficient &&
+            !hasBlockingShortfall &&
+            availability.length > 0 &&
+            request.requestType !== 'site_transfer' && (
+              <View className="bg-[#DC2626]/15 rounded-[10px] p-4 border border-[#DC2626]/30">
+                <View className="flex-row items-center gap-2 mb-2">
+                  <Ionicons name="alert-circle" size={24} color="#DC2626" />
+                  <Text className="text-[15px] font-semibold text-[#DC2626]">
+                    Stock short on some lines
+                  </Text>
+                </View>
+                <Text className="text-[13px] text-[#64748B] mb-3">
+                  Lower quantities or set unavailable lines to 0 to approve what is in stock now.
+                  Remaining quantities will open as a new pending request. You can also create a PO
+                  for shortfall.
                 </Text>
                 <TouchableOpacity
                   onPress={handleCreatePOForShortfall}
@@ -757,11 +915,28 @@ export const ProcessRequestScreen: React.FC = () => {
               </View>
             )}
 
+          {canProcess &&
+            isPending &&
+            !isCheckingAvailability &&
+            !allOriginalLinesSufficient &&
+            !hasBlockingShortfall &&
+            availability.length > 0 &&
+            request.requestType === 'site_transfer' && (
+              <View className="bg-[#D97706]/10 rounded-[10px] p-4 border border-[#D97706]/30">
+                <Text className="text-[13px] text-[#64748B]">
+                  Some lines are short at {request.sourceSiteName ?? 'the source site'}. Adjust
+                  quantities (or set to 0 to exclude) to approve what is available; excluded lines
+                  stay on a new pending request.
+                </Text>
+              </View>
+            )}
+
           {/* Replenishment Banner: Stock sufficient but will go low after fulfillment */}
           {canProcess &&
             isPending &&
             !isCheckingAvailability &&
-            allSufficient &&
+            selectedLinesSufficient &&
+            fullQuantityApproval &&
             replenishmentItems.length > 0 && (
               <View className="bg-[#D97706]/10 rounded-[10px] p-4 border border-[#D97706]/30">
                 <View className="flex-row items-center gap-2 mb-2">
@@ -822,16 +997,15 @@ export const ProcessRequestScreen: React.FC = () => {
 
             <TouchableOpacity
               onPress={handleApprove}
-              disabled={isLoading || !allSufficient || isCheckingAvailability}
+              disabled={isLoading || !canApprovePending}
               className="flex-1 bg-[#1E40AF] rounded-[10px] h-[50px] items-center justify-center"
               style={{
-                opacity:
-                  !allSufficient || isCheckingAvailability ? 0.5 : 1,
+                opacity: !canApprovePending ? 0.5 : 1,
               }}
               accessibilityRole="button"
               accessibilityLabel="Approve request"
               accessibilityState={{
-                disabled: !allSufficient || isCheckingAvailability,
+                disabled: !canApprovePending,
               }}
             >
               {isLoading ? (

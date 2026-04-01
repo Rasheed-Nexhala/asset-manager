@@ -76,6 +76,21 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         </View>
       </View>
 
+      {(request.splitFromRequestNumber || request.splitRemainderRequestNumber) && (
+        <View className="mb-3">
+          {request.splitFromRequestNumber && (
+            <Text className="text-[12px] font-medium text-[#334155]">
+              Continued from {request.splitFromRequestNumber}
+            </Text>
+          )}
+          {request.splitRemainderRequestNumber && (
+            <Text className="text-[12px] font-medium text-[#334155]">
+              Pending remainder {request.splitRemainderRequestNumber}
+            </Text>
+          )}
+        </View>
+      )}
+
       {/* Middle: Key Info */}
       <View className="flex-row gap-4 mb-3">
         <View className="flex-1">

@@ -124,6 +124,14 @@ export interface Request {
   /** Site Manager split / return — who last updated supervisor custody on this request */
   lastSupervisorCustodyUpdateBy?: string;
   lastSupervisorCustodyUpdateByName?: string;
+
+  /** Present on remainder request created after partial approval (links to original REQ). */
+  splitFromRequestId?: string;
+  splitFromRequestNumber?: string;
+
+  /** Present on parent after partial approval (links to pending remainder REQ). */
+  splitRemainderRequestId?: string;
+  splitRemainderRequestNumber?: string;
 }
 
 /**

@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { Alert } from 'react-native';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { CreatePOScreen } from '../CreatePOScreen';
@@ -68,6 +68,7 @@ jest.mock('../../../services/firebase/vendorService', () => ({
 
 jest.mock('../../../services/firebase/purchaseOrderService', () => ({
   getPOById: (...args: unknown[]) => mockGetPOById(...args),
+  getNextIbfPoNumberPreview: jest.fn().mockResolvedValue('IBF/PO/2026-27/001'),
 }));
 
 let mockCreatePOResolve: (value: string) => void;
@@ -279,10 +280,16 @@ describe('CreatePOScreen', () => {
     });
   });
 
-  it('renders create form when no poId (new PO)', () => {
+  it('renders create form when no poId (new PO)', async () => {
     renderWithStore(<CreatePOScreen />, defaultPreloadedState);
 
     expect(screen.getByText('New Purchase Order')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('IBF/PO/2026-27/001')).toBeTruthy();
+    });
+    expect(
+      screen.getByText(/Preview of the next number/i)
+    ).toBeTruthy();
     expect(screen.getByText('VENDOR')).toBeTruthy();
     expect(screen.getByText('ITEMS')).toBeTruthy();
     // SUMMARY is only shown when at least one item has a price entered
@@ -339,5 +346,19 @@ describe('CreatePOScreen', () => {
 
     expect(screen.getByText('Steel Bar')).toBeTruthy();
     expect(screen.getByDisplayValue('50')).toBeTruthy();
+  });
+
+  it('shows editable P.O. No. field for SuperAdmin', async () => {
+    renderWithStore(<CreatePOScreen />, {
+      ...defaultPreloadedState,
+      auth: {
+        ...defaultPreloadedState.auth!,
+        userRole: { role: 'SuperAdmin', isActive: true, permissions: [] },
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('IBF/PO/2026-27/001')).toBeTruthy();
+    });
   });
 });

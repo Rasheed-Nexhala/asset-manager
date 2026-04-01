@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { FormField } from '../../components/FormField';
-import { PODocumentCard } from '../../components/PurchaseOrder';
+import { PODocumentCard, POItemsScrollTable } from '../../components/PurchaseOrder';
 import { printPurchaseOrder } from '../../utils/poPdfUtils';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
 import {
@@ -88,10 +88,7 @@ const GrrReceiptsSection: React.FC<{
                   key={`${r.grrNumber}-${li.itemId}`}
                   className="mb-2 flex-row items-baseline justify-between gap-3 last:mb-0"
                 >
-                  <Text
-                    className="flex-1 text-[15px] font-medium text-[#0F172A]"
-                    numberOfLines={2}
-                  >
+                  <Text className="flex-1 text-[15px] font-medium text-[#0F172A] leading-5">
                     {li.itemName}
                   </Text>
                   <Text className="text-[15px] text-[#64748B]">
@@ -450,75 +447,7 @@ export const ApprovePOScreen: React.FC = () => {
           </Text>
         </View>
 
-        <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-4">
-          <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">
-            ITEMS
-          </Text>
-          {po.items.map((item, i) => (
-            <View
-              key={item.itemId + i}
-              className={`flex-row items-start gap-3 py-3 border-b border-[#E2E8F0] ${
-                i === po.items.length - 1 ? 'border-b-0' : ''
-              }`}
-            >
-              <View className="flex-1 min-w-0">
-                <Text className="text-[13px] text-[#64748B] mb-0.5">Item</Text>
-                <Text
-                  className="text-[15px] font-medium text-[#0F172A]"
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {item.itemName}
-                </Text>
-              </View>
-              <View className="shrink-0 min-w-[64px]">
-                <Text className="text-[13px] text-[#64748B] mb-0.5">Qty</Text>
-                <Text className="text-[15px] text-[#0F172A]">
-                  {/*
-                    orderedUnit/orderedQuantity represent user-entered ordering unit.
-                    Fallback to item's base inventory unit for consistency across modules.
-                  */}
-                  {item.orderedQuantity != null && item.orderedUnit
-                    ? `${item.orderedQuantity} ${item.orderedUnit}`
-                    : `${item.quantity} ${item.unit || 'Pcs'}`}
-                </Text>
-              </View>
-              <View className="shrink-0 min-w-[72px] items-end">
-                <Text className="text-[13px] text-[#64748B] mb-0.5">Unit Price</Text>
-                <Text
-                  className="text-[15px] text-[#0F172A]"
-                  numberOfLines={1}
-                >
-                  {formatCurrencyOrOptional(item.unitPrice ?? 0)}
-                </Text>
-              </View>
-              <View className="shrink-0 min-w-[56px] items-end">
-                <Text className="text-[13px] text-[#64748B] mb-0.5">GST %</Text>
-                <Text
-                  className="text-[15px] text-[#0F172A]"
-                  numberOfLines={1}
-                >
-                  {formatGstOrOptional(item.gstPercentage)}
-                </Text>
-              </View>
-              <View className="shrink-0 min-w-[72px] items-end">
-                <Text className="text-[13px] text-[#64748B] mb-0.5">Total</Text>
-                <Text
-                  className="text-[15px] font-semibold text-[#0F172A]"
-                  numberOfLines={1}
-                >
-                  {formatCurrencyOrOptional(
-                    item.amount +
-                      (item.gstAmount ??
-                        Math.round(
-                          (item.amount * (item.gstPercentage ?? 0)) / 100
-                        ))
-                  )}
-                </Text>
-              </View>
-            </View>
-          ))}
-        </View>
+        <POItemsScrollTable items={po.items} />
 
         {hasAnyPrice && (
           <View className="mb-4">
@@ -622,11 +551,8 @@ export const ApprovePOScreen: React.FC = () => {
                   key={item.itemId + i}
                   className={`py-3 ${i < po.items.length - 1 ? 'border-b border-[#E2E8F0]' : ''}`}
                 >
-                  <View className="flex-row items-center justify-between mb-1">
-                    <Text
-                      className="text-[15px] font-medium text-[#0F172A] flex-1 mr-2"
-                      numberOfLines={1}
-                    >
+                  <View className="flex-row items-start justify-between mb-1 gap-2">
+                    <Text className="text-[15px] font-medium text-[#0F172A] flex-1 mr-2 leading-5">
                       {item.itemName}
                     </Text>
                     {isExact && (

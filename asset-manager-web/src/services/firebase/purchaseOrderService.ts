@@ -39,6 +39,12 @@ import type { VendorLedgerDateRange } from '../../utils/vendorLedgerUtils';
 export type { VendorLedgerDateRange } from '../../utils/vendorLedgerUtils';
 import { incrementVendorPoCountInTransaction } from './vendorService';
 import { mapPoItemsAfterReceive } from '../../utils/poReceiveUtils';
+import {
+  allocateNextIbfPoNumberInTransaction,
+  formatIbfPoNumber,
+  getIndianFinancialYearCounterDocId,
+  getIndianFinancialYearLabel,
+} from '../../utils/poNumberFormat';
 
 const PURCHASE_ORDERS_COLLECTION = 'purchaseOrders';
 const PO_COUNTERS_COLLECTION = 'poCounters';
@@ -49,6 +55,19 @@ const USERS_COLLECTION = 'users';
 const VENDORS_COLLECTION = 'vendors';
 
 const DEFAULT_GST_PERCENTAGE = 18;
+
+/**
+ * Read-only preview of the next PO number (does not increment the counter).
+ * Uses current FY counter; another user may take this number before save.
+ */
+export async function getNextIbfPoNumberPreview(date: Date = new Date()): Promise<string> {
+  const fyLabel = getIndianFinancialYearLabel(date);
+  const fyDocId = getIndianFinancialYearCounterDocId(date);
+  const counterRef = doc(db, PO_COUNTERS_COLLECTION, fyDocId);
+  const snap = await getDoc(counterRef);
+  const lastNumber = snap.exists() ? Number(snap.data()?.lastNumber ?? 0) : 0;
+  return formatIbfPoNumber(fyLabel, lastNumber + 1);
+}
 
 const getInventoryDocId = (itemId: string, locationId: string): string =>
   `${itemId}_${locationId}`;
@@ -310,41 +329,6 @@ const mapFirestoreDocToPOFirestore = (
 };
 
 /**
- * Generate unique PO number using a counter document.
- * Format: PO-YYYY-NNNN
- */
-const generatePoNumber = async (): Promise<string> => {
-  const year = new Date().getFullYear();
-  const prefix = `PO-${year}-`;
-  const counterDocId = `year_${year}`;
-
-  try {
-    const result = await runTransaction(db, async (transaction) => {
-      const counterRef = doc(db, PO_COUNTERS_COLLECTION, counterDocId);
-      const counterSnap = await transaction.get(counterRef);
-
-      const lastNumber = counterSnap.exists()
-        ? (counterSnap.data()?.lastNumber ?? 0)
-        : 0;
-      const nextNumber = lastNumber + 1;
-
-      transaction.set(counterRef, {
-        year,
-        lastNumber: nextNumber,
-        updatedAt: serverTimestamp(),
-      });
-
-      return `${prefix}${String(nextNumber).padStart(4, '0')}`;
-    });
-
-    return result;
-  } catch (error) {
-    console.error('Error generating PO number:', error);
-    throw new Error('Failed to generate PO number. Please try again.');
-  }
-};
-
-/**
  * Build PO items with amounts and per-item GST from CreatePurchaseOrderData
  */
 const buildPOItems = (
@@ -408,14 +392,11 @@ export const createPO = async (
         throw new Error('Please select an admin to assign for approval when submitting for approval.');
       }
     }
-    const trimmed = data.poNumber?.trim();
-    if (!trimmed) {
-      throw new Error('PO number is required.');
-    }
-    if (await isPoNumberTaken(trimmed)) {
+    const trimmed = data.poNumber?.trim() ?? '';
+    if (trimmed && (await isPoNumberTaken(trimmed))) {
       throw new Error(`PO number "${trimmed}" is already in use.`);
     }
-    const poNumber = trimmed;
+
     const items = buildPOItems(data.items);
     const { subtotal, gstAmount, totalAmount, gstPercentage } = calculateTotals(items);
 
@@ -429,52 +410,63 @@ export const createPO = async (
     const reviewedByName = null;
     const reviewedAt = null;
 
-    const newPO = {
-      poNumber,
-      vendorId: data.vendorId,
-      vendorName: data.vendorName,
-      vendorContact: data.vendorContact,
-      vendorEmail: data.vendorEmail ?? null,
-      vendorAddress: data.vendorAddress ?? null,
-      vendorGstin: data.vendorGstin ?? null,
-      vendorContactPerson: data.vendorContactPerson ?? null,
-      location: data.location ?? null,
-      jobNo: data.jobNo ?? null,
-      poIssueSite: data.poIssueSite ?? null,
-      deliveryLocation: data.deliveryLocation ?? null,
-      buyerContactName: data.buyerContactName ?? null,
-      buyerContactPhone: data.buyerContactPhone ?? null,
-      siteId: data.siteId?.trim() || null,
-      siteName: data.siteName?.trim() || null,
-      deliveryDateText: data.deliveryDateText?.trim() || null,
-      items,
-      subtotal,
-      gstPercentage,
-      gstAmount,
-      totalAmount,
-      justification: data.justification.trim(),
-      expectedDeliveryDate: expectedDeliveryTimestamp,
-      documents: [],
-      status,
-      createdBy: userId,
-      createdByName: userName,
-      createdByRole: createdByRole ?? null,
-      createdAt: serverTimestamp(),
-      reviewedBy,
-      reviewedByName,
-      reviewedAt,
-      adminComments: null,
-      rejectionReason: null,
-      receivedAt: null,
-      receivedBy: null,
-      receivedByName: null,
-      receivedNotes: null,
-      assignedToAdminId: !isDraft && data.assignedToAdminId?.trim() ? data.assignedToAdminId.trim() : null,
-      assignedToAdminName: !isDraft && data.assignedToAdminName?.trim() ? data.assignedToAdminName.trim() : null,
-      updatedAt: serverTimestamp(),
-    };
-
     const docId = await runTransaction(db, async (transaction) => {
+      let poNumber: string;
+      if (trimmed) {
+        poNumber = trimmed;
+      } else {
+        poNumber = await allocateNextIbfPoNumberInTransaction(
+          transaction,
+          db,
+          PO_COUNTERS_COLLECTION
+        );
+      }
+
+      const newPO = {
+        poNumber,
+        vendorId: data.vendorId,
+        vendorName: data.vendorName,
+        vendorContact: data.vendorContact,
+        vendorEmail: data.vendorEmail ?? null,
+        vendorAddress: data.vendorAddress ?? null,
+        vendorGstin: data.vendorGstin ?? null,
+        vendorContactPerson: data.vendorContactPerson ?? null,
+        location: data.location ?? null,
+        jobNo: data.jobNo ?? null,
+        poIssueSite: data.poIssueSite ?? null,
+        deliveryLocation: data.deliveryLocation ?? null,
+        buyerContactName: data.buyerContactName ?? null,
+        buyerContactPhone: data.buyerContactPhone ?? null,
+        siteId: data.siteId?.trim() || null,
+        siteName: data.siteName?.trim() || null,
+        deliveryDateText: data.deliveryDateText?.trim() || null,
+        items,
+        subtotal,
+        gstPercentage,
+        gstAmount,
+        totalAmount,
+        justification: data.justification.trim(),
+        expectedDeliveryDate: expectedDeliveryTimestamp,
+        documents: [],
+        status,
+        createdBy: userId,
+        createdByName: userName,
+        createdByRole: createdByRole ?? null,
+        createdAt: serverTimestamp(),
+        reviewedBy,
+        reviewedByName,
+        reviewedAt,
+        adminComments: null,
+        rejectionReason: null,
+        receivedAt: null,
+        receivedBy: null,
+        receivedByName: null,
+        receivedNotes: null,
+        assignedToAdminId: !isDraft && data.assignedToAdminId?.trim() ? data.assignedToAdminId.trim() : null,
+        assignedToAdminName: !isDraft && data.assignedToAdminName?.trim() ? data.assignedToAdminName.trim() : null,
+        updatedAt: serverTimestamp(),
+      };
+
       const docRef = doc(collection(db, PURCHASE_ORDERS_COLLECTION));
       transaction.set(docRef, newPO);
       if (!isDraft) {
@@ -575,19 +567,16 @@ export const updatePO = async (
         throw new Error('Please select an admin to assign for approval when submitting for approval.');
       }
     }
-    const trimmed = data.poNumber?.trim();
-    if (!trimmed) {
-      throw new Error('PO number is required.');
-    }
-    const newPoNumber = trimmed;
+    const trimmed = data.poNumber?.trim() ?? '';
     const poRef = doc(db, PURCHASE_ORDERS_COLLECTION, poId);
 
     const existingSnap = await getDoc(poRef);
+    let currentPoNumber = '';
     if (existingSnap.exists()) {
-      const currentPoNumber = existingSnap.data()?.poNumber as string | undefined;
-      if (currentPoNumber !== newPoNumber && (await isPoNumberTaken(newPoNumber, poId))) {
-        throw new Error(`PO number "${newPoNumber}" is already in use.`);
-      }
+      currentPoNumber = String(existingSnap.data()?.poNumber ?? '').trim();
+    }
+    if (trimmed && trimmed !== currentPoNumber && (await isPoNumberTaken(trimmed, poId))) {
+      throw new Error(`PO number "${trimmed}" is already in use.`);
     }
 
     const items = buildPOItems(data.items);
@@ -617,6 +606,16 @@ export const updatePO = async (
       }
       if (poData.createdBy !== userId) {
         throw new Error('Only the creator can update this draft');
+      }
+
+      const currentFromTx = String(poData.poNumber ?? '').trim();
+      let newPoNumber = trimmed || currentFromTx;
+      if (!newPoNumber) {
+        newPoNumber = await allocateNextIbfPoNumberInTransaction(
+          transaction,
+          db,
+          PO_COUNTERS_COLLECTION
+        );
       }
 
       const updatePayload: Record<string, unknown> = {

@@ -1,7 +1,7 @@
 {
   "name": "functions",
   "scripts": {
-    "test": "tsx --test src/supervisorCustodyActivity.test.ts",
+    "test": "tsx --test src/supervisorCustodyActivity.test.ts src/partialApprovePartition.test.ts",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",

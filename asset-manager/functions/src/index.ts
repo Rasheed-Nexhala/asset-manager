@@ -765,6 +765,29 @@ export const onRequestCreated = onDocumentCreated(
         if (tokens.length > 0) {
           await sendExpoPushNotification(tokens, title, body, pushData);
         }
+
+        const splitFromNum = request.splitFromRequestNumber as string | undefined;
+        if (request.splitFromRequestId && requestedBy && splitFromNum) {
+          const remainderTitle = 'Remainder request';
+          const remainderBody = `Partial approval: ${request.requestNumber ?? requestId} continues items still pending from ${splitFromNum}.`;
+          const remainderData = { screen: 'ProcessRequest', requestId };
+          await createInAppNotification(
+            requestedBy,
+            'request_remainder',
+            remainderTitle,
+            remainderBody,
+            remainderData
+          );
+          const smTokens = await getUserPushTokens(requestedBy, 'requestUpdates');
+          if (smTokens.length > 0) {
+            await sendExpoPushNotification(
+              smTokens,
+              remainderTitle,
+              remainderBody,
+              remainderData
+            );
+          }
+        }
       } catch (notifErr) {
         logger.error('Push failed for new request', { notifErr, requestId });
       }
@@ -2955,3 +2978,6 @@ export const logVehicleFuelAssigned = onCall(async (request) => {
 
 /** Scheduled Firestore backup — exports daily to GCS. See docs/FIREBASE_BACKUP_IMPLEMENTATION.md */
 export { scheduledFirestoreBackup } from './scheduledBackup';
+
+/** Partial approval: approve selected lines, create pending remainder request (same requester). */
+export { partialApproveAndSplit } from './partialApproveAndSplit';
