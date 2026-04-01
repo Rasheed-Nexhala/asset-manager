@@ -40,7 +40,8 @@ export function ItemSelectorModal({
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  /** Full Item per id so selections survive search/pagination changes (not just ids ∩ current page). */
+  const [selectedById, setSelectedById] = useState<Record<string, Item>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastDocRef = useRef<DocumentSnapshot | null>(null);
 
@@ -102,6 +103,12 @@ export function ItemSelectorModal({
 
   useEffect(() => {
     if (isOpen) {
+      setSelectedById({});
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
       fetchFirstPage();
     }
   }, [isOpen, fetchFirstPage]);
@@ -126,24 +133,24 @@ export function ItemSelectorModal({
     }
   }, [debouncedSearch, loadingMore, hasMore, allowedItemTypes]);
 
-  const toggleItem = useCallback((itemId: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(itemId)) {
-        next.delete(itemId);
+  const toggleItem = useCallback((item: Item) => {
+    setSelectedById((prev) => {
+      const next = { ...prev };
+      if (next[item.id]) {
+        delete next[item.id];
       } else {
-        next.add(itemId);
+        next[item.id] = item;
       }
       return next;
     });
   }, []);
 
   const handleAdd = useCallback(() => {
-    const selected = filteredItems.filter((item) => selectedIds.has(item.id));
+    const selected = Object.values(selectedById);
     if (selected.length === 0) return;
     onSelect(selected);
     onClose();
-  }, [filteredItems, selectedIds, onSelect, onClose]);
+  }, [selectedById, onSelect, onClose]);
 
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent) => {
@@ -154,7 +161,7 @@ export function ItemSelectorModal({
 
   if (!isOpen) return null;
 
-  const selectedCount = filteredItems.filter((i) => selectedIds.has(i.id)).length;
+  const selectedCount = Object.keys(selectedById).length;
   const isEmpty = !loading && filteredItems.length === 0;
   const isForPO = restrictToLowStock;
 
@@ -258,12 +265,12 @@ export function ItemSelectorModal({
           ) : (
             <div className="space-y-3">
               {filteredItems.map((item) => {
-                const isSelected = selectedIds.has(item.id);
+                const isSelected = Boolean(selectedById[item.id]);
                 return (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => toggleItem(item.id)}
+                    onClick={() => toggleItem(item)}
                     className={`flex w-full items-center gap-3 rounded-[10px] border p-4 text-left transition-colors min-h-[48px] ${
                       isSelected
                         ? 'border-blue-800 bg-blue-50'

@@ -55,7 +55,8 @@ export const SelectItemsScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  /** Full Item per id so selections survive search/pagination (not ids ∩ current list only). */
+  const [selectedById, setSelectedById] = useState<Record<string, Item>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastDocRef = useRef<DocumentSnapshot | null>(null);
 
@@ -150,53 +151,52 @@ export const SelectItemsScreen: React.FC = () => {
     }
   }, [debouncedSearch, loadingMore, hasMore, allowedItemTypes]);
 
-  const toggleItem = useCallback((itemId: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(itemId)) {
-        next.delete(itemId);
+  const toggleItem = useCallback((item: Item) => {
+    setSelectedById((prev) => {
+      const next = { ...prev };
+      if (next[item.id]) {
+        delete next[item.id];
       } else {
-        next.add(itemId);
+        next[item.id] = item;
       }
       return next;
     });
   }, []);
 
   const handleAdd = useCallback(() => {
-    const selected = filteredItems.filter((item) => selectedIds.has(item.id));
+    const selected = Object.values(selectedById);
     if (selected.length === 0) return;
 
-    // For CreatePO: use goBack + setParams to return to the EXISTING screen without
-    // pushing a new one. navigation.navigate() can push a fresh CreatePO instance
-    // (React Navigation 7), losing vendor details in component state.
-    if (returnScreen === 'CreatePO') {
-      try {
-        const state = navigation.getState?.();
-        const routes = state?.routes;
-        const previousRoute = routes?.[routes.length - 2];
-        if (previousRoute?.name === 'CreatePO' && typeof navigation.dispatch === 'function') {
-          navigation.dispatch({
-            ...CommonActions.setParams({
-              ...returnParams,
-              selectedItems: selected,
-            }),
-            source: previousRoute.key,
-          });
-          navigation.goBack();
-          return;
-        }
-      } catch {
-        // Fall through to navigate if getState/dispatch unavailable (e.g. in tests)
+    // Return to the EXISTING caller screen (CreatePO, CreateRequest, EditRequest, …) without
+    // pushing a new instance — navigation.navigate() can remount and lose form state (RN 7+).
+    try {
+      const state = navigation.getState?.();
+      const routes = state?.routes;
+      const previousRoute = routes?.[routes.length - 2];
+      if (
+        previousRoute?.name === returnScreen &&
+        typeof navigation.dispatch === 'function'
+      ) {
+        navigation.dispatch({
+          ...CommonActions.setParams({
+            ...returnParams,
+            selectedItems: selected,
+          }),
+          source: previousRoute.key,
+        });
+        navigation.goBack();
+        return;
       }
+    } catch {
+      // Fall through to navigate if getState/dispatch unavailable (e.g. in tests)
     }
 
-    // Fallback: navigate (for CreateRequest, EditRequest, or when previous route not found)
     // @ts-ignore - dynamic navigation params
     navigation.navigate(returnScreen as any, {
       ...returnParams,
       selectedItems: selected,
     } as any);
-  }, [filteredItems, selectedIds, navigation, returnScreen, returnParams]);
+  }, [selectedById, navigation, returnScreen, returnParams]);
 
   const handleBack = useCallback(() => {
     navigation.goBack();
@@ -204,14 +204,14 @@ export const SelectItemsScreen: React.FC = () => {
 
   const renderItem = useCallback(
     ({ item }: { item: Item }) => {
-      const isSelected = selectedIds.has(item.id);
+      const isSelected = Boolean(selectedById[item.id]);
 
       return (
         <TouchableOpacity
           className={`bg-white rounded-[10px] p-4 border mb-3 min-h-[48px] ${
             isSelected ? 'border-[#1E40AF] bg-[#1E40AF]/5' : 'border-[#E2E8F0]'
           }`}
-          onPress={() => toggleItem(item.id)}
+          onPress={() => toggleItem(item)}
           activeOpacity={0.7}
           accessibilityRole="checkbox"
           accessibilityLabel={`${item.name}, ${isSelected ? 'selected' : 'not selected'}`}
@@ -252,7 +252,7 @@ export const SelectItemsScreen: React.FC = () => {
         </TouchableOpacity>
       );
     },
-    [selectedIds, toggleItem]
+    [selectedById, toggleItem]
   );
 
   const ListFooterComponent = useCallback(() => {
@@ -292,7 +292,7 @@ export const SelectItemsScreen: React.FC = () => {
   }, [loading, items.length, debouncedSearch, poSelectionLowStockOnly]);
 
   const isInitialLoad = loading && items.length === 0 && totalCount === null;
-  const selectedCount = filteredItems.filter((i) => selectedIds.has(i.id)).length;
+  const selectedCount = Object.keys(selectedById).length;
 
   if (isInitialLoad) {
     return (
