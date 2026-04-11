@@ -36,6 +36,7 @@ import {
   canPrintTransferSlip,
 } from '../../utils/transferSlipPdfUtils';
 import { SupervisorAllocationsSection } from '../../components/requests/SupervisorAllocationsSection';
+import { VehicleFuelAllocationsSection } from '../../components/requests/VehicleFuelAllocationsSection';
 
 const CONDITION_LABELS: Record<ItemCondition, string> = {
   good: 'Good',
@@ -433,6 +434,11 @@ export function ProcessRequestPage() {
     hasItemsToReturn;
   const showTransferSlipPrint = request ? canPrintTransferSlip(request) : false;
 
+  const hasSupervisorSplittableItems = Boolean(
+    request?.items?.some((i) => i.itemType === 'consumable' || i.itemType === 'non_consumable')
+  );
+  const hasFuelItems = Boolean(request?.items?.some((i) => i.itemType === 'fuel'));
+
   const handlePrintTransferSlip = useCallback(async () => {
     if (!request) return;
     setSlipPrinting(true);
@@ -650,9 +656,19 @@ export function ProcessRequestPage() {
 
         {isSiteManager &&
           isRequestOwner &&
-          (isTransferred || isPartiallyReturned) && (
-            <SupervisorAllocationsSection siteId={request.siteId} requestId={request.id} />
+          (isTransferred || isPartiallyReturned) &&
+          hasSupervisorSplittableItems && (
+            <SupervisorAllocationsSection
+              siteId={request.siteId}
+              requestId={request.id}
+              requestItems={request.items}
+            />
           )}
+
+        {isSiteManager &&
+          isRequestOwner &&
+          (isTransferred || isPartiallyReturned) &&
+          hasFuelItems && <VehicleFuelAllocationsSection requestId={request.id} />}
 
         {/* Blocking shortfall: approved qty exceeds available */}
         {canProcess &&

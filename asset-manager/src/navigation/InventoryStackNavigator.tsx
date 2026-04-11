@@ -16,6 +16,7 @@ import {
   OtherSiteInventoryScreen,
   SiteSupervisorsScreen,
   AllocateItemsToSupervisorsScreen,
+  InventoryDirectSplitScreen,
   SteelMasterScreen,
   InventoryUpdateRequestsScreen,
   CategorySelectScreen,
@@ -23,6 +24,7 @@ import {
   VehiclesListScreen,
   VehicleDetailScreen,
   AddEditVehicleScreen,
+  AllocateFuelToVehiclesScreen,
 } from '../screens';
 import { MaintenanceStackNavigator } from './MaintenanceStackNavigator';
 
@@ -55,6 +57,8 @@ export type InventoryStackParamList = {
   SiteSupervisors: undefined;
   /** returnTo: where to navigate after a successful split (defaults to inventory). */
   AllocateItemsToSupervisors: { returnTo?: 'inventory' | 'requests' } | undefined;
+  AllocateFuelToVehicles: { returnTo?: 'inventory' | 'requests' } | undefined;
+  InventoryDirectSplit: { returnTo?: 'inventory' | 'requests' } | undefined;
 };
 
 const Stack = createStackNavigator<InventoryStackParamList>();
@@ -217,6 +221,31 @@ export const InventoryStackNavigator: React.FC = () => {
               presentation: 'card',
               gestureEnabled: true,
             }}
+          />
+          <Stack.Screen
+            name="VehiclesList"
+            component={VehiclesListScreen}
+            options={{ presentation: 'card', gestureEnabled: true }}
+          />
+          <Stack.Screen
+            name="VehicleDetail"
+            component={VehicleDetailScreen}
+            options={{ presentation: 'card', gestureEnabled: true }}
+          />
+          <Stack.Screen
+            name="AddEditVehicle"
+            component={AddEditVehicleScreen}
+            options={{ presentation: 'card', gestureEnabled: true }}
+          />
+          <Stack.Screen
+            name="AllocateFuelToVehicles"
+            component={AllocateFuelToVehiclesScreen}
+            options={{ presentation: 'card', gestureEnabled: true }}
+          />
+          <Stack.Screen
+            name="InventoryDirectSplit"
+            component={InventoryDirectSplitScreen}
+            options={{ presentation: 'card', gestureEnabled: true }}
           />
           <Stack.Screen
             name="ItemDetail"

@@ -15,6 +15,8 @@ export { AddEditCustomItemScreen } from './Inventory/AddEditCustomItemScreen';
 export { MySiteInventoryScreen } from './Inventory/MySiteInventoryScreen';
 export { SiteSupervisorsScreen } from './Inventory/SiteSupervisorsScreen';
 export { AllocateItemsToSupervisorsScreen } from './Inventory/AllocateItemsToSupervisorsScreen';
+export { InventoryDirectSplitScreen } from './Inventory/InventoryDirectSplitScreen';
+export { AllocateFuelToVehiclesScreen } from './Inventory/AllocateFuelToVehiclesScreen';
 export { OtherSiteInventoryScreen } from './Inventory/OtherSiteInventoryScreen';
 export { InventoryUpdateRequestsScreen } from './Inventory/InventoryUpdateRequestsScreen';
 export { CategorySelectScreen } from './Inventory/CategorySelectScreen';

@@ -13,6 +13,8 @@ import { OtherSitesListPage } from './pages/inventory/OtherSitesListPage';
 import { OtherSiteInventoryPage } from './pages/inventory/OtherSiteInventoryPage';
 import { SiteSupervisorsPage } from './pages/inventory/SiteSupervisorsPage';
 import { AllocateItemsToSupervisorsPage } from './pages/inventory/AllocateItemsToSupervisorsPage';
+import { InventoryDirectSplitPage } from './pages/inventory/InventoryDirectSplitPage';
+import { AllocateFuelToVehiclesPage } from './pages/inventory/AllocateFuelToVehiclesPage';
 import { SteelMasterPage } from './pages/inventory/SteelMasterPage';
 import { ItemDetailPage } from './pages/inventory/ItemDetailPage';
 import { ItemActivityHistoryPage } from './pages/inventory/ItemActivityHistoryPage';
@@ -112,13 +114,33 @@ export const router = createBrowserRouter([
             element: <AllocateItemsToSupervisorsPage />,
           },
           {
+            path: 'inventory/split-from-inventory',
+            element: <InventoryDirectSplitPage />,
+          },
+          {
+            path: 'inventory/divide-fuel-to-vehicles',
+            element: <AllocateFuelToVehiclesPage />,
+          },
+          {
+            path: 'inventory/vehicles/new',
+            element: <AddEditVehiclePage />,
+          },
+          {
+            path: 'inventory/vehicles/:vehicleId/edit',
+            element: <AddEditVehiclePage />,
+          },
+          {
+            path: 'inventory/vehicles/:vehicleId',
+            element: <VehicleDetailPage />,
+          },
+          {
+            path: 'inventory/vehicles',
+            element: <VehiclesPage />,
+          },
+          {
             element: <AdminOrStoreInchargeGuard />,
             children: [
               { path: 'inventory/central', element: <CentralStoreInventoryPage /> },
-              { path: 'inventory/vehicles/new', element: <AddEditVehiclePage /> },
-              { path: 'inventory/vehicles/:vehicleId/edit', element: <AddEditVehiclePage /> },
-              { path: 'inventory/vehicles/:vehicleId', element: <VehicleDetailPage /> },
-              { path: 'inventory/vehicles', element: <VehiclesPage /> },
               { path: 'inventory/steel-master', element: <SteelMasterPage /> },
               { path: 'inventory/categories', element: <CategoryManagementPage /> },
               { path: 'inventory/update-requests', element: <InventoryUpdateRequestsPage /> },

@@ -18,6 +18,7 @@ import type { Vehicle } from '../../types/vehicle';
 import {
   selectIsStoreIncharge,
   selectIsAdminOrSuperAdmin,
+  selectIsSiteManager,
 } from '../../store/selectors/authSelectors';
 import { useAppSelector } from '../../store/hooks';
 import { getTotalLitersAssignedToVehicle } from '../../services/firebase/vehicleFuelAssignmentService';
@@ -28,6 +29,8 @@ type Nav = StackNavigationProp<InventoryStackParamList, 'VehiclesList'>;
 export const VehiclesListScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const canManage = useAppSelector(selectIsStoreIncharge);
+  const isSiteManager = useAppSelector(selectIsSiteManager);
+  const canCreateVehicle = canManage || isSiteManager;
   const isOverview = useAppSelector(selectIsAdminOrSuperAdmin) && !canManage;
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -84,7 +87,7 @@ export const VehiclesListScreen: React.FC = () => {
         <Text className="flex-1 text-center text-[22px] font-semibold text-[#0F172A]">
           Vehicles
         </Text>
-        {canManage ? (
+        {canCreateVehicle ? (
           <TouchableOpacity
             className="h-12 w-12 items-center justify-center"
             onPress={() => navigation.navigate('AddEditVehicle', {})}
@@ -102,6 +105,15 @@ export const VehiclesListScreen: React.FC = () => {
         <View className="border-b border-[#E2E8F0] bg-[#475569]/15 px-4 py-2">
           <Text className="text-[13px] text-[#475569]">
             Overview only — fuel assignment is managed by Store Incharge.
+          </Text>
+        </View>
+      )}
+
+      {isSiteManager && !canManage && (
+        <View className="border-b border-[#E2E8F0] bg-[#D97706]/15 px-4 py-2">
+          <Text className="text-[13px] text-[#475569]">
+            Add vehicles and dispense fuel from transferred requests. Central store fuel is assigned by Store Incharge
+            only.
           </Text>
         </View>
       )}
@@ -157,8 +169,10 @@ export const VehiclesListScreen: React.FC = () => {
                       No vehicles yet
                     </Text>
                     <Text className="mt-2 max-w-md text-center text-[15px] text-[#64748B]">
-                      {canManage
-                        ? 'Add a vehicle to assign fuel from the central store.'
+                      {canCreateVehicle
+                        ? canManage
+                          ? 'Add a vehicle to assign fuel from the central store.'
+                          : 'Add a vehicle to dispense fuel from transferred requests.'
                         : 'No vehicles registered.'}
                     </Text>
                   </View>

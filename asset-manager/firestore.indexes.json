@@ -440,6 +440,14 @@
         { "fieldPath": "vehicleId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "vehicleFuelAssignments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sourceRequestId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

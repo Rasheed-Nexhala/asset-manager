@@ -7,7 +7,7 @@ import { clsx } from 'clsx';
 const allTabs = [
   { to: '/inventory', end: true, label: 'My Site', icon: 'map-pin' as const, roles: ['SiteManager'] as const },
   { to: '/inventory/central', end: false, label: 'Central Store', icon: 'building-storefront' as const, roles: ['Admin', 'StoreIncharge'] as const },
-  { to: '/inventory/vehicles', end: false, label: 'Vehicles', icon: 'truck' as const, roles: ['Admin', 'StoreIncharge'] as const },
+   { to: '/inventory/vehicles', end: false, label: 'Vehicles', icon: 'truck' as const, roles: ['Admin', 'StoreIncharge', 'SiteManager'] as const },
   { to: '/inventory/other-sites', end: false, label: 'Other Sites', icon: 'building-office-2' as const, roles: ['SiteManager'] as const },
   { to: '/inventory/steel-master', end: false, label: 'Custom Items', icon: 'chart-bar-square' as const, roles: ['Admin', 'StoreIncharge'] as const },
 ];

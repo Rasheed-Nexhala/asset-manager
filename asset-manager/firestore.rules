@@ -48,13 +48,73 @@ service cloud.firestore {
       return isAuthenticated() && getUserRole() == 'StoreIncharge';
     }
 
-    /** Vehicles & fuel assignments: Admin/SuperAdmin overview; Store Incharge manages. */
+    /** Vehicles & fuel assignments: Admin/SuperAdmin overview; Store Incharge manages; Site Managers view fleet + site-request fuel. */
     function canViewVehiclesModule() {
-      return isAdminOrSuperAdmin() || isStoreIncharge();
+      return isAdminOrSuperAdmin() || isStoreIncharge() || isSiteManager();
     }
 
     function canManageVehiclesModule() {
       return isStoreIncharge();
+    }
+
+    /** Site Manager: create vehicle in global registry (same shape as client createVehicle). */
+    function isSiteManagerVehicleCreate() {
+      return isSiteManager() && isUserActive()
+        && request.resource.data.keys().hasOnly([
+          'vehicleNumber',
+          'vehicleNumberNormalized',
+          'notes',
+          'createdAt',
+          'updatedAt',
+          'createdByUserId',
+          'createdByName'
+        ])
+        && request.resource.data.vehicleNumber is string
+        && request.resource.data.vehicleNumber.size() > 0
+        && request.resource.data.vehicleNumberNormalized is string
+        && request.resource.data.notes is string
+        && request.resource.data.createdByUserId == request.auth.uid
+        && request.resource.data.createdByName is string;
+    }
+
+    /** Site Manager: log fuel dispensed from a transferred request to a vehicle (no central store deduction). */
+    function isSiteManagerSiteRequestFuelAssignmentCreate() {
+      return isSiteManager() && isUserActive()
+        && request.resource.data.keys().hasOnly([
+          'assignmentSource',
+          'sourceRequestId',
+          'sourceRequestNumber',
+          'vehicleId',
+          'vehicleNumber',
+          'itemId',
+          'itemName',
+          'itemSku',
+          'quantityLiters',
+          'referenceSiteId',
+          'referenceSiteName',
+          'reason',
+          'notes',
+          'assignedByUserId',
+          'assignedByName',
+          'createdAt'
+        ])
+        && request.resource.data.assignmentSource == 'site_request'
+        && request.resource.data.sourceRequestId is string
+        && request.resource.data.sourceRequestId.size() > 0
+        && request.resource.data.sourceRequestNumber is string
+        && request.resource.data.vehicleId is string
+        && request.resource.data.vehicleNumber is string
+        && request.resource.data.itemId is string
+        && request.resource.data.itemName is string
+        && request.resource.data.itemSku is string
+        && request.resource.data.quantityLiters is number
+        && request.resource.data.quantityLiters > 0
+        && request.resource.data.assignedByUserId == request.auth.uid
+        && request.resource.data.assignedByName is string
+        && (request.resource.data.referenceSiteId == null || request.resource.data.referenceSiteId is string)
+        && (request.resource.data.referenceSiteName == null || request.resource.data.referenceSiteName is string)
+        && request.resource.data.reason is string
+        && request.resource.data.notes is string;
     }
     
     /**
@@ -392,15 +452,20 @@ service cloud.firestore {
      */
     match /vehicles/{vehicleId} {
       allow read: if isAuthenticated() && isUserActive() && canViewVehiclesModule();
-      allow create, update, delete: if isAuthenticated() && isUserActive() && canManageVehiclesModule();
+      allow create: if isAuthenticated() && isUserActive() && (
+        canManageVehiclesModule() || isSiteManagerVehicleCreate()
+      );
+      allow update, delete: if isAuthenticated() && isUserActive() && canManageVehiclesModule();
     }
 
     /**
-     * Vehicle fuel assignments — consumption from central store to a vehicle (immutable rows).
+     * Vehicle fuel assignments — central store consumption (Store Incharge) or site request dispense (Site Manager).
      */
     match /vehicleFuelAssignments/{assignmentId} {
       allow read: if isAuthenticated() && isUserActive() && canViewVehiclesModule();
-      allow create: if isAuthenticated() && isUserActive() && canManageVehiclesModule();
+      allow create: if isAuthenticated() && isUserActive() && (
+        canManageVehiclesModule() || isSiteManagerSiteRequestFuelAssignmentCreate()
+      );
       allow update, delete: if false;
     }
 

@@ -11,6 +11,7 @@ import { ToastProvider } from '../../../contexts/ToastContext';
 import { siteSupervisorService } from '../../../services/firebase/siteSupervisorService';
 import { createSiteManagerPreloadedState, SITE_MANAGER_TEST_IDS } from '../../../test/fixtures/siteManagerStore';
 import type { SupervisorItemAllocation } from '../../../types/siteSupervisor';
+import type { RequestItem } from '../../../types/request';
 
 vi.mock('../../../config/firebase', () => ({
   auth: {},
@@ -34,14 +35,18 @@ vi.mock('react-router-dom', async (importOriginal) => {
 
 function renderSection(
   preloaded = createSiteManagerPreloadedState(),
-  props: { siteId?: string; requestId?: string } = {}
+  props: { siteId?: string; requestId?: string; requestItems?: RequestItem[] } = {}
 ) {
   const siteId = props.siteId ?? SITE_MANAGER_TEST_IDS.siteId;
   const requestId = props.requestId ?? 'req-1';
   return renderWithProviders(
     <ToastProvider>
       <MemoryRouter>
-        <SupervisorAllocationsSection siteId={siteId} requestId={requestId} />
+        <SupervisorAllocationsSection
+          siteId={siteId}
+          requestId={requestId}
+          requestItems={props.requestItems}
+        />
       </MemoryRouter>
     </ToastProvider>,
     { preloadedState: preloaded }
@@ -89,6 +94,7 @@ describe('SupervisorAllocationsSection', () => {
       requestNumber: 'REQ-1',
       itemId: 'item-1',
       itemName: 'Hammer',
+      itemType: 'non_consumable',
       quantityAllocated: 4,
       quantityReturnedToManager: 1,
       createdAt: null,
@@ -131,6 +137,7 @@ describe('SupervisorAllocationsSection', () => {
       requestNumber: 'REQ-1',
       itemId: 'item-1',
       itemName: 'Hammer',
+      itemType: 'non_consumable',
       quantityAllocated: 4,
       quantityReturnedToManager: 1,
       createdAt: null,
@@ -158,5 +165,34 @@ describe('SupervisorAllocationsSection', () => {
       expect(screen.getByText(/whole number of at least 1/i)).toBeInTheDocument();
     });
     expect(recordReturnFromSupervisor).not.toHaveBeenCalled();
+  });
+
+  it('does not offer return from supervisor for consumable lines', async () => {
+    const row: SupervisorItemAllocation = {
+      id: 'alloc-c',
+      siteId: SITE_MANAGER_TEST_IDS.siteId,
+      supervisorId: 'sup-1',
+      supervisorName: 'Lead',
+      requestId: 'req-1',
+      requestNumber: 'REQ-1',
+      itemId: 'item-c',
+      itemName: 'Gloves',
+      itemType: 'consumable',
+      quantityAllocated: 10,
+      quantityReturnedToManager: 0,
+      createdAt: null,
+      updatedAt: null,
+    };
+
+    vi.mocked(siteSupervisorService.subscribeRequestAllocations).mockImplementation((_site, _req, cb) => {
+      cb([row]);
+      return vi.fn();
+    });
+
+    renderSection();
+
+    await waitFor(() => screen.findByText('Gloves'));
+    expect(screen.queryByRole('button', { name: /record return from supervisor/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/not returned from supervisors/i)).toBeInTheDocument();
   });
 });

@@ -318,9 +318,19 @@ export const MySiteInventoryScreen: React.FC = () => {
               }
               className="flex-1 min-h-[48px] justify-center items-center border-r border-[#E2E8F0] px-2 py-2 active:bg-[#F8FAFC]"
               accessibilityRole="button"
-              accessibilityLabel="Split transferred stock to supervisors"
+              accessibilityLabel="Split transferred stock to supervisors via request"
             >
-              <Text className="text-[14px] font-semibold text-[#1E40AF] text-center">Split stock</Text>
+              <Text className="text-[14px] font-semibold text-[#1E40AF] text-center">Split via request</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate('InventoryDirectSplit', { returnTo: 'inventory' })
+              }
+              className="flex-1 min-h-[48px] justify-center items-center border-r border-[#E2E8F0] px-2 py-2 active:bg-[#F8FAFC]"
+              accessibilityRole="button"
+              accessibilityLabel="Split directly from site inventory"
+            >
+              <Text className="text-[14px] font-semibold text-[#B45309] text-center">Split from stock</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => navigation.navigate('SiteSupervisors')}
@@ -328,7 +338,30 @@ export const MySiteInventoryScreen: React.FC = () => {
               accessibilityRole="button"
               accessibilityLabel="Manage site supervisors team list"
             >
-              <Text className="text-[14px] font-semibold text-[#B45309] text-center">Team list</Text>
+              <Text className="text-[14px] font-semibold text-[#475569] text-center">Team list</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View className="px-4 pt-2">
+          <View className="flex-row rounded-[10px] border border-[#E2E8F0] bg-white overflow-hidden">
+            <TouchableOpacity
+              onPress={() => navigation.navigate('VehiclesList')}
+              className="flex-1 min-h-[48px] justify-center items-center border-r border-[#E2E8F0] px-2 py-2 active:bg-[#F8FAFC]"
+              accessibilityRole="button"
+              accessibilityLabel="Open vehicles list"
+            >
+              <Text className="text-[14px] font-semibold text-[#0F172A] text-center">Vehicles</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate('AllocateFuelToVehicles', { returnTo: 'inventory' })
+              }
+              className="flex-1 min-h-[48px] justify-center items-center px-2 py-2 active:bg-[#F8FAFC]"
+              accessibilityRole="button"
+              accessibilityLabel="Dispense fuel to vehicles from requests"
+            >
+              <Text className="text-[14px] font-semibold text-[#D97706] text-center">Dispense fuel</Text>
             </TouchableOpacity>
           </View>
         </View>

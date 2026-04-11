@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAppSelector } from '../../store/hooks';
-import { selectIsStoreIncharge } from '../../store/selectors/authSelectors';
+import { selectIsStoreIncharge, selectIsSiteManager } from '../../store/selectors/authSelectors';
 import {
   createVehicle,
   updateVehicle,
@@ -21,6 +21,8 @@ export function AddEditVehiclePage() {
   const navigate = useNavigate();
   const toast = useToast();
   const canManage = useAppSelector(selectIsStoreIncharge);
+  const isSiteManager = useAppSelector(selectIsSiteManager);
+  const canCreateVehicle = canManage || isSiteManager;
   const isEdit = Boolean(vehicleId);
 
   const [vehicleNumber, setVehicleNumber] = useState('');
@@ -33,11 +35,14 @@ export function AddEditVehiclePage() {
   const vehicleNumberLocked = isEdit && assignmentCount > 0;
 
   useEffect(() => {
-    if (!canManage) {
+    if (isEdit && !canManage) {
       toast.error('Only Store Incharge can edit vehicles.');
       navigate('/inventory/vehicles');
+    } else if (!isEdit && !canCreateVehicle) {
+      toast.error('You do not have permission to add vehicles.');
+      navigate('/inventory/vehicles');
     }
-  }, [canManage, navigate, toast]);
+  }, [isEdit, canManage, canCreateVehicle, navigate, toast]);
 
   useEffect(() => {
     if (!vehicleId) return;
@@ -98,7 +103,7 @@ export function AddEditVehiclePage() {
     }
   }, [vehicleNumber, notes, isEdit, vehicleId, vehicleNumberLocked, navigate, toast]);
 
-  if (!canManage) return null;
+  if ((isEdit && !canManage) || (!isEdit && !canCreateVehicle)) return null;
 
   if (isEdit && notFound && !loading) {
     return (
@@ -143,10 +148,12 @@ export function AddEditVehiclePage() {
             <h1 className="truncate text-[22px] font-semibold leading-tight text-slate-900">
               {isEdit ? 'Edit vehicle' : 'Add vehicle'}
             </h1>
-            <p className="hidden text-[13px] text-slate-500 md:block">Central store · Vehicles and fuel</p>
+            <p className="hidden text-[13px] text-slate-500 md:block">
+              {isSiteManager && !canManage ? 'Fleet · Dispense fuel from requests' : 'Central store · Vehicles and fuel'}
+            </p>
           </div>
           <span className="hidden shrink-0 rounded-full bg-teal-600/15 px-3 py-1.5 text-center text-[12px] font-medium text-teal-700 sm:inline-block">
-            Store Incharge
+            {isSiteManager && !canManage ? 'Site Manager' : 'Store Incharge'}
           </span>
         </div>
       </header>
@@ -175,12 +182,14 @@ export function AddEditVehiclePage() {
                         ? vehicleNumberLocked
                           ? 'Notes only — vehicle number is fixed after fuel has been assigned to this vehicle.'
                           : 'Update the registration or notes. The vehicle number must remain unique across the fleet.'
-                        : 'Add a registration before assigning fuel from the central store. Each vehicle number must be unique.'}
+                        : isSiteManager && !canManage
+                          ? 'Add a registration for your fleet. Use these vehicles when dispensing fuel from transferred requests.'
+                          : 'Add a registration before assigning fuel from the central store. Each vehicle number must be unique.'}
                     </p>
                   </div>
                 </div>
                 <span className="inline-flex w-fit rounded-full bg-teal-600/15 px-3 py-1.5 text-[12px] font-medium text-teal-700 sm:hidden">
-                  Store Incharge
+                  {isSiteManager && !canManage ? 'Site Manager' : 'Store Incharge'}
                 </span>
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { selectUserId } from '../../store/selectors/authSelectors';
 import {
@@ -223,6 +224,28 @@ export function MySiteInventoryPage() {
             )}
           </div>
         </div>
+
+        {/* Quick actions for site managers */}
+        {effectiveSiteId && (
+          <div className="px-4 pb-3">
+            <div className="flex flex-wrap gap-2">
+              <Link
+                to="/inventory/divide-to-supervisors"
+                className="flex min-h-[44px] items-center gap-2 rounded-[10px] border border-[#1E40AF]/30 bg-[#EFF6FF] px-4 text-[13px] font-semibold text-[#1E40AF] hover:bg-[#DBEAFE] transition-colors"
+              >
+                <Icon name="arrows-pointing-out" className="h-5 w-5" />
+                Split via request
+              </Link>
+              <Link
+                to="/inventory/split-from-inventory"
+                className="flex min-h-[44px] items-center gap-2 rounded-[10px] border border-[#B45309]/30 bg-[#B45309]/10 px-4 text-[13px] font-semibold text-[#B45309] hover:bg-[#B45309]/20 transition-colors"
+              >
+                <Icon name="squares-plus" className="h-5 w-5" />
+                Split from inventory
+              </Link>
+            </div>
+          </div>
+        )}
 
         <div className="px-4 pb-6">
           {isLoading ? (

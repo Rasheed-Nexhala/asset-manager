@@ -13,10 +13,12 @@ import { useAppSelector } from '../../store/hooks';
 import { selectUserId, selectUserDisplayName } from '../../store/selectors/authSelectors';
 import { siteSupervisorService } from '../../services/firebase/siteSupervisorService';
 import type { SupervisorItemAllocation } from '../../types/siteSupervisor';
+import type { RequestItem } from '../../types/request';
 
 type Props = {
   siteId: string;
   requestId: string;
+  requestItems?: RequestItem[];
   /** Tab navigator (parent of the Requests stack). */
   tabNavigation: {
     navigate: (
@@ -26,9 +28,17 @@ type Props = {
   };
 };
 
+function lineItemType(
+  row: SupervisorItemAllocation,
+  requestItems?: RequestItem[]
+): RequestItem['itemType'] | undefined {
+  return row.itemType ?? requestItems?.find((i) => i.itemId === row.itemId)?.itemType;
+}
+
 export const SupervisorAllocationsSection: React.FC<Props> = ({
   siteId,
   requestId,
+  requestItems,
   tabNavigation,
 }) => {
   const userId = useAppSelector(selectUserId);
@@ -112,7 +122,8 @@ export const SupervisorAllocationsSection: React.FC<Props> = ({
           <View className="flex-row gap-2 mb-4 bg-[#F8FAFC] rounded-lg p-3 border border-[#E2E8F0]">
             <Ionicons name="information-circle-outline" size={20} color="#64748B" style={{ marginTop: 2 }} />
             <Text className="text-[13px] text-[#64748B] flex-1 leading-5">
-              Custody only — stock stays on site until your supervisors return it to you, then Store Incharge returns to central store.
+              Only non-consumables can be recorded as returned from a supervisor; consumables and fuel are issued and
+              are not returned through this screen. Store Incharge returns non-consumables to central store.
             </Text>
           </View>
 
@@ -127,30 +138,45 @@ export const SupervisorAllocationsSection: React.FC<Props> = ({
               <Text className="text-[15px] text-[#64748B] text-center mb-5">
                 Add people under Team list, then use Split stock to assign quantities from transferred lines.
               </Text>
-              <View className="flex-row gap-3 w-full">
+              <View className="gap-2 w-full">
                 <TouchableOpacity
                   onPress={() =>
                     tabNavigation.navigate('Inventory', { screen: 'SiteSupervisors' })
                   }
-                  className="flex-1 border-[1.5px] border-[#B45309] rounded-[10px] min-h-[48px] justify-center items-center px-2"
+                  className="border-[1.5px] border-[#B45309] rounded-[10px] min-h-[48px] justify-center items-center px-2"
                   accessibilityRole="button"
                   accessibilityLabel="Open team list"
                 >
                   <Text className="text-[15px] font-semibold text-[#B45309]">Team list</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() =>
-                    tabNavigation.navigate('Inventory', {
-                      screen: 'AllocateItemsToSupervisors',
-                      params: { returnTo: 'requests' },
-                    })
-                  }
-                  className="flex-1 border-[1.5px] border-[#1E40AF] rounded-[10px] min-h-[48px] justify-center items-center px-2"
-                  accessibilityRole="button"
-                  accessibilityLabel="Split stock to supervisors"
-                >
-                  <Text className="text-[15px] font-semibold text-[#1E40AF]">Split stock</Text>
-                </TouchableOpacity>
+                <View className="flex-row gap-2">
+                  <TouchableOpacity
+                    onPress={() =>
+                      tabNavigation.navigate('Inventory', {
+                        screen: 'AllocateItemsToSupervisors',
+                        params: { returnTo: 'requests' },
+                      })
+                    }
+                    className="flex-1 border-[1.5px] border-[#1E40AF] rounded-[10px] min-h-[48px] justify-center items-center px-2"
+                    accessibilityRole="button"
+                    accessibilityLabel="Split via request"
+                  >
+                    <Text className="text-[15px] font-semibold text-[#1E40AF]">Split via request</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() =>
+                      tabNavigation.navigate('Inventory', {
+                        screen: 'InventoryDirectSplit',
+                        params: { returnTo: 'requests' },
+                      })
+                    }
+                    className="flex-1 border-[1.5px] border-[#475569] rounded-[10px] min-h-[48px] justify-center items-center px-2"
+                    accessibilityRole="button"
+                    accessibilityLabel="Split from site inventory"
+                  >
+                    <Text className="text-[15px] font-semibold text-[#475569]">Split from stock</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           ) : (
@@ -158,6 +184,14 @@ export const SupervisorAllocationsSection: React.FC<Props> = ({
               {rows.map((row) => {
                 const out = row.quantityAllocated - row.quantityReturnedToManager;
                 const withSup = out > 0;
+                const lt = lineItemType(row, requestItems);
+                const isIssuedOnly = lt === 'consumable' || lt === 'fuel';
+                const canRecordReturn = withSup && lt === 'non_consumable';
+                const statusLabel = !withSup
+                  ? 'All back'
+                  : isIssuedOnly
+                    ? 'Issued'
+                    : `${out} out`;
                 return (
                   <View
                     key={row.id}
@@ -176,25 +210,35 @@ export const SupervisorAllocationsSection: React.FC<Props> = ({
                         <Text
                           className={`text-[12px] font-medium ${withSup ? 'text-[#D97706]' : 'text-[#16A34A]'}`}
                         >
-                          {withSup ? `${out} out` : 'All back'}
+                          {statusLabel}
                         </Text>
                       </View>
                     </View>
-                    <View className="flex-row gap-4 mb-3 pb-3 border-b border-[#E2E8F0]">
-                      <View className="flex-1">
+                    <View className="flex-row flex-wrap gap-4 mb-3 pb-3 border-b border-[#E2E8F0]">
+                      <View className="flex-1 min-w-[100px]">
                         <Text className="text-[13px] text-[#64748B] mb-0.5">Supervisor</Text>
                         <Text className="text-[15px] font-medium text-[#0F172A]" numberOfLines={1}>
                           {row.supervisorName}
                         </Text>
                       </View>
-                      <View className="flex-1">
+                      <View className="flex-1 min-w-[100px]">
                         <Text className="text-[13px] text-[#64748B] mb-0.5">Allocated / returned</Text>
                         <Text className="text-[15px] text-[#0F172A]">
                           {row.quantityAllocated} / {row.quantityReturnedToManager}
                         </Text>
                       </View>
+                      {row.requestNumber ? (
+                        <View>
+                          <Text className="text-[13px] text-[#64748B] mb-0.5">From request</Text>
+                          <View className="rounded-full bg-[#1E40AF]/10 px-2 py-0.5 self-start">
+                            <Text className="text-[12px] font-medium text-[#1E40AF]">
+                              {row.requestNumber}
+                            </Text>
+                          </View>
+                        </View>
+                      ) : null}
                     </View>
-                    {withSup && (
+                    {canRecordReturn && (
                       <TouchableOpacity
                         onPress={() => {
                           setModalAlloc(row);
@@ -210,6 +254,11 @@ export const SupervisorAllocationsSection: React.FC<Props> = ({
                         </Text>
                       </TouchableOpacity>
                     )}
+                    {withSup && isIssuedOnly ? (
+                      <Text className="text-center text-[13px] text-[#64748B]">
+                        This line type is not returned from supervisors — only non-consumables use return here.
+                      </Text>
+                    ) : null}
                   </View>
                 );
               })}
@@ -217,30 +266,45 @@ export const SupervisorAllocationsSection: React.FC<Props> = ({
           )}
 
           {rows.length > 0 && (
-            <View className="flex-row gap-3 mt-4 pt-4 border-t border-[#E2E8F0]">
+            <View className="gap-2 mt-4 pt-4 border-t border-[#E2E8F0]">
               <TouchableOpacity
                 onPress={() =>
                   tabNavigation.navigate('Inventory', { screen: 'SiteSupervisors' })
                 }
-                className="flex-1 border-[1.5px] border-[#B45309] rounded-[10px] min-h-[48px] px-2 justify-center items-center"
+                className="border-[1.5px] border-[#B45309] rounded-[10px] min-h-[48px] px-2 justify-center items-center"
                 accessibilityRole="button"
                 accessibilityLabel="Manage supervisors list"
               >
                 <Text className="text-[15px] font-semibold text-[#B45309] text-center">Team list</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() =>
-                  tabNavigation.navigate('Inventory', {
-                    screen: 'AllocateItemsToSupervisors',
-                    params: { returnTo: 'requests' },
-                  })
-                }
-                className="flex-1 border-[1.5px] border-[#1E40AF] rounded-[10px] min-h-[48px] px-2 justify-center items-center"
-                accessibilityRole="button"
-                accessibilityLabel="Divide more items"
-              >
-                <Text className="text-[15px] font-semibold text-[#1E40AF] text-center">Split stock</Text>
-              </TouchableOpacity>
+              <View className="flex-row gap-2">
+                <TouchableOpacity
+                  onPress={() =>
+                    tabNavigation.navigate('Inventory', {
+                      screen: 'AllocateItemsToSupervisors',
+                      params: { returnTo: 'requests' },
+                    })
+                  }
+                  className="flex-1 border-[1.5px] border-[#1E40AF] rounded-[10px] min-h-[48px] px-2 justify-center items-center"
+                  accessibilityRole="button"
+                  accessibilityLabel="Split via request"
+                >
+                  <Text className="text-[15px] font-semibold text-[#1E40AF] text-center">Split via request</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() =>
+                    tabNavigation.navigate('Inventory', {
+                      screen: 'InventoryDirectSplit',
+                      params: { returnTo: 'requests' },
+                    })
+                  }
+                  className="flex-1 border-[1.5px] border-[#475569] rounded-[10px] min-h-[48px] px-2 justify-center items-center"
+                  accessibilityRole="button"
+                  accessibilityLabel="Split from site inventory"
+                >
+                  <Text className="text-[15px] font-semibold text-[#475569] text-center">Split from stock</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>

@@ -3,6 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   onSnapshot,
   orderBy,
@@ -18,8 +19,14 @@ import type {
   SiteSupervisorInput,
   SupervisorItemAllocation,
   CreateSupervisorAllocationInput,
+  MultiRequestAllocationInput,
 } from '../../types/siteSupervisor';
 import type { Request, RequestItem } from '../../types/request';
+
+function allocationItemTypeFromDoc(raw: unknown): RequestItem['itemType'] | undefined {
+  if (raw === 'consumable' || raw === 'non_consumable' || raw === 'fuel') return raw;
+  return undefined;
+}
 
 const SUPERVISORS_SUB = 'siteSupervisors';
 const ALLOCATIONS_SUB = 'supervisorAllocations';
@@ -107,15 +114,37 @@ export async function deleteSiteSupervisor(
       where('supervisorId', '==', supervisorId)
     )
   );
+  const requestCache = new Map<string, Request>();
+
+  const lineItemType = async (
+    requestId: string,
+    itemId: string
+  ): Promise<RequestItem['itemType'] | undefined> => {
+    if (!requestCache.has(requestId)) {
+      const snap = await getDoc(doc(db, REQUESTS_COLLECTION, requestId));
+      if (!snap.exists()) return undefined;
+      requestCache.set(requestId, snap.data() as Request);
+    }
+    const req = requestCache.get(requestId);
+    return req?.items?.find((i) => i.itemId === itemId)?.itemType;
+  };
+
   for (const d of open.docs) {
     const data = d.data();
     const alloc = Number(data.quantityAllocated ?? 0);
     const ret = Number(data.quantityReturnedToManager ?? 0);
-    if (alloc - ret > 0) {
-      throw new Error(
-        'Cannot remove a supervisor who still has items not returned to you. Record returns first.'
-      );
-    }
+    const outstanding = alloc - ret;
+    if (outstanding <= 0) continue;
+
+    const fromDoc = allocationItemTypeFromDoc(data.itemType);
+
+    const resolved =
+      fromDoc ?? (await lineItemType(String(data.requestId ?? ''), String(data.itemId ?? '')));
+    if (resolved !== 'non_consumable') continue;
+
+    throw new Error(
+      'Cannot remove a supervisor who still has items not returned to you. Record returns first.'
+    );
   }
   await deleteDoc(doc(db, 'sites', siteId, SUPERVISORS_SUB, supervisorId));
 }
@@ -139,6 +168,7 @@ export function subscribeSiteAllocations(
           requestNumber: String(data.requestNumber ?? ''),
           itemId: String(data.itemId ?? ''),
           itemName: String(data.itemName ?? ''),
+          itemType: allocationItemTypeFromDoc(data.itemType),
           quantityAllocated: Number(data.quantityAllocated ?? 0),
           quantityReturnedToManager: Number(data.quantityReturnedToManager ?? 0),
           createdAt: data.createdAt ?? null,
@@ -183,6 +213,7 @@ export function subscribeRequestAllocations(
           requestNumber: String(data.requestNumber ?? ''),
           itemId: String(data.itemId ?? ''),
           itemName: String(data.itemName ?? ''),
+          itemType: allocationItemTypeFromDoc(data.itemType),
           quantityAllocated: Number(data.quantityAllocated ?? 0),
           quantityReturnedToManager: Number(data.quantityReturnedToManager ?? 0),
           createdAt: data.createdAt ?? null,
@@ -268,11 +299,89 @@ export async function createSupervisorAllocation(
       requestNumber: requestData.requestNumber ?? '',
       itemId,
       itemName: line.itemName ?? '',
+      itemType: line.itemType,
       quantityAllocated: quantity,
       quantityReturnedToManager: 0,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+  });
+}
+
+/**
+ * Allocates an item to a supervisor across multiple request lines in one atomic transaction.
+ * Used by the inventory-first split flow. Each distribution entry creates one allocation doc
+ * with a real requestId, keeping supervisorOutstandingQty accurate on every request line.
+ */
+export async function createMultiRequestSupervisorAllocation(
+  input: MultiRequestAllocationInput,
+  actor: { userId: string; userName: string }
+): Promise<void> {
+  const { siteId, itemId, itemName, itemType, supervisorId, supervisorName, distributions } = input;
+
+  const active = distributions.filter((d) => d.quantity > 0);
+  if (active.length === 0) throw new Error('No quantity to allocate');
+
+  for (const dist of active) {
+    if (!Number.isInteger(dist.quantity) || dist.quantity < 1) {
+      throw new Error('Each quantity must be a positive whole number');
+    }
+  }
+
+  const requestRefs = active.map((d) => doc(db, REQUESTS_COLLECTION, d.requestId));
+  const allocRefs = active.map(() => doc(allocationsCol(siteId)));
+
+  await runTransaction(db, async (transaction) => {
+    // All reads must happen before any writes in a Firestore transaction
+    const reqSnaps = await Promise.all(requestRefs.map((ref) => transaction.get(ref)));
+
+    for (let i = 0; i < active.length; i++) {
+      const dist = active[i];
+      const reqSnap = reqSnaps[i];
+      if (!reqSnap.exists()) throw new Error(`Request not found`);
+      const requestData = reqSnap.data() as Request;
+
+      if (requestData.siteId !== siteId) throw new Error('Request does not belong to this site');
+      if (requestData.status !== 'transferred' && requestData.status !== 'partially_returned') {
+        throw new Error(`Request ${requestData.requestNumber} is not transferred yet`);
+      }
+
+      const line = requestData.items?.find((item) => item.itemId === itemId);
+      if (!line) throw new Error(`Item not found on request ${requestData.requestNumber}`);
+
+      const maxAtSite =
+        Number(line.quantityApproved ?? 0) - Number(line.quantityReturned ?? 0);
+      const supOut = Number(line.supervisorOutstandingQty ?? 0);
+
+      if (supOut + dist.quantity > maxAtSite) {
+        throw new Error(
+          `Only ${Math.max(0, maxAtSite - supOut)} unit(s) available on ${requestData.requestNumber}`
+        );
+      }
+
+      const newItems = patchItemsSupervisorQty(requestData.items, itemId, dist.quantity);
+
+      transaction.update(requestRefs[i], {
+        items: newItems,
+        updatedAt: serverTimestamp(),
+        lastSupervisorCustodyUpdateBy: actor.userId,
+        lastSupervisorCustodyUpdateByName: actor.userName,
+      });
+
+      transaction.set(allocRefs[i], {
+        supervisorId,
+        supervisorName,
+        requestId: dist.requestId,
+        requestNumber: requestData.requestNumber ?? '',
+        itemId,
+        itemName,
+        itemType,
+        quantityAllocated: dist.quantity,
+        quantityReturnedToManager: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
   });
 }
 
@@ -307,6 +416,12 @@ export async function recordReturnFromSupervisor(
     if (!reqSnap.exists()) throw new Error('Request not found');
     const requestData = reqSnap.data() as Request;
 
+    const line = requestData.items?.find((i) => i.itemId === itemId);
+    if (!line) throw new Error('Item not found on this request');
+    if (line.itemType !== 'non_consumable') {
+      throw new Error('Only non-consumable items can be returned from supervisors');
+    }
+
     const newItems = patchItemsSupervisorQty(requestData.items, itemId, -quantity);
 
     transaction.update(requestRef, {
@@ -331,5 +446,6 @@ export const siteSupervisorService = {
   subscribeSiteAllocations,
   subscribeRequestAllocations,
   createSupervisorAllocation,
+  createMultiRequestSupervisorAllocation,
   recordReturnFromSupervisor,
 };

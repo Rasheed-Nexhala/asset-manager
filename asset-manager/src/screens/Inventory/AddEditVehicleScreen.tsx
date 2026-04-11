@@ -20,7 +20,7 @@ import {
   countAssignmentsForVehicle,
 } from '../../services/firebase/vehicleService';
 import { useAppSelector } from '../../store/hooks';
-import { selectIsStoreIncharge } from '../../store/selectors/authSelectors';
+import { selectIsStoreIncharge, selectIsSiteManager } from '../../store/selectors/authSelectors';
 
 type Nav = StackNavigationProp<InventoryStackParamList, 'AddEditVehicle'>;
 type R = RouteProp<InventoryStackParamList, 'AddEditVehicle'>;
@@ -31,6 +31,8 @@ export const AddEditVehicleScreen: React.FC = () => {
   const vehicleId = route.params?.vehicleId;
   const isEdit = Boolean(vehicleId);
   const canManage = useAppSelector(selectIsStoreIncharge);
+  const isSiteManager = useAppSelector(selectIsSiteManager);
+  const canCreateVehicle = canManage || isSiteManager;
 
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [notes, setNotes] = useState('');
@@ -41,11 +43,14 @@ export const AddEditVehicleScreen: React.FC = () => {
   const vehicleNumberLocked = isEdit && assignmentCount > 0;
 
   useEffect(() => {
-    if (!canManage) {
+    if (isEdit && !canManage) {
       Alert.alert('Read-only', 'Only Store Incharge can edit vehicles.');
       navigation.goBack();
+    } else if (!isEdit && !canCreateVehicle) {
+      Alert.alert('Permission', 'You do not have permission to add vehicles.');
+      navigation.goBack();
     }
-  }, [canManage, navigation]);
+  }, [isEdit, canManage, canCreateVehicle, navigation]);
 
   useEffect(() => {
     if (!vehicleId) return;
@@ -94,7 +99,7 @@ export const AddEditVehicleScreen: React.FC = () => {
     }
   }, [vehicleNumber, notes, isEdit, vehicleId, vehicleNumberLocked, navigation]);
 
-  if (!canManage) return null;
+  if ((isEdit && !canManage) || (!isEdit && !canCreateVehicle)) return null;
 
   if (loading) {
     return (

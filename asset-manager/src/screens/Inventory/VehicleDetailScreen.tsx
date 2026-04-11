@@ -26,6 +26,7 @@ import type { Item } from '../../types/inventory';
 import {
   selectIsStoreIncharge,
   selectIsAdminOrSuperAdmin,
+  selectIsSiteManager,
   selectUserDisplayName,
   selectUserRoleType,
 } from '../../store/selectors/authSelectors';
@@ -44,6 +45,7 @@ export const VehicleDetailScreen: React.FC = () => {
   const isWideLayout = width >= 900;
   const dispatch = useAppDispatch();
   const canManage = useAppSelector(selectIsStoreIncharge);
+  const isSiteManager = useAppSelector(selectIsSiteManager);
   const isOverview = useAppSelector(selectIsAdminOrSuperAdmin) && !canManage;
   const userName = useAppSelector(selectUserDisplayName) ?? 'Unknown';
   const userRole = useAppSelector(selectUserRoleType) ?? 'Unassigned';
@@ -208,6 +210,14 @@ export const VehicleDetailScreen: React.FC = () => {
       {isOverview && (
         <View className="bg-[#475569]/15 px-4 py-2 border-b border-[#E2E8F0]">
           <Text className="text-[13px] text-[#475569]">Read-only overview</Text>
+        </View>
+      )}
+
+      {isSiteManager && !canManage && (
+        <View className="bg-[#D97706]/15 px-4 py-2 border-b border-[#E2E8F0]">
+          <Text className="text-[13px] text-[#475569]">
+            Site Manager: dispense fuel from transferred requests. Central store assignment is Store Incharge only.
+          </Text>
         </View>
       )}
 
@@ -391,6 +401,11 @@ export const VehicleDetailScreen: React.FC = () => {
                     </Text>
                     <Text className="text-[15px] font-bold text-[#B45309]">{a.quantityLiters} L</Text>
                   </View>
+                  {a.assignmentSource === 'site_request' && a.sourceRequestNumber ? (
+                    <Text className="mb-1 text-[12px] font-medium text-[#475569]">
+                      From request {a.sourceRequestNumber}
+                    </Text>
+                  ) : null}
                   <Text className="text-[13px] text-[#64748B]">
                     {new Date(a.createdAt).toLocaleString()} · {a.assignedByName}
                   </Text>

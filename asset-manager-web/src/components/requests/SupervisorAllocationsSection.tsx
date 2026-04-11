@@ -4,6 +4,7 @@ import { useAppSelector } from '../../store/hooks';
 import { selectUserId, selectUserDisplayName } from '../../store/selectors/authSelectors';
 import { siteSupervisorService } from '../../services/firebase/siteSupervisorService';
 import type { SupervisorItemAllocation } from '../../types/siteSupervisor';
+import type { RequestItem } from '../../types/request';
 import { Icon } from '../shared/Icon';
 import { LoadingSpinner } from '../shared/LoadingSpinner';
 import { useToast } from '../../contexts/ToastContext';
@@ -11,9 +12,18 @@ import { useToast } from '../../contexts/ToastContext';
 type Props = {
   siteId: string;
   requestId: string;
+  /** Resolve line type for legacy allocations missing `itemType` on the document. */
+  requestItems?: RequestItem[];
 };
 
-export function SupervisorAllocationsSection({ siteId, requestId }: Props) {
+function lineItemType(
+  row: SupervisorItemAllocation,
+  requestItems?: RequestItem[]
+): RequestItem['itemType'] | undefined {
+  return row.itemType ?? requestItems?.find((i) => i.itemId === row.itemId)?.itemType;
+}
+
+export function SupervisorAllocationsSection({ siteId, requestId, requestItems }: Props) {
   const navigate = useNavigate();
   const toast = useToast();
   const userId = useAppSelector(selectUserId);
@@ -96,7 +106,8 @@ export function SupervisorAllocationsSection({ siteId, requestId }: Props) {
           <div className="mb-4 flex gap-2 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3">
             <Icon name="exclamation-circle" className="mt-0.5 h-5 w-5 shrink-0 text-[#64748B]" />
             <p className="text-[13px] leading-5 text-[#64748B]">
-              Custody only — stock stays on site until supervisors return it to you; Store Incharge returns to central store.
+              Only non-consumables can be recorded as returned from a supervisor; consumables and fuel are issued and
+              are not returned through this screen. Store Incharge returns non-consumables to central store.
             </p>
           </div>
 
@@ -109,7 +120,7 @@ export function SupervisorAllocationsSection({ siteId, requestId }: Props) {
               <p className="mb-6 max-w-md text-center text-[15px] leading-6 text-[#64748B]">
                 Add people under Team list, then use Split stock to assign quantities from transferred lines.
               </p>
-              <div className="flex w-full max-w-md gap-3">
+              <div className="flex w-full max-w-md flex-wrap gap-3">
                 <button
                   type="button"
                   onClick={() => navigate('/inventory/site-supervisors')}
@@ -122,7 +133,14 @@ export function SupervisorAllocationsSection({ siteId, requestId }: Props) {
                   onClick={() => navigate('/inventory/divide-to-supervisors')}
                   className="min-h-[48px] flex-1 rounded-[10px] border-2 border-[#1E40AF] px-2 text-[15px] font-semibold text-[#1E40AF] hover:bg-[#EFF6FF]"
                 >
-                  Split stock
+                  Split via request
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/inventory/split-from-inventory')}
+                  className="min-h-[48px] flex-1 rounded-[10px] border-2 border-[#475569] px-2 text-[15px] font-semibold text-[#475569] hover:bg-[#F1F5F9]"
+                >
+                  Split from stock
                 </button>
               </div>
             </div>
@@ -131,6 +149,14 @@ export function SupervisorAllocationsSection({ siteId, requestId }: Props) {
               {rows.map((row) => {
                 const out = row.quantityAllocated - row.quantityReturnedToManager;
                 const withSup = out > 0;
+                const lt = lineItemType(row, requestItems);
+                const isIssuedOnly = lt === 'consumable' || lt === 'fuel';
+                const canRecordReturn = withSup && lt === 'non_consumable';
+                const statusLabel = !withSup
+                  ? 'All back'
+                  : isIssuedOnly
+                    ? 'Issued'
+                    : `${out} out`;
                 return (
                   <li
                     key={row.id}
@@ -143,10 +169,10 @@ export function SupervisorAllocationsSection({ siteId, requestId }: Props) {
                           withSup ? 'bg-[#D97706]/15 text-[#D97706]' : 'bg-[#16A34A]/15 text-[#16A34A]'
                         }`}
                       >
-                        {withSup ? `${out} out` : 'All back'}
+                        {statusLabel}
                       </span>
                     </div>
-                    <div className="mb-3 flex gap-6 border-b border-[#E2E8F0] pb-3">
+                    <div className="mb-3 flex flex-wrap gap-6 border-b border-[#E2E8F0] pb-3">
                       <div className="min-w-0 flex-1">
                         <p className="text-[13px] text-[#64748B]">Supervisor</p>
                         <p className="truncate text-[15px] font-medium text-[#0F172A]">{row.supervisorName}</p>
@@ -157,8 +183,16 @@ export function SupervisorAllocationsSection({ siteId, requestId }: Props) {
                           {row.quantityAllocated} / {row.quantityReturnedToManager}
                         </p>
                       </div>
+                      {row.requestNumber && (
+                        <div>
+                          <p className="text-[13px] text-[#64748B]">From request</p>
+                          <span className="rounded-full bg-[#1E40AF]/10 px-2 py-0.5 text-[12px] font-medium text-[#1E40AF]">
+                            {row.requestNumber}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    {withSup && (
+                    {canRecordReturn && (
                       <button
                         type="button"
                         onClick={() => {
@@ -171,6 +205,11 @@ export function SupervisorAllocationsSection({ siteId, requestId }: Props) {
                         Record return from supervisor
                       </button>
                     )}
+                    {withSup && isIssuedOnly ? (
+                      <p className="text-center text-[13px] text-[#64748B]">
+                        This line type is not returned from supervisors — only non-consumables use return here.
+                      </p>
+                    ) : null}
                   </li>
                 );
               })}
@@ -178,7 +217,7 @@ export function SupervisorAllocationsSection({ siteId, requestId }: Props) {
           )}
 
           {rows.length > 0 && (
-            <div className="mt-4 flex gap-3 border-t border-[#E2E8F0] pt-4">
+            <div className="mt-4 flex flex-wrap gap-3 border-t border-[#E2E8F0] pt-4">
               <button
                 type="button"
                 onClick={() => navigate('/inventory/site-supervisors')}
@@ -191,7 +230,14 @@ export function SupervisorAllocationsSection({ siteId, requestId }: Props) {
                 onClick={() => navigate('/inventory/divide-to-supervisors')}
                 className="min-h-[48px] flex-1 rounded-[10px] border-2 border-[#1E40AF] px-2 text-[15px] font-semibold text-[#1E40AF] hover:bg-[#EFF6FF]"
               >
-                Split stock
+                Split via request
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/inventory/split-from-inventory')}
+                className="min-h-[48px] flex-1 rounded-[10px] border-2 border-[#475569] px-2 text-[15px] font-semibold text-[#475569] hover:bg-[#F1F5F9]"
+              >
+                Split from stock
               </button>
             </div>
           )}

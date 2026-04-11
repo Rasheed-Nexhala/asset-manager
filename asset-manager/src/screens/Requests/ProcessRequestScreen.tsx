@@ -43,6 +43,7 @@ import {
   canPrintTransferSlip,
 } from '../../utils/transferSlipPdfUtils';
 import { SupervisorAllocationsSection } from '../../components/Requests/SupervisorAllocationsSection';
+import { VehicleFuelAllocationsSection } from '../../components/Requests/VehicleFuelAllocationsSection';
 
 type RouteParams = RouteProp<RequestStackParamList, 'ProcessRequest'>;
 type NavigationProp = StackNavigationProp<RequestStackParamList, 'ProcessRequest'>;
@@ -484,6 +485,10 @@ export const ProcessRequestScreen: React.FC = () => {
   const tabNavigation =
     typeof navigation.getParent === 'function' ? navigation.getParent() : null;
   const showTransferSlipPrint = request ? canPrintTransferSlip(request) : false;
+  const hasSupervisorSplittableItems = Boolean(
+    request?.items?.some((i) => i.itemType === 'consumable' || i.itemType === 'non_consumable')
+  );
+  const hasFuelItems = Boolean(request?.items?.some((i) => i.itemType === 'fuel'));
 
   const handlePrintTransferSlip = useCallback(async () => {
     if (!request) return;
@@ -675,12 +680,22 @@ export const ProcessRequestScreen: React.FC = () => {
           {isSiteManager &&
             isRequestOwner &&
             (isTransferred || isPartiallyReturned) &&
-            tabNavigation != null && (
+            tabNavigation != null &&
+            hasSupervisorSplittableItems && (
               <SupervisorAllocationsSection
                 siteId={request.siteId}
                 requestId={request.id}
+                requestItems={request.items}
                 tabNavigation={tabNavigation}
               />
+            )}
+
+          {isSiteManager &&
+            isRequestOwner &&
+            (isTransferred || isPartiallyReturned) &&
+            tabNavigation != null &&
+            hasFuelItems && (
+              <VehicleFuelAllocationsSection requestId={request.id} tabNavigation={tabNavigation} />
             )}
 
           {/* Return history – shown when status is returned or partially_returned */}

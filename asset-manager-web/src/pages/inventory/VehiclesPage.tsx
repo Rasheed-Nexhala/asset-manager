@@ -1,7 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppSelector } from '../../store/hooks';
-import { selectIsStoreIncharge, selectIsAdminOrSuperAdmin } from '../../store/selectors/authSelectors';
+import {
+  selectIsStoreIncharge,
+  selectIsAdminOrSuperAdmin,
+  selectIsSiteManager,
+} from '../../store/selectors/authSelectors';
 import { listVehicles } from '../../services/firebase/vehicleService';
 import { getTotalLitersAssignedToVehicle } from '../../services/firebase/vehicleFuelAssignmentService';
 import type { Vehicle } from '../../types/vehicle';
@@ -13,6 +17,8 @@ import { filterVehiclesBySearch } from '../../utils/vehicleNumberUtils';
 
 export function VehiclesPage() {
   const canManage = useAppSelector(selectIsStoreIncharge);
+  const isSiteManager = useAppSelector(selectIsSiteManager);
+  const canCreateVehicle = canManage || isSiteManager;
   const isOverview = useAppSelector(selectIsAdminOrSuperAdmin) && !canManage;
   const toast = useToast();
 
@@ -70,7 +76,7 @@ export function VehiclesPage() {
           <h1 className="min-w-0 flex-1 text-center text-[22px] font-semibold text-slate-900 md:text-left md:pl-2">
             Vehicles
           </h1>
-          {canManage ? (
+          {canCreateVehicle ? (
             <Link
               to="/inventory/vehicles/new"
               className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-blue-800 transition-colors hover:bg-blue-50"
@@ -89,6 +95,17 @@ export function VehiclesPage() {
           <div className="mx-auto max-w-6xl px-4 py-2 md:px-6 lg:px-8">
             <p className="text-[13px] text-slate-600">
               Overview only — fuel assignment is managed by Store Incharge.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isSiteManager && !canManage && (
+        <div className="shrink-0 border-b border-slate-200 bg-amber-600/10">
+          <div className="mx-auto max-w-6xl px-4 py-2 md:px-6 lg:px-8">
+            <p className="text-[13px] text-slate-700">
+              Site Manager: add vehicles here for your site. Dispense fuel from transferred requests on each request’s
+              detail page. Assigning fuel directly from the central store is done by Store Incharge only.
             </p>
           </div>
         </div>
@@ -149,8 +166,10 @@ export function VehiclesPage() {
               <Icon name="truck" className="h-14 w-14 text-slate-400" />
               <p className="mt-4 text-[17px] font-semibold text-slate-900">No vehicles yet</p>
               <p className="mt-2 max-w-md text-[15px] text-slate-500">
-                {canManage
-                  ? 'Add a vehicle to assign fuel from the central store.'
+                {canCreateVehicle
+                  ? canManage
+                    ? 'Add a vehicle to assign fuel from the central store.'
+                    : 'Add a vehicle to dispense fuel from transferred requests.'
                   : 'No vehicles registered.'}
               </p>
             </div>
