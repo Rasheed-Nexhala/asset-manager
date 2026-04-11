@@ -109,6 +109,8 @@ export interface FirestoreInventoryEntry {
   locationType: LocationType;     // store, site, or maintenance
   locationName: string;            // Denormalized location name
   quantity: number;                // Current quantity at this location
+  itemType?: ItemType;            // Optional denormalized item type for resilient rendering
+  unit?: string;                  // Optional denormalized unit for resilient rendering
   lengthPerPiece?: number;        // meters, length of pieces at this location
   updatedAt: Timestamp;           // Last modified timestamp
 }
@@ -125,6 +127,8 @@ export interface InventoryEntry {
   locationType: LocationType;
   locationName: string;
   quantity: number;
+  itemType?: ItemType;
+  unit?: string;
   lengthPerPiece?: number;
   updatedAt: string;             // Serialized timestamp (ISO string)
 }

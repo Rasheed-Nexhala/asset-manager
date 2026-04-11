@@ -31,7 +31,7 @@ export interface RequestItem {
   itemName: string;
   itemSku: string;
   unit?: string;
-  itemType: 'consumable' | 'non_consumable';
+  itemType: 'consumable' | 'non_consumable' | 'fuel';
   categoryId: string;
   categoryName: string;
   imageUrl?: string;

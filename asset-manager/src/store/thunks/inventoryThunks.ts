@@ -451,3 +451,52 @@ export const exportInventoryThunk = createAsyncThunk(
     }
   }
 );
+
+/**
+ * Export site inventory to CSV
+ */
+export const exportSiteInventoryThunk = createAsyncThunk(
+  'inventory/exportSite',
+  async (
+    payload: { locationId: string; siteName: string; inventoryEntries?: any[] },
+    { rejectWithValue }
+  ) => {
+    try {
+      let entries = payload.inventoryEntries;
+      if (!entries) {
+        entries = await getInventoryByLocation(payload.locationId);
+      }
+      
+      // Fetch items without filters to get mapping details
+      const items = await listItems();
+      
+      const header = 'Item Name,SKU,Category,Type,Unit,System Quantity,Physical Count,Variance\n';
+      
+      const escapeCsvField = (value: string | number | null | undefined): string =>
+        `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+      const rows = (entries || [])
+        .filter((entry: any) => entry.quantity > 0)
+        .map((entry: any) => {
+          const item = items.find(i => i.id === entry.itemId);
+          return [
+            item?.name || entry.itemName || 'Unknown',
+            item?.sku || entry.itemSku || 'Unknown',
+            item?.categoryName || 'Uncategorized',
+            item?.type || '',
+            item?.unit || '',
+            entry.quantity,
+            '', // Physical Count
+            ''  // Variance
+          ].map(escapeCsvField).join(',');
+        }).join('\n');
+
+      const fileName = `inventory_${payload.siteName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      await saveCsvAndShare(header + rows, fileName);
+      return true;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to export site inventory';
+      return rejectWithValue(errorMessage);
+    }
+  }
+);

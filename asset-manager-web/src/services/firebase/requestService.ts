@@ -560,7 +560,7 @@ export const transferRequest = async (
       // Read all documents upfront
       for (const item of requestData.items) {
         const quantity = item.quantityApproved;
-        if (!Number.isInteger(quantity) || quantity <= 0) {
+        if (typeof quantity !== 'number' || isNaN(quantity) || quantity <= 0) {
           throw new TransferValidationError(`Invalid approved quantity for ${item.itemName}`);
         }
 
@@ -652,6 +652,8 @@ export const transferRequest = async (
             locationType: 'site',
             locationName: requestData.siteName,
             quantity: quantity,
+            itemType: item.itemType ?? itemData?.type,
+            unit: item.unit ?? itemData?.unit,
             updatedAt: serverTimestamp(),
           };
           if (lengthToUse != null) newEntry.lengthPerPiece = lengthToUse;
@@ -839,7 +841,7 @@ const returnItemsBatch = async (
 
     for (const returnItem of returnData.items) {
       const item = requestDataOuter.items.find((i: any) => i.itemId === returnItem.itemId);
-      if (!item || item.itemType === 'consumable') continue;
+      if (!item || item.itemType === 'consumable' || item.itemType === 'fuel') continue;
 
       const siteLocationId = `site_${requestDataOuter.siteId}`;
       const siteRef = doc(
@@ -874,13 +876,13 @@ const returnItemsBatch = async (
 
       for (const returnItem of returnData.items) {
         const item = requestData.items.find((i: any) => i.itemId === returnItem.itemId);
-        if (!item || item.itemType === 'consumable') continue;
-        if (!Number.isInteger(returnItem.quantityReturned) || returnItem.quantityReturned < 1) {
+        if (!item || item.itemType === 'consumable' || item.itemType === 'fuel') continue;
+        if (typeof returnItem.quantityReturned !== 'number' || isNaN(returnItem.quantityReturned) || returnItem.quantityReturned <= 0) {
           throw new Error(`Invalid return quantity for ${item.itemName}`);
         }
         const currentReturned = item.quantityReturned ?? 0;
         const remaining = item.quantityApproved - currentReturned;
-        if (returnItem.quantityReturned > remaining || returnItem.quantityReturned < 1) {
+        if (returnItem.quantityReturned > remaining || returnItem.quantityReturned <= 0) {
           throw new Error(
             `Invalid quantity for ${item.itemName}: cannot return ${returnItem.quantityReturned}, remaining is ${remaining}`
           );
@@ -892,7 +894,7 @@ const returnItemsBatch = async (
 
       for (const returnItem of returnData.items) {
         const item = requestData.items.find((i: any) => i.itemId === returnItem.itemId);
-        if (!item || item.itemType === 'consumable') continue;
+        if (!item || item.itemType === 'consumable' || item.itemType === 'fuel') continue;
 
         const refs = inventoryRefs.get(returnItem.itemId);
         if (!refs) continue;
@@ -980,14 +982,15 @@ const returnItemsBatch = async (
       const quantityReturnedMap = new Map<string, number>();
       for (const ri of returnData.items) {
         const item = currentItems.find((i: any) => i.itemId === ri.itemId);
-        if (!item || item.itemType === 'consumable') continue;
+        if (!item || item.itemType === 'consumable' || item.itemType === 'fuel') continue;
         const prev = item.quantityReturned ?? 0;
         quantityReturnedMap.set(ri.itemId, prev + ri.quantityReturned);
       }
 
       const updatedItems = currentItems.map((item: any) => {
         const newQtyReturned = quantityReturnedMap.get(item.itemId) ?? item.quantityReturned ?? 0;
-        const isFullyReturned = item.itemType === 'consumable' || newQtyReturned >= item.quantityApproved;
+        const isFullyReturned =
+          item.itemType === 'consumable' || item.itemType === 'fuel' || newQtyReturned >= item.quantityApproved;
         return {
           ...item,
           quantityReturned: newQtyReturned,

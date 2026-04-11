@@ -16,6 +16,7 @@ import {
   selectUserDisplayName,
   selectIsAdminOrSuperAdmin,
   selectIsSuperAdmin,
+  selectCanReceivePurchaseOrder,
 } from '../../store/selectors/authSelectors';
 import { selectPurchaseOrderError } from '../../store/selectors/purchaseOrderSelectors';
 import { PODocumentCard, GrrReceiptsList } from '../../components/purchaseOrder';
@@ -45,6 +46,7 @@ export function ApprovePOPage() {
   const userName = useAppSelector(selectUserDisplayName);
   const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
+  const canReceivePO = useAppSelector(selectCanReceivePurchaseOrder);
   const reduxError = useAppSelector(selectPurchaseOrderError);
 
   const [po, setPo] = useState<PurchaseOrder | null>(null);
@@ -208,12 +210,18 @@ export function ApprovePOPage() {
             This PO has been partially received. Record another receipt when more
             goods arrive, or open Receive from the list.
           </p>
-          <Link
-            to={`/purchase-orders/${poId}/receive`}
-            className="inline-flex h-[50px] items-center justify-center rounded-[10px] bg-blue-800 px-6 text-[15px] font-semibold text-white transition-colors hover:bg-blue-900"
-          >
-            Continue receiving
-          </Link>
+          {canReceivePO ? (
+            <Link
+              to={`/purchase-orders/${poId}/receive`}
+              className="inline-flex h-[50px] items-center justify-center rounded-[10px] bg-blue-800 px-6 text-[15px] font-semibold text-white transition-colors hover:bg-blue-900"
+            >
+              Continue receiving
+            </Link>
+          ) : (
+            <p className="text-[14px] text-slate-500">
+              Only Store Incharge or Super Admin can record receipts.
+            </p>
+          )}
         </div>
       </div>
     );

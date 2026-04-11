@@ -121,7 +121,7 @@ export const CreateRequestScreen: React.FC = () => {
       returnScreen: 'CreateRequest',
       returnParams: { siteId },
       excludeItemIds: items.map((i) => i.id),
-      allowedItemTypes: ['consumable', 'non_consumable'],
+      allowedItemTypes: ['consumable', 'non_consumable', 'fuel'],
     });
   }, [navigation, siteId, items]);
 

@@ -149,7 +149,7 @@ export const EditRequestScreen: React.FC = () => {
       returnScreen: 'EditRequest',
       returnParams: { requestId },
       excludeItemIds: items.map((i) => i.itemId),
-      allowedItemTypes: ['consumable', 'non_consumable'],
+      allowedItemTypes: ['consumable', 'non_consumable', 'fuel'],
     });
   }, [navigation, requestId, items]);
 

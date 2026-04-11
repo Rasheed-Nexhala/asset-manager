@@ -155,7 +155,11 @@ export const RequestItemCard: React.FC<RequestItemCardProps> = ({
             <Text className="text-[13px] text-[#64748B]">{item.itemSku}</Text>
             <View className="w-1 h-1 rounded-full bg-[#64748B]" />
             <Text className="text-[13px] text-[#64748B]">
-              {item.itemType === 'consumable' ? 'Consumable' : 'Non-Consumable'}
+              {item.itemType === 'consumable'
+                ? 'Consumable'
+                : item.itemType === 'fuel'
+                  ? 'Fuel'
+                  : 'Non-Consumable'}
             </Text>
           </View>
 

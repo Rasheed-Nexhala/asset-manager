@@ -1,4 +1,4 @@
-import { normalizeVehicleNumber } from '../vehicleNumberUtils';
+import { filterVehiclesBySearch, normalizeVehicleNumber, vehicleMatchesSearch } from '../vehicleNumberUtils';
 
 describe('normalizeVehicleNumber', () => {
   it('trims and lowercases', () => {
@@ -7,5 +7,16 @@ describe('normalizeVehicleNumber', () => {
 
   it('handles empty string', () => {
     expect(normalizeVehicleNumber('   ')).toBe('');
+  });
+});
+
+describe('filterVehiclesBySearch', () => {
+  it('filters by number or notes', () => {
+    const v = [
+      { vehicleNumber: 'MH-1', notes: '' },
+      { vehicleNumber: 'KA-2', notes: 'Tipper' },
+    ];
+    expect(filterVehiclesBySearch(v, 'mh')).toHaveLength(1);
+    expect(vehicleMatchesSearch(v[1], 'tipper')).toBe(true);
   });
 });

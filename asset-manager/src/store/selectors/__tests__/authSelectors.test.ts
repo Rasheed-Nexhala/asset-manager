@@ -12,6 +12,7 @@ import {
   selectAuthError,
   selectIsAuthenticated,
   selectCanCreatePurchaseOrder,
+  selectCanReceivePurchaseOrder,
 } from '../authSelectors';
 import type { RootState } from '../../index';
 
@@ -220,5 +221,29 @@ describe('authSelectors', () => {
       userRole: { role: 'Admin', isActive: true, permissions: [] },
     });
     expect(selectCanCreatePurchaseOrder(state)).toBe(false);
+  });
+
+  it('selectCanReceivePurchaseOrder matches create PO roles (Store Incharge, SuperAdmin)', () => {
+    expect(
+      selectCanReceivePurchaseOrder(
+        createMockState({
+          userRole: { role: 'StoreIncharge', isActive: true, permissions: [] },
+        })
+      )
+    ).toBe(true);
+    expect(
+      selectCanReceivePurchaseOrder(
+        createMockState({
+          userRole: { role: 'SuperAdmin', isActive: true, permissions: [] },
+        })
+      )
+    ).toBe(true);
+    expect(
+      selectCanReceivePurchaseOrder(
+        createMockState({
+          userRole: { role: 'Admin', isActive: true, permissions: [] },
+        })
+      )
+    ).toBe(false);
   });
 });

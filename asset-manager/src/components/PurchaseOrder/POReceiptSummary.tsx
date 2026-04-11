@@ -54,7 +54,7 @@ export const POReceiptSummary: React.FC<POReceiptSummaryProps> = ({
               )}
             </View>
             <Text className="text-[13px] text-[#64748B] ml-2">
-              {`${u.currentQty} → ${u.newQty} (+${u.receivedQty} of ${expected} expected)`}
+              {`${u.currentQty} → ${u.newQty} (+${u.receivedQty})`}
             </Text>
           </View>
         );

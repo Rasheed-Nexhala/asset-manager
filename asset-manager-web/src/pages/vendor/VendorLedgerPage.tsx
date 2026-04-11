@@ -5,7 +5,11 @@ import { Icon } from '../../components/shared/Icon';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { POCard } from '../../components/purchaseOrder/POCard';
 import { useAppSelector } from '../../store/hooks';
-import { selectIsAdminOrSuperAdmin, selectIsStoreIncharge } from '../../store/selectors/authSelectors';
+import {
+  selectIsAdminOrSuperAdmin,
+  selectIsStoreIncharge,
+  selectCanReceivePurchaseOrder,
+} from '../../store/selectors/authSelectors';
 import { selectVendors } from '../../store/selectors/purchaseOrderSelectors';
 import {
   DEFAULT_VENDOR_LEDGER_PAGE_SIZE,
@@ -22,7 +26,7 @@ import {
   type VendorLedgerDateRange,
 } from '../../utils/vendorLedgerUtils';
 
-function getPONavigateTo(po: PurchaseOrder): string {
+function getPONavigateTo(po: PurchaseOrder, canReceive: boolean): string {
   if (po.status === 'draft') {
     return `/purchase-orders/new?poId=${po.id}`;
   }
@@ -30,11 +34,19 @@ function getPONavigateTo(po: PurchaseOrder): string {
     return `/purchase-orders/${po.id}/approve`;
   }
   if (
+    (po.status === 'approved' ||
+      po.status === 'ordered' ||
+      po.status === 'partially_received') &&
+    canReceive
+  ) {
+    return `/purchase-orders/${po.id}/receive`;
+  }
+  if (
     po.status === 'approved' ||
     po.status === 'ordered' ||
     po.status === 'partially_received'
   ) {
-    return `/purchase-orders/${po.id}/receive`;
+    return `/purchase-orders/${po.id}`;
   }
   return `/purchase-orders/${po.id}`;
 }
@@ -60,6 +72,7 @@ export function VendorLedgerPage() {
   const navigate = useNavigate();
   const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
+  const canReceivePO = useAppSelector(selectCanReceivePurchaseOrder);
   const canAccess = isAdminOrSuperAdmin || isStoreIncharge;
 
   const vendorsFromStore = useAppSelector(selectVendors);
@@ -330,7 +343,7 @@ export function VendorLedgerPage() {
           ) : (
             <>
               {orders.map((po) => (
-                <POCard key={po.id} po={po} to={getPONavigateTo(po)} />
+                <POCard key={po.id} po={po} to={getPONavigateTo(po, canReceivePO)} />
               ))}
               {hasMore && (
                 <button

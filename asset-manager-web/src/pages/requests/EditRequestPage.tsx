@@ -107,7 +107,7 @@ export function EditRequestPage() {
       itemName: item.name,
       itemSku: item.sku,
       unit: item.unit,
-      itemType: (item.type === 'fuel' ? 'consumable' : item.type) as 'consumable' | 'non_consumable',
+      itemType: item.type,
       categoryId: item.categoryId ?? '',
       categoryName: item.categoryName ?? '',
       imageUrl: item.imageUrl,
@@ -361,7 +361,7 @@ export function EditRequestPage() {
         onClose={() => setItemSelectorOpen(false)}
         onSelect={handleAddItems}
         excludeItemIds={items.map((i) => i.itemId)}
-        allowedItemTypes={['consumable', 'non_consumable']}
+        allowedItemTypes={['consumable', 'non_consumable', 'fuel']}
       />
       {confirmationModal}
     </div>

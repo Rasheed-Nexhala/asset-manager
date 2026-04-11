@@ -296,3 +296,61 @@ describe('ReceivePOPage — success toasts', () => {
     expect(screen.getByRole('alert').textContent).not.toMatch(/Partial receipt saved/i);
   });
 });
+
+describe('ReceivePOPage — prior GRR history', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes('min-width: 768px'),
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    });
+  });
+
+  it('shows Receipts heading and GRR number when PO already has grrReceipts (partial receive)', async () => {
+    const poWithGrr = createApprovedPO({
+      status: 'partially_received',
+      items: [
+        item({
+          itemId: 'item-a',
+          itemName: 'Item A',
+          quantity: 100,
+          receivedQuantity: 50,
+        }),
+        item({
+          itemId: 'item-b',
+          itemName: 'Item B',
+          quantity: 100,
+          receivedQuantity: 0,
+        }),
+      ],
+      grrReceipts: [
+        {
+          grrNumber: 'PO-RCV-2026-0099',
+          receivedAt: '2026-03-01T10:00:00.000Z',
+          receivedBy: 'u2',
+          receivedByName: 'Receiver One',
+          lineItems: [
+            {
+              itemId: 'item-a',
+              itemName: 'Item A',
+              quantityReceived: 50,
+              unit: 'Pcs',
+            },
+          ],
+        },
+      ],
+    });
+    mockGetPOById.mockResolvedValue(poWithGrr);
+
+    renderReceivePage();
+
+    expect(await screen.findByRole('heading', { name: /^Receipts$/i })).toBeTruthy();
+    expect(screen.getByText('PO-RCV-2026-0099')).toBeTruthy();
+    expect(screen.getByText(/ITEMS TO RECEIVE/i)).toBeTruthy();
+  });
+});

@@ -123,9 +123,8 @@ export function ConfirmTransferPage() {
       }
       navigate('/requests/queue');
     } catch (error: unknown) {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to confirm transfer'
-      );
+      const msg = typeof error === 'string' ? error : (error instanceof Error ? error.message : 'Failed to confirm transfer');
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }

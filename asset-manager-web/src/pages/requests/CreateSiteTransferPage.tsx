@@ -120,9 +120,10 @@ export function CreateSiteTransferPage() {
                 itemName: preselectedItem.itemName,
                 itemSku: preselectedItem.itemSku,
                 unit: preselectedItem.unit,
-                itemType: (preselectedItem.itemType === 'fuel'
-                  ? 'consumable'
-                  : preselectedItem.itemType) as 'consumable' | 'non_consumable',
+                itemType: preselectedItem.itemType as
+                  | 'consumable'
+                  | 'non_consumable'
+                  | 'fuel',
                 categoryId: preselectedItem.categoryId,
                 categoryName: preselectedItem.categoryName,
                 imageUrl: preselectedItem.imageUrl,

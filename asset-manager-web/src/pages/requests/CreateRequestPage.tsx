@@ -111,7 +111,7 @@ export function CreateRequestPage() {
           itemName: item.name,
           itemSku: item.sku,
           unit: item.unit,
-          itemType: item.type === 'fuel' ? 'consumable' : item.type,
+          itemType: item.type,
           categoryId: item.categoryId ?? '',
           categoryName: item.categoryName ?? '',
           imageUrl: item.imageUrl,
@@ -287,7 +287,7 @@ export function CreateRequestPage() {
                     itemName: item.name,
                     itemSku: item.sku,
                     unit: item.unit,
-                    itemType: item.type === 'fuel' ? 'consumable' : item.type,
+                    itemType: item.type,
                     categoryId: item.categoryId ?? '',
                     categoryName: item.categoryName ?? '',
                     imageUrl: item.imageUrl,
@@ -359,7 +359,7 @@ export function CreateRequestPage() {
         onClose={() => setItemSelectorOpen(false)}
         onSelect={handleAddItems}
         excludeItemIds={items.map((i) => i.id)}
-        allowedItemTypes={['consumable', 'non_consumable']}
+        allowedItemTypes={['consumable', 'non_consumable', 'fuel']}
       />
     </div>
   );

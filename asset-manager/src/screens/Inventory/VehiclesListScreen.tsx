@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
   FlatList,
   TouchableOpacity,
   RefreshControl,
@@ -20,6 +21,7 @@ import {
 } from '../../store/selectors/authSelectors';
 import { useAppSelector } from '../../store/hooks';
 import { getTotalLitersAssignedToVehicle } from '../../services/firebase/vehicleFuelAssignmentService';
+import { filterVehiclesBySearch } from '../../utils/vehicleNumberUtils';
 
 type Nav = StackNavigationProp<InventoryStackParamList, 'VehiclesList'>;
 
@@ -32,6 +34,12 @@ export const VehiclesListScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [totals, setTotals] = useState<Record<string, number>>({});
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredVehicles = useMemo(
+    () => filterVehiclesBySearch(vehicles, searchQuery),
+    [vehicles, searchQuery]
+  );
 
   const load = useCallback(async () => {
     try {
@@ -98,6 +106,33 @@ export const VehiclesListScreen: React.FC = () => {
         </View>
       )}
 
+      {!loading && vehicles.length > 0 && (
+        <View className="border-b border-[#E2E8F0] bg-white px-4 py-3">
+          <View className="h-12 flex-row items-center rounded-full bg-[#F1F5F9] px-4">
+            <Ionicons name="search" size={20} color="#94A3B8" />
+            <TextInput
+              className="ml-3 flex-1 text-[15px] text-[#0F172A]"
+              placeholder="Search by vehicle number or notes…"
+              placeholderTextColor="#94A3B8"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              accessibilityLabel="Search vehicles"
+              accessibilityRole="search"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchQuery('')}
+                className="h-8 w-8 items-center justify-center"
+                accessibilityLabel="Clear search"
+                accessibilityRole="button"
+              >
+                <Ionicons name="close-circle" size={20} color="#94A3B8" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+
       {loading ? (
         <View className="flex-1 items-center justify-center bg-[#F8FAFC]">
           <ActivityIndicator size="large" color="#1E40AF" />
@@ -109,23 +144,43 @@ export const VehiclesListScreen: React.FC = () => {
             <FlatList
               className="flex-1 pt-3"
               contentContainerClassName="px-4 pb-6"
-              data={vehicles}
+              data={filteredVehicles}
               keyExtractor={(item) => item.id}
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1E40AF" />
               }
               ListEmptyComponent={
-                <View className="items-center px-4 py-12">
-                  <Ionicons name="car-sport-outline" size={56} color="#94A3B8" />
-                  <Text className="mt-4 text-center text-[17px] font-semibold text-[#0F172A]">
-                    No vehicles yet
-                  </Text>
-                  <Text className="mt-2 max-w-md text-center text-[15px] text-[#64748B]">
-                    {canManage
-                      ? 'Add a vehicle to assign fuel from the central store.'
-                      : 'No vehicles registered.'}
-                  </Text>
-                </View>
+                vehicles.length === 0 ? (
+                  <View className="items-center px-4 py-12">
+                    <Ionicons name="car-sport-outline" size={56} color="#94A3B8" />
+                    <Text className="mt-4 text-center text-[17px] font-semibold text-[#0F172A]">
+                      No vehicles yet
+                    </Text>
+                    <Text className="mt-2 max-w-md text-center text-[15px] text-[#64748B]">
+                      {canManage
+                        ? 'Add a vehicle to assign fuel from the central store.'
+                        : 'No vehicles registered.'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View className="items-center px-4 py-12">
+                    <Ionicons name="search" size={56} color="#94A3B8" />
+                    <Text className="mt-4 text-center text-[17px] font-semibold text-[#0F172A]">
+                      No matching vehicles
+                    </Text>
+                    <Text className="mt-2 max-w-md text-center text-[15px] text-[#64748B]">
+                      Try a different search term or clear the search to see all vehicles.
+                    </Text>
+                    <TouchableOpacity
+                      className="mt-6 rounded-[10px] bg-[#1E40AF] px-4 py-2.5"
+                      onPress={() => setSearchQuery('')}
+                      accessibilityRole="button"
+                      accessibilityLabel="Clear search"
+                    >
+                      <Text className="text-[15px] font-semibold text-white">Clear search</Text>
+                    </TouchableOpacity>
+                  </View>
+                )
               }
               renderItem={({ item }) => (
                 <TouchableOpacity

@@ -68,10 +68,19 @@ export const POCard: React.FC<POCardProps> = ({ po, onPress }) => {
         </View>
       </View>
 
-      <View className="border-t border-[#E2E8F0] pt-2 flex-row justify-between items-center">
-        <Text className="text-[13px] text-[#64748B]">
-          {formatDate(po.createdAt)} • {po.createdByName ?? '—'}
-        </Text>
+      <View className="border-t border-[#E2E8F0] pt-3 flex-row justify-between items-center">
+        <View className="flex-col">
+          <Text className="text-[13px] text-[#64748B]">
+            {formatDate(po.createdAt)} • {po.createdByName ?? '—'}
+          </Text>
+          {po.hasPriceUpdates && (
+            <View className="mt-1.5 self-start rounded-full bg-[#B45309]/15 px-2 py-0.5 border border-[#D97706]/30">
+              <Text className="text-[10px] font-semibold text-[#B45309] tracking-wide" allowFontScaling={false}>
+                ⚠️ PRICING ADJUSTED
+              </Text>
+            </View>
+          )}
+        </View>
         {hasAnyPrice && (
           <Text className="text-[15px] font-semibold text-[#0F172A]">
             {formatCurrency(po.totalAmount ?? 0)}

@@ -62,10 +62,17 @@ export function POCard({ po, to }: POCardProps) {
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-slate-200 pt-2">
-        <p className="text-[13px] text-slate-500">
-          {formatDate(po.createdAt)} • {po.createdByName ?? '—'}
-        </p>
+      <div className="flex items-center justify-between border-t border-slate-200 pt-3">
+        <div className="flex flex-col">
+          <p className="text-[13px] text-slate-500">
+            {formatDate(po.createdAt)} • {po.createdByName ?? '—'}
+          </p>
+          {po.hasPriceUpdates && (
+            <span className="mt-1.5 w-max rounded-full bg-amber-600/15 px-2 py-0.5 text-[10px] font-semibold text-amber-700 border border-amber-600/30 tracking-wide">
+              ⚠️ PRICING ADJUSTED
+            </span>
+          )}
+        </div>
         {hasAnyPrice && (
           <span className="text-[15px] font-semibold text-slate-900">
             {formatCurrency(po.totalAmount ?? 0)}

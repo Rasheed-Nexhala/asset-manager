@@ -6,10 +6,14 @@ import {
   type NotificationItem,
 } from '../services/firebase/notificationService';
 import { useAppSelector } from '../store/hooks';
-import { selectUserId } from '../store/selectors/authSelectors';
+import {
+  selectUserId,
+  selectCanReceivePurchaseOrder,
+} from '../store/selectors/authSelectors';
 
 export function NotificationCenterPage() {
   const userId = useAppSelector(selectUserId);
+  const canReceivePO = useAppSelector(selectCanReceivePurchaseOrder);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   useEffect(() => {
@@ -32,9 +36,12 @@ export function NotificationCenterPage() {
       return `/requests/${data.requestId}/process`;
     }
     if ((data?.screen === 'ApprovePO' || data?.screen === 'ReceivePO') && data?.poId) {
-      return data.screen === 'ApprovePO'
-        ? `/purchase-orders/${data.poId}/approve`
-        : `/purchase-orders/${data.poId}/receive`;
+      if (data.screen === 'ApprovePO') {
+        return `/purchase-orders/${data.poId}/approve`;
+      }
+      return canReceivePO
+        ? `/purchase-orders/${data.poId}/receive`
+        : `/purchase-orders/${data.poId}`;
     }
     if (data?.screen === 'PurchaseOrderList') return '/purchase-orders';
     if (data?.screen === 'RequestQueue') return '/requests/queue';
@@ -51,7 +58,7 @@ export function NotificationCenterPage() {
     if (data?.screen === 'InventoryUpdateRequests') return '/inventory/update-requests';
     if (data?.screen === 'Users') return '/admin/users';
     return '/requests/queue';
-  }, []);
+  }, [canReceivePO]);
 
   const handleMarkRead = useCallback(
     (item: NotificationItem) => {

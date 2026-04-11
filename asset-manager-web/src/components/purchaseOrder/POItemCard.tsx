@@ -258,11 +258,6 @@ export function POItemCard({
               {qtyError && (
                 <p className="mt-1 text-[12px] text-red-600 whitespace-pre-wrap">{qtyError}</p>
               )}
-              {entryMode !== 'pieces' && !qtyError && item.quantity > 0 && (
-                <p className="mt-1 text-[12px] text-green-600">
-                  = {item.quantity} exact pieces
-                </p>
-              )}
             </div>
           ) : (
             <p className="h-12 py-3 text-[15px] text-slate-900">
@@ -328,9 +323,34 @@ export function POItemCard({
         </div>
 
         <div>
-          <p className="mb-1.5 text-[15px] text-slate-900">
-            Amount (incl. GST)
-          </p>
+          <div className="flex items-center gap-2 mb-1.5">
+            <p className="text-[15px] text-slate-900">
+              Amount (incl. GST)
+            </p>
+            {item.isPriceUpdated && (
+              <div className="group relative flex items-center cursor-help">
+                <span className="shrink-0 rounded-full bg-amber-600/15 px-2 py-0.5 text-[11px] font-semibold text-amber-600 border border-amber-600/30 flex items-center gap-1">
+                  ⚠️ Price Adjusted
+                </span>
+                {item.priceChangeLog && item.priceChangeLog.length > 0 && (
+                  <div className="absolute bottom-full left-1/2 z-10 mb-2 hidden w-max max-w-xs -translate-x-1/2 flex-col rounded bg-slate-800 px-3 py-2 text-[12px] text-white shadow-lg group-hover:flex">
+                    <p className="mb-1 font-semibold text-slate-200">Price Adjustments (Receipts):</p>
+                    {item.priceChangeLog.map((log, i) => (
+                      <span key={i} className="mb-1">
+                        {new Date(log.date).toLocaleDateString()} — Qty {log.quantityAffected} @ ₹{log.newPrice} 
+                        <span className="text-slate-400 block ml-2">(was ₹{log.oldPrice} — {log.receivedByName})</span>
+                      </span>
+                    ))}
+                    {item.originalUnitPrice !== undefined && (
+                      <p className="mt-1 border-t border-slate-600 pt-1 text-slate-300">
+                        Original Approved PO Price: ₹{item.originalUnitPrice}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           <p className="text-[15px] font-semibold text-slate-900">
             {amountWithGst > 0 ? formatCurrency(amountWithGst) : '—'}
           </p>

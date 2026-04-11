@@ -114,6 +114,12 @@ export const selectCanCreatePurchaseOrder = createSelector(
   (isStoreIncharge, isSuperAdmin) => isStoreIncharge || isSuperAdmin
 );
 
+/** Store Incharge or SuperAdmin may receive POs and record GRR (not regular Admin). */
+export const selectCanReceivePurchaseOrder = createSelector(
+  [selectIsStoreIncharge, selectIsSuperAdmin],
+  (isStoreIncharge, isSuperAdmin) => isStoreIncharge || isSuperAdmin
+);
+
 export const selectIsSiteManager = createSelector(
   [selectUserRoleType],
   (role) => role === 'SiteManager'

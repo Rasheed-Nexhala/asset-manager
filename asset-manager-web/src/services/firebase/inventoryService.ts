@@ -1406,6 +1406,8 @@ export const subscribeInventoryByLocation = (
           locationType: data.locationType,
           locationName: data.locationName,
           quantity: data.quantity,
+          itemType: data.itemType,
+          unit: data.unit,
           lengthPerPiece: data.lengthPerPiece,
           updatedAt: data.updatedAt,
         };
@@ -1508,6 +1510,8 @@ export const getInventoryByItemId = async (
         locationType: data.locationType,
         locationName: data.locationName,
         quantity: data.quantity,
+        itemType: data.itemType,
+        unit: data.unit,
         lengthPerPiece: data.lengthPerPiece,
         updatedAt: data.updatedAt,
       };
@@ -1558,6 +1562,8 @@ export const subscribeInventoryByItemId = (
           locationType: data.locationType,
           locationName: data.locationName,
           quantity: data.quantity,
+          itemType: data.itemType,
+          unit: data.unit,
           lengthPerPiece: data.lengthPerPiece,
           updatedAt: data.updatedAt,
         };

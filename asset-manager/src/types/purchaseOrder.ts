@@ -39,6 +39,20 @@ export interface PurchaseOrderItem {
   orderedUnit?: string;
   orderedQuantity?: number;
   remarks?: string;
+
+  /** The original unit price approved by Admin */
+  originalUnitPrice?: number;
+  /** Becomes true if the price was overridden during receipt */
+  isPriceUpdated?: boolean;
+  /** Audit log of exactly when and by whom the price was altered during receipt */
+  priceChangeLog?: Array<{
+    date: string;
+    oldPrice: number;
+    newPrice: number;
+    receivedBy: string;
+    receivedByName: string;
+    quantityAffected: number;
+  }>;
 }
 
 /**
@@ -57,6 +71,8 @@ export interface PurchaseOrderGrrLineItem {
   itemName: string;
   quantityReceived: number;
   unit?: string;
+  /** Unit price recorded exactly at the moment of this receipt */
+  unitPrice?: number;
 }
 
 /** One goods-receipt register entry (Firestore) */
@@ -118,6 +134,9 @@ export interface PurchaseOrderFirestore {
   gstPercentage: number;
   gstAmount: number;
   totalAmount: number;
+
+  /** Indicates if any line items had their prices updated during receipt */
+  hasPriceUpdates?: boolean;
 
   justification: string;
   expectedDeliveryDate: Timestamp | null;
@@ -189,6 +208,8 @@ export interface PurchaseOrder {
   gstPercentage: number;
   gstAmount: number;
   totalAmount: number;
+
+  hasPriceUpdates?: boolean;
 
   justification: string;
   expectedDeliveryDate: string | null;
@@ -305,7 +326,7 @@ export interface CreatePurchaseOrderData {
  * Data for receiving a PO
  */
 export interface ReceivePOData {
-  receivedQuantities: Array<{ itemId: string; receivedQuantity: number }>;
+  receivedQuantities: Array<{ itemId: string; receivedQuantity: number; unitPrice?: number }>;
   documents: Array<{ type: 'invoice' | 'other'; fileName: string; fileUrl: string }>;
   receivedDate: string;
   receivedNotes?: string;

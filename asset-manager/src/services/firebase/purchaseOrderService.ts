@@ -26,6 +26,7 @@ import { db } from '../../../config/firebase';
 import { getLocationId } from '../../utils/locationUtils';
 import type {
   PurchaseOrder,
+  PurchaseOrderItem,
   PurchaseOrderFirestore,
   PurchaseOrderGrrLineItem,
   PurchaseOrderGrrReceiptFirestore,
@@ -173,8 +174,8 @@ const ensureCanReceive = async (userId: string): Promise<void> => {
     throw new Error('User not found');
   }
   const role = userSnap.data()?.role;
-  if (role !== 'Admin' && role !== 'StoreIncharge' && role !== 'SuperAdmin') {
-    throw new Error('Only Admin, Super Admin, or Store Incharge can receive POs');
+  if (role !== 'StoreIncharge' && role !== 'SuperAdmin') {
+    throw new Error('Only Store Incharge or Super Admin can receive POs');
   }
 };
 
@@ -190,11 +191,13 @@ const normalizeGrrLineItems = (raw: unknown): PurchaseOrderGrrLineItem[] | undef
     if (!itemId) continue;
     const itemName = typeof o.itemName === 'string' ? o.itemName : '';
     const unit = typeof o.unit === 'string' && o.unit ? (o.unit as string) : undefined;
+    const unitPrice = typeof o.unitPrice === 'number' ? o.unitPrice : undefined;
     out.push({
       itemId,
       itemName: itemName || itemId,
       quantityReceived: qty,
       ...(unit ? { unit } : {}),
+      ...(unitPrice !== undefined ? { unitPrice } : {}),
     });
   }
   return out.length > 0 ? out : undefined;
@@ -263,6 +266,9 @@ const normalizePOItemsForRead = (
       orderedUnit: (item.orderedUnit as string | undefined),
       orderedQuantity: (item.orderedQuantity as number | undefined),
       remarks: (item.remarks as string | undefined),
+      originalUnitPrice: (item.originalUnitPrice as number | undefined),
+      isPriceUpdated: (item.isPriceUpdated as boolean | undefined),
+      priceChangeLog: (item.priceChangeLog as PurchaseOrderItem['priceChangeLog'] | undefined),
     };
   });
 
@@ -299,6 +305,7 @@ const mapFirestoreDocToPOFirestore = (
     gstPercentage: data.gstPercentage ?? DEFAULT_GST_PERCENTAGE,
     gstAmount: data.gstAmount ?? 0,
     totalAmount: data.totalAmount ?? 0,
+    hasPriceUpdates: (data.hasPriceUpdates as boolean | undefined),
     justification: data.justification,
     expectedDeliveryDate: data.expectedDeliveryDate ?? null,
     documents: data.documents ?? [],
@@ -925,6 +932,12 @@ export const receivePO = async (
   const receivedByQty = new Map(
     receiveData.receivedQuantities.map((r) => [r.itemId, r.receivedQuantity])
   );
+  
+  const receivedByPrice = new Map(
+    receiveData.receivedQuantities
+      .filter((r) => typeof r.unitPrice === 'number')
+      .map((r) => [r.itemId, r.unitPrice as number])
+  );
 
   let mintedGrrNumber = '';
 
@@ -1067,13 +1080,16 @@ export const receivePO = async (
       itemId: string;
       itemName?: string;
       unit?: string;
+      unitPrice?: number;
     }>) {
       const qty = receivedByQty.get(item.itemId) ?? 0;
       if (qty <= 0) continue;
+      const actualPrice = receivedByPrice.get(item.itemId) ?? item.unitPrice;
       grrLineItems.push({
         itemId: item.itemId,
         itemName: item.itemName ?? item.itemId,
         quantityReceived: qty,
+        unitPrice: actualPrice,
         ...(item.unit ? { unit: item.unit } : {}),
       });
     }
@@ -1086,12 +1102,75 @@ export const receivePO = async (
       ...(grrLineItems.length > 0 ? { lineItems: grrLineItems } : {}),
     };
 
-    const { updatedItems, allFullyReceived } = mapPoItemsAfterReceive(
+    const { updatedItems: purelyQtyUpdatedItems, allFullyReceived } = mapPoItemsAfterReceive(
       poData.items,
       receivedByQty
     );
+    
+    let hasNewPriceUpdates = false;
+
+    const finalUpdatedItems = purelyQtyUpdatedItems.map((item: any) => {
+      const newlyReceivedQty = receivedByQty.get(item.itemId) ?? 0;
+      const actualPrice = receivedByPrice.get(item.itemId);
+      
+      const currentUnitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : 0;
+      const isOverride = actualPrice !== undefined && newlyReceivedQty > 0 && actualPrice !== currentUnitPrice;
+      
+      let newPriceLog = item.priceChangeLog ?? [];
+      const originalUnitPrice = item.originalUnitPrice ?? currentUnitPrice;
+
+      if (isOverride) {
+        hasNewPriceUpdates = true;
+        newPriceLog = [
+          ...newPriceLog,
+          {
+            date: receivedAtTimestamp.toDate().toISOString(),
+            oldPrice: currentUnitPrice,
+            newPrice: actualPrice,
+            receivedBy: userId,
+            receivedByName: userName,
+            quantityAffected: newlyReceivedQty,
+          }
+        ];
+      }
+
+      // Calculate dynamic amount based on historical GRR + unreceived * originalPO
+      let sumOfHistoricalAmounts = 0;
+      let totalReceivedQty = 0;
+      
+      const allGrrs = [...existingGrr, newGrrReceipt];
+      for (const grr of allGrrs) {
+        const line = grr.lineItems?.find((l: any) => l.itemId === item.itemId);
+        if (line) {
+          const qty = line.quantityReceived || 0;
+          const price = line.unitPrice ?? originalUnitPrice;
+          sumOfHistoricalAmounts += qty * price;
+          totalReceivedQty += qty;
+        }
+      }
+      
+      const unreceivedQty = Math.max(0, (item.quantity ?? 0) - totalReceivedQty);
+      const newAmount = sumOfHistoricalAmounts + (unreceivedQty * originalUnitPrice);
+
+      const gstPct = item.gstPercentage ?? DEFAULT_GST_PERCENTAGE;
+      const newGstAmount =
+        gstPct > 0 ? Math.round((newAmount * gstPct) / 100) : 0;
+
+      return {
+        ...item,
+        originalUnitPrice,
+        unitPrice: isOverride ? actualPrice : currentUnitPrice,
+        isPriceUpdated: isOverride || Boolean(item.isPriceUpdated),
+        priceChangeLog: newPriceLog,
+        amount: newAmount,
+        gstAmount: newGstAmount,
+      };
+    });
 
     const newStatus = allFullyReceived ? 'received' : 'partially_received';
+    
+    // Recalculate PO totals because item amounts could have shifted
+    const { subtotal, gstAmount, totalAmount } = calculateTotals(finalUpdatedItems);
 
     transaction.set(grrCounterRef, {
       year: grrYear,
@@ -1106,7 +1185,11 @@ export const receivePO = async (
       receivedByName: userName,
       receivedNotes: receiveData.receivedNotes?.trim() ?? null,
       documents: [...(poData.documents ?? []), ...documents],
-      items: updatedItems,
+      items: finalUpdatedItems,
+      subtotal,
+      gstAmount,
+      totalAmount,
+      ...(hasNewPriceUpdates || poData.hasPriceUpdates ? { hasPriceUpdates: true } : {}),
       grrReceipts: [...existingGrr, newGrrReceipt],
       updatedAt: serverTimestamp(),
     });

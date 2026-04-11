@@ -296,6 +296,52 @@ describe('ReceivePOScreen', () => {
     expect(screen.getByText('CONFIRM & UPDATE INVENTORY')).toBeTruthy();
   });
 
+  it('shows prior Receipts section when PO has grrReceipts (partial receive)', async () => {
+    renderWithStore(<ReceivePOScreen />, defaultPreloadedState);
+
+    mockGetPOByIdResolve!(
+      createMockPO({
+        status: 'partially_received',
+        items: [
+          {
+            itemId: 'item1',
+            itemName: 'Steel Bar',
+            itemSku: 'SKU-001',
+            isExistingItem: true,
+            quantity: 10,
+            unitPrice: 500,
+            amount: 5000,
+            gstPercentage: 18,
+            receivedQuantity: 5,
+            unit: 'Pcs',
+          },
+        ],
+        grrReceipts: [
+          {
+            grrNumber: 'PO-RCV-2026-0099',
+            receivedAt: '2026-03-01T10:00:00.000Z',
+            receivedBy: 'u2',
+            receivedByName: 'Receiver One',
+            lineItems: [
+              {
+                itemId: 'item1',
+                itemName: 'Steel Bar',
+                quantityReceived: 5,
+                unit: 'Pcs',
+              },
+            ],
+          },
+        ],
+      })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Receipts')).toBeTruthy();
+    });
+    expect(screen.getByText('PO-RCV-2026-0099')).toBeTruthy();
+    expect(screen.getByText('ITEMS TO RECEIVE')).toBeTruthy();
+  });
+
   it('submit dispatches receivePO thunk and shows success Alert', async () => {
     renderWithStore(<ReceivePOScreen />, defaultPreloadedState);
 

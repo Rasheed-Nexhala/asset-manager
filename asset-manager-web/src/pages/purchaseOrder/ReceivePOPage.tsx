@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { Icon } from '../../components/shared/Icon';
 import { useToast } from '../../contexts/ToastContext';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
@@ -9,10 +9,12 @@ import { getItemById } from '../../services/firebase/inventoryService';
 import { uploadPOInvoice } from '../../services/firebase/storageService';
 import { receivePO } from '../../store/thunks/purchaseOrderThunks';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { PODocumentCard } from '../../components/purchaseOrder';
+import { PODocumentCard, GrrReceiptsList } from '../../components/purchaseOrder';
 import {
   selectUserId,
   selectUserDisplayName,
+  selectCanReceivePurchaseOrder,
+  selectRoleLoading,
 } from '../../store/selectors/authSelectors';
 import type { PurchaseOrder } from '../../types/purchaseOrder';
 import type { Item } from '../../types/inventory';
@@ -27,6 +29,8 @@ export function ReceivePOPage() {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
+  const roleLoading = useAppSelector(selectRoleLoading);
+  const canReceivePO = useAppSelector(selectCanReceivePurchaseOrder);
 
   const [po, setPo] = useState<PurchaseOrder | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,6 +44,7 @@ export function ReceivePOPage() {
   const [receivedNotes, setReceivedNotes] = useState('');
   const [uploadingInvoice, setUploadingInvoice] = useState(false);
   const [receivedQtys, setReceivedQtys] = useState<Record<string, string>>({});
+  const [receivedPrices, setReceivedPrices] = useState<Record<string, string>>({});
   const [inventoryItemsMap, setInventoryItemsMap] = useState<Record<string, Item>>({});
 
   const fetchInventoryDetails = useCallback(async (itemIds: string[]) => {
@@ -71,12 +76,15 @@ export function ReceivePOPage() {
         if (p) {
           setPo(p);
           const initial: Record<string, string> = {};
+          const initialPrices: Record<string, string> = {};
           p.items.forEach((item) => {
             const received = item.receivedQuantity ?? 0;
             const remaining = Math.max(0, item.quantity - received);
             initial[item.itemId] = remaining > 0 ? String(remaining) : '0';
+            initialPrices[item.itemId] = String(item.unitPrice ?? 0);
           });
           setReceivedQtys(initial);
+          setReceivedPrices(initialPrices);
           setLoadError(null);
         } else {
           setLoadError('Purchase order not found');
@@ -149,6 +157,12 @@ export function ReceivePOPage() {
         );
         return;
       }
+      const rawPrice = receivedPrices[item.itemId] ?? '';
+      const price = parseFloat(rawPrice);
+      if (isNaN(price) || price < 0) {
+        toast.error(`Enter a valid unit price for "${item.itemName}".`);
+        return;
+      }
     }
 
     const atLeastOne = po.items.some((item) => {
@@ -174,6 +188,9 @@ export function ReceivePOPage() {
               receivedQuantity: parseInt(
                 receivedQtys[item.itemId] ?? '0',
                 10
+              ),
+              unitPrice: parseFloat(
+                receivedPrices[item.itemId] ?? String(item.unitPrice)
               ),
             })),
             documents: invoiceFiles.map((f) => ({
@@ -207,6 +224,7 @@ export function ReceivePOPage() {
     userId,
     userName,
     receivedQtys,
+    receivedPrices,
     invoiceFiles,
     receivedDate,
     receivedNotes,
@@ -234,6 +252,33 @@ export function ReceivePOPage() {
         };
       })
     : [];
+
+  if (roleLoading) {
+    return (
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="flex items-center gap-2 text-[15px] font-medium text-slate-600"
+        >
+          <Icon name="arrow-left" className="h-5 w-5" />
+          Back
+        </button>
+        <div className="flex flex-col items-center justify-center py-16">
+          <LoadingSpinner className="h-10 w-10 text-blue-800" />
+          <p className="mt-4 text-[15px] text-slate-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!canReceivePO) {
+    return poId ? (
+      <Navigate to={`/purchase-orders/${poId}`} replace />
+    ) : (
+      <Navigate to="/purchase-orders" replace />
+    );
+  }
 
   if (loading || !po) {
     return (
@@ -357,6 +402,12 @@ export function ReceivePOPage() {
         </p>
       </div>
 
+      {(po.grrReceipts?.length ?? 0) > 0 && (
+        <div className="rounded-[10px] border border-slate-200 bg-white p-4 lg:p-6">
+          <GrrReceiptsList receipts={po.grrReceipts} />
+        </div>
+      )}
+
       <div>
         <h2 className="mb-1 text-[17px] font-semibold text-slate-900">
           ITEMS TO RECEIVE
@@ -425,54 +476,69 @@ export function ReceivePOPage() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <span className="flex-1 text-[14px] text-slate-500">
-                    Received qty ({item.unit || 'Pcs'})
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const current =
-                          parseInt(receivedQtys[item.itemId] ?? '0', 10) || 0;
-                        if (current > 0) {
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex-1 text-[14px] text-slate-500">
+                      Received qty ({item.unit || 'Pcs'})
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current =
+                            parseInt(receivedQtys[item.itemId] ?? '0', 10) || 0;
+                          if (current > 0) {
+                            setReceivedQtys((prev) => ({
+                              ...prev,
+                              [item.itemId]: String(current - 1),
+                            }));
+                          }
+                        }}
+                        className="flex h-12 w-12 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100"
+                      >
+                        <Icon name="minus" className="h-4 w-4 text-slate-500" />
+                      </button>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={raw}
+                        onChange={(e) => {
+                          const cleaned = e.target.value.replace(/[^0-9]/g, '');
                           setReceivedQtys((prev) => ({
                             ...prev,
-                            [item.itemId]: String(current - 1),
+                            [item.itemId]: cleaned,
                           }));
-                        }
-                      }}
-                      className="flex h-12 w-12 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100"
-                    >
-                      <Icon name="minus" className="h-4 w-4 text-slate-500" />
-                    </button>
+                        }}
+                        className="h-12 w-16 rounded-lg border border-slate-200 bg-white text-center text-[15px] font-semibold text-slate-900"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current =
+                            parseInt(receivedQtys[item.itemId] ?? '0', 10) || 0;
+                          setReceivedQtys((prev) => ({
+                            ...prev,
+                            [item.itemId]: String(current + 1),
+                          }));
+                        }}
+                        className="flex h-12 w-12 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100"
+                      >
+                        <Icon name="plus" className="h-4 w-4 text-slate-500" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    <span className="flex-1 text-[14px] text-slate-500">
+                      Unit Price
+                    </span>
                     <input
-                      type="text"
-                      inputMode="numeric"
-                      value={raw}
-                      onChange={(e) => {
-                        const cleaned = e.target.value.replace(/[^0-9]/g, '');
-                        setReceivedQtys((prev) => ({
-                          ...prev,
-                          [item.itemId]: cleaned,
-                        }));
-                      }}
-                      className="h-12 w-16 rounded-lg border border-slate-200 bg-white text-center text-[15px] font-semibold text-slate-900"
+                      type="number"
+                      step="0.01"
+                      value={receivedPrices[item.itemId] ?? ''}
+                      onChange={(e) => setReceivedPrices((prev) => ({ ...prev, [item.itemId]: e.target.value }))}
+                      className="h-12 w-28 rounded-lg border border-slate-200 bg-white text-center text-[15px] font-semibold text-slate-900 focus:border-blue-800 focus:outline-none focus:ring-1 focus:ring-blue-800"
                     />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const current =
-                          parseInt(receivedQtys[item.itemId] ?? '0', 10) || 0;
-                        setReceivedQtys((prev) => ({
-                          ...prev,
-                          [item.itemId]: String(current + 1),
-                        }));
-                      }}
-                      className="flex h-12 w-12 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100"
-                    >
-                      <Icon name="plus" className="h-4 w-4 text-slate-500" />
-                    </button>
                   </div>
                 </div>
               </div>
@@ -605,8 +671,7 @@ export function ReceivePOPage() {
             .map((u, i) => (
               <div key={i} className="mb-2">
                 <p className="text-[14px] text-slate-900">
-                  • {u.itemName} — {u.currentQty} → {u.newQty} (+{u.receivedQty}{' '}
-                  of {u.remainingQty ?? u.orderedQty} expected)
+                  • {u.itemName} — {u.currentQty} → {u.newQty} (+{u.receivedQty})
                 </p>
               </div>
             ))}

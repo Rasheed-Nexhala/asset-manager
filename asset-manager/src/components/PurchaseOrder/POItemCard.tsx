@@ -191,9 +191,6 @@ export const POItemCard: React.FC<POItemCardProps> = ({
                 }`}
               />
               {qtyError && <Text className="text-[12px] text-[#DC2626] mt-1">{qtyError}</Text>}
-              {entryMode !== 'pieces' && !qtyError && item.quantity > 0 && (
-                <Text className="text-[12px] text-[#16A34A] mt-1">= {item.quantity} exact pieces</Text>
-              )}
             </View>
           ) : (
             <View className="h-12 justify-center">
@@ -257,14 +254,45 @@ export const POItemCard: React.FC<POItemCardProps> = ({
         </View>
 
         <View className="gap-1.5">
-          <Text className="text-[15px] text-[#0F172A]">
-            Amount (incl. GST)
-          </Text>
+          <View className="flex-row items-center gap-2">
+            <Text className="text-[15px] text-[#0F172A]">
+              Amount (incl. GST)
+            </Text>
+            {item.isPriceUpdated && (
+              <View className="bg-[#D97706]/15 rounded-full px-2 py-0.5 border border-[#D97706]/30 flex-row items-center gap-1">
+                <Text className="text-[10px] font-semibold text-[#D97706]">⚠️ Price Adjusted</Text>
+              </View>
+            )}
+          </View>
           <View className="h-12 justify-center">
             <Text className="text-[15px] font-semibold text-[#0F172A]">
               {amountWithGst > 0 ? formatCurrency(amountWithGst) : '—'}
             </Text>
           </View>
+          {item.isPriceUpdated && (
+            <View className="mt-1 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 gap-1">
+              {item.originalUnitPrice !== undefined && (
+                <Text className="text-[12px] text-[#92400E] font-medium">
+                  Original Approved Price: {formatCurrency(item.originalUnitPrice)}
+                </Text>
+              )}
+              {item.priceChangeLog && item.priceChangeLog.length > 0 && (
+                <>
+                  <Text className="text-[11px] text-[#92400E] font-semibold mt-0.5">Price Adjustments (Receipts):</Text>
+                  {item.priceChangeLog.map((log, i) => (
+                    <View key={i} className="ml-1">
+                      <Text className="text-[11px] text-[#78350F]">
+                        {new Date(log.date).toLocaleDateString('en-IN')} — Qty {log.quantityAffected} @ {formatCurrency(log.newPrice)}
+                      </Text>
+                      <Text className="text-[11px] text-[#A16207]">
+                        {'  '}(was {formatCurrency(log.oldPrice)} · {log.receivedByName})
+                      </Text>
+                    </View>
+                  ))}
+                </>
+              )}
+            </View>
+          )}
         </View>
 
         {editable && onRemarksChange ? (

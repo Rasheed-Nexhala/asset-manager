@@ -25,10 +25,13 @@ import {
   selectPurchaseOrderHasMore,
   selectPurchaseOrderError,
 } from '../../store/selectors/purchaseOrderSelectors';
-import { selectCanCreatePurchaseOrder } from '../../store/selectors/authSelectors';
+import {
+  selectCanCreatePurchaseOrder,
+  selectCanReceivePurchaseOrder,
+} from '../../store/selectors/authSelectors';
 import type { PurchaseOrder } from '../../types/purchaseOrder';
 
-function getPONavigateTo(po: PurchaseOrder): string {
+function getPONavigateTo(po: PurchaseOrder, canReceive: boolean): string {
   if (po.status === 'draft') {
     return `/purchase-orders/new?poId=${po.id}`;
   }
@@ -36,11 +39,19 @@ function getPONavigateTo(po: PurchaseOrder): string {
     return `/purchase-orders/${po.id}/approve`;
   }
   if (
+    (po.status === 'approved' ||
+      po.status === 'ordered' ||
+      po.status === 'partially_received') &&
+    canReceive
+  ) {
+    return `/purchase-orders/${po.id}/receive`;
+  }
+  if (
     po.status === 'approved' ||
     po.status === 'ordered' ||
     po.status === 'partially_received'
   ) {
-    return `/purchase-orders/${po.id}/receive`;
+    return `/purchase-orders/${po.id}`;
   }
   return `/purchase-orders/${po.id}`;
 }
@@ -51,6 +62,7 @@ export function PurchaseOrderListPage() {
   const [retryTrigger, setRetryTrigger] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
   const canCreatePO = useAppSelector(selectCanCreatePurchaseOrder);
+  const canReceivePO = useAppSelector(selectCanReceivePurchaseOrder);
 
   const orders = useAppSelector((state) =>
     selectFilteredPurchaseOrdersForViewer(state, searchQuery)
@@ -312,7 +324,7 @@ export function PurchaseOrderListPage() {
                   >
                     <td className="px-4 py-3">
                       <Link
-                        to={getPONavigateTo(po)}
+                        to={getPONavigateTo(po, canReceivePO)}
                         className="text-[15px] font-semibold text-blue-800 hover:underline"
                       >
                         {po.poNumber ?? '—'}
@@ -349,7 +361,7 @@ export function PurchaseOrderListPage() {
           {/* Mobile: Cards */}
           <div className="space-y-3 md:hidden">
             {orders.map((po) => (
-              <POCard key={po.id} po={po} to={getPONavigateTo(po)} />
+              <POCard key={po.id} po={po} to={getPONavigateTo(po, canReceivePO)} />
             ))}
           </div>
 

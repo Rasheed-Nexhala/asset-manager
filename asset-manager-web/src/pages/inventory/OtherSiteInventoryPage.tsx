@@ -128,7 +128,7 @@ export function OtherSiteInventoryPage() {
             itemName: entry.itemName,
             itemSku: entry.itemSku,
             unit: item.unit,
-            itemType: item.type === 'fuel' ? 'consumable' : item.type,
+            itemType: item.type,
             categoryId: item.categoryId,
             categoryName: item.categoryName,
             imageUrl: item.imageUrl,

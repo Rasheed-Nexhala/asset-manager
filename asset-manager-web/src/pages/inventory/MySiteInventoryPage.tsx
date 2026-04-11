@@ -23,12 +23,14 @@ import {
 } from '../../services/firebase/inventoryService';
 import { getLocationId } from '../../utils/locationUtils';
 import { runNonCriticalTask } from '../../utils/nonCriticalTask';
+import { exportSiteInventoryThunk, fetchItems } from '../../store/thunks/inventoryThunks';
 import type { InventoryEntry, ItemType } from '../../types/inventory';
 import type { Site } from '../../types/sites';
 import { InventorySubNav, ManagedSiteSwitcher } from '../../components/inventory';
 import { InventoryListItem } from '../../components/inventory/InventoryListItem';
 import { Icon } from '../../components/shared/Icon';
 import { InventoryLoadingState } from '../../components/shared/InventoryLoadingState';
+import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 
 export function MySiteInventoryPage() {
   const dispatch = useAppDispatch();
@@ -41,6 +43,7 @@ export function MySiteInventoryPage() {
   const effectiveSiteId = useAppSelector(selectAssignedSiteIdForUser(userId));
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     dispatch(fetchSites());
@@ -89,6 +92,12 @@ export function MySiteInventoryPage() {
       .catch(() => {});
   }, [siteId, dispatch]);
 
+  useEffect(() => {
+    if (items.length === 0) {
+      dispatch(fetchItems(undefined));
+    }
+  }, [dispatch, items.length]);
+
   const siteLocationId = currentSite ? getLocationId('site', currentSite.id) : '';
   const inventoryEntries = useAppSelector(selectInventoryByLocation(siteLocationId));
 
@@ -104,8 +113,8 @@ export function MySiteInventoryPage() {
         return {
           entry,
           item,
-          type: (item?.type || 'consumable') as ItemType,
-          unit: item?.unit || 'piece',
+          type: (entry.itemType ?? item?.type ?? 'consumable') as ItemType,
+          unit: entry.unit ?? item?.unit ?? 'piece',
           imageUrl: item?.imageUrl,
         };
       });
@@ -120,6 +129,24 @@ export function MySiteInventoryPage() {
       return itemName.includes(query) || itemSku.includes(query);
     });
   }, [enrichedInventory, searchQuery]);
+
+  const handleExport = useCallback(async () => {
+    if (!currentSite || !effectiveSiteId) return;
+    setIsExporting(true);
+    try {
+      await dispatch(
+        exportSiteInventoryThunk({
+          locationId: getLocationId('site', effectiveSiteId),
+          siteName: currentSite.name,
+          inventoryEntries: filteredInventory,
+        })
+      ).unwrap();
+    } catch {
+      // Error is surfaced by the thunk (e.g. toast)
+    } finally {
+      setIsExporting(false);
+    }
+  }, [currentSite, effectiveSiteId, dispatch, filteredInventory]);
 
   if (sitesLoading) {
     return (
@@ -151,12 +178,27 @@ export function MySiteInventoryPage() {
     <div className="flex flex-col h-full">
       <InventorySubNav />
       <div className="flex-1 overflow-y-auto">
-        <div className="px-4 pt-3">
-          <ManagedSiteSwitcher
-            managedSites={managedSites}
-            activeSiteId={effectiveSiteId}
-            onSiteChange={handleWorkingSiteChange}
-          />
+        <div className="px-4 pt-3 flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <ManagedSiteSwitcher
+              managedSites={managedSites}
+              activeSiteId={effectiveSiteId}
+              onSiteChange={handleWorkingSiteChange}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={isExporting}
+            className="w-12 h-12 shrink-0 flex items-center justify-center rounded-[10px] hover:bg-slate-100 transition-colors"
+            aria-label="Export site inventory"
+          >
+            {isExporting ? (
+              <LoadingSpinner className="w-5 h-5 text-blue-800" />
+            ) : (
+              <Icon name="arrow-down-tray" className="w-5 h-5 text-blue-800" />
+            )}
+          </button>
         </div>
         <div className="px-4 pt-4 pb-3">
           <div className="bg-slate-100 rounded-full h-12 px-4 flex items-center gap-3">

@@ -25,7 +25,6 @@ import {
 } from '../../services/firebase/categoryService';
 import type {
   Item,
-  Category,
   InventoryEntry,
   CreateItemData,
   UpdateItemData,
@@ -42,8 +41,9 @@ export const fetchItems = createAsyncThunk(
     try {
       const items = await listItems(filters);
       return items;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch items');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch items';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -69,8 +69,9 @@ export const fetchItemsPaginated = createAsyncThunk(
         totalCount: countResult,
         lastDoc: listResult.lastDoc,
       };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch items');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch items';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -99,8 +100,9 @@ export const loadMoreItems = createAsyncThunk(
         items: result.items,
         lastDoc: result.lastDoc,
       };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to load more items');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load more items';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -117,8 +119,9 @@ export const fetchItemById = createAsyncThunk(
         return rejectWithValue(`Item with ID ${itemId} not found`);
       }
       return item;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch item');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch item';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -157,7 +160,7 @@ export const createItem = createAsyncThunk(
         throw new Error('Failed to retrieve created item');
       }
       return createdItem;
-    } catch (error: any) {
+    } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
       // Handle service-level duplicate SKU error (checkSkuExists throws before Firestore)
       if (
         error?.message?.includes('SKU') &&
@@ -212,7 +215,7 @@ export const updateItem = createAsyncThunk(
         throw new Error('Failed to retrieve updated item');
       }
       return updatedItem;
-    } catch (error: any) {
+    } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
       // Handle duplicate SKU error (same as createItem)
       if (
         error?.message?.includes('SKU') &&
@@ -234,8 +237,9 @@ export const deleteItem = createAsyncThunk(
     try {
       await deleteItemService(itemId);
       return itemId;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to delete item');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete item';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -335,8 +339,9 @@ export const fetchInventoryByLocation = createAsyncThunk(
         locationId,
         inventory,
       };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch inventory by location');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch inventory by location';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -350,8 +355,9 @@ export const fetchCategories = createAsyncThunk(
     try {
       const categories = await listCategories();
       return categories;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch categories');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch categories';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -370,8 +376,9 @@ export const createCategory = createAsyncThunk(
         throw new Error('Failed to retrieve created category');
       }
       return createdCategory;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to create category');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create category';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -390,8 +397,9 @@ export const updateCategory = createAsyncThunk(
         throw new Error('Failed to retrieve updated category');
       }
       return updatedCategory;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to update category');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update category';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -405,8 +413,9 @@ export const deleteCategory = createAsyncThunk(
     try {
       await deleteCategoryService(categoryId);
       return categoryId;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to delete category');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete category';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -447,6 +456,60 @@ export const exportInventoryThunk = createAsyncThunk(
       return true;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to export inventory';
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+/**
+ * Export site inventory to CSV
+ */
+export const exportSiteInventoryThunk = createAsyncThunk(
+  'inventory/exportSite',
+  async (
+    {
+      siteName,
+      inventoryEntries,
+    }: {
+      locationId: string;
+      siteName: string;
+      inventoryEntries: {
+        entry: InventoryEntry;
+        item?: Item;
+        type: string;
+        unit: string;
+      }[];
+    },
+    { rejectWithValue }
+  ) => {
+    try {
+      const header = 'Item Name,SKU,Category,Type,Unit,System Quantity,Physical Count,Variance\n';
+
+      const escapeCsvField = (value: string | number | null | undefined): string =>
+        `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+      const rows = inventoryEntries
+        .map(({ entry, item, type, unit }) => {
+          return [
+            entry?.itemName,
+            entry?.itemSku,
+            item?.categoryName || 'Uncategorized',
+            type,
+            unit,
+            entry?.quantity,
+            '', // Physical Count
+            '', // Variance
+          ]
+            .map(escapeCsvField)
+            .join(',');
+        })
+        .join('\n');
+
+      const fileName = `inventory_${siteName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`;
+      await saveCsvAndShare(header + rows, fileName);
+      return true;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to export site inventory';
       return rejectWithValue(errorMessage);
     }
   }

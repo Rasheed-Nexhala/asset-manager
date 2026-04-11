@@ -39,7 +39,10 @@ import {
   selectPurchaseOrderHasMore,
   selectPurchaseOrderError,
 } from '../../store/selectors/purchaseOrderSelectors';
-import { selectCanCreatePurchaseOrder } from '../../store/selectors/authSelectors';
+import {
+  selectCanCreatePurchaseOrder,
+  selectCanReceivePurchaseOrder,
+} from '../../store/selectors/authSelectors';
 import type { PurchaseOrder } from '../../types/purchaseOrder';
 import type { PurchaseOrderStackParamList } from '../../navigation/PurchaseOrderStackParamList';
 
@@ -68,6 +71,7 @@ export const PurchaseOrderListScreen: React.FC = () => {
   const error = useAppSelector(selectPurchaseOrderError);
   const filters = useAppSelector(selectPurchaseOrderFilters);
   const canCreatePO = useAppSelector(selectCanCreatePurchaseOrder);
+  const canReceivePO = useAppSelector(selectCanReceivePurchaseOrder);
 
   // Fetch purchase orders with pagination when screen is focused or filters change
   useEffect(() => {
@@ -109,13 +113,20 @@ export const PurchaseOrderListScreen: React.FC = () => {
         navigation.navigate('CreatePO', { poId: po.id });
       } else if (po.status === 'pending_approval') {
         navigation.navigate('ApprovePO', { poId: po.id });
-      } else if (po.status === 'approved' || po.status === 'ordered' || po.status === 'partially_received') {
+      } else if (
+        (po.status === 'approved' || po.status === 'ordered' || po.status === 'partially_received') &&
+        canReceivePO
+      ) {
         navigation.navigate('ReceivePO', { poId: po.id });
+      } else if (
+        po.status === 'approved' || po.status === 'ordered' || po.status === 'partially_received'
+      ) {
+        navigation.navigate('ApprovePO', { poId: po.id });
       } else {
         navigation.navigate('ApprovePO', { poId: po.id });
       }
     },
-    [navigation]
+    [navigation, canReceivePO]
   );
 
   const renderFilterChip = useCallback(

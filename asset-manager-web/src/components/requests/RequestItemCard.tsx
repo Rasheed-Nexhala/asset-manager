@@ -180,7 +180,11 @@ export function RequestItemCard({
             <span className="text-[13px] text-slate-500">{item.itemSku}</span>
             <span className="w-1 h-1 rounded-full bg-slate-500" />
             <span className="text-[13px] text-slate-500">
-              {item.itemType === 'consumable' ? 'Consumable' : 'Non-Consumable'}
+              {item.itemType === 'consumable'
+                ? 'Consumable'
+                : item.itemType === 'fuel'
+                  ? 'Fuel'
+                  : 'Non-Consumable'}
             </span>
           </div>
 

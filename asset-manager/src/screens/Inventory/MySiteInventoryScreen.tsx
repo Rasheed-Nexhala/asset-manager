@@ -28,6 +28,7 @@ import { setInventoryForLocation } from '../../store/slices/inventorySlice';
 import { fetchSites, setSites } from '../../store/slices/sitesSlice';
 import { subscribeToSites } from '../../services/firebase/siteService';
 import { subscribeInventoryByLocation, getInventoryByLocation } from '../../services/firebase/inventoryService';
+import { exportSiteInventoryThunk, fetchItems } from '../../store/thunks/inventoryThunks';
 import { ScreenLayout, ScreenHeader } from '../../components';
 import { InventoryListItem } from '../../components/Inventory';
 import { getLocationId } from '../../utils/locationUtils';
@@ -63,6 +64,7 @@ export const MySiteInventoryScreen: React.FC = () => {
   // Local state
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showOtherSitesModal, setShowOtherSitesModal] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
   
   // Fetch sites and set up real-time listener
   useEffect(() => {
@@ -136,6 +138,12 @@ export const MySiteInventoryScreen: React.FC = () => {
     }, [siteId, dispatch])
   );
   
+  useEffect(() => {
+    if (items.length === 0) {
+      dispatch(fetchItems());
+    }
+  }, [dispatch, items.length]);
+
   // Get inventory for current site (standardized location ID format)
   // Memoize selector to avoid "new reference" warning - only recreate when siteLocationId changes
   const siteLocationId = currentSite ? getLocationId('site', currentSite.id) : '';
@@ -164,8 +172,8 @@ export const MySiteInventoryScreen: React.FC = () => {
         return {
           entry,
           item,
-          type: item?.type || 'consumable' as ItemType,
-          unit: item?.unit || 'piece',
+          type: (entry.itemType ?? item?.type ?? 'consumable') as ItemType,
+          unit: entry.unit ?? item?.unit ?? 'piece',
           imageUrl: item?.imageUrl,
         };
       });
@@ -214,6 +222,24 @@ export const MySiteInventoryScreen: React.FC = () => {
     setShowOtherSitesModal(false);
   }, []);
   
+  const handleExport = useCallback(async () => {
+    if (!currentSite) return;
+    setIsExporting(true);
+    try {
+      await dispatch(
+        exportSiteInventoryThunk({
+          locationId: siteLocationId,
+          siteName: currentSite.name,
+          inventoryEntries,
+        })
+      ).unwrap();
+    } catch (error) {
+      // Error is handled by thunk
+    } finally {
+      setIsExporting(false);
+    }
+  }, [dispatch, currentSite, siteLocationId, inventoryEntries]);
+  
   if (sitesLoading) {
     return (
       <ScreenLayout edges={['top']}>
@@ -253,15 +279,21 @@ export const MySiteInventoryScreen: React.FC = () => {
         title={`My Inventory`}
         showBack
         onBackPress={() => navigation.goBack()}
-        rightAction={
-          otherSites.length > 0
-            ? {
-                icon: 'business-outline',
+        rightActions={[
+          ...(otherSites.length > 0
+            ? [{
+                icon: 'business-outline' as const,
                 onPress: handleOpenOtherSitesModal,
                 accessibilityLabel: 'View inventory at other sites',
-              }
-            : undefined
-        }
+              }]
+            : []),
+          {
+            icon: 'download-outline' as const,
+            onPress: handleExport,
+            accessibilityLabel: 'Export site inventory',
+            loading: isExporting,
+          }
+        ]}
       />
 
       <ScrollView

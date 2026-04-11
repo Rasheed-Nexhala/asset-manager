@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { FormField } from '../../components/FormField';
-import { POReceiptSummary } from '../../components/PurchaseOrder';
+import { POReceiptSummary, GrrReceiptsSection } from '../../components/PurchaseOrder';
 import { printPurchaseOrder } from '../../utils/poPdfUtils';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
 import { getItemById } from '../../services/firebase/inventoryService';
@@ -26,6 +26,8 @@ import { receivePO } from '../../store/thunks/purchaseOrderThunks';
 import {
   selectUserId,
   selectUserDisplayName,
+  selectCanReceivePurchaseOrder,
+  selectRoleLoading,
 } from '../../store/selectors/authSelectors';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 
@@ -46,6 +48,8 @@ export const ReceivePOScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
+  const roleLoading = useAppSelector(selectRoleLoading);
+  const canReceivePO = useAppSelector(selectCanReceivePurchaseOrder);
 
   const [po, setPo] = useState<PurchaseOrder | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,6 +66,7 @@ export const ReceivePOScreen: React.FC = () => {
   const [uploadingInvoice, setUploadingInvoice] = useState(false);
   // Per-item received quantities — pre-filled with ordered qty, editable by user
   const [receivedQtys, setReceivedQtys] = useState<Record<string, string>>({});
+  const [receivedPrices, setReceivedPrices] = useState<Record<string, string>>({});
   const [inventoryItemsMap, setInventoryItemsMap] = useState<Record<string, any>>({});
 
   // Helper to fetch details for multiple items
@@ -97,12 +102,15 @@ export const ReceivePOScreen: React.FC = () => {
           setPo(p);
           // Pre-fill each item with its remaining quantity
           const initial: Record<string, string> = {};
+          const initialPrices: Record<string, string> = {};
           p.items.forEach((item) => {
             const received = item.receivedQuantity ?? 0;
             const remaining = Math.max(0, item.quantity - received);
             initial[item.itemId] = remaining > 0 ? String(remaining) : '0';
+            initialPrices[item.itemId] = String(item.unitPrice ?? 0);
           });
           setReceivedQtys(initial);
+          setReceivedPrices(initialPrices);
           setLoadError(null);
         } else {
           setLoadError('Purchase order not found');
@@ -175,6 +183,12 @@ export const ReceivePOScreen: React.FC = () => {
         Alert.alert('Invalid Quantity', `Enter a valid quantity (0 or more) for "${item.itemName}".`);
         return;
       }
+      const rawPrice = receivedPrices[item.itemId] ?? '';
+      const price = parseFloat(rawPrice);
+      if (isNaN(price) || price < 0) {
+        Alert.alert('Invalid Price', `Enter a valid unit price for "${item.itemName}".`);
+        return;
+      }
     }
 
     const atLeastOne = po.items.some((item) => {
@@ -196,6 +210,7 @@ export const ReceivePOScreen: React.FC = () => {
             receivedQuantities: po.items.map((item) => ({
               itemId: item.itemId,
               receivedQuantity: parseInt(receivedQtys[item.itemId] ?? '0', 10),
+              unitPrice: parseFloat(receivedPrices[item.itemId] ?? String(item.unitPrice)),
             })),
             documents: invoiceFiles.map((f) => ({
               type: 'invoice' as const,
@@ -229,6 +244,7 @@ export const ReceivePOScreen: React.FC = () => {
     userId,
     userName,
     receivedQtys,
+    receivedPrices,
     invoiceFiles,
     receivedDate,
     receivedNotes,
@@ -251,6 +267,31 @@ export const ReceivePOScreen: React.FC = () => {
         };
       })
     : [];
+
+  if (roleLoading) {
+    return (
+      <ScreenLayout edges={['top']}>
+        <ScreenHeader title="Receive PO" showBack onBackPress={handleBack} />
+        <View className="flex-1 items-center justify-center px-4">
+          <ActivityIndicator size="large" color="#1E40AF" />
+          <Text className="text-[15px] text-[#64748B] mt-4">Loading...</Text>
+        </View>
+      </ScreenLayout>
+    );
+  }
+
+  if (!canReceivePO) {
+    return (
+      <ScreenLayout edges={['top']}>
+        <ScreenHeader title="Receive PO" showBack onBackPress={handleBack} />
+        <View className="flex-1 items-center justify-center px-4">
+          <Text className="text-[15px] text-[#64748B] text-center">
+            Only Store Incharge or Super Admin can receive purchase orders.
+          </Text>
+        </View>
+      </ScreenLayout>
+    );
+  }
 
   if (loading || !po) {
     return (
@@ -344,6 +385,10 @@ export const ReceivePOScreen: React.FC = () => {
           </Text>
         </View>
 
+        {(po.grrReceipts?.length ?? 0) > 0 && (
+          <GrrReceiptsSection receipts={po.grrReceipts} />
+        )}
+
         <View className="mb-4">
           <Text className="text-[17px] font-semibold text-[#0F172A] mb-1">
             ITEMS TO RECEIVE
@@ -398,57 +443,78 @@ export const ReceivePOScreen: React.FC = () => {
                   )}
                 </View>
 
-                {/* Quantity input */}
-                <View className="flex-row items-center gap-3">
-                  <Text className="text-[14px] text-[#64748B] flex-1">
-                    Received qty ({item.unit || 'Pcs'})
-                  </Text>
-                  <View className="flex-row items-center gap-2">
-                    <TouchableOpacity
-                      onPress={() => {
-                        const current = parseInt(receivedQtys[item.itemId] ?? '0', 10) || 0;
-                        if (current > 0) {
+                <View className="flex-col gap-4">
+                  {/* Quantity input */}
+                  <View className="flex-row items-center gap-3">
+                    <Text className="text-[14px] text-[#64748B] flex-1">
+                      Received qty ({item.unit || 'Pcs'})
+                    </Text>
+                    <View className="flex-row items-center gap-2">
+                      <TouchableOpacity
+                        onPress={() => {
+                          const current = parseInt(receivedQtys[item.itemId] ?? '0', 10) || 0;
+                          if (current > 0) {
+                            setReceivedQtys((prev) => ({
+                              ...prev,
+                              [item.itemId]: String(current - 1),
+                            }));
+                          }
+                        }}
+                        className="w-10 h-10 rounded-lg border border-[#E2E8F0] items-center justify-center bg-[#F8FAFC]"
+                        accessibilityLabel={`Decrease ${item.itemName} quantity`}
+                        accessibilityRole="button"
+                      >
+                        <Ionicons name="remove" size={18} color="#64748B" />
+                      </TouchableOpacity>
+
+                      <TextInput
+                        value={raw}
+                        onChangeText={(text) => {
+                          const cleaned = text.replace(/[^0-9]/g, '');
                           setReceivedQtys((prev) => ({
                             ...prev,
-                            [item.itemId]: String(current - 1),
+                            [item.itemId]: cleaned,
                           }));
-                        }
-                      }}
-                      className="w-12 h-12 rounded-lg border border-[#E2E8F0] items-center justify-center bg-[#F8FAFC]"
-                      accessibilityLabel={`Decrease ${item.itemName} quantity`}
-                      accessibilityRole="button"
-                    >
-                      <Ionicons name="remove" size={18} color="#64748B" />
-                    </TouchableOpacity>
+                        }}
+                        keyboardType="number-pad"
+                        className="w-14 h-10 px-0 border border-[#E2E8F0] rounded-lg text-center text-[15px] font-semibold text-[#0F172A] bg-white"
+                        accessibilityLabel={`Received quantity for ${item.itemName}`}
+                      />
 
+                      <TouchableOpacity
+                        onPress={() => {
+                          const current = parseInt(receivedQtys[item.itemId] ?? '0', 10) || 0;
+                          setReceivedQtys((prev) => ({
+                            ...prev,
+                            [item.itemId]: String(current + 1),
+                          }));
+                        }}
+                        className="w-10 h-10 rounded-lg border border-[#E2E8F0] items-center justify-center bg-[#F8FAFC]"
+                        accessibilityLabel={`Increase ${item.itemName} quantity`}
+                        accessibilityRole="button"
+                      >
+                        <Ionicons name="add" size={18} color="#64748B" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Price input */}
+                  <View className="flex-row items-center gap-3">
+                    <Text className="text-[14px] text-[#64748B] flex-1">
+                      Unit Price
+                    </Text>
                     <TextInput
-                      value={raw}
+                      value={receivedPrices[item.itemId] ?? ''}
                       onChangeText={(text) => {
-                        const cleaned = text.replace(/[^0-9]/g, '');
-                        setReceivedQtys((prev) => ({
+                        setReceivedPrices((prev) => ({
                           ...prev,
-                          [item.itemId]: cleaned,
+                          [item.itemId]: text,
                         }));
                       }}
-                      keyboardType="number-pad"
-                      className="w-16 h-12 border border-[#E2E8F0] rounded-lg text-center text-[15px] font-semibold text-[#0F172A] bg-white"
-                      accessibilityLabel={`Received quantity for ${item.itemName}`}
+                      keyboardType="decimal-pad"
+                      className="w-24 h-10 px-2 border border-[#E2E8F0] rounded-lg text-center text-[15px] font-semibold text-[#0F172A] bg-white"
+                      accessibilityLabel={`Unit price for ${item.itemName}`}
                     />
-
-                    <TouchableOpacity
-                      onPress={() => {
-                        const current = parseInt(receivedQtys[item.itemId] ?? '0', 10) || 0;
-                        setReceivedQtys((prev) => ({
-                          ...prev,
-                          [item.itemId]: String(current + 1),
-                        }));
-                      }}
-                      className="w-12 h-12 rounded-lg border border-[#E2E8F0] items-center justify-center bg-[#F8FAFC]"
-                      accessibilityLabel={`Increase ${item.itemName} quantity`}
-                      accessibilityRole="button"
-                    >
-                      <Ionicons name="add" size={18} color="#64748B" />
-                    </TouchableOpacity>
                   </View>
                 </View>
               </View>

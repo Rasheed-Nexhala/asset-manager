@@ -23,6 +23,7 @@ import {
 } from '../../services/firebase/purchaseOrderService';
 import { getVendorById } from '../../services/firebase/vendorService';
 import { useAppSelector } from '../../store/hooks';
+import { selectCanReceivePurchaseOrder } from '../../store/selectors/authSelectors';
 import { selectVendors } from '../../store/selectors/purchaseOrderSelectors';
 import type { PurchaseOrder } from '../../types/purchaseOrder';
 import type { Vendor } from '../../types/vendor';
@@ -53,6 +54,7 @@ export const VendorLedgerScreen: React.FC = () => {
   const { vendorId } = route.params;
 
   const vendorsFromStore = useAppSelector(selectVendors);
+  const canReceivePO = useAppSelector(selectCanReceivePurchaseOrder);
   const vendorFromStore = useMemo(
     () => vendorsFromStore.find((v) => v.id === vendorId),
     [vendorsFromStore, vendorId]
@@ -209,16 +211,23 @@ export const VendorLedgerScreen: React.FC = () => {
       } else if (po.status === 'pending_approval') {
         navigation.navigate('ApprovePO', { poId: po.id });
       } else if (
+        (po.status === 'approved' ||
+          po.status === 'ordered' ||
+          po.status === 'partially_received') &&
+        canReceivePO
+      ) {
+        navigation.navigate('ReceivePO', { poId: po.id });
+      } else if (
         po.status === 'approved' ||
         po.status === 'ordered' ||
         po.status === 'partially_received'
       ) {
-        navigation.navigate('ReceivePO', { poId: po.id });
+        navigation.navigate('ApprovePO', { poId: po.id });
       } else {
         navigation.navigate('ApprovePO', { poId: po.id });
       }
     },
-    [navigation]
+    [navigation, canReceivePO]
   );
 
   const renderSegment = () => (

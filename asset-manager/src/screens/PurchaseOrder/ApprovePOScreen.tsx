@@ -14,7 +14,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenLayout } from '../../components/layout/ScreenLayout';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { FormField } from '../../components/FormField';
-import { PODocumentCard, POItemsScrollTable } from '../../components/PurchaseOrder';
+import {
+  PODocumentCard,
+  POItemsScrollTable,
+  GrrReceiptsSection,
+} from '../../components/PurchaseOrder';
 import { printPurchaseOrder } from '../../utils/poPdfUtils';
 import { getPOById } from '../../services/firebase/purchaseOrderService';
 import {
@@ -26,6 +30,7 @@ import {
   selectUserDisplayName,
   selectIsAdminOrSuperAdmin,
   selectIsSuperAdmin,
+  selectCanReceivePurchaseOrder,
 } from '../../store/selectors/authSelectors';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { clearError, setError } from '../../store/slices/purchaseOrderSlice';
@@ -58,52 +63,6 @@ const formatCurrencyOrOptional = (n: number) =>
 const formatGstOrOptional = (pct: number | undefined) =>
   pct != null && pct > 0 ? `${pct}%` : '—';
 
-const GrrReceiptsSection: React.FC<{
-  receipts: PurchaseOrder['grrReceipts'];
-}> = ({ receipts }) => {
-  const list = receipts ?? [];
-  if (list.length === 0) return null;
-  return (
-    <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-4">
-      <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">
-        Receipts
-      </Text>
-      {list.map((r) => (
-        <View
-          key={`${r.grrNumber}-${r.receivedAt}`}
-          className="mb-3 rounded-[10px] border border-[#E2E8F0] bg-[#F8FAFC] p-3 last:mb-0"
-        >
-          <View className="flex-col gap-0.5">
-            <Text className="text-[15px] font-semibold text-[#0F172A]">
-              {r.grrNumber}
-            </Text>
-            <Text className="text-[13px] text-[#64748B]">
-              {formatDate(r.receivedAt)} · {r.receivedByName?.trim() || '—'}
-            </Text>
-          </View>
-          {r.lineItems && r.lineItems.length > 0 ? (
-            <View className="mt-3 border-t border-[#E2E8F0] pt-2">
-              {r.lineItems.map((li) => (
-                <View
-                  key={`${r.grrNumber}-${li.itemId}`}
-                  className="mb-2 flex-row items-baseline justify-between gap-3 last:mb-0"
-                >
-                  <Text className="flex-1 text-[15px] font-medium text-[#0F172A] leading-5">
-                    {li.itemName}
-                  </Text>
-                  <Text className="text-[15px] text-[#64748B]">
-                    {li.quantityReceived} {li.unit?.trim() || 'Pcs'}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-        </View>
-      ))}
-    </View>
-  );
-};
-
 export const ApprovePOScreen: React.FC = () => {
   const route = useRoute<RouteParams>();
   const navigation = useNavigation<NavigationProp>();
@@ -114,6 +73,7 @@ export const ApprovePOScreen: React.FC = () => {
   const userName = useAppSelector(selectUserDisplayName);
   const isAdminOrSuperAdmin = useAppSelector(selectIsAdminOrSuperAdmin);
   const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
+  const canReceivePO = useAppSelector(selectCanReceivePurchaseOrder);
   const reduxError = useAppSelector(selectPurchaseOrderError);
 
   const [po, setPo] = useState<PurchaseOrder | null>(null);
@@ -291,16 +251,22 @@ export const ApprovePOScreen: React.FC = () => {
               This PO has been partially received. Record another receipt when more
               goods arrive, or open Receive from the list.
             </Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('ReceivePO', { poId })}
-              className="bg-[#1E40AF] rounded-[10px] px-6 py-3"
-              accessibilityRole="button"
-              accessibilityLabel="Continue receiving purchase order"
-            >
-              <Text className="text-[15px] font-semibold text-white text-center">
-                Continue receiving
+            {canReceivePO ? (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('ReceivePO', { poId })}
+                className="bg-[#1E40AF] rounded-[10px] px-6 py-3"
+                accessibilityRole="button"
+                accessibilityLabel="Continue receiving purchase order"
+              >
+                <Text className="text-[15px] font-semibold text-white text-center">
+                  Continue receiving
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <Text className="text-[14px] text-[#64748B] text-center">
+                Only Store Incharge or Super Admin can record receipts.
               </Text>
-            </TouchableOpacity>
+            )}
           </View>
         </ScrollView>
       </ScreenLayout>

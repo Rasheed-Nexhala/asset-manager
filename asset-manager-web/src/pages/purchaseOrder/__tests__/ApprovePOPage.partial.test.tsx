@@ -83,7 +83,7 @@ const minimalPartialPO: PurchaseOrder = {
   ],
 };
 
-function renderApprovePage(role: 'Admin' | 'StoreIncharge') {
+function renderApprovePage(role: 'Admin' | 'StoreIncharge' | 'SuperAdmin') {
   const store = configureStore({
     reducer: rootReducer,
     preloadedState: {
@@ -150,7 +150,7 @@ describe('ApprovePOPage — partially_received', () => {
     });
   });
 
-  it.each(['Admin', 'StoreIncharge'] as const)(
+  it.each(['StoreIncharge', 'SuperAdmin'] as const)(
     'shows Continue receiving link to receive route (%s)',
     async (role) => {
       renderApprovePage(role);
@@ -158,4 +158,12 @@ describe('ApprovePOPage — partially_received', () => {
       expect(link.getAttribute('href')).toContain('/purchase-orders/po-test/receive');
     }
   );
+
+  it('does not show Continue receiving link for Admin', async () => {
+    renderApprovePage('Admin');
+    expect(
+      await screen.findByText(/Only Store Incharge or Super Admin can record receipts/i)
+    ).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /Continue receiving/i })).toBeNull();
+  });
 });
