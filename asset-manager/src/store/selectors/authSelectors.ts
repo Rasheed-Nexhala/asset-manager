@@ -125,10 +125,14 @@ export const selectIsSiteManager = createSelector(
   (role) => role === 'SiteManager'
 );
 
-/** Return from site to central store — Store Incharge only (not Site Manager / Admin). */
+/**
+ * Return from site to central store — Store Incharge (any request) OR
+ * Site Manager (must additionally be the request owner; enforced in screens/rules).
+ * This selector reflects *role capability*; ownership is checked at the call site.
+ */
 export const selectCanReturnItemsToCentralStore = createSelector(
-  [selectIsStoreIncharge],
-  (isStoreIncharge) => isStoreIncharge === true
+  [selectIsStoreIncharge, selectIsSiteManager],
+  (isStoreIncharge, isSiteManager) => isStoreIncharge === true || isSiteManager === true
 );
 
 export const selectHasPermission = (permission: Permission) =>

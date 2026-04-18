@@ -261,21 +261,64 @@ export const RequestItemCard: React.FC<RequestItemCardProps> = ({
               )}
             </View>
           ) : (
-            <View className="flex-row items-center gap-2 flex-wrap">
-              <Text className="text-[15px] text-[#0F172A]">Quantity: </Text>
-              {hasFullWeightConfig ? (
-                <WeightDisplay
-                  quantity={item.quantityRequested}
-                  weightPerMeter={item.weightPerMeter}
-                  lengthPerPiece={item.lengthPerPiece}
-                  viewMode={viewMode}
-                  unit={item.unit || 'Pcs'}
-                />
-              ) : (
-                <Text className="text-[15px] text-[#0F172A]">
-                  {item.quantityRequested} {displayUnit}
-                </Text>
-              )}
+            <View className="gap-2">
+              <View className="flex-row items-center gap-2 flex-wrap">
+                <Text className="text-[15px] text-[#0F172A]">Quantity: </Text>
+                {hasFullWeightConfig ? (
+                  <WeightDisplay
+                    quantity={item.quantityRequested}
+                    weightPerMeter={item.weightPerMeter}
+                    lengthPerPiece={item.lengthPerPiece}
+                    viewMode={viewMode}
+                    unit={item.unit || 'Pcs'}
+                  />
+                ) : (
+                  <Text className="text-[15px] text-[#0F172A]">
+                    {item.quantityRequested} {displayUnit}
+                  </Text>
+                )}
+              </View>
+
+              {/* Return status — only meaningful for non-consumables that have been approved */}
+              {item.itemType === 'non_consumable' && item.quantityApproved > 0 && (() => {
+                const returned = item.quantityReturned ?? 0;
+                const remaining = item.quantityApproved - returned;
+                const isFullyReturned = remaining <= 0;
+                const isPartiallyReturned = returned > 0 && !isFullyReturned;
+                return (
+                  <View className="flex-row flex-wrap gap-2">
+                    <View className="px-2 py-0.5 rounded-full bg-[#F1F5F9]">
+                      <Text className="text-[12px] text-[#475569]">
+                        Approved: {item.quantityApproved} {displayUnit}
+                      </Text>
+                    </View>
+                    <View className={`px-2 py-0.5 rounded-full ${
+                      isFullyReturned
+                        ? 'bg-[#DCFCE7]'
+                        : isPartiallyReturned
+                          ? 'bg-[#FEF9C3]'
+                          : 'bg-[#F1F5F9]'
+                    }`}>
+                      <Text className={`text-[12px] font-medium ${
+                        isFullyReturned
+                          ? 'text-[#15803D]'
+                          : isPartiallyReturned
+                            ? 'text-[#B45309]'
+                            : 'text-[#94A3B8]'
+                      }`}>
+                        Returned: {returned} {displayUnit}
+                      </Text>
+                    </View>
+                    {!isFullyReturned && (
+                      <View className="px-2 py-0.5 rounded-full bg-[#EFF6FF]">
+                        <Text className="text-[12px] text-[#1D4ED8]">
+                          Remaining: {remaining} {displayUnit}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
             </View>
           )}
 

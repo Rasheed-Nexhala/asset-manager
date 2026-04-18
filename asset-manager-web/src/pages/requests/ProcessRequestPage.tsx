@@ -11,6 +11,7 @@ import {
   selectUserDisplayName,
   selectCanManageRequests,
   selectIsSiteManager,
+  selectIsStoreIncharge,
   selectCanReturnItemsToCentralStore,
 } from '../../store/selectors/authSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
@@ -76,6 +77,7 @@ export function ProcessRequestPage() {
   const userName = useAppSelector(selectUserDisplayName);
   const canManageRequests = useAppSelector(selectCanManageRequests);
   const isSiteManager = useAppSelector(selectIsSiteManager);
+  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const canReturnToCentralStore = useAppSelector(selectCanReturnItemsToCentralStore);
   const inventoryItems = useAppSelector(selectAllItems);
   const requestFromStore = useAppSelector(
@@ -425,13 +427,25 @@ export function ProcessRequestPage() {
   const isRequestOwner = request?.requestedBy === userId;
   const nonConsumables =
     request?.items?.filter((i) => i.itemType === 'non_consumable') ?? [];
-  const hasItemsToReturn = nonConsumables.some(
-    (i) => (i.quantityReturned ?? 0) < i.quantityApproved
-  );
+  /**
+   * Physically returnable qty excludes items still with supervisors
+   * (`supervisorOutstandingQty`), since those are not in the Site Manager's hand yet.
+   * They become returnable as supervisors hand them back.
+   */
+  const hasItemsToReturn = nonConsumables.some((i) => {
+    const remaining =
+      i.quantityApproved - (i.quantityReturned ?? 0) - (i.supervisorOutstandingQty ?? 0);
+    return remaining > 0;
+  });
+  /**
+   * Gate the "Return to central store" button:
+   * - Store Incharge: allowed on any request (they receive at warehouse).
+   * - Site Manager:  allowed only on requests they created (enforced by Firestore rules too).
+   */
+  const canExecuteReturn =
+    canReturnToCentralStore && (isStoreIncharge || (isSiteManager && isRequestOwner));
   const showReturnItems =
-    (isTransferred || isPartiallyReturned) &&
-    canReturnToCentralStore &&
-    hasItemsToReturn;
+    (isTransferred || isPartiallyReturned) && canExecuteReturn && hasItemsToReturn;
   const showTransferSlipPrint = request ? canPrintTransferSlip(request) : false;
 
   const hasSupervisorSplittableItems = Boolean(
@@ -856,7 +870,9 @@ export function ProcessRequestPage() {
             Return to central store
           </button>
           <p className="text-[13px] text-slate-500 mt-2 text-center">
-            Only Store Incharge executes physical returns to the central store.
+            {isSiteManager
+              ? 'Return non-consumables currently with you. Items still with supervisors must be handed back first.'
+              : 'Non-consumables are moved from the site back to the central store.'}
           </p>
         </div>
       )}

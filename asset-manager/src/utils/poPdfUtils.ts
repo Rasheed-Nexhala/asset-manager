@@ -199,7 +199,8 @@ export function generatePOHtml(
 ): string {
   const approvedByDisplay =
     approvedByName ?? po.downloadedByName ?? po.reviewedByName ?? '—';
-  const docTitle = companyConfig.documentTitle ?? 'PURCHASE / SERVICE ORDER';
+  const baseDocTitle = companyConfig.documentTitle ?? 'PURCHASE / SERVICE ORDER';
+  const docTitle = po.status === 'pending_approval' ? `DRAFT - PENDING APPROVAL - ${baseDocTitle}` : baseDocTitle;
   const displayName = companyConfig.documentDisplayName ?? companyConfig.name;
   const isoLine = companyConfig.isoCertificationLine?.trim();
   const phones = companyConfig.phones?.trim();
@@ -308,6 +309,9 @@ export function generatePOHtml(
     </td>
   </tr>`;
 
+  const watermarkCss = po.status === 'pending_approval' ? `\n    .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 80px; font-weight: bold; color: rgba(220, 38, 38, 0.15); z-index: -1; pointer-events: none; white-space: nowrap; text-align: center; }` : '';
+  const watermarkHtml = po.status === 'pending_approval' ? `\n  <div class="watermark">DRAFT<br/>PENDING APPROVAL</div>` : '';
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -322,10 +326,10 @@ export function generatePOHtml(
     table.po-grid tbody tr { page-break-inside: avoid; break-inside: avoid; }
     table.po-signatures { page-break-inside: avoid; break-inside: avoid; }
     .po-page-footer { page-break-inside: avoid; break-inside: avoid; }
-    p { margin: 0; }
+    p { margin: 0; }${watermarkCss}
   </style>
 </head>
-<body>
+<body>${watermarkHtml}
   <!-- Letterhead: logo + red ISO left; company blue + address right -->
   <table style="width:100%;border-collapse:collapse;border:none;">
     <tr>

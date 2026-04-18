@@ -24,6 +24,8 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   selectUserId,
   selectUserDisplayName,
+  selectIsSiteManager,
+  selectIsStoreIncharge,
   selectCanReturnItemsToCentralStore,
 } from '../../store/selectors/authSelectors';
 import { selectAllItems } from '../../store/selectors/inventorySelectors';
@@ -66,8 +68,11 @@ export const ReturnItemsScreen: React.FC = () => {
 
   const userId = useAppSelector(selectUserId);
   const userName = useAppSelector(selectUserDisplayName);
+  const isSiteManager = useAppSelector(selectIsSiteManager);
+  const isStoreIncharge = useAppSelector(selectIsStoreIncharge);
   const canReturnToCentralStore = useAppSelector(selectCanReturnItemsToCentralStore);
   const inventoryItems = useAppSelector(selectAllItems);
+  const [isOwnerOfRequest, setIsOwnerOfRequest] = useState(false);
   const { viewMode, toggleViewMode } = useWeightViewPreference();
 
   // Ensure inventory items are loaded so unit fallback works for old requests
@@ -110,11 +115,18 @@ export const ReturnItemsScreen: React.FC = () => {
     requestService.getRequestById(requestId).then((r) => {
       if (!cancelled && r && (r.status === 'transferred' || r.status === 'partially_returned')) {
         setRequest(r);
+        setIsOwnerOfRequest(r.requestedBy === userId);
         const items = nonConsumableItems(r);
         const itemsWithRemaining = items
           .map((item) => {
             const currentReturned = item.quantityReturned ?? 0;
-            const remaining = item.quantityApproved - currentReturned;
+            /**
+             * Items held by site supervisors are not physically available to return.
+             * They must first be handed back to the Site Manager (decrements
+             * `supervisorOutstandingQty`) before they become returnable here.
+             */
+            const withSupervisors = item.supervisorOutstandingQty ?? 0;
+            const remaining = item.quantityApproved - currentReturned - withSupervisors;
             return { ...item, remaining };
           })
           .filter((item) => item.remaining > 0);
@@ -145,7 +157,7 @@ export const ReturnItemsScreen: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [requestId, safeGoBack, nonConsumableItems]);
+  }, [requestId, safeGoBack, nonConsumableItems, userId]);
 
   const updateItem = useCallback(
     (itemId: string, updates: Partial<ReturnItemState>) => {
@@ -214,17 +226,35 @@ export const ReturnItemsScreen: React.FC = () => {
     }
   };
 
-  if (!canReturnToCentralStore) {
+  /**
+   * Final access gate — mirrors Firestore rules:
+   * - Store Incharge: any request.
+   * - Site Manager:   only if they created the request (checked once request loads).
+   * Other roles are blocked here, with a contextual message.
+   *
+   * Note: role-level block is decided before the fetch completes, but the owner
+   * check needs the request, so we wait for the load for Site Managers.
+   */
+  const roleAllowed = canReturnToCentralStore;
+  const ownershipResolved = !isLoading;
+  const accessAllowed =
+    roleAllowed && (isStoreIncharge || (isSiteManager && isOwnerOfRequest));
+
+  if (!roleAllowed || (ownershipResolved && !accessAllowed)) {
+    const blockTitle = isSiteManager ? 'Not the request owner' : 'Not authorized';
+    const blockMessage = isSiteManager
+      ? 'Only the Site Manager who created this request (or the Store Incharge) can return its items.'
+      : 'Returning items to the central store is done by the Store Incharge or the Site Manager who created the request.';
     return (
       <ScreenLayout edges={['top']}>
         <ScreenHeader title="Return to central store" showBack onBackPress={handleBack} />
         <View className="flex-1 items-center justify-center px-4">
           <Ionicons name="lock-closed-outline" size={64} color="#64748B" />
           <Text className="text-[22px] font-semibold text-[#0F172A] text-center mb-2 mt-4">
-            Store Incharge only
+            {blockTitle}
           </Text>
           <Text className="text-[15px] text-[#64748B] text-center">
-            Returning items to the central store is done by the Store Incharge after receiving materials from the site.
+            {blockMessage}
           </Text>
         </View>
       </ScreenLayout>
@@ -359,7 +389,7 @@ export const ReturnItemsScreen: React.FC = () => {
                             </Text>
                           </View>
                         )}
-                        {isDamaged && canReturnToCentralStore && (
+                        {isDamaged && isStoreIncharge && (
                           <View className="mt-2">
                             <QuickMoveToMaintenanceButton
                               itemId={returnedItem.itemId}

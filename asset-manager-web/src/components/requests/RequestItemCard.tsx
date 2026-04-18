@@ -300,21 +300,52 @@ export function RequestItemCard({
 
           {/* View mode */}
           {(mode === 'view' || !onQuantityChange) && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[15px] text-slate-900">Quantity: </span>
-              {hasFullWeightConfig && item.weightPerMeter != null && item.lengthPerPiece != null ? (
-                <WeightDisplay
-                  quantity={item.quantityRequested}
-                  weightPerMeter={item.weightPerMeter}
-                  lengthPerPiece={item.lengthPerPiece}
-                  viewMode={viewMode}
-                  unit={item.unit || 'Pcs'}
-                />
-              ) : (
-                <span className="text-[15px] text-slate-900">
-                  {item.quantityRequested} {displayUnit}
-                </span>
-              )}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[15px] text-slate-900">Quantity: </span>
+                {hasFullWeightConfig && item.weightPerMeter != null && item.lengthPerPiece != null ? (
+                  <WeightDisplay
+                    quantity={item.quantityRequested}
+                    weightPerMeter={item.weightPerMeter}
+                    lengthPerPiece={item.lengthPerPiece}
+                    viewMode={viewMode}
+                    unit={item.unit || 'Pcs'}
+                  />
+                ) : (
+                  <span className="text-[15px] text-slate-900">
+                    {item.quantityRequested} {displayUnit}
+                  </span>
+                )}
+              </div>
+
+              {/* Return status — only meaningful for non-consumables that have been approved */}
+              {item.itemType === 'non_consumable' && item.quantityApproved > 0 && (() => {
+                const returned = item.quantityReturned ?? 0;
+                const remaining = item.quantityApproved - returned;
+                const isFullyReturned = remaining <= 0;
+                const isPartiallyReturned = returned > 0 && !isFullyReturned;
+                return (
+                  <div className="flex flex-wrap gap-2">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-[12px] text-slate-600">
+                      Approved: {item.quantityApproved} {displayUnit}
+                    </span>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium ${
+                      isFullyReturned
+                        ? 'bg-green-100 text-green-700'
+                        : isPartiallyReturned
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      Returned: {returned} {displayUnit}
+                    </span>
+                    {!isFullyReturned && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-[12px] text-blue-700">
+                        Remaining: {remaining} {displayUnit}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

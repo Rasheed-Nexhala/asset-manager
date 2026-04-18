@@ -381,7 +381,7 @@ service cloud.firestore {
         !exists(/databases/$(database)/documents/items/$(request.resource.data.sku));
       allow update: if hasInventoryAccess() ||
         (isSiteManager() && isUserActive() && 
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['centralStoreQuantity', 'atSitesQuantity', 'updatedAt']));
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['centralStoreQuantity', 'atSitesQuantity', 'isLowStock', 'updatedAt']));
       allow delete: if hasInventoryAccess();
     }
     
@@ -416,7 +416,12 @@ service cloud.firestore {
            (resource.data.locationType == 'site' && isAssignedSite(resource.data.locationId.replace('site_', '')) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantity', 'updatedAt'])) ||
            (resource.data.locationId == 'store' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantity', 'updatedAt']))
          ));
-      allow delete: if hasInventoryAccess();
+      // SiteManagers may delete their own site's inventory doc when fully returning
+      // an item (quantity hits 0 → service deletes the doc rather than writing qty=0).
+      allow delete: if hasInventoryAccess() ||
+        (isSiteManager() && isUserActive() &&
+         resource.data.locationType == 'site' &&
+         isAssignedSite(resource.data.locationId.replace('site_', '')));
     }
     
     /**
@@ -637,7 +642,8 @@ service cloud.firestore {
         request.resource.data.requestedBy == request.auth.uid &&
         request.resource.data.status in ['draft', 'pending'];
       
-      // Update: Site Managers (own drafts only OR supervisor split on transferred requests — items only),
+      // Update: Site Managers (own drafts, cancel own pending, supervisor custody on transferred,
+      // OR return-to-central-store on own transferred/partially_returned),
       // SuperAdmin (full staff path) or Store Incharge (approve/reject/transfer/return-to-store)
       allow update: if isAuthenticated() && isUserActive() && (
         isSuperAdmin() ||
@@ -645,7 +651,12 @@ service cloud.firestore {
          resource.data.requestedBy == request.auth.uid && (
            (resource.data.status == 'draft' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['priority', 'purpose', 'items', 'status', 'updatedAt'])) ||
            (resource.data.status == 'pending' && request.resource.data.status == 'cancelled' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
-           (resource.data.status in ['transferred', 'partially_returned'] && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['items', 'updatedAt', 'lastSupervisorCustodyUpdateBy', 'lastSupervisorCustodyUpdateByName']))
+           (resource.data.status in ['transferred', 'partially_returned'] && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['items', 'updatedAt', 'lastSupervisorCustodyUpdateBy', 'lastSupervisorCustodyUpdateByName'])) ||
+           // Return non-consumables to central store (own request).
+           // Resulting status must be either 'partially_returned' or 'returned'; other fields locked.
+           (resource.data.status in ['transferred', 'partially_returned'] &&
+            request.resource.data.status in ['partially_returned', 'returned'] &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['items', 'status', 'returnHistory', 'updatedAt']))
          )
         ) ||
         (isStoreIncharge() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([

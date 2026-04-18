@@ -264,7 +264,7 @@ export function ApprovePOPage() {
     (i) => (Number(i.unitPrice) || 0) > 0
   );
 
-  const showPrint = po.status !== 'pending_approval';
+  const showPrint = po.status !== 'draft';
 
   return (
     <div className="space-y-6">
@@ -356,6 +356,32 @@ export function ApprovePOPage() {
             <Icon name="phone" className="h-4 w-4 shrink-0" />
             {po.vendorContact}
           </p>
+        </div>
+
+        <div className="rounded-[10px] border border-slate-200 bg-white p-4">
+          <h2 className="mb-3 text-[17px] font-semibold text-[#0F172A]">
+            Delivery details
+          </h2>
+          <div className="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <p className="text-[13px] text-slate-500">Target site</p>
+              <p className="text-[15px] text-[#0F172A]">
+                {po.siteName?.trim() ? po.siteName : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-[13px] text-slate-500">Job number</p>
+              <p className="text-[15px] text-[#0F172A]">
+                {po.jobNo?.trim() ? po.jobNo : '—'}
+              </p>
+            </div>
+          </div>
+          <div className="border-t border-slate-200 pt-3">
+            <p className="text-[13px] text-slate-500">Expected delivery</p>
+            <p className="text-[15px] text-[#0F172A]">
+              {formatDate(po.expectedDeliveryDate)}
+            </p>
+          </div>
         </div>
 
         <div className="rounded-[10px] border border-slate-200 bg-white p-4">

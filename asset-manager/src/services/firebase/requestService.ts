@@ -878,10 +878,19 @@ const returnItemsBatch = async (
           throw new Error(`Invalid return quantity for ${item.itemName}`);
         }
         const currentReturned = item.quantityReturned ?? 0;
-        const remaining = item.quantityApproved - currentReturned;
+        /**
+         * Items currently in a supervisor's custody can't be returned to central store;
+         * they must first be handed back (this decrements `supervisorOutstandingQty`).
+         */
+        const withSupervisors = item.supervisorOutstandingQty ?? 0;
+        const remaining = item.quantityApproved - currentReturned - withSupervisors;
         if (returnItem.quantityReturned > remaining || returnItem.quantityReturned <= 0) {
+          const suffix =
+            withSupervisors > 0
+              ? ` (${withSupervisors} still with supervisors — collect back first)`
+              : '';
           throw new Error(
-            `Invalid quantity for ${item.itemName}: cannot return ${returnItem.quantityReturned}, remaining is ${remaining}`
+            `Invalid quantity for ${item.itemName}: cannot return ${returnItem.quantityReturned}, remaining is ${remaining}${suffix}`
           );
         }
       }

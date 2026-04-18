@@ -325,7 +325,7 @@ export const ApprovePOScreen: React.FC = () => {
     (i) => (Number(i.unitPrice) || 0) > 0
   );
 
-  const showPrint = po.status !== 'pending_approval';
+  const showPrint = po.status !== 'draft';
 
   return (
     <ScreenLayout edges={['top']}>
@@ -411,6 +411,32 @@ export const ApprovePOScreen: React.FC = () => {
           <Text className="text-[13px] text-[#64748B] mt-1">
             📞 {po.vendorContact}
           </Text>
+        </View>
+
+        <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-4">
+          <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">
+            DELIVERY DETAILS
+          </Text>
+          <View className="flex-row gap-4 mb-3">
+            <View className="flex-1">
+              <Text className="text-[13px] text-[#64748B]">Target site</Text>
+              <Text className="text-[15px] text-[#0F172A]">
+                {po.siteName?.trim() ? po.siteName : '—'}
+              </Text>
+            </View>
+            <View className="flex-1">
+              <Text className="text-[13px] text-[#64748B]">Job number</Text>
+              <Text className="text-[15px] text-[#0F172A]">
+                {po.jobNo?.trim() ? po.jobNo : '—'}
+              </Text>
+            </View>
+          </View>
+          <View className="border-t border-[#E2E8F0] pt-3 mt-1">
+            <Text className="text-[13px] text-[#64748B]">Expected delivery</Text>
+            <Text className="text-[15px] text-[#0F172A]">
+              {formatDate(po.expectedDeliveryDate)}
+            </Text>
+          </View>
         </View>
 
         <POItemsScrollTable items={po.items} />
