@@ -27,6 +27,8 @@ export interface UserRoleData {
   role: UserRole;
   isActive: boolean;
   permissions: Permission[];
+  /** Display name from the Firestore users doc (more reliable than Firebase Auth displayName) */
+  displayName?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }

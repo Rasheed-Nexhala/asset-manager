@@ -482,6 +482,43 @@ export function PurchaseOrderDetailPage() {
         </p>
       </div>
 
+      {/* Approval Details */}
+      {(po.status === 'approved' || po.status === 'ordered' || po.status === 'partially_received' || po.status === 'received') && (po.reviewedByName || po.reviewedAt) && (
+        <div className="rounded-[10px] border border-slate-200 bg-white p-4 lg:p-6">
+          <h2 className="mb-3 text-[17px] font-semibold text-[#0F172A]">
+            Approval details
+          </h2>
+          <div className="mb-2 flex justify-between">
+            <div>
+              <p className="text-[13px] text-slate-500">Approved by</p>
+              <p className="text-[15px] font-medium text-[#0F172A]">
+                {po.reviewedByName || '—'}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[13px] text-slate-500">Approved on</p>
+              <p className="text-[15px] text-[#0F172A]">
+                {po.reviewedAt
+                  ? new Date(po.reviewedAt).toLocaleString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : '—'}
+              </p>
+            </div>
+          </div>
+          {po.adminComments && (
+            <div className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="mb-0.5 text-[12px] text-slate-500">Admin comments</p>
+              <p className="text-[14px] text-slate-900">{po.adminComments}</p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Attached Documents */}
       {(po.documents?.length ?? 0) > 0 && (
         <div className="rounded-[10px] border border-slate-200 bg-white p-4 lg:p-6">

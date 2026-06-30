@@ -385,6 +385,42 @@ export const ReceivePOScreen: React.FC = () => {
           </Text>
         </View>
 
+        {(po.reviewedByName || po.reviewedAt) && (
+          <View className="bg-white rounded-[10px] p-4 border border-[#E2E8F0] mb-4">
+            <Text className="text-[17px] font-semibold text-[#0F172A] mb-3">
+              APPROVAL DETAILS
+            </Text>
+            <View className="flex-row justify-between mb-2">
+              <View>
+                <Text className="text-[13px] text-[#64748B]">Approved by</Text>
+                <Text className="text-[15px] font-medium text-[#0F172A]">
+                  {po.reviewedByName || '—'}
+                </Text>
+              </View>
+              <View className="items-end">
+                <Text className="text-[13px] text-[#64748B]">Approved on</Text>
+                <Text className="text-[15px] text-[#0F172A]">
+                  {po.reviewedAt
+                    ? new Date(po.reviewedAt).toLocaleString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : '—'}
+                </Text>
+              </View>
+            </View>
+            {po.adminComments ? (
+              <View className="bg-[#F8FAFC] rounded-lg px-3 py-2 mt-1 border border-[#E2E8F0]">
+                <Text className="text-[12px] text-[#64748B] mb-0.5">Admin comments</Text>
+                <Text className="text-[14px] text-[#0F172A]">{po.adminComments}</Text>
+              </View>
+            ) : null}
+          </View>
+        )}
+
         {(po.grrReceipts?.length ?? 0) > 0 && (
           <GrrReceiptsSection receipts={po.grrReceipts} />
         )}

@@ -34,7 +34,7 @@ export function mapFirestoreErrorToUserMessage(
   const code = getErrorCode(error);
   const message = (getErrorMessage(error) ?? '').toLowerCase();
 
-  if (__DEV__ && error) {
+  if (import.meta.env.DEV && error) {
     // eslint-disable-next-line no-console
     console.warn('[Firestore Error]', {
       code,

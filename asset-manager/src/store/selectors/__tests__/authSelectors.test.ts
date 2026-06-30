@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import {
   selectUserId,
   selectIsAdmin,
@@ -78,14 +79,23 @@ describe('authSelectors', () => {
     expect(selectIsSiteManager(state)).toBe(true);
   });
 
-  it('selectUserDisplayName returns displayName when present', () => {
+  it('selectUserDisplayName prefers userRole.displayName over user.displayName', () => {
     const state = createMockState({
-      user: { displayName: 'John Doe', email: 'j@x.com' } as never,
+      user: { displayName: 'John Firebase', email: 'j@x.com' } as never,
+      userRole: { role: 'Admin', isActive: true, permissions: [], displayName: 'John Firestore' },
     });
-    expect(selectUserDisplayName(state)).toBe('John Doe');
+    expect(selectUserDisplayName(state)).toBe('John Firestore');
   });
 
-  it('selectUserDisplayName falls back to email', () => {
+  it('selectUserDisplayName falls back to user.displayName if userRole.displayName is missing', () => {
+    const state = createMockState({
+      user: { displayName: 'John Firebase', email: 'j@x.com' } as never,
+      userRole: { role: 'Admin', isActive: true, permissions: [] },
+    });
+    expect(selectUserDisplayName(state)).toBe('John Firebase');
+  });
+
+  it('selectUserDisplayName falls back to email if neither displayName is present', () => {
     const state = createMockState({
       user: { email: 'j@x.com' } as never,
     });

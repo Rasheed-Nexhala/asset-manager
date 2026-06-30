@@ -250,6 +250,7 @@ export const subscribeToUserRole = (
         role: data.role as UserRole,
         isActive: data.isActive ?? false,
         permissions: Array.isArray(data.permissions) ? data.permissions : [],
+        displayName: data.displayName ?? null,
       });
     },
     (error) => {

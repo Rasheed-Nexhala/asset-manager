@@ -44,9 +44,17 @@ export const selectUserEmail = createSelector(
   (user) => user?.email || null
 );
 
+export const selectUserRole = createSelector(
+  [selectAuthState],
+  (auth) => auth.userRole
+);
+
 export const selectUserDisplayName = createSelector(
-  [selectCurrentUser],
-  (user) => user?.displayName || user?.email || null
+  [selectCurrentUser, selectUserRole],
+  (user, userRole) =>
+    // Prefer Firestore displayName (set explicitly during account creation/update)
+    // over Firebase Auth displayName which may be null for admin-created accounts.
+    userRole?.displayName || user?.displayName || user?.email || null
 );
 
 export const selectUserId = createSelector(
@@ -54,10 +62,6 @@ export const selectUserId = createSelector(
   (auth) => auth.user?.uid ?? null
 );
 
-export const selectUserRole = createSelector(
-  [selectAuthState],
-  (auth) => auth.userRole
-);
 
 export const selectUserRoleType = createSelector(
   [selectUserRole],

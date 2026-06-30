@@ -102,7 +102,8 @@ const authSlice = createSlice({
       .addCase(signOutUser.pending, (state, action) => {
         state.isLoading = true;
         // Set deactivated message for redirect; clear error for normal sign-out
-        if (action.meta.arg?.reason === 'account-deactivated') {
+        const arg = action.meta.arg as SignOutPayload | undefined;
+        if (arg?.reason === 'account-deactivated') {
           state.error = INACTIVE_ACCOUNT_MESSAGE;
         } else {
           state.error = null;
@@ -115,7 +116,8 @@ const authSlice = createSlice({
         state.isRoleLoading = false;
         state.isAuthenticated = false;
         // Preserve error for account-deactivated so Login screen shows the message
-        if (action.meta.arg?.reason !== 'account-deactivated') {
+        const arg = action.meta.arg as SignOutPayload | undefined;
+        if (arg?.reason !== 'account-deactivated') {
           state.error = null;
         }
       })
