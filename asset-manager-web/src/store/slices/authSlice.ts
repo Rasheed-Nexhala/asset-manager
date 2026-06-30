@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { User } from 'firebase/auth';
-import type { AuthState } from '../../types/auth';
+import type { AuthState, SignOutPayload } from '../../types/auth';
 import { INACTIVE_ACCOUNT_MESSAGE } from '../../services/firebase/authService';
 import type { UserRoleData } from '../../types/roles';
 import {
